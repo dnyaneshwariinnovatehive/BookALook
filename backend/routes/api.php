@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Customer\CustomerAuthController;
 Route::prefix('customer')->group(function () {
     Route::post('/auth/send-otp', [CustomerAuthController::class, 'sendOtp']);
     Route::post('/auth/verify-otp', [CustomerAuthController::class, 'verifyOtp']);
+    Route::post('/auth/complete-profile', [CustomerAuthController::class, 'completeProfile']);
 
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {

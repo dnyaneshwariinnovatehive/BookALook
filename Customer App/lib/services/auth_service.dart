@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  // Use 10.0.2.2 for Android Emulator, 127.0.0.1 for iOS Simulator
-  static const String baseUrl = 'http://10.0.2.2:8000/api/customer/auth';
+  // Use 10.0.2.2 for Android Emulator, 127.0.0.1 for iOS Simulator, or your local IP for physical devices
+  static const String baseUrl = 'http://192.168.41.204:8000/api/customer/auth';
 
   /// Sends an OTP to the provided phone number.
   Future<bool> sendOtp(String phone) async {
@@ -28,16 +28,12 @@ class AuthService {
   }
 
   /// Verifies the OTP. If successful, saves the Sanctum token.
-  Future<bool> verifyOtp(String phone, String otp, {String? name, String? gender}) async {
+  Future<dynamic> verifyOtp(String phone, String otp) async {
     try {
       final body = {
         'phone': phone,
         'otp': otp,
       };
-      
-      // Add optional fields if registering
-      if (name != null && name.isNotEmpty) body['name'] = name;
-      if (gender != null && gender.isNotEmpty) body['gender'] = gender;
 
       final response = await http.post(
         Uri.parse('$baseUrl/verify-otp'),
@@ -49,10 +45,9 @@ class AuthService {
         final data = jsonDecode(response.body);
         if (data.containsKey('access_token')) {
           await _saveToken(data['access_token']);
-          return true;
+          return true; // Authenticated
         } else if (data['requires_registration'] == true) {
-          // Returning false with a specific flow for UI is better, but this handles basic flow.
-          throw Exception('Requires Registration');
+          return 'requires_registration';
         }
       }
       print('Verify OTP failed: ${response.body}');
@@ -60,6 +55,38 @@ class AuthService {
     } catch (e) {
       print('Verify OTP error: $e');
       rethrow;
+    }
+  }
+
+  /// Complete profile for new user
+  Future<bool> completeProfile(String phone, String name, String gender, String? dob, String? address) async {
+    try {
+      final body = {
+        'phone': phone,
+        'name': name,
+        'gender': gender,
+      };
+      if (dob != null && dob.isNotEmpty) body['date_of_birth'] = dob;
+      if (address != null && address.isNotEmpty) body['address'] = address;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/complete-profile'),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data.containsKey('access_token')) {
+          await _saveToken(data['access_token']);
+          return true;
+        }
+      }
+      print('Complete Profile failed: ${response.body}');
+      return false;
+    } catch (e) {
+      print('Complete Profile error: $e');
+      return false;
     }
   }
 

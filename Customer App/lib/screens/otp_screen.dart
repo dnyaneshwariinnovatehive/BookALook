@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'profile_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -13,11 +14,8 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   final _otpController = TextEditingController();
-  final _nameController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-  bool _needsRegistration = false;
-  String _selectedGender = 'unspecified';
 
   void _verifyOtp() async {
     final otp = _otpController.text.trim();
@@ -31,18 +29,18 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final success = await _authService.verifyOtp(
-        widget.phone, 
-        otp,
-        name: _needsRegistration ? _nameController.text.trim() : null,
-        gender: _needsRegistration ? _selectedGender : null,
-      );
+      final result = await _authService.verifyOtp(widget.phone, otp);
 
-      if (success) {
+      if (result == true) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen()),
           (route) => false, // Clears the navigation stack
+        );
+      } else if (result == 'requires_registration') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ProfileScreen(phone: widget.phone)),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,19 +48,11 @@ class _OtpScreenState extends State<OtpScreen> {
         );
       }
     } catch (e) {
-      if (e.toString().contains('Requires Registration')) {
-        // Backend said this user doesn't exist yet, prompt for name and gender
-        setState(() => _needsRegistration = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('New account! Please enter your name to continue.')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred. Please try again.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred. Please try again.')),
+      );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -98,43 +88,6 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
             ),
             
-            if (_needsRegistration) ...[
-              SizedBox(height: 24),
-              Text(
-                'Complete your profile',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-              SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedGender,
-                decoration: InputDecoration(
-                  labelText: 'Gender',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.group),
-                ),
-                items: [
-                  DropdownMenuItem(value: 'unspecified', child: Text('Prefer not to say')),
-                  DropdownMenuItem(value: 'male', child: Text('Male')),
-                  DropdownMenuItem(value: 'female', child: Text('Female')),
-                  DropdownMenuItem(value: 'other', child: Text('Other')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedGender = value!;
-                  });
-                },
-              ),
-            ],
-
             SizedBox(height: 32),
             ElevatedButton(
               onPressed: _isLoading ? null : _verifyOtp,
