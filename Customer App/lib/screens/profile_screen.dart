@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String phone;
@@ -20,11 +20,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = false;
   String _selectedGender = 'unspecified';
 
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(Duration(days: 365 * 18)), // Default to 18 years old
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
   void _completeProfile() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Name is required')),
+      );
+      return;
+    }
+
+    final dob = _dobController.text.trim();
+    if (dob.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Date of Birth is required')),
       );
       return;
     }
@@ -44,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (success) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => HomeScreen()),
+        MaterialPageRoute(builder: (context) => MainScreen()),
         (route) => false,
       );
     } else {
@@ -106,12 +128,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(height: 16),
             TextField(
               controller: _dobController,
+              readOnly: true,
+              onTap: () => _selectDate(context),
               decoration: InputDecoration(
-                labelText: 'Date of Birth (YYYY-MM-DD)',
+                labelText: 'Date of Birth (YYYY-MM-DD) *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.calendar_today),
               ),
-              keyboardType: TextInputType.datetime,
             ),
             SizedBox(height: 16),
             TextField(

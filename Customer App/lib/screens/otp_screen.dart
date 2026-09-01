@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 import 'profile_screen.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -34,7 +34,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (result == true) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => HomeScreen()),
+          MaterialPageRoute(builder: (context) => MainScreen()),
           (route) => false, // Clears the navigation stack
         );
       } else if (result == 'requires_registration') {

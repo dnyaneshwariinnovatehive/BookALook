@@ -3,27 +3,26 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  // Use 10.0.2.2 for Android Emulator, 127.0.0.1 for iOS Simulator, or your local IP for physical devices
-  static const String baseUrl = 'http://192.168.41.204:8000/api/customer/auth';
+  // Using 127.0.0.1:8001 routed to localhost:8000 via ADB reverse to bypass Windows Firewall
+  static const String baseUrl = 'http://127.0.0.1:8001/api/customer/auth';
 
   /// Sends an OTP to the provided phone number.
-  Future<bool> sendOtp(String phone) async {
+  Future<String> sendOtp(String phone) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/send-otp'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: jsonEncode({'phone': phone}),
       );
-
+      
       if (response.statusCode == 200) {
-        return true;
+        return 'success';
       } else {
-        print('Send OTP failed: ${response.body}');
-        return false;
+        return 'HTTP Error ${response.statusCode}: ${response.body}';
       }
     } catch (e) {
       print('Send OTP error: $e');
-      return false;
+      return 'Network Exception: $e';
     }
   }
 
