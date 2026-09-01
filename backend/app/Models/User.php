@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasUuids;
 
     /**
      * The attributes that are mass assignable.
@@ -18,9 +19,17 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'role',
         'name',
+        'phone',
         'email',
-        'password',
+        'password_hash',
+        'gender',
+        'date_of_birth',
+        'address',
+        'pincode',
+        'is_active',
+        'last_login_at',
     ];
 
     /**
@@ -29,7 +38,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
-        'password',
+        'password_hash',
         'remember_token',
     ];
 
@@ -41,8 +50,20 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password_hash' => 'hashed',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
+            'date_of_birth' => 'date',
         ];
+    }
+
+    /**
+     * Get the password for the user.
+     *
+     * @return string
+     */
+    public function getAuthPasswordName()
+    {
+        return 'password_hash';
     }
 }
