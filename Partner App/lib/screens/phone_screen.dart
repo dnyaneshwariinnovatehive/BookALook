@@ -56,20 +56,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Logo Section
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: const TextSpan(
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                    ),
-                    children: [
-                      TextSpan(text: 'BookALook ', style: TextStyle(color: AppTheme.lightTextHeading)),
-                      TextSpan(text: 'Partner', style: TextStyle(color: AppTheme.accentColor)),
-                    ],
-                  ),
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 60,
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 8),
                 const Text(

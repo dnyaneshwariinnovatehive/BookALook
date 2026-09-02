@@ -77,6 +77,12 @@ class AppTheme {
       ),
       labelStyle: TextStyle(color: lightTextLight),
     ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: darkBg,
+      contentTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
   );
 
   static final ThemeData darkTheme = ThemeData(
@@ -130,6 +136,12 @@ class AppTheme {
         borderSide: BorderSide(color: accentColor, width: 2),
       ),
       labelStyle: TextStyle(color: darkTextLight),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: lightBg,
+      contentTextStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }

@@ -1,10 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../../models/banner.dart';
+import '../../services/banner_service.dart';
+import '../../widgets/banner_carousel.dart';
 
-class HomeTab extends StatelessWidget {
+class HomeTab extends StatefulWidget {
   final bool isGuest;
 
   const HomeTab({Key? key, required this.isGuest}) : super(key: key);
+
+  @override
+  _HomeTabState createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  List<PromoBanner> _banners = [];
+  bool _isLoadingBanners = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBanners();
+  }
+
+  Future<void> _fetchBanners() async {
+    final bannerService = BannerService();
+    // Assuming we want to fetch banners for the user's current city if known.
+    // For now, we fetch platform-wide banners (and city banners if city is passed).
+    final banners = await bannerService.fetchBanners();
+    setState(() {
+      _banners = banners;
+      _isLoadingBanners = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +56,7 @@ class HomeTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
+                        widget.isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
                         style: TextStyle(
                           color: AppTheme.lightTextBody,
                           fontSize: 14,
@@ -100,34 +128,19 @@ class HomeTab extends StatelessWidget {
             ),
             SizedBox(height: 24),
 
-            // Promos Placeholder
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: AppTheme.lightAccentSoft,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.local_offer, size: 48, color: AppTheme.accentColor.withOpacity(0.5)),
-                  SizedBox(height: 12),
-                  Text(
-                    'No active offers right now',
-                    style: TextStyle(
-                      color: AppTheme.accentColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  Text(
-                    'Check back later for exciting spa and salon deals!',
-                    style: TextStyle(color: AppTheme.lightTextBody),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            // Banners Carousel
+            if (_isLoadingBanners)
+              Container(
+                height: 180,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightAccentSoft,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              BannerCarousel(banners: _banners),
+              
             SizedBox(height: 32),
 
             // Categories Placeholder
@@ -180,7 +193,7 @@ class HomeTab extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
-                        isGuest ? 'Sign in to see your appointments' : 'No upcoming appointments',
+                        widget.isGuest ? 'Sign in to see your appointments' : 'No upcoming appointments',
                         style: TextStyle(color: AppTheme.lightTextBody, fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -215,7 +228,7 @@ class HomeTab extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  isGuest ? 'Sign in to view your past bookings' : 'You have no previous bookings to show here.',
+                  widget.isGuest ? 'Sign in to view your past bookings' : 'You have no previous bookings to show here.',
                   style: TextStyle(color: AppTheme.lightTextBody),
                   textAlign: TextAlign.center,
                 ),

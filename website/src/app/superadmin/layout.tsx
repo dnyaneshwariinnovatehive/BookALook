@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import styles from './layout.module.css';
@@ -47,7 +48,7 @@ export default function SuperAdminLayout({
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
-          <div className={styles.logoText}>BookALook</div>
+          <Image src="/logo.png" alt="BookALook" width={180} height={60} style={{ objectFit: 'contain' }} priority />
         </div>
         
         <nav className={styles.navMenu}>

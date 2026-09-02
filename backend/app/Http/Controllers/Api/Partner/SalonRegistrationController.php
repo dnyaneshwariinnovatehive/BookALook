@@ -26,7 +26,7 @@ class SalonRegistrationController extends Controller
             'salon_name' => 'required|string|max:150',
             'description' => 'nullable|string',
             'street_address' => 'required|string',
-            'city' => 'required|string|max:100',
+            'city_id' => 'required|exists:cities,id',
             'pincode' => 'required|string|max:10',
             'gender_focus' => 'nullable|string', // Appended to description
         ]);
@@ -59,7 +59,7 @@ class SalonRegistrationController extends Controller
                 'name' => $request->salon_name,
                 'slug' => $slug,
                 'description' => trim($fullDescription),
-                'city' => $request->city,
+                'city_id' => $request->city_id,
                 'address' => $fullAddress,
                 'pincode' => $request->pincode,
                 'status' => 'pending_approval',

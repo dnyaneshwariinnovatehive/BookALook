@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import './globals.css';
 
@@ -5,7 +6,7 @@ export default function LandingPage() {
   return (
     <div className="landing-container">
       <header className="navbar">
-        <div className="logo">BookALook</div>
+        <Image src="/logo.png" alt="BookALook" width={180} height={50} style={{ objectFit: 'contain' }} priority />
         <nav>
           <Link href="/enquiry" className="btn-primary">Partner With Us</Link>
           <Link href="/login" className="btn-secondary">SuperAdmin Login</Link>

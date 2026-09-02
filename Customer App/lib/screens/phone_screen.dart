@@ -56,20 +56,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Logo Section
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                    ),
-                    children: [
-                      TextSpan(text: 'BookA', style: TextStyle(color: AppTheme.lightTextHeading)),
-                      TextSpan(text: 'Look', style: TextStyle(color: AppTheme.accentColor)),
-                    ],
-                  ),
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 60,
+                  fit: BoxFit.contain,
                 ),
                 SizedBox(height: 8),
                 Text(
@@ -83,65 +73,65 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 ),
                 SizedBox(height: 40),
 
-                // Login / Sign Up Toggle
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightBorder.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  padding: EdgeInsets.all(4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _isLogin = true),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: _isLogin ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: _isLogin
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
-                                  : [],
-                            ),
-                            child: Text(
-                              'Login',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextBody,
+                  // Login / Sign Up Toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightBorder.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    padding: EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _isLogin = true),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _isLogin ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                                boxShadow: _isLogin
+                                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    : [],
+                              ),
+                              child: Text(
+                                'Login',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextHeading.withOpacity(0.6),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _isLogin = false),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: !_isLogin ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: !_isLogin
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
-                                  : [],
-                            ),
-                            child: Text(
-                              'Sign Up',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: !_isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextBody,
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _isLogin = false),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_isLogin ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(26),
+                                boxShadow: !_isLogin
+                                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    : [],
+                              ),
+                              child: Text(
+                                'Sign Up',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: !_isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextHeading.withOpacity(0.6),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 32),
+                  SizedBox(height: 32),
 
                 // Phone Number Input
                 Text(

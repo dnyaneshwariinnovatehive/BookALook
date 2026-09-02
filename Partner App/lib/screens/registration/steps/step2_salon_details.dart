@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../../services/api_service.dart';
 
 class Step2SalonDetails extends StatefulWidget {
   final Function(Map<String, dynamic>) onNext;
@@ -21,6 +22,26 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   final _pincodeController = TextEditingController();
   
   String _genderFocus = 'Unisex';
+  
+  List<dynamic> _cities = [];
+  String? _selectedCityId;
+  bool _isLoadingCities = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCities();
+  }
+
+  Future<void> _loadCities() async {
+    final cities = await ApiService.fetchCities();
+    if (mounted) {
+      setState(() {
+        _cities = cities;
+        _isLoadingCities = false;
+      });
+    }
+  }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
@@ -34,7 +55,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         'salon_name': _salonNameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'street_address': fullStreet,
-        'city': _cityController.text.trim(),
+        'city_id': _selectedCityId,
         'pincode': _pincodeController.text.trim(),
         'gender_focus': _genderFocus,
       });
@@ -103,12 +124,35 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildLabel('City *'),
-                      _buildTextField(
-                        controller: _cityController,
-                        hint: 'City',
-                        icon: Icons.location_city_outlined,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
+                      if (_isLoadingCities)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        DropdownButtonFormField<String>(
+                          value: _selectedCityId,
+                          decoration: InputDecoration(
+                            hintText: 'City',
+                            hintStyle: const TextStyle(color: Colors.black26),
+                            prefixIcon: const Icon(Icons.location_city_outlined, color: Colors.black38, size: 20),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
+                          ),
+                          items: _cities.map<DropdownMenuItem<String>>((city) {
+                            return DropdownMenuItem<String>(
+                              value: city['id'],
+                              child: Text(city['name'] + (city['state'] != null ? ' (\${city['state']})' : '')),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedCityId = val;
+                            });
+                          },
+                          validator: (v) => v == null ? 'Required' : null,
+                        ),
                     ],
                   ),
                 ),
