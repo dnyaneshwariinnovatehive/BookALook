@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
 import '../theme/app_theme.dart';
+import 'registration/admin_registration_screen.dart';
 
 class PhoneScreen extends StatefulWidget {
   const PhoneScreen({super.key});
@@ -116,7 +117,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                       ),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => setState(() => _isLogin = false),
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
@@ -202,7 +205,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     children: [
                       const Text('Don\'t have an account? ', style: TextStyle(color: AppTheme.lightTextBody)),
                       GestureDetector(
-                        onTap: () => setState(() => _isLogin = false),
+                        onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));
+                        },
                         child: const Text(
                           'Register here',
                           style: TextStyle(

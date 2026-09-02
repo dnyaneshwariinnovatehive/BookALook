@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->boolean('will_refund_advance_if_cancelled')->default(false);
             $table->boolean('is_active')->default(true);
             $table->integer('display_order')->default(0);
+            $table->enum('gender_focus', ['Unisex', 'Men Only', 'Women Only'])->default('Unisex');
             $table->timestamps();
             $table->softDeletes();
             

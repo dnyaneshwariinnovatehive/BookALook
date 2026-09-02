@@ -32,6 +32,7 @@ return new class extends Migration {
             $table->decimal('avg_rating', 3, 2)->default(0.00);
             $table->integer('review_count')->default(0);
             $table->text('suspended_reason')->nullable();
+            $table->enum('gender_focus', ['Unisex', 'Men Only', 'Women Only'])->default('Unisex');
             $table->timestamps();
             $table->softDeletes();
             

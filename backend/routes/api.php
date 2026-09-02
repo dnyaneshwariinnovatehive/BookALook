@@ -27,3 +27,7 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
     });
 });
+
+Route::prefix('partner')->group(function () {
+    Route::post('/register', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'register']);
+});
