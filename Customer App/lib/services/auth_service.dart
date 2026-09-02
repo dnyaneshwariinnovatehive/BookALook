@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthService {
-  // Using 127.0.0.1:8001 routed to localhost:8000 via ADB reverse to bypass Windows Firewall
-  static const String baseUrl = 'http://127.0.0.1:8001/api/customer/auth';
+  static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
 
   /// Sends an OTP to the provided phone number.
   Future<String> sendOtp(String phone) async {
