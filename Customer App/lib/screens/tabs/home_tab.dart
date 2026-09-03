@@ -3,6 +3,8 @@ import '../../theme/app_theme.dart';
 import '../../models/banner.dart';
 import '../../services/banner_service.dart';
 import '../../widgets/banner_carousel.dart';
+import '../../models/category.dart';
+import '../../services/category_service.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -16,11 +18,14 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   List<PromoBanner> _banners = [];
   bool _isLoadingBanners = true;
+  List<ServiceCategory> _categories = [];
+  bool _isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
     _fetchBanners();
+    _fetchCategories();
   }
 
   Future<void> _fetchBanners() async {
@@ -31,6 +36,15 @@ class _HomeTabState extends State<HomeTab> {
     setState(() {
       _banners = banners;
       _isLoadingBanners = false;
+    });
+  }
+
+  Future<void> _fetchCategories() async {
+    final categoryService = CategoryService();
+    final categories = await categoryService.fetchCategories();
+    setState(() {
+      _categories = categories;
+      _isLoadingCategories = false;
     });
   }
 
@@ -143,26 +157,82 @@ class _HomeTabState extends State<HomeTab> {
               
             SizedBox(height: 32),
 
-            // Categories Placeholder
-            Text(
-              'Categories',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+            // Categories Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Categories',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                ),
+                Text(
+                  'See All',
+                  style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
             SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(24),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.lightBorder, style: BorderStyle.solid),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Text(
-                  'No categories available yet.',
-                  style: TextStyle(color: AppTheme.lightTextBody),
+            if (_isLoadingCategories)
+              Container(
+                height: 100,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_categories.isEmpty)
+              Container(
+                padding: EdgeInsets.all(24),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.lightBorder),
                 ),
+                child: Center(
+                  child: Text(
+                    'No categories available yet.',
+                    style: TextStyle(color: AppTheme.lightTextBody),
+                  ),
+                ),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.8,
+                ),
+                itemCount: _categories.length > 8 ? 8 : _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  return Column(
+                    children: [
+                      Container(
+                        height: 65,
+                        width: 65,
+                        decoration: BoxDecoration(
+                          color: AppTheme.lightAccentSoft.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: category.iconUrl != null && category.iconUrl!.isNotEmpty
+                              ? Image.network(category.iconUrl!, width: 32, height: 32, errorBuilder: (c,e,s) => Icon(Icons.category, color: AppTheme.accentColor))
+                              : Icon(Icons.category, color: AppTheme.accentColor, size: 32),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        category.name,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  );
+                },
               ),
-            ),
             SizedBox(height: 32),
 
             // Next Appointment Placeholder

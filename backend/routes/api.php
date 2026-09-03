@@ -12,6 +12,7 @@ Route::prefix('customer')->group(function () {
     
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
+    Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
 
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -46,6 +47,7 @@ Route::prefix('superadmin')->group(function () {
 
         // Catalog Management
         Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
+        Route::post('/catalog/categories/upload-icon', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'uploadIcon']);
         Route::post('/catalog/categories', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeCategory']);
         Route::post('/catalog/templates', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeTemplate']);
         Route::put('/catalog/categories/{id}/promote', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'promoteCategory']);
@@ -78,5 +80,17 @@ Route::prefix('partner')->group(function () {
         // Staff Assignment
         Route::get('/salons/{salon_id}/services/{service_id}/staff', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getServiceStaff']);
         Route::post('/salons/{salon_id}/services/{service_id}/staff', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'assignServiceStaff']);
+
+        // Salon Settings (Working Hours, etc.)
+        Route::get('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getWorkingHours']);
+        Route::put('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateWorkingHours']);
+
+        // Staff Management
+        Route::get('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'index']);
+        Route::post('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'store']);
+        
+        // Staff Leaves
+        Route::get('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'getLeaves']);
+        Route::put('/salons/{salon_id}/leaves/{leave_id}/status', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'updateLeaveStatus']);
     });
 });

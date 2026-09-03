@@ -50,10 +50,52 @@ class _AddComboScreenState extends State<AddComboScreen> {
     }
   }
   
-  void _addServiceRow() {
-    setState(() {
-      _selectedServices.add({'service_id': null, 'special_price': 0.0});
-    });
+  void _showMultiSelectDropdown() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select Services'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: _availableServices.map((service) {
+                    final isSelected = _selectedServices.any((s) => s['service_id'] == service.id);
+                    return CheckboxListTile(
+                      title: Text('${service.template?.name} (\u20B9${service.price.toStringAsFixed(0)})'),
+                      value: isSelected,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          setState(() {
+                            if (val == true) {
+                              _selectedServices.add({
+                                'service_id': service.id,
+                                'special_price': service.price,
+                              });
+                            } else {
+                              _selectedServices.removeWhere((s) => s['service_id'] == service.id);
+                            }
+                          });
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _saveCombo() async {
@@ -125,41 +167,38 @@ class _AddComboScreenState extends State<AddComboScreen> {
           const Text('Services Included:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           
+          OutlinedButton.icon(
+            onPressed: _showMultiSelectDropdown,
+            icon: const Icon(Icons.arrow_drop_down),
+            label: const Text('Select Services from Dropdown'),
+          ),
+          const SizedBox(height: 16),
+          
           ..._selectedServices.asMap().entries.map((entry) {
             int idx = entry.key;
             Map<String, dynamic> item = entry.value;
+            final selectedService = _availableServices.firstWhere((s) => s.id == item['service_id']);
             
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(labelText: 'Select Service'),
-                      value: item['service_id'],
-                      items: _availableServices.map((s) => DropdownMenuItem(
-                        value: s.id,
-                        child: Text('${s.template?.name} (\u20B9${s.price.toStringAsFixed(0)})'),
-                      )).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          item['service_id'] = val;
-                          final selectedService = _availableServices.firstWhere((s) => s.id == val);
-                          item['special_price'] = selectedService.price; // Default to original price
-                        });
-                      },
+                    Text(
+                      '${selectedService.template?.name} (Original: \u20B9${selectedService.price.toStringAsFixed(0)})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 12),
-                    if (item['service_id'] != null)
-                      TextFormField(
-                        decoration: const InputDecoration(labelText: 'Combo Price (\u20B9)', prefixIcon: Icon(Icons.currency_rupee, size: 16)),
-                        initialValue: item['special_price'].toString(),
-                        keyboardType: TextInputType.number,
-                        onChanged: (val) {
-                          item['special_price'] = double.tryParse(val) ?? 0.0;
-                        },
-                      ),
+                    TextFormField(
+                      decoration: const InputDecoration(labelText: 'Combo Price (\u20B9)', prefixIcon: Icon(Icons.currency_rupee, size: 16)),
+                      initialValue: item['special_price'].toString(),
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) {
+                        item['special_price'] = double.tryParse(val) ?? 0.0;
+                      },
+                    ),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
@@ -175,13 +214,6 @@ class _AddComboScreenState extends State<AddComboScreen> {
               ),
             );
           }),
-          
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _addServiceRow,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Service to Combo'),
-          )
         ],
       ),
     );

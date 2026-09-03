@@ -5,15 +5,26 @@ import styles from './page.module.css';
 
 interface Template {
   id: string;
+  category_id: string;
   name: string;
   estimated_duration_minutes: number;
   is_custom: boolean;
+  created_by_salon_id: string | null;
+  promoted_to_standard_at: string | null;
+  promoted_by: string | null;
+  is_active: boolean;
 }
 
 interface Category {
   id: string;
   name: string;
+  icon_url: string | null;
   is_custom: boolean;
+  created_by_salon_id: string | null;
+  promoted_to_standard_at: string | null;
+  promoted_by: string | null;
+  is_active: boolean;
+  display_order: number;
   templates: Template[];
 }
 
@@ -34,8 +45,14 @@ export default function CatalogPage() {
 
   // Form state
   const [catName, setCatName] = useState('');
+  const [catIconUrl, setCatIconUrl] = useState('');
+  const [catIconFile, setCatIconFile] = useState<File | null>(null);
+  const [catIsActive, setCatIsActive] = useState(true);
+  const [catDisplayOrder, setCatDisplayOrder] = useState('0');
+
   const [tplName, setTplName] = useState('');
   const [tplDuration, setTplDuration] = useState('30');
+  const [tplIsActive, setTplIsActive] = useState(true);
 
   useEffect(() => {
     fetchCatalog();
@@ -70,16 +87,46 @@ export default function CatalogPage() {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
+      let finalIconUrl = catIconUrl;
+
+      // Upload file first if a new one is selected
+      if (catIconFile) {
+        const formData = new FormData();
+        formData.append('icon', catIconFile);
+        
+        const uploadRes = await fetch('/api/proxy/superadmin/catalog/categories/upload-icon', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          finalIconUrl = uploadData.url;
+        } else {
+          alert('Failed to upload icon');
+          return;
+        }
+      }
+
       const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ name: catName })
+        body: JSON.stringify({ 
+          name: catName,
+          icon_url: finalIconUrl || null,
+          is_active: catIsActive,
+          display_order: parseInt(catDisplayOrder) || 0
+        })
       });
       if (res.ok) {
         setCatName('');
+        setCatIconUrl('');
+        setCatIconFile(null);
+        setCatIsActive(true);
+        setCatDisplayOrder('0');
         setEditingCategory(null);
         setShowCatModal(false);
         fetchCatalog();
@@ -122,7 +169,8 @@ export default function CatalogPage() {
 
     const bodyData: any = {
       name: tplName,
-      estimated_duration_minutes: parseInt(tplDuration)
+      estimated_duration_minutes: parseInt(tplDuration),
+      is_active: tplIsActive
     };
     if (!isEdit) {
       bodyData.category_id = selectedCatId;
@@ -140,6 +188,7 @@ export default function CatalogPage() {
       if (res.ok) {
         setTplName('');
         setTplDuration('30');
+        setTplIsActive(true);
         setEditingTemplate(null);
         setShowTplModal(false);
         fetchCatalog();
@@ -209,6 +258,10 @@ export default function CatalogPage() {
   const openAddCategory = () => {
     setEditingCategory(null);
     setCatName('');
+    setCatIconUrl('');
+    setCatIconFile(null);
+    setCatIsActive(true);
+    setCatDisplayOrder('0');
     setShowCatModal(true);
   };
 
@@ -216,6 +269,10 @@ export default function CatalogPage() {
     e.stopPropagation();
     setEditingCategory(cat);
     setCatName(cat.name);
+    setCatIconUrl(cat.icon_url || '');
+    setCatIconFile(null);
+    setCatIsActive(cat.is_active);
+    setCatDisplayOrder(cat.display_order.toString());
     setShowCatModal(true);
   };
 
@@ -224,6 +281,7 @@ export default function CatalogPage() {
     setEditingTemplate(null);
     setTplName('');
     setTplDuration('30');
+    setTplIsActive(true);
     setShowTplModal(true);
   };
 
@@ -232,6 +290,7 @@ export default function CatalogPage() {
     setEditingTemplate(tpl);
     setTplName(tpl.name);
     setTplDuration(tpl.estimated_duration_minutes.toString());
+    setTplIsActive(tpl.is_active);
     setShowTplModal(true);
   };
 
@@ -255,10 +314,26 @@ export default function CatalogPage() {
               onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
             >
               <div className={styles.categoryInfo}>
-                <span className={styles.categoryName}>{cat.name}</span>
-                <span className={`${styles.badge} ${cat.is_custom ? styles.badgeCustom : styles.badgeStandard}`}>
-                  {cat.is_custom ? 'Custom' : 'Standard'}
-                </span>
+                <div className={styles.iconSquare}>
+                  {cat.icon_url ? (
+                    <img src={cat.icon_url} alt={cat.name} className={styles.catImage} />
+                  ) : (
+                    <div className={styles.catImagePlaceholder}>
+                      {cat.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className={styles.categoryName}>{cat.name}</span>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px', alignItems: 'center' }}>
+                    <span className={`${styles.badge} ${cat.is_custom ? styles.badgeCustom : styles.badgeStandard}`}>
+                      {cat.is_custom ? 'Custom' : 'Standard'}
+                    </span>
+                    {!cat.is_active && (
+                      <span className={`${styles.badge} ${styles.badgeInactive}`}>Inactive</span>
+                    )}
+                  </div>
+                </div>
                 {cat.is_custom && (
                   <button className={styles.promoteBtn} onClick={(e) => handlePromoteCategory(cat.id, e)}>
                     Promote
@@ -332,6 +407,40 @@ export default function CatalogPage() {
                   required
                 />
               </div>
+              <div className={styles.formGroup}>
+                <label>Category Icon (optional)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {catIconUrl && !catIconFile && (
+                    <img src={catIconUrl} alt="Icon preview" style={{ width: 40, height: 40, objectFit: 'contain', border: '1px solid #ccc', borderRadius: 4 }} />
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setCatIconFile(e.target.files[0]);
+                      }
+                    }}
+                    style={{ border: 'none', padding: 0 }}
+                  />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Display Order</label>
+                <input 
+                  type="number" 
+                  value={catDisplayOrder} 
+                  onChange={(e) => setCatDisplayOrder(e.target.value)}
+                />
+              </div>
+              <label className={styles.checkboxGroup}>
+                <input 
+                  type="checkbox" 
+                  checked={catIsActive} 
+                  onChange={(e) => setCatIsActive(e.target.checked)}
+                />
+                <span>Is Active (Visible to users)</span>
+              </label>
               <div className={styles.modalActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => {
                   setShowCatModal(false);
@@ -366,11 +475,19 @@ export default function CatalogPage() {
                   type="number" 
                   value={tplDuration} 
                   onChange={(e) => setTplDuration(e.target.value)}
-                  min="15"
-                  step="15"
+                  min="30"
+                  step="30"
                   required
                 />
               </div>
+              <label className={styles.checkboxGroup}>
+                <input 
+                  type="checkbox" 
+                  checked={tplIsActive} 
+                  onChange={(e) => setTplIsActive(e.target.checked)}
+                />
+                <span>Is Active (Visible to users)</span>
+              </label>
               <div className={styles.modalActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => {
                   setShowTplModal(false);

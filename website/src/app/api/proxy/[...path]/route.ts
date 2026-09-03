@@ -22,9 +22,14 @@ async function handleRequest(req: NextRequest, { params }: { params: Promise<{ p
     headers['Content-Type'] = contentType;
   }
 
-  let body: string | undefined;
+  let body: any;
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    body = await req.text();
+    if (contentType?.includes('multipart/form-data')) {
+      // Pass the raw ArrayBuffer so binary data isn't corrupted
+      body = await req.arrayBuffer();
+    } else {
+      body = await req.text();
+    }
   }
 
   try {

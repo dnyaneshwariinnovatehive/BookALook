@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class ComboService extends Pivot
 {
     protected $table = 'combo_services';
+    public $timestamps = false;
 
     protected $fillable = [
         'combo_id',

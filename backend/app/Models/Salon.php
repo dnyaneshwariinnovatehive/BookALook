@@ -20,4 +20,19 @@ class Salon extends Model
     {
         return $this->belongsTo(User::class, 'admin_id');
     }
+
+    public function services()
+    {
+        return $this->hasMany(Service::class);
+    }
+
+    public function providers()
+    {
+        return $this->hasMany(ServiceProvider::class);
+    }
+
+    public function combos()
+    {
+        return $this->hasMany(Combo::class);
+    }
 }

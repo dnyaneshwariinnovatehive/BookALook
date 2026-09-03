@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../phone_screen.dart';
+import 'settings/salon_timings_screen.dart';
 
 class MoreTab extends StatelessWidget {
-  const MoreTab({super.key});
+  final String salonId;
+  const MoreTab({super.key, required this.salonId});
 
   void _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
@@ -38,6 +40,19 @@ class MoreTab extends StatelessWidget {
               // TODO: Fetch salons and navigate to SalonSelectionScreen
               // For now, logging out works similarly for testing
               _logout(context);
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.access_time, color: Colors.black87),
+            title: const Text('Change Salon Timings'),
+            subtitle: const Text('Update operating hours and closed days'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonId)),
+              );
             },
           ),
           const Divider(),

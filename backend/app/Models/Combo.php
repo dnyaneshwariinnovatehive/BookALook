@@ -9,6 +9,8 @@ class Combo extends Model
 {
     use HasUuids;
 
+    public $timestamps = false;
+
     protected $fillable = [
         'salon_id',
         'name',
@@ -31,7 +33,6 @@ class Combo extends Model
     public function services()
     {
         return $this->belongsToMany(Service::class, 'combo_services', 'combo_id', 'service_id')
-                    ->withPivot('combo_special_price')
-                    ->withTimestamps();
+                    ->withPivot('combo_special_price');
     }
 }

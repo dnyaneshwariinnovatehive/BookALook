@@ -2,10 +2,26 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
+import 'tabs/provider_profile_tab.dart';
 
-class ServiceProviderDashboard extends StatelessWidget {
+class ServiceProviderDashboard extends StatefulWidget {
   final Map<String, dynamic> salon;
-  const ServiceProviderDashboard({super.key, required this.salon});
+  final Map<String, dynamic> provider;
+  final Map<String, dynamic> user;
+  
+  const ServiceProviderDashboard({
+    super.key, 
+    required this.salon,
+    required this.provider,
+    required this.user,
+  });
+
+  @override
+  State<ServiceProviderDashboard> createState() => _ServiceProviderDashboardState();
+}
+
+class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
+  int _currentIndex = 0; // Default to home tab as requested
 
   void _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,58 +37,61 @@ class ServiceProviderDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      const Center(child: Text('Home')),
+      const Center(child: Text('Schedule')),
+      const Center(child: Text('Add Walk-in')),
+      ProviderProfileTab(
+        salon: widget.salon,
+        provider: widget.provider,
+        user: widget.user,
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
-      appBar: AppBar(
-        title: const Text('My Workspace', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _logout(context),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: AppTheme.lightBorder,
-              backgroundImage: salon['cover_photo_url'] != null
-                  ? NetworkImage(salon['cover_photo_url'])
-                  : null,
-              child: salon['cover_photo_url'] == null
-                  ? Text(
-                      salon['name']?.substring(0, 1).toUpperCase() ?? 'S',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: AppTheme.lightTextHeading),
-                    )
-                  : null,
+      body: pages[_currentIndex],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Working at ${salon['name'] ?? 'Salon'}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: AppTheme.accentColor,
+          unselectedItemColor: Colors.grey,
+          showSelectedLabels: true,
+          showUnselectedLabels: true,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
             ),
-            const SizedBox(height: 8),
-            Text(
-              salon['city'] ?? '',
-              style: const TextStyle(fontSize: 14, color: AppTheme.lightTextBody),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_outlined),
+              activeIcon: Icon(Icons.calendar_today),
+              label: 'Schedule',
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Service Provider Dashboard',
-              style: TextStyle(fontSize: 16, color: AppTheme.accentColor, fontWeight: FontWeight.bold),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_add_alt_1_outlined),
+              activeIcon: Icon(Icons.person_add_alt_1),
+              label: 'Add Walk-in',
             ),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'This space will contain your upcoming appointments, schedule, and earnings.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.lightTextBody),
-              ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
         ),

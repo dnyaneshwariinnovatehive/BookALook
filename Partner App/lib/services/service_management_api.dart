@@ -18,10 +18,8 @@ class ServiceManagementApi {
   }
 
   // Fetch Master Catalog (Categories and Templates)
-  static Future<List<ServiceCategory>> getMasterCatalog(String? salonId) async {
-    final uri = Uri.parse('$baseUrl/master-catalog').replace(queryParameters: {
-      if (salonId != null) 'salon_id': salonId,
-    });
+  static Future<List<ServiceCategory>> getMasterCatalog(String salonId) async {
+    final uri = Uri.parse('$baseUrl/salons/$salonId/master-catalog');
     
     final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {

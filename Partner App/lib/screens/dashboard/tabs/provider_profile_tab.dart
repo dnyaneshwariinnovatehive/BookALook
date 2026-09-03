@@ -1,0 +1,302 @@
+import 'package:flutter/material.dart';
+import '../../../../theme/app_theme.dart';
+
+class ProviderProfileTab extends StatelessWidget {
+  final Map<String, dynamic> salon;
+  final Map<String, dynamic> provider;
+  final Map<String, dynamic> user;
+  
+  const ProviderProfileTab({
+    super.key, 
+    required this.salon,
+    required this.provider,
+    required this.user,
+  });
+
+  String _formatTime(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return 'Closed';
+    final parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      int h = int.tryParse(parts[0]) ?? 0;
+      int m = int.tryParse(parts[1]) ?? 0;
+      final tod = TimeOfDay(hour: h, minute: m);
+      String period = tod.hour >= 12 ? 'PM' : 'AM';
+      int displayHour = tod.hour > 12 ? tod.hour - 12 : (tod.hour == 0 ? 12 : tod.hour);
+      return '${displayHour.toString().padLeft(2, '0')}:${tod.minute.toString().padLeft(2, '0')} $period';
+    }
+    return timeStr;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<dynamic> services = provider['services'] ?? [];
+    final List<dynamic> workingHours = provider['working_hours'] ?? [];
+    
+    // Sort working hours by day of week (0 = Sunday, 1 = Monday...)
+    workingHours.sort((a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int));
+
+    final List<String> daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    return Scaffold(
+      backgroundColor: AppTheme.lightBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Profile',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const SizedBox(height: 32),
+                
+                // Header Profile Section
+                Row(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.accentColor, width: 2),
+                        image: const DecorationImage(
+                          image: NetworkImage('https://i.pravatar.cc/150?img=11'), // Generic avatar
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user['name'] ?? 'Unknown',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Service Provider',
+                              style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            salon['name'] ?? 'Luxe Studio Salon',
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+
+                // Services Chips
+                if (services.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: services.map((s) => _buildServiceChip(s['name'] ?? 'Service')).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Set by salon admin',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+
+                // Personal Information Section
+                const Text(
+                  'Personal Information',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const SizedBox(height: 24),
+                
+                _buildInfoRow('FULL NAME', user['name'] ?? '', actionIcon: Icons.lock_outline),
+                const Divider(height: 32, color: Colors.black12),
+                
+                _buildInfoRow('PHONE NUMBER', user['phone'] ?? '', actionText: 'Edit'),
+                const Divider(height: 32, color: Colors.black12),
+                
+                _buildInfoRow('EMAIL ADDRESS', user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
+                const Divider(height: 32, color: Colors.black12),
+                
+                _buildPhotoUploadRow(),
+                
+                const SizedBox(height: 40),
+
+                // Working Hours Section
+                const Text(
+                  'Working Hours',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                ),
+                const SizedBox(height: 24),
+                
+                if (workingHours.isEmpty)
+                  const Text('No working hours assigned yet.', style: TextStyle(color: Colors.grey))
+                else
+                  ...workingHours.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final hour = entry.value;
+                    final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
+                    
+                    final workTime = isOff 
+                      ? 'Closed' 
+                      : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
+                      
+                    final breakTime = hour['break_start'] != null 
+                      ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
+                      : 'No break';
+
+                    return Column(
+                      children: [
+                        _buildWorkingHourRow(daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
+                        if (index < workingHours.length - 1)
+                          const Divider(height: 32, color: Colors.black12),
+                      ],
+                    );
+                  }),
+                
+                const SizedBox(height: 80), // Padding for bottom nav
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {IconData? actionIcon, String? actionText}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
+              ),
+            ],
+          ),
+        ),
+        if (actionIcon != null)
+          Icon(actionIcon, size: 20, color: Colors.black26),
+        if (actionText != null)
+          Text(
+            actionText,
+            style: const TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoUploadRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'PHOTO',
+                style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      image: const DecorationImage(
+                        image: NetworkImage('https://i.pravatar.cc/150?img=11'),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Tap to change photo',
+                    style: TextStyle(color: Colors.black38, fontSize: 14),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Text(
+          'Upload',
+          style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWorkingHourRow(String day, String workTime, String? breakTime) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          day,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
+        ),
+        Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  workTime,
+                  style: const TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+                if (breakTime != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Break: $breakTime',
+                    style: const TextStyle(fontSize: 12, color: Colors.black38),
+                  ),
+                ]
+              ],
+            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.lock_outline, size: 16, color: Colors.black26),
+          ],
+        ),
+      ],
+    );
+  }
+}

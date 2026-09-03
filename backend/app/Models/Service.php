@@ -18,6 +18,7 @@ class Service extends Model
         'will_refund_advance_if_cancelled',
         'is_active',
         'display_order',
+        'gender_focus',
     ];
 
     public function template()
@@ -33,13 +34,11 @@ class Service extends Model
     public function combos()
     {
         return $this->belongsToMany(Combo::class, 'combo_services', 'service_id', 'combo_id')
-                    ->withPivot('combo_special_price')
-                    ->withTimestamps();
+                    ->withPivot('combo_special_price');
     }
 
     public function providers()
     {
-        return $this->belongsToMany(ServiceProvider::class, 'provider_services', 'service_id', 'provider_id')
-                    ->withTimestamps();
+        return $this->belongsToMany(ServiceProvider::class, 'provider_services', 'service_id', 'provider_id');
     }
 }

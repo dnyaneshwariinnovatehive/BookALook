@@ -26,9 +26,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _tabs = [
       const HomeTab(),
       const AppointmentsTab(),
-      const StaffTab(),
+      StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),
-      const MoreTab(),
+      MoreTab(salonId: widget.salonData['id']),
     ];
   }
 

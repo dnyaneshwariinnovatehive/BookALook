@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CatalogController extends Controller
 {
@@ -25,11 +27,41 @@ class CatalogController extends Controller
         ]);
     }
 
+    public function uploadIcon(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'icon' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->hasFile('icon')) {
+            $file = $request->file('icon');
+            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+            // Store in the 'public' disk under 'category_icons' directory
+            $path = $file->storeAs('category_icons', $filename, 'public');
+            
+            // Return the full URL to the file
+            $url = asset('storage/' . $path);
+            
+            return response()->json([
+                'message' => 'Icon uploaded successfully',
+                'url' => $url
+            ]);
+        }
+
+        return response()->json(['message' => 'No file provided'], 400);
+    }
+
     public function storeCategory(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:80',
             'icon_url' => 'nullable|string|max:255',
+            'is_active' => 'boolean',
+            'display_order' => 'integer',
         ]);
 
         if ($validator->fails()) {
@@ -40,7 +72,8 @@ class CatalogController extends Controller
             'name' => $request->name,
             'icon_url' => $request->icon_url,
             'is_custom' => false,
-            'is_active' => true,
+            'is_active' => $request->input('is_active', true),
+            'display_order' => $request->input('display_order', 0),
         ]);
 
         return response()->json([
@@ -54,7 +87,8 @@ class CatalogController extends Controller
         $validator = Validator::make($request->all(), [
             'category_id' => 'required|uuid',
             'name' => 'required|string|max:150',
-            'estimated_duration_minutes' => 'required|integer|min:15',
+            'estimated_duration_minutes' => 'required|integer|min:30|multiple_of:30',
+            'is_active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -66,7 +100,7 @@ class CatalogController extends Controller
             'name' => $request->name,
             'estimated_duration_minutes' => $request->estimated_duration_minutes,
             'is_custom' => false,
-            'is_active' => true,
+            'is_active' => $request->input('is_active', true),
         ]);
 
         return response()->json([
@@ -119,6 +153,8 @@ class CatalogController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:80',
             'icon_url' => 'nullable|string|max:255',
+            'is_active' => 'boolean',
+            'display_order' => 'integer',
         ]);
 
         if ($validator->fails()) {
@@ -128,6 +164,8 @@ class CatalogController extends Controller
         $category->update([
             'name' => $request->name,
             'icon_url' => $request->icon_url,
+            'is_active' => $request->input('is_active', $category->is_active),
+            'display_order' => $request->input('display_order', $category->display_order),
         ]);
 
         return response()->json([
@@ -159,7 +197,8 @@ class CatalogController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:150',
-            'estimated_duration_minutes' => 'required|integer|min:15',
+            'estimated_duration_minutes' => 'required|integer|min:30|multiple_of:30',
+            'is_active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -169,6 +208,7 @@ class CatalogController extends Controller
         $template->update([
             'name' => $request->name,
             'estimated_duration_minutes' => $request->estimated_duration_minutes,
+            'is_active' => $request->input('is_active', $template->is_active),
         ]);
 
         return response()->json([

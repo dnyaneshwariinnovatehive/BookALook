@@ -39,8 +39,14 @@
 .categoryCard {
   background: white;
   border: 1px solid #E5E7EB;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s;
+}
+
+.categoryCard:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .categoryHeader {
@@ -55,11 +61,36 @@
 .categoryInfo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.iconSquare {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.catImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.catImagePlaceholder {
+  font-size: 20px;
+  font-weight: 700;
+  color: #9CA3AF;
 }
 
 .categoryName {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: #111827;
 }
@@ -79,6 +110,11 @@
 .badgeCustom {
   background-color: #FEF3C7;
   color: #92400E;
+}
+
+.badgeInactive {
+  background-color: #F3F4F6;
+  color: #4B5563;
 }
 
 .promoteBtn {
@@ -169,11 +205,39 @@
   margin-bottom: 4px;
 }
 
-.formGroup input {
+.formGroup input:not([type="checkbox"]) {
   width: 100%;
   padding: 8px;
   border: 1px solid #D1D5DB;
   border-radius: 4px;
+}
+
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.checkboxGroup label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
+.checkboxGroup input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4F46E5;
 }
 
 .modalActions {

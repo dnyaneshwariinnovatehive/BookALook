@@ -84,7 +84,7 @@ class ServiceManagementController extends Controller
             'category_id' => 'required_if:is_custom,true',
             'custom_category_name' => 'required_if:category_id,new_custom|string|max:80',
             'custom_template_name' => 'required_if:is_custom,true|string|max:150',
-            'estimated_duration_minutes' => 'required_if:is_custom,true|integer|min:15',
+            'estimated_duration_minutes' => 'required_if:is_custom,true|integer|multiple_of:30|min:30',
         ]);
 
         if ($validator->fails()) {

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceProvider extends Model
 {
-    use HasUuids;
+    use HasUuids, SoftDeletes;
     
     protected $table = 'service_providers';
 
@@ -42,7 +43,6 @@ class ServiceProvider extends Model
 
     public function services()
     {
-        return $this->belongsToMany(Service::class, 'provider_services', 'provider_id', 'service_id')
-                    ->withTimestamps();
+        return $this->belongsToMany(Service::class, 'provider_services', 'provider_id', 'service_id');
     }
 }

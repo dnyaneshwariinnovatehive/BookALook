@@ -17,6 +17,18 @@ interface Salon {
   description: string;
   city?: { name: string };
   admin?: { name: string; phone: string; email: string };
+  providers?: { id: string; user?: { name: string; phone: string; email: string }; is_active: boolean }[];
+  services?: { 
+    id: string; 
+    price: number; 
+    estimated_duration_minutes?: number;
+    template?: { 
+      name: string; 
+      estimated_duration_minutes: number;
+      category?: { name: string } 
+    }
+  }[];
+  combos?: { id: string; name: string; total_price: number; is_active: boolean }[];
 }
 
 export default function SalonDirectoryDetail() {
@@ -145,9 +157,79 @@ export default function SalonDirectoryDetail() {
         </div>
       </div>
 
-      <div className={styles.comingSoonCard}>
-        <div className={styles.comingSoonTitle}>Extended Profile Coming Soon</div>
-        <p>In future updates, this space will display the salon's categories, services, customer volume, revenue, and financials.</p>
+      {/* Staff Directory */}
+      <div className={styles.card} style={{ marginTop: '24px' }}>
+        <h2 className={styles.sectionTitle}>Staff Directory</h2>
+        {salon.providers && salon.providers.length > 0 ? (
+          <div className={styles.staffGrid}>
+            {salon.providers.map(provider => (
+              <div key={provider.id} className={styles.staffCard}>
+                <div className={styles.staffAvatar}>
+                  {provider.user?.name.charAt(0).toUpperCase()}
+                </div>
+                <div className={styles.staffInfo}>
+                  <h4>{provider.user?.name}</h4>
+                  <p>{provider.user?.phone}</p>
+                  <p>{provider.user?.email}</p>
+                  <span className={`${styles.badge} ${provider.is_active ? styles.badgeActive : styles.badgeInactive}`}>
+                    {provider.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: '#64748b' }}>No staff members registered.</p>
+        )}
+      </div>
+
+      {/* Services Offered */}
+      <div className={styles.card} style={{ marginTop: '24px' }}>
+        <h2 className={styles.sectionTitle}>Services Offered</h2>
+        {salon.services && salon.services.length > 0 ? (
+          <div className={styles.servicesGrid}>
+            {salon.services.map(service => (
+              <div key={service.id} className={styles.serviceItem}>
+                <div>
+                  <div className={styles.serviceCategory}>
+                    {service.template?.category?.name || 'Uncategorized'}
+                  </div>
+                  <div className={styles.serviceName}>
+                    {service.template?.name || 'Custom Service'}
+                  </div>
+                </div>
+                <div className={styles.serviceMeta}>
+                  <span className={styles.serviceDuration}>
+                    {service.estimated_duration_minutes || service.template?.estimated_duration_minutes || 0} mins
+                  </span>
+                  <span className={styles.servicePrice}>
+                    ₹{service.price}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: '#64748b' }}>No services configured.</p>
+        )}
+      </div>
+
+      {/* Combos */}
+      <div className={styles.card} style={{ marginTop: '24px' }}>
+        <h2 className={styles.sectionTitle}>Combos</h2>
+        {salon.combos && salon.combos.length > 0 ? (
+          <div className={styles.combosGrid}>
+            {salon.combos.map(combo => (
+              <div key={combo.id} className={styles.comboItem}>
+                <div className={styles.comboName}>{combo.name}</div>
+                <div className={styles.comboPrice}>₹{combo.total_price}</div>
+                {!combo.is_active && <span className={`${styles.badge} ${styles.badgeInactive}`}>Inactive</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: '#64748b' }}>No combos configured.</p>
+        )}
       </div>
     </div>
   );

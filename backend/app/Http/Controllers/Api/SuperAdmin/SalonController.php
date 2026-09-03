@@ -41,7 +41,13 @@ class SalonController extends Controller
 
     public function show($id)
     {
-        $salon = \App\Models\Salon::with(['admin', 'city'])->findOrFail($id);
+        $salon = \App\Models\Salon::with([
+            'admin', 
+            'city',
+            'services.template.category',
+            'providers.user',
+            'combos.services'
+        ])->findOrFail($id);
 
         return response()->json([
             'success' => true,

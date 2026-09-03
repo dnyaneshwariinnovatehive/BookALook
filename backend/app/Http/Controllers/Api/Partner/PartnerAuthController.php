@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Salon;
+use App\Models\ServiceProvider;
 use Illuminate\Support\Facades\DB;
 
 class PartnerAuthController extends Controller
@@ -65,7 +66,7 @@ class PartnerAuthController extends Controller
                 'user' => $user,
             ]);
         } elseif ($user->role === 'service_provider') {
-            $serviceProvider = DB::table('service_providers')->where('user_id', $user->id)->first();
+            $serviceProvider = ServiceProvider::with(['services', 'workingHours'])->where('user_id', $user->id)->first();
             
             if (!$serviceProvider) {
                  return response()->json([
@@ -83,6 +84,7 @@ class PartnerAuthController extends Controller
                 'salon' => $salon,
                 'token' => $token,
                 'user' => $user,
+                'provider' => $serviceProvider,
             ]);
         }
 

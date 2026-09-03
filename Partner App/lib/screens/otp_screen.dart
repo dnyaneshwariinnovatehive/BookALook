@@ -58,7 +58,11 @@ class _OtpScreenState extends State<OtpScreen> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(
-              builder: (context) => ServiceProviderDashboard(salon: response['salon'] ?? {}),
+              builder: (context) => ServiceProviderDashboard(
+                salon: response['salon'] ?? {},
+                provider: response['provider'] ?? {},
+                user: response['user'] ?? {},
+              ),
             ),
             (route) => false,
           );

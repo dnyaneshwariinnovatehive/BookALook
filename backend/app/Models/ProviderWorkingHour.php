@@ -5,21 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class SalonWorkingHour extends Model
+class ProviderWorkingHour extends Model
 {
     use HasUuids;
 
     public $timestamps = false;
 
     protected $fillable = [
-        'salon_id',
+        'provider_id',
         'day_of_week',
-        'is_closed',
-        'open_time',
-        'close_time',
+        'is_weekly_off',
+        'shift_start',
+        'shift_end',
+        'break_start',
+        'break_end',
     ];
 
     protected $casts = [
-        'is_closed' => 'boolean',
+        'is_weekly_off' => 'boolean',
     ];
 }
