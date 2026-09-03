@@ -61,24 +61,24 @@ class _BannerCarouselState extends State<BannerCarousel> {
         width: double.infinity,
         padding: EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft,
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
           children: [
-            Icon(Icons.local_offer, size: 48, color: AppTheme.accentColor.withOpacity(0.5)),
+            Icon(Icons.local_offer, size: 48, color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
             SizedBox(height: 12),
             Text(
               'No active offers right now',
               style: TextStyle(
-                color: AppTheme.accentColor,
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
             Text(
               'Check back later for exciting spa and salon deals!',
-              style: TextStyle(color: AppTheme.lightTextBody),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -116,7 +116,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   margin: EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
-                    color: AppTheme.lightBorder,
+                    color: Theme.of(context).dividerColor,
                     image: DecorationImage(
                       image: NetworkImage(banner.imageUrl),
                       fit: BoxFit.cover,
@@ -141,7 +141,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   height: 8,
                   width: realCurrentPage == index ? 24 : 8,
                   decoration: BoxDecoration(
-                    color: realCurrentPage == index ? AppTheme.accentColor : AppTheme.lightBorder,
+                    color: realCurrentPage == index ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );

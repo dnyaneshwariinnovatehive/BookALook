@@ -23,14 +23,14 @@ class BookingsTab extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_note, size: 80, color: AppTheme.lightBorder),
+            Icon(Icons.event_note, size: 80, color: Theme.of(context).dividerColor),
             SizedBox(height: 24),
             Text(
               'No Bookings Yet',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.lightTextHeading,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -39,7 +39,7 @@ class BookingsTab extends StatelessWidget {
               'When you book an appointment, it will appear here.',
               style: TextStyle(
                 fontSize: 16,
-                color: AppTheme.lightTextBody,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),

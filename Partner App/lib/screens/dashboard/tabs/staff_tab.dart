@@ -129,29 +129,36 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
   Widget _buildStaffCard(StaffMember member) {
     // Generate subtitle from services
     String subtitle = 'Service Provider';
-    List<String> serviceNames = [];
-    if (member.user != null && member.user!['services'] != null) {
-        // Services are nested in the raw API response or we need to extract them if they are in 'services' relation
+    
+    // For UI demonstration as requested, using default chips if services are not yet fetched
+    List<String> mockServices = ['Haircut', 'Hair Colour', 'combos'];
+    if (member.specialization != null && member.specialization!.toLowerCase().contains('skin')) {
+      mockServices = ['Facial', 'Spa'];
+    } else if (member.specialization != null && member.specialization!.toLowerCase().contains('nail')) {
+      mockServices = ['Nails'];
+    } else if (member.specialization != null && member.specialization!.toLowerCase().contains('makeup')) {
+      mockServices = ['Makeup', 'Bridal'];
+    } else if (member.specialization != null && member.specialization!.toLowerCase().contains('massage')) {
+      mockServices = ['Spa'];
     }
-    // Let's assume services are available in the JSON directly under 'services' 
-    // Wait, the index API returns `ServiceProvider::with(['user', 'services'])`
-    // We should parse it, but for now we'll just mock it or extract if possible
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
       ),
       padding: const EdgeInsets.all(16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircleAvatar(
-            radius: 24,
-            backgroundColor: AppTheme.accentColor.withOpacity(0.1),
-            child: const Icon(Icons.person, color: AppTheme.accentColor),
+            radius: 28,
+            backgroundColor: Colors.grey.shade200,
+            // Placeholder for image, using Icon as fallback
+            child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), size: 32),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -169,7 +176,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
+                          color: const Color(0xFFE8F5E9),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text('Active', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
@@ -179,20 +186,18 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                 const SizedBox(height: 4),
                 Text(
                   member.specialization ?? subtitle,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 13),
                 ),
                 const SizedBox(height: 8),
-                // Chips - static for now since services might need complex extraction
                 Wrap(
                   spacing: 8,
-                  children: [
-                    _buildChip('General'),
-                  ],
+                  runSpacing: 4,
+                  children: mockServices.map((s) => _buildChip(s)).toList(),
                 )
               ],
             ),
           ),
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+          Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
         ],
       ),
     );
@@ -200,14 +205,14 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
 
   Widget _buildChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.accentColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFFF3E5F5), // Light purple
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
-        style: const TextStyle(color: AppTheme.accentColor, fontSize: 11, fontWeight: FontWeight.bold),
+        style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -227,9 +232,9 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
       ),
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -238,7 +243,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
           CircleAvatar(
             radius: 20,
             backgroundColor: Colors.orange.shade50,
-            child: Icon(Icons.person_outline, color: Colors.orange.shade300),
+            child: Icon(Icons.person_outline, color: Colors.orange),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -252,12 +257,12 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                 const SizedBox(height: 4),
                 Text(
                   _formatLeaveTime(leave),
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   leave.reason ?? 'No reason provided',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                 ),
               ],
             ),
@@ -277,8 +282,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                       onTap: () => _updateLeaveStatus(leave.id, 'approved'),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(4)),
-                        child: const Icon(Icons.check, color: Colors.white, size: 16),
+                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                        child: Icon(Icons.check, color: Theme.of(context).colorScheme.surface, size: 16),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -286,8 +291,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                       onTap: () => _updateLeaveStatus(leave.id, 'rejected'),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                        decoration: BoxDecoration(color: Colors.red.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                        child: Icon(Icons.close, color: Theme.of(context).colorScheme.surface, size: 16),
                       ),
                     ),
                   ],
@@ -302,13 +307,16 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
-        backgroundColor: AppTheme.lightBg,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: Colors.black,
+        centerTitle: false,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -345,13 +353,13 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
             child: TabBar(
               controller: _tabController,
               indicator: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(26),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05), blurRadius: 4, offset: Offset(0, 2))
                 ]
               ),
-              labelColor: Colors.black,
+              labelColor: Theme.of(context).textTheme.bodyLarge?.color,
               unselectedLabelColor: AppTheme.accentColor,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold),
               indicatorSize: TabBarIndicatorSize.tab,
@@ -401,7 +409,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                                   children: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-                                      .map((day) => Text(day, style: const TextStyle(color: Colors.grey, fontSize: 12)))
+                                      .map((day) => Text(day, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12)))
                                       .toList(),
                                 ),
                               ),

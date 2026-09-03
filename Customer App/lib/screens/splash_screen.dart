@@ -103,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       Icon(
                         Icons.spa,
                         size: 80,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                       ),
                       SizedBox(height: 16),
                       Text(
@@ -111,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         style: TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           letterSpacing: 2,
                         ),
                       ),
@@ -120,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         'Salon Marketplace Platform',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
                           letterSpacing: 1.2,
                         ),
                       ),

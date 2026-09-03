@@ -14,12 +14,13 @@
 .title {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-heading);
   margin-bottom: 0.5rem;
 }
 
 .subtitle {
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
   font-size: 0.95rem;
 }
 
@@ -31,29 +32,34 @@
 
 .searchInput, .selectInput {
   padding: 0.75rem 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.95rem;
-  color: #334155;
+  color: var(--text-body);
   outline: none;
   min-width: 200px;
-}
+
+  background-color: transparent;
+  background-color: transparent;}
 
 .searchInput:focus, .selectInput:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
+  border-color: var(--border-color);
+  box-shadow: var(--card-shadow);
+
+  background-color: transparent;
+  background-color: transparent;}
 
 .searchInput {
   flex-grow: 1;
   max-width: 400px;
-}
+
+  background-color: transparent;}
 
 .tableContainer {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
 }
 
@@ -64,21 +70,22 @@
 }
 
 .th {
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
   padding: 1rem 1.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-body);
+  opacity: 0.8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .td {
   padding: 1rem 1.5rem;
   font-size: 0.875rem;
-  color: #334155;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .tr:last-child .td {
@@ -86,12 +93,12 @@
 }
 
 .tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
 }
 
 .salonName {
   font-weight: 500;
-  color: #0f172a;
+  color: var(--text-body);
 }
 
 .badge {
@@ -104,23 +111,23 @@
 }
 
 .badgeActive {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
 }
 
 .badgePending {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
 }
 
 .badgeRejected {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .badgeSuspended {
-  background-color: #f3f4f6;
-  color: #374151;
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
 }
 
 .actionButton {
@@ -128,25 +135,26 @@
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1rem;
-  background-color: #f1f5f9;
-  color: #334155;
+  background-color: var(--bg-color);
+  color: var(--text-body);
   font-size: 0.875rem;
   font-weight: 500;
   border-radius: 6px;
   text-decoration: none;
   transition: all 0.2s ease;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-color);
 }
 
 .actionButton:hover {
-  background-color: #e2e8f0;
-  color: #0f172a;
+  background-color: var(--border-color);
+  color: var(--text-body);
 }
 
 .emptyState {
   padding: 3rem;
   text-align: center;
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
   font-size: 0.95rem;
 }
 
@@ -155,13 +163,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #e2e8f0;
-  background-color: #f8fafc;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-color);
 }
 
 .pageInfo {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
 }
 
 .pageControls {
@@ -171,12 +180,13 @@
 
 .pageButton {
   padding: 0.5rem 1rem;
-  border: 1px solid #cbd5e1;
-  background: white;
-  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
   font-size: 0.875rem;
-  color: #334155;
+  color: var(--text-body);
   cursor: pointer;
+  box-shadow: var(--card-shadow);
 }
 
 .pageButton:disabled {
@@ -185,5 +195,5 @@
 }
 
 .pageButton:not(:disabled):hover {
-  background: #f1f5f9;
+  background: var(--bg-color);
 }

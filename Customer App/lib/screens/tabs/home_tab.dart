@@ -61,8 +61,8 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: AppTheme.lightAccentSoft,
-                  child: Icon(Icons.person, color: AppTheme.accentColor),
+                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
                 ),
                 SizedBox(width: 12),
                 Expanded(
@@ -72,7 +72,7 @@ class _HomeTabState extends State<HomeTab> {
                       Text(
                         widget.isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
                         style: TextStyle(
-                          color: AppTheme.lightTextBody,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                           fontSize: 14,
                         ),
                       ),
@@ -81,12 +81,12 @@ class _HomeTabState extends State<HomeTab> {
                           Text(
                             'Select Location',
                             style: TextStyle(
-                              color: AppTheme.lightTextHeading,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
-                          Icon(Icons.keyboard_arrow_down, size: 20, color: AppTheme.accentColor),
+                          Icon(Icons.keyboard_arrow_down, size: 20, color: Theme.of(context).colorScheme.primary),
                         ],
                       ),
                     ],
@@ -95,11 +95,11 @@ class _HomeTabState extends State<HomeTab> {
                 Container(
                   padding: EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.lightBorder),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
-                  child: Icon(Icons.notifications_none, color: AppTheme.lightTextHeading),
+                  child: Icon(Icons.notifications_none, color: Theme.of(context).colorScheme.onSurface),
                 ),
               ],
             ),
@@ -112,17 +112,17 @@ class _HomeTabState extends State<HomeTab> {
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: AppTheme.lightBorder),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.search, color: AppTheme.lightTextBody),
+                        Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                         SizedBox(width: 8),
                         Text(
                           'Search salons, services...',
-                          style: TextStyle(color: AppTheme.lightTextLight, fontSize: 16),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 16),
                         ),
                       ],
                     ),
@@ -132,11 +132,11 @@ class _HomeTabState extends State<HomeTab> {
                 Container(
                   padding: EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.lightBorder),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
-                  child: Icon(Icons.filter_list, color: AppTheme.lightTextHeading),
+                  child: Icon(Icons.filter_list, color: Theme.of(context).colorScheme.onSurface),
                 ),
               ],
             ),
@@ -147,7 +147,7 @@ class _HomeTabState extends State<HomeTab> {
               Container(
                 height: 180,
                 decoration: BoxDecoration(
-                  color: AppTheme.lightAccentSoft,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Center(child: CircularProgressIndicator()),
@@ -163,11 +163,11 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 Text(
                   'Categories',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 Text(
                   'See All',
-                  style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -182,56 +182,64 @@ class _HomeTabState extends State<HomeTab> {
                 padding: EdgeInsets.all(24),
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.lightBorder),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Text(
                     'No categories available yet.',
-                    style: TextStyle(color: AppTheme.lightTextBody),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                   ),
                 ),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.8,
+              SizedBox(
+                height: 48,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    return Container(
+                      margin: EdgeInsets.only(right: 12),
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (category.iconUrl != null && category.iconUrl!.isNotEmpty)
+                            Image.network(category.iconUrl!, width: 20, height: 20, errorBuilder: (c,e,s) => Icon(Icons.category, size: 20, color: Theme.of(context).colorScheme.primary))
+                          else
+                            Icon(Icons.category, color: Theme.of(context).colorScheme.primary, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            category.name,
+                            style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                itemCount: _categories.length > 8 ? 8 : _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  return Column(
-                    children: [
-                      Container(
-                        height: 65,
-                        width: 65,
-                        decoration: BoxDecoration(
-                          color: AppTheme.lightAccentSoft.withOpacity(0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: category.iconUrl != null && category.iconUrl!.isNotEmpty
-                              ? Image.network(category.iconUrl!, width: 32, height: 32, errorBuilder: (c,e,s) => Icon(Icons.category, color: AppTheme.accentColor))
-                              : Icon(Icons.category, color: AppTheme.accentColor, size: 32),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        category.name,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  );
-                },
               ),
             SizedBox(height: 32),
 
@@ -240,9 +248,9 @@ class _HomeTabState extends State<HomeTab> {
               width: double.infinity,
               padding: EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppTheme.lightAccentSoft.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1).withOpacity(0.5),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppTheme.lightAccentSoft),
+                border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,12 +258,12 @@ class _HomeTabState extends State<HomeTab> {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.accentColor,
-                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(50),
                     ),
                     child: Text(
                       'YOUR NEXT APPOINTMENT',
-                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Theme.of(context).colorScheme.surface, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
                   SizedBox(height: 16),
@@ -264,7 +272,7 @@ class _HomeTabState extends State<HomeTab> {
                       padding: const EdgeInsets.symmetric(vertical: 24.0),
                       child: Text(
                         widget.isGuest ? 'Sign in to see your appointments' : 'No upcoming appointments',
-                        style: TextStyle(color: AppTheme.lightTextBody, fontWeight: FontWeight.w500),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -279,11 +287,11 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 Text(
                   'Book Again',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 Text(
                   'See All',
-                  style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -292,14 +300,21 @@ class _HomeTabState extends State<HomeTab> {
               padding: EdgeInsets.all(24),
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.lightBorder),
+                border: Border.all(color: Theme.of(context).dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
               child: Center(
                 child: Text(
                   widget.isGuest ? 'Sign in to view your past bookings' : 'You have no previous bookings to show here.',
-                  style: TextStyle(color: AppTheme.lightTextBody),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                   textAlign: TextAlign.center,
                 ),
               ),

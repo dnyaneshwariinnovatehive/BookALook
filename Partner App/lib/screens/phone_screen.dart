@@ -91,7 +91,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               color: _isLogin ? Colors.white : Colors.transparent,
                               borderRadius: BorderRadius.circular(26),
                               boxShadow: _isLogin
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
+                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
                                   : [],
                             ),
                             child: Text(
@@ -116,7 +116,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               color: !_isLogin ? Colors.white : Colors.transparent,
                               borderRadius: BorderRadius.circular(26),
                               boxShadow: !_isLogin
-                                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
+                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
                                   : [],
                             ),
                             child: Text(
@@ -177,7 +177,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     elevation: 0,
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

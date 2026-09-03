@@ -42,8 +42,8 @@ class ProfileTab extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: AppTheme.lightAccentSoft,
-                    child: Icon(Icons.person, size: 50, color: AppTheme.accentColor),
+                    backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    child: Icon(Icons.person, size: 50, color: Theme.of(context).colorScheme.primary),
                   ),
                   SizedBox(height: 16),
                   Text(
@@ -51,7 +51,7 @@ class ProfileTab extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.lightTextHeading,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -61,21 +61,21 @@ class ProfileTab extends StatelessWidget {
             
             // Settings Placeholder
             ListTile(
-              leading: Icon(Icons.settings, color: AppTheme.accentColor),
+              leading: Icon(Icons.settings, color: Theme.of(context).colorScheme.primary),
               title: Text('Account Settings'),
               trailing: Icon(Icons.chevron_right),
               onTap: () {},
             ),
-            Divider(color: AppTheme.lightBorder),
+            Divider(color: Theme.of(context).dividerColor),
             ListTile(
-              leading: Icon(Icons.payment, color: AppTheme.accentColor),
+              leading: Icon(Icons.payment, color: Theme.of(context).colorScheme.primary),
               title: Text('Payment Methods'),
               trailing: Icon(Icons.chevron_right),
               onTap: () {},
             ),
-            Divider(color: AppTheme.lightBorder),
+            Divider(color: Theme.of(context).dividerColor),
             ListTile(
-              leading: Icon(Icons.help_outline, color: AppTheme.accentColor),
+              leading: Icon(Icons.help_outline, color: Theme.of(context).colorScheme.primary),
               title: Text('Help & Support'),
               trailing: Icon(Icons.chevron_right),
               onTap: () {},

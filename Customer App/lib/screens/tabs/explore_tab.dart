@@ -10,14 +10,14 @@ class ExploreTab extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.explore, size: 80, color: AppTheme.lightBorder),
+            Icon(Icons.explore, size: 80, color: Theme.of(context).dividerColor),
             SizedBox(height: 24),
             Text(
               'Explore Salons',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.lightTextHeading,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -26,7 +26,7 @@ class ExploreTab extends StatelessWidget {
               'Interactive map and discovery features coming soon.',
               style: TextStyle(
                 fontSize: 16,
-                color: AppTheme.lightTextBody,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),

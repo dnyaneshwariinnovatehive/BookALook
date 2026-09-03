@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -43,6 +44,31 @@ export default function SuperAdminLayout({
     }
   };
 
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    // Check local storage or system preference on mount
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDarkMode((prev) => {
+      const newTheme = !prev;
+      if (newTheme) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+      return newTheme;
+    });
+  };
+
   return (
     <div className={styles.layoutContainer}>
       {/* Sidebar */}
@@ -75,6 +101,15 @@ export default function SuperAdminLayout({
       {/* Main Content Area */}
       <div className={styles.mainContentWrapper}>
         <header className={styles.topbar}>
+          <div style={{ flex: 1 }} />
+          <button 
+            onClick={toggleTheme} 
+            className={styles.themeToggleBtn}
+            title={`Switch to ${isDarkMode ? 'Light' : 'Dark'} Mode`}
+          >
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
+          
           <div className={styles.userProfile}>
             <div style={{ textAlign: 'right' }}>
               <div className={styles.userName}>Super Admin</div>

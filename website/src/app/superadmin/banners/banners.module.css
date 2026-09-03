@@ -1,6 +1,6 @@
 .container {
   padding: 2rem;
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
   min-height: calc(100vh - 64px);
 }
 
@@ -14,11 +14,11 @@
 .title {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-heading);
 }
 
 .createButton {
-  background-color: #2563eb;
+  background-color: var(--accent-color);
   color: white;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
@@ -47,20 +47,20 @@
 }
 
 .modal {
-  background-color: white;
-  border-radius: 12px;
+  background-color: var(--surface-color);
+  border-radius: var(--radius-lg);
   padding: 2rem;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow);
 }
 
 .modalTitle {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-heading);
   margin-bottom: 1.5rem;
 }
 
@@ -72,23 +72,25 @@
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-body);
+  opacity: 0.8;
   margin-bottom: 0.5rem;
 }
 
 .input, .select {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   font-size: 0.95rem;
-  color: #0f172a;
+  color: var(--text-body);
+  background-color: transparent;
 }
 
 .input:focus, .select:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--border-color);
+  box-shadow: var(--card-shadow);
 }
 
 .modalActions {
@@ -100,21 +102,23 @@
 
 .cancelButton {
   padding: 0.75rem 1.5rem;
-  background-color: white;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  color: #475569;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-body);
+  opacity: 0.8;
   font-weight: 500;
   cursor: pointer;
+  box-shadow: var(--card-shadow);
 }
 
 .cancelButton:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-color);
 }
 
 .submitButton {
   padding: 0.75rem 1.5rem;
-  background-color: #2563eb;
+  background-color: var(--accent-color);
   color: white;
   border: none;
   border-radius: 8px;
@@ -127,7 +131,8 @@
 }
 
 .submitButton:disabled {
-  background-color: #94a3b8;
+  background-color: var(--text-body);
+  opacity: 0.8;
   cursor: not-allowed;
 }
 
@@ -139,11 +144,11 @@
 }
 
 .bannerCard {
-  background-color: white;
-  border-radius: 12px;
+  background-color: var(--surface-color);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
 }
@@ -152,7 +157,7 @@
   width: 100%;
   height: 160px;
   object-fit: cover;
-  background-color: #f1f5f9;
+  background-color: var(--bg-color);
 }
 
 .bannerContent {
@@ -163,13 +168,14 @@
 .bannerTitle {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-heading);
   margin-bottom: 0.5rem;
 }
 
 .bannerMeta {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
   margin-bottom: 0.25rem;
 }
 
@@ -183,18 +189,19 @@
 }
 
 .statusActive {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
 }
 
 .statusInactive {
-  background-color: #f1f5f9;
-  color: #475569;
+  background-color: var(--bg-color);
+  color: var(--text-body);
+  opacity: 0.8;
 }
 
 .bannerActions {
   padding: 1rem 1.25rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
 }
@@ -210,19 +217,31 @@
 
 .deleteButton {
   color: #ef4444;
-  background-color: #fef2f2;
+  background-color: rgba(239, 68, 68, 0.15);
 }
 
 .deleteButton:hover {
-  background-color: #fee2e2;
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.editButton {
+  color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.15);
+}
+
+.editButton:hover {
+  background-color: rgba(245, 158, 11, 0.25);
 }
 
 .toggleButton {
-  background-color: white;
-  border-color: #cbd5e1;
-  color: #475569;
+  background-color: var(--surface-color);
+  border-color: var(--border-color);
+  color: var(--text-body);
+  opacity: 0.8;
+  box-shadow: var(--card-shadow);
+  border-radius: var(--radius-lg);
 }
 
 .toggleButton:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-color);
 }

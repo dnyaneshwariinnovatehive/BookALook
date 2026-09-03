@@ -18,7 +18,7 @@ class PartnerApp extends StatelessWidget {
       title: 'BookALook Partner',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );

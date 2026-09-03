@@ -130,7 +130,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Combo'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
@@ -143,7 +143,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
             backgroundColor: AppTheme.accentColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Create Combo', style: TextStyle(fontSize: 16)),
+          child: _isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface) : Text('Create Combo', style: TextStyle(fontSize: 16)),
         ),
       ),
     );

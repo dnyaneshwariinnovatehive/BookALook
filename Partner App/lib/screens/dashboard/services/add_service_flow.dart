@@ -87,161 +87,208 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Add Service'),
-        backgroundColor: Colors.white,
+        title: const Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        foregroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
         : _error != null
           ? Center(child: Text(_error!))
-          : _buildFlow(),
+          : _buildForm(),
     );
   }
 
-  Widget _buildFlow() {
-    // Step 1: Pick Category
-    if (_selectedCategory == null && !_isCustom) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('1. Pick a Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ..._masterCategories.map((c) => ListTile(
-            title: Text(c.name),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              setState(() {
-                _selectedCategory = c;
-              });
-            },
-          )),
-          const Divider(),
-          ListTile(
-            title: const Text('Create Custom Category', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.add, color: AppTheme.accentColor),
-            onTap: () {
-              setState(() {
-                _isCustom = true;
-              });
-            },
-          )
-        ],
-      );
-    }
+  int _duration = 30;
+  String _genderFocus = 'Unisex';
+  bool _refundAdvance = false;
 
-    // Step 2: Pick Template
-    if (_selectedCategory != null && _selectedTemplate == null && !_isCustom) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('2. Select a Service under ${_selectedCategory!.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ...(_selectedCategory!.templates ?? []).map((t) => ListTile(
-            title: Text(t.name),
-            subtitle: Text('${t.estimatedDurationMinutes} mins'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              setState(() {
-                _selectedTemplate = t;
-              });
-            },
-          )),
-          const Divider(),
-          ListTile(
-            title: const Text('Create Custom Service here', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.add, color: AppTheme.accentColor),
-            onTap: () {
-              setState(() {
-                _isCustom = true;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          TextButton(onPressed: () => setState(() => _selectedCategory = null), child: const Text('Back to Categories'))
-        ],
-      );
-    }
-
-    // Step 3: Set Price & Details (Standard or Custom)
+  Widget _buildForm() {
     return Form(
       key: _formKey,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(_isCustom ? 'Create Custom Service' : 'Set Price for ${_selectedTemplate!.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-
-          if (_isCustom) ...[
-            if (_selectedCategory == null) ...[
-              TextFormField(
-                controller: _customCategoryController,
-                decoration: const InputDecoration(labelText: 'New Category Name', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+          _buildLabel('Name'),
+          _buildTextField(_customTemplateController),
+          const SizedBox(height: 16),
+          
+          _buildLabel('Description'),
+          _buildTextField(_descriptionController),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('Price (₹)'),
+                    _buildTextField(_priceController, isNumber: true),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-            ] else ...[
-              Text('Category: ${_selectedCategory!.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLabel('Duration (min)'),
+                    Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove, size: 18),
+                            onPressed: () {
+                              if (_duration > 5) setState(() => _duration -= 5);
+                            },
+                          ),
+                          Text('$_duration', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          IconButton(
+                            icon: const Icon(Icons.add, size: 18),
+                            onPressed: () {
+                              setState(() => _duration += 5);
+                            },
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ),
             ],
-            
-            TextFormField(
-              controller: _customTemplateController,
-              decoration: const InputDecoration(labelText: 'Service Name', border: OutlineInputBorder()),
-              validator: (v) => v!.isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _durationController,
-              decoration: const InputDecoration(labelText: 'Estimated Duration (minutes)', border: OutlineInputBorder()),
-              keyboardType: TextInputType.number,
-              validator: (v) => v!.isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          TextFormField(
-            controller: _priceController,
-            decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder()),
-            keyboardType: TextInputType.number,
-            validator: (v) => v!.isEmpty ? 'Required' : null,
           ),
           const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'Description (Optional)', border: OutlineInputBorder()),
-            maxLines: 3,
+          
+          _buildLabel('Min Advance %'),
+          _buildTextField(TextEditingController(text: '20'), isNumber: true), // Placeholder for advance
+          const SizedBox(height: 16),
+          
+          _buildLabel('Category'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ServiceCategory>(
+                isExpanded: true,
+                value: _selectedCategory ?? (_masterCategories.isNotEmpty ? _masterCategories.first : null),
+                items: _masterCategories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                onChanged: (val) {
+                  setState(() => _selectedCategory = val);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          _buildLabel('Gender Focus'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _genderFocus,
+                items: ['Unisex', 'Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: (val) {
+                  setState(() => _genderFocus = val!);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _refundAdvance,
+                  onChanged: (val) => setState(() => _refundAdvance = val!),
+                  activeColor: AppTheme.accentColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
+            ],
           ),
           const SizedBox(height: 32),
-
+          
           ElevatedButton(
-            onPressed: _isSaving ? null : _saveService,
+            onPressed: _isSaving ? null : () {
+              // Ensure we save properly using the single form data
+              _isCustom = true;
+              _durationController.text = _duration.toString();
+              _saveService();
+            },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
+              backgroundColor: const Color(0xFF1E1E2C), // Dark solid button
               padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Service', style: TextStyle(fontSize: 16)),
+            child: _isSaving 
+              ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2)) 
+              : Text('Add Service', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.surface, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                if (_isCustom) {
-                  _isCustom = false;
-                  if (_selectedTemplate == null) _selectedCategory = null;
-                } else {
-                  _selectedTemplate = null;
-                }
-              });
-            }, 
-            child: const Text('Back')
-          )
+          const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Builder(
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87)),
+        );
+      }
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, {bool isNumber = false}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: AppTheme.accentColor),
+        ),
+      ),
+      validator: (v) => v!.isEmpty ? 'Required' : null,
     );
   }
 }

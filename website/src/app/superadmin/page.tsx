@@ -83,7 +83,7 @@ export default function AdminDashboard() {
                 <div style={{ width: '60%', height: `${val}%`, backgroundColor: '#cbd5e1', borderRadius: '4px 4px 0 0', position: 'relative' }}>
                   <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${val * 0.1}%`, backgroundColor: '#3b82f6', borderRadius: '0' }} title="Platform Commission"></div>
                 </div>
-                <div style={{ marginTop: '10px', fontSize: '0.75rem', color: '#64748b' }}>
+                <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-body)', opacity: 0.7 }}>
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
                 </div>
               </div>
@@ -95,31 +95,31 @@ export default function AdminDashboard() {
           <h2 className={styles.cardTitle}>Booking Status</h2>
           <div style={{ width: '100%', height: 300, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1.5rem' }}>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#334155', fontWeight: 500 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-body)', fontWeight: 500 }}>
                 <span>Completed (1240)</span>
                 <span>85%</span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ width: '85%', height: '100%', backgroundColor: '#16a34a' }}></div>
               </div>
             </div>
             
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#334155', fontWeight: 500 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-body)', fontWeight: 500 }}>
                 <span>Cancelled (180)</span>
                 <span>12%</span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ width: '12%', height: '100%', backgroundColor: '#f97316' }}></div>
               </div>
             </div>
             
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#334155', fontWeight: 500 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-body)', fontWeight: 500 }}>
                 <span>No-Show (45)</span>
                 <span>3%</span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ width: '3%', height: '100%', backgroundColor: '#dc2626' }}></div>
               </div>
             </div>

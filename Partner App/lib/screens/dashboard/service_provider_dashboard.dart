@@ -55,7 +55,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -65,7 +65,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           selectedItemColor: AppTheme.accentColor,
           unselectedItemColor: Colors.grey,
           showSelectedLabels: true,

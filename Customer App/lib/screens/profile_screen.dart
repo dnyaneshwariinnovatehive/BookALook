@@ -94,7 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               'Please provide your details to continue.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             ),
             SizedBox(height: 32),
             TextField(
@@ -153,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading 
-                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                 : Text('Complete & Login', style: TextStyle(fontSize: 18)),
             ),
           ],

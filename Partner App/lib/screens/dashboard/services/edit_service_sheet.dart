@@ -112,7 +112,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
                 backgroundColor: AppTheme.accentColor,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Update Service', style: TextStyle(fontSize: 16)),
+              child: _isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface) : Text('Update Service', style: TextStyle(fontSize: 16)),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(

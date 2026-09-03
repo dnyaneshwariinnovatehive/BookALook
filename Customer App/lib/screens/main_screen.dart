@@ -41,7 +41,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: _tabs,
@@ -50,7 +50,7 @@ class _MainScreenState extends State<MainScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
               blurRadius: 20,
               offset: Offset(0, -5),
             ),
@@ -62,9 +62,9 @@ class _MainScreenState extends State<MainScreen> {
             currentIndex: _currentIndex,
             onTap: _onTabTapped,
             type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            selectedItemColor: AppTheme.accentColor,
-            unselectedItemColor: AppTheme.lightTextLight,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            selectedItemColor: Theme.of(context).colorScheme.primary,
+            unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
             selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
             items: [

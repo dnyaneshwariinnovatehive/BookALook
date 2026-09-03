@@ -22,14 +22,14 @@ class GuestRestrictedView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: AppTheme.lightBorder),
+            Icon(icon, size: 80, color: Theme.of(context).dividerColor),
             SizedBox(height: 24),
             Text(
               title,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.lightTextHeading,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -38,7 +38,7 @@ class GuestRestrictedView extends StatelessWidget {
               message,
               style: TextStyle(
                 fontSize: 16,
-                color: AppTheme.lightTextBody,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -53,7 +53,7 @@ class GuestRestrictedView extends StatelessWidget {
               },
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                backgroundColor: AppTheme.accentColor,
+                backgroundColor: Theme.of(context).colorScheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
               child: Text(

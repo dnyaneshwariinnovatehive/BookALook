@@ -164,7 +164,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
                 child: _isLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                     : const Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],

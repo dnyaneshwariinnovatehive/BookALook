@@ -46,7 +46,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -66,7 +66,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   'Premium Grooming & Beauty Discovery',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppTheme.lightTextBody,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -76,7 +76,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   // Login / Sign Up Toggle
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.lightBorder.withOpacity(0.7),
+                      color: Theme.of(context).dividerColor.withOpacity(0.7),
                       borderRadius: BorderRadius.circular(30),
                     ),
                     padding: EdgeInsets.all(4),
@@ -91,7 +91,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 color: _isLogin ? Colors.white : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: _isLogin
-                                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
                                     : [],
                               ),
                               child: Text(
@@ -99,7 +99,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: _isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextHeading.withOpacity(0.6),
+                                  color: _isLogin ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                 ),
                               ),
                             ),
@@ -114,7 +114,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 color: !_isLogin ? Colors.white : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: !_isLogin
-                                    ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
                                     : [],
                               ),
                               child: Text(
@@ -122,7 +122,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: !_isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextHeading.withOpacity(0.6),
+                                  color: !_isLogin ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                 ),
                               ),
                             ),
@@ -139,7 +139,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.lightTextHeading,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: 8),
@@ -151,11 +151,11 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     hintText: 'Enter your mobile no.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.lightBorder),
+                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppTheme.lightBorder),
+                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -169,13 +169,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   onPressed: _isLoading ? null : _sendOtp,
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: AppTheme.accentColor,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                     elevation: 0,
                   ),
                   child: _isLoading
-                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -192,13 +192,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('New to BookALook? ', style: TextStyle(color: AppTheme.lightTextBody)),
+                      Text('New to BookALook? ', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
                       GestureDetector(
                         onTap: () => setState(() => _isLogin = false),
                         child: Text(
                           'Register',
                           style: TextStyle(
-                            color: AppTheme.accentColor,
+                            color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -207,7 +207,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   ),
                 
                 SizedBox(height: 32),
-                Divider(color: AppTheme.lightBorder),
+                Divider(color: Theme.of(context).dividerColor),
                 SizedBox(height: 24),
 
                 // Explore as Guest
@@ -219,11 +219,11 @@ class _PhoneScreenState extends State<PhoneScreen> {
                         MaterialPageRoute(builder: (context) => MainScreen(isGuest: true)),
                       );
                     },
-                    icon: Icon(Icons.visibility, color: AppTheme.accentColor, size: 20),
+                    icon: Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary, size: 20),
                     label: Text(
                       'Explore as Guest',
                       style: TextStyle(
-                        color: AppTheme.accentColor,
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -235,18 +235,18 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 // Register Your Salon (Outline Button)
                 OutlinedButton.icon(
                   onPressed: () {},
-                  icon: Icon(Icons.storefront, color: AppTheme.accentColor, size: 20),
+                  icon: Icon(Icons.storefront, color: Theme.of(context).colorScheme.primary, size: 20),
                   label: Text(
                     'Register Your Salon',
                     style: TextStyle(
-                      color: AppTheme.accentColor,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(color: AppTheme.accentColor.withOpacity(0.5)),
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   ),
                 ),

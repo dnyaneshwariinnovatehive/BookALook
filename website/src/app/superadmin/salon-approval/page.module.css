@@ -11,20 +11,21 @@
 .title {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-heading);
   margin-bottom: 0.5rem;
 }
 
 .subtitle {
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
   font-size: 0.95rem;
 }
 
 .tableContainer {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
 }
 
@@ -35,21 +36,22 @@
 }
 
 .th {
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
   padding: 1rem 1.5rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-body);
+  opacity: 0.8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .td {
   padding: 1rem 1.5rem;
   font-size: 0.875rem;
-  color: #334155;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .tr:last-child .td {
@@ -57,12 +59,12 @@
 }
 
 .tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
 }
 
 .salonName {
   font-weight: 500;
-  color: #0f172a;
+  color: var(--text-body);
 }
 
 .actionButton {
@@ -70,7 +72,7 @@
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1rem;
-  background-color: #2563eb;
+  background-color: var(--accent-color);
   color: white;
   font-size: 0.875rem;
   font-weight: 500;
@@ -86,6 +88,7 @@
 .emptyState {
   padding: 3rem;
   text-align: center;
-  color: #64748b;
+  color: var(--text-body);
+  opacity: 0.8;
   font-size: 0.95rem;
 }

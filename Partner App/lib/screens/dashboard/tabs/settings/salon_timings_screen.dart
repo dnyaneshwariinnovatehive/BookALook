@@ -127,7 +127,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Change Salon Timings'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         foregroundColor: Colors.black,
       ),
@@ -157,7 +157,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                           minimumSize: const Size(double.infinity, 50),
                         ),
                         child: _isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface)
                             : const Text('Save Timings', style: TextStyle(fontSize: 16)),
                       ),
                     ),
@@ -265,7 +265,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Opens At', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                Text('Opens At', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                                 Text(_formatTimeDisplay(hour.openTime), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
                               ],
                             ),
@@ -293,7 +293,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Closes At', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                Text('Closes At', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                                 Text(_formatTimeDisplay(hour.closeTime), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
                               ],
                             ),

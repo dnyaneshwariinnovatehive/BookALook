@@ -240,7 +240,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Service Provider'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         foregroundColor: Colors.black,
       ),
@@ -296,7 +296,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -345,7 +345,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isSaving
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface)
                   : const Text('Save Provider', style: TextStyle(fontSize: 16)),
             ),
             const SizedBox(height: 32),
@@ -396,11 +396,11 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                     onTap: () => _selectTime(hour, true),
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), borderRadius: BorderRadius.circular(8)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Shift Start', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('Shift Start', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                           const SizedBox(height: 4),
                           Text(_formatTime(hour.shiftStart), style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],
@@ -414,11 +414,11 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                     onTap: () => _selectTime(hour, false),
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+                      decoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), borderRadius: BorderRadius.circular(8)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Shift End', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('Shift End', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                           const SizedBox(height: 4),
                           Text(_formatTime(hour.shiftEnd), style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],

@@ -327,9 +327,8 @@ export default function BannersPage() {
             </div>
             <div className={styles.bannerActions}>
               <button 
-                className={styles.actionButton}
+                className={`${styles.actionButton} ${styles.editButton}`}
                 onClick={() => handleEdit(banner)}
-                style={{ backgroundColor: '#f0ad4e', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' }}
               >
                 Edit
               </button>

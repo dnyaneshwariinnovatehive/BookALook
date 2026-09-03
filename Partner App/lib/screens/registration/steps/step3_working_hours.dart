@@ -93,9 +93,9 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
         ),
         Container(
           padding: const EdgeInsets.all(24.0),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppTheme.lightBorder)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: const Border(top: BorderSide(color: AppTheme.lightBorder)),
           ),
           child: Row(
             children: [
@@ -139,7 +139,7 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
       decoration: BoxDecoration(
         border: Border.all(color: AppTheme.lightBorder),
         borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
       ),
       child: Column(
         children: [

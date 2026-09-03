@@ -32,7 +32,6 @@ class AppTheme {
     colorScheme: ColorScheme.light(
       primary: accentColor,
       surface: lightSurface,
-      background: lightBg,
       onPrimary: Colors.white,
       onSurface: lightTextHeading,
     ),
@@ -51,12 +50,22 @@ class AppTheme {
         fontWeight: FontWeight.w600,
       ),
     ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: lightBg,
+        backgroundColor: lightTextHeading,
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        side: BorderSide.none,
+      ),
+    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
         textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
       ),
     ),
@@ -64,24 +73,38 @@ class AppTheme {
       filled: true,
       fillColor: lightSurface,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: lightBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: lightBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: accentColor, width: 2),
       ),
       labelStyle: TextStyle(color: lightTextLight),
+    ),
+    cardTheme: CardThemeData(
+      color: lightSurface,
+      elevation: 4,
+      shadowColor: Colors.black.withOpacity(0.15),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: lightBorder),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: lightBorder,
+      thickness: 1,
+      space: 1,
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: darkBg,
       contentTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
     ),
   );
 
@@ -92,7 +115,6 @@ class AppTheme {
     colorScheme: ColorScheme.dark(
       primary: accentColor,
       surface: darkSurface,
-      background: darkBg,
       onPrimary: Colors.white,
       onSurface: darkTextHeading,
     ),
@@ -111,12 +133,22 @@ class AppTheme {
         fontWeight: FontWeight.w600,
       ),
     ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: darkBg,
+        backgroundColor: darkTextHeading,
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        side: BorderSide.none,
+      ),
+    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
         textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
         padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
       ),
     ),
@@ -124,24 +156,38 @@ class AppTheme {
       filled: true,
       fillColor: darkSurface,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: darkBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: darkBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         borderSide: BorderSide(color: accentColor, width: 2),
       ),
       labelStyle: TextStyle(color: darkTextLight),
+    ),
+    cardTheme: CardThemeData(
+      color: darkSurface,
+      elevation: 6,
+      shadowColor: Colors.black.withOpacity(0.4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: darkBorder),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: darkBorder,
+      thickness: 1,
+      space: 1,
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: lightBg,
       contentTextStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
     ),
   );
 }

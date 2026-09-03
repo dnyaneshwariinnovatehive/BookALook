@@ -46,9 +46,9 @@ class ProviderProfileTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'My Profile',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 32),
                 
@@ -74,7 +74,7 @@ class ProviderProfileTab extends StatelessWidget {
                         children: [
                           Text(
                             user['name'] ?? 'Unknown',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                           ),
                           const SizedBox(height: 4),
                           Container(
@@ -91,7 +91,7 @@ class ProviderProfileTab extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             salon['name'] ?? 'Luxe Studio Salon',
-                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
                           ),
                         ],
                       ),
@@ -108,42 +108,42 @@ class ProviderProfileTab extends StatelessWidget {
                     children: services.map((s) => _buildServiceChip(s['name'] ?? 'Service')).toList(),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Set by salon admin',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                   ),
                   const SizedBox(height: 40),
                 ],
 
                 // Personal Information Section
-                const Text(
+                Text(
                   'Personal Information',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 24),
                 
-                _buildInfoRow('FULL NAME', user['name'] ?? '', actionIcon: Icons.lock_outline),
+                _buildInfoRow(context, 'FULL NAME', user['name'] ?? '', actionIcon: Icons.lock_outline),
                 const Divider(height: 32, color: Colors.black12),
                 
-                _buildInfoRow('PHONE NUMBER', user['phone'] ?? '', actionText: 'Edit'),
+                _buildInfoRow(context, 'PHONE NUMBER', user['phone'] ?? '', actionText: 'Edit'),
                 const Divider(height: 32, color: Colors.black12),
                 
-                _buildInfoRow('EMAIL ADDRESS', user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
+                _buildInfoRow(context, 'EMAIL ADDRESS', user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
                 const Divider(height: 32, color: Colors.black12),
                 
-                _buildPhotoUploadRow(),
+                _buildPhotoUploadRow(context),
                 
                 const SizedBox(height: 40),
 
                 // Working Hours Section
-                const Text(
+                Text(
                   'Working Hours',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 24),
                 
                 if (workingHours.isEmpty)
-                  const Text('No working hours assigned yet.', style: TextStyle(color: Colors.grey))
+                  Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
                 else
                   ...workingHours.asMap().entries.map((entry) {
                     final index = entry.key;
@@ -160,7 +160,7 @@ class ProviderProfileTab extends StatelessWidget {
 
                     return Column(
                       children: [
-                        _buildWorkingHourRow(daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
+                        _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
                         if (index < workingHours.length - 1)
                           const Divider(height: 32, color: Colors.black12),
                       ],
@@ -190,7 +190,7 @@ class ProviderProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {IconData? actionIcon, String? actionText}) {
+  Widget _buildInfoRow(BuildContext context, String label, String value, {IconData? actionIcon, String? actionText}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -200,12 +200,12 @@ class ProviderProfileTab extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
               const SizedBox(height: 8),
               Text(
                 value,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
               ),
             ],
           ),
@@ -221,7 +221,7 @@ class ProviderProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildPhotoUploadRow() {
+  Widget _buildPhotoUploadRow(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -229,9 +229,9 @@ class ProviderProfileTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'PHOTO',
-                style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.bold, letterSpacing: 0.5),
               ),
               const SizedBox(height: 12),
               Row(
@@ -265,14 +265,14 @@ class ProviderProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkingHourRow(String day, String workTime, String? breakTime) {
+  Widget _buildWorkingHourRow(BuildContext context, String day, String workTime, String? breakTime) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           day,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
         ),
         Row(
           children: [

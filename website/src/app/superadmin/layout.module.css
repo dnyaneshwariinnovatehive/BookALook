@@ -3,24 +3,26 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background-color: #f8fafc;
+  background-color: var(--bg-color);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .sidebar {
   width: 280px;
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: var(--surface-color);
+  color: var(--text-body);
   display: flex;
   flex-direction: column;
   height: 100%;
-  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--card-shadow);
   z-index: 10;
+  border-right: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
 }
 
 .sidebarHeader {
   padding: 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -28,10 +30,8 @@
 
 .logoText {
   font-size: 1.25rem;
-  font-weight: 700;
-  background: linear-gradient(to right, #38bdf8, #818cf8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  color: var(--accent-color);
   letter-spacing: -0.02em;
 }
 
@@ -62,7 +62,8 @@
   align-items: center;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  color: #cbd5e1;
+  color: var(--text-body);
+  opacity: 0.8;
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -72,13 +73,13 @@
 }
 
 .navItem:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: #f8fafc;
+  background-color: rgba(156, 84, 242, 0.05);
+  color: var(--accent-color);
 }
 
 .activeNavItem {
-  background-color: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  background-color: rgba(156, 84, 242, 0.1);
+  color: var(--accent-color);
   font-weight: 600;
 }
 
@@ -88,14 +89,14 @@
   left: 0;
   top: 15%;
   height: 70%;
-  width: 3px;
-  background-color: #38bdf8;
+  width: 4px;
+  background-color: var(--accent-color);
   border-radius: 0 4px 4px 0;
 }
 
 .sidebarFooter {
   padding: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-color);
 }
 
 .logoutButton {
@@ -106,7 +107,7 @@
   padding: 0.75rem;
   background-color: rgba(239, 68, 68, 0.1);
   color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.9rem;
   font-weight: 500;
@@ -127,15 +128,16 @@
 }
 
 .topbar {
-  height: 64px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  height: 72px;
+  background-color: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 2rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: var(--card-shadow);
   z-index: 5;
+  border-radius: var(--radius-lg);
 }
 
 .userProfile {
@@ -144,11 +146,32 @@
   gap: 0.75rem;
 }
 
-.userAvatar {
-  width: 36px;
-  height: 36px;
+.themeToggleBtn {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-body);
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.themeToggleBtn:hover {
+  background-color: var(--surface-color);
+  box-shadow: var(--card-shadow);
+}
+
+.userAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,17 +183,18 @@
 .userName {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-body);
 }
 
 .userRole {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-body);
+  opacity: 0.8;
 }
 
 .mainContent {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
-  background-color: #f8fafc;
+  padding: 24px;
+  background-color: var(--bg-color);
 }

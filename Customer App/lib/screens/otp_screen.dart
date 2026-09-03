@@ -74,7 +74,7 @@ class _OtpScreenState extends State<OtpScreen> {
             Text(
               '(For testing, use 123456)',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             ),
             SizedBox(height: 32),
             TextField(
@@ -95,7 +95,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 padding: EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading 
-                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                 : Text('Verify & Login', style: TextStyle(fontSize: 18)),
             ),
           ],

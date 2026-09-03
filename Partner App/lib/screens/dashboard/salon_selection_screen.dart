@@ -61,16 +61,16 @@ class SalonSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         title: const Text('bookalook', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, fontFamily: 'InstagramLogo')), // Fallback to standard bold if font not found
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
+            icon: Icon(Icons.logout, color: Theme.of(context).colorScheme.onSurface),
             onPressed: () => _logout(context),
           ),
           const SizedBox(width: 8),
@@ -80,14 +80,14 @@ class SalonSelectionScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Text(
                 'Switch Account',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ),
@@ -125,12 +125,12 @@ class SalonSelectionScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     salon['name'] ?? 'Unnamed Salon',
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black),
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
-                                      Text(salon['city'] ?? 'Unknown location', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                                      Text(salon['city'] ?? 'Unknown location', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                                       if (isPending) ...[
                                         const SizedBox(width: 8),
                                         Container(
@@ -147,7 +147,7 @@ class SalonSelectionScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 24),
+                            Icon(Icons.radio_button_unchecked, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), size: 24),
                           ],
                         ),
                       ),
@@ -166,17 +166,17 @@ class SalonSelectionScreen extends StatelessWidget {
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.black, width: 1.5),
+                                  border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1.5),
                                 ),
-                                child: const Center(
-                                  child: Icon(Icons.add, color: Colors.black, size: 28),
+                                child: Center(
+                                  child: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurface, size: 28),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 16),
-                            const Text(
+                            Text(
                               'Add new salon',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.black),
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Theme.of(context).colorScheme.onSurface),
                             ),
                           ],
                         ),

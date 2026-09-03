@@ -72,7 +72,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Manage Staff: ${widget.serviceName}'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
@@ -85,7 +85,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
             backgroundColor: AppTheme.accentColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(fontSize: 16)),
+          child: _isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface) : Text('Save Changes', style: TextStyle(fontSize: 16)),
         ),
       ) : null,
     );

@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
       title: 'BookALook Customer',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system, // Switches based on system preference
+      themeMode: ThemeMode.light, // Enforce light theme as default
       home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );

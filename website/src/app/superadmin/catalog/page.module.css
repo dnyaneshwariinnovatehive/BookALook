@@ -12,22 +12,22 @@
 .title {
   font-size: 24px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-heading);
 }
 
 .addButton {
   padding: 10px 16px;
-  background-color: #4F46E5;
+  background-color: var(--accent-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .addButton:hover {
-  background-color: #4338CA;
+  background-color: var(--accent-hover);
 }
 
 .catalogList {
@@ -37,16 +37,16 @@
 }
 
 .categoryCard {
-  background: white;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.2s;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .categoryCard:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--card-shadow);
 }
 
 .categoryHeader {
@@ -54,8 +54,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #F9FAFB;
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
   cursor: pointer;
+  box-shadow: var(--card-shadow);
+  border-radius: var(--radius-lg);
 }
 
 .categoryInfo {
@@ -69,7 +72,7 @@
   height: 48px;
   border-radius: 8px;
   background-color: #F3F4F6;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +95,7 @@
 .categoryName {
   font-size: 17px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text-body);
 }
 
 .badge {
@@ -103,18 +106,18 @@
 }
 
 .badgeStandard {
-  background-color: #D1FAE5;
-  color: #065F46;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
 }
 
 .badgeCustom {
-  background-color: #FEF3C7;
-  color: #92400E;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
 }
 
 .badgeInactive {
-  background-color: #F3F4F6;
-  color: #4B5563;
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
 }
 
 .promoteBtn {
@@ -137,7 +140,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border-top: 1px solid #E5E7EB;
+  background: var(--bg-color);
 }
 
 .templateItem {
@@ -145,8 +148,10 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background: #F3F4F6;
-  border-radius: 6px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
 }
 
 .templateInfo {
@@ -158,7 +163,7 @@
 .templateName {
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-body);
 }
 
 .templateDuration {
@@ -181,11 +186,12 @@
 }
 
 .modal {
-  background: white;
+  background: var(--surface-color);
   padding: 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 400px;
+  box-shadow: var(--card-shadow);
 }
 
 .modalTitle {
@@ -208,7 +214,7 @@
 .formGroup input:not([type="checkbox"]) {
   width: 100%;
   padding: 8px;
-  border: 1px solid #D1D5DB;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
 }
 
@@ -219,7 +225,7 @@
   margin-bottom: 16px;
   padding: 8px 12px;
   background: #F9FAFB;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -227,7 +233,7 @@
 .checkboxGroup label {
   font-size: 15px;
   font-weight: 500;
-  color: #111827;
+  color: var(--text-body);
   cursor: pointer;
   margin: 0;
   user-select: none;
@@ -237,7 +243,7 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #4F46E5;
+  accent-color: var(--accent-color);
 }
 
 .modalActions {
@@ -249,24 +255,30 @@
 
 .cancelBtn {
   padding: 8px 16px;
-  background: white;
-  border: 1px solid #D1D5DB;
+  background: transparent;
+  color: var(--text-body);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .saveBtn {
   padding: 8px 16px;
-  background: #4F46E5;
+  background: var(--accent-color);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  font-weight: 500;
+}
+
+.saveBtn:hover {
+  background: var(--accent-hover);
 }
 
 .editBtn {
   padding: 6px 12px;
-  background-color: #3B82F6;
+  background-color: var(--accent-color);
   color: white;
   border: none;
   border-radius: 4px;
@@ -276,7 +288,7 @@
 }
 
 .editBtn:hover {
-  background-color: #2563EB;
+  background-color: var(--accent-color);
 }
 
 .deleteBtn {
