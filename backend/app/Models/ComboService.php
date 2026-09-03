@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class ComboService extends Model
+class ComboService extends Pivot
 {
-    //
+    protected $table = 'combo_services';
+
+    protected $fillable = [
+        'combo_id',
+        'service_id',
+        'combo_special_price',
+    ];
+
+    protected $casts = [
+        'combo_special_price' => 'decimal:2',
+    ];
 }

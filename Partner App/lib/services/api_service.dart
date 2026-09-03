@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.90.1.35:8000/api';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   static Future<List<dynamic>> fetchCities() async {
     try {

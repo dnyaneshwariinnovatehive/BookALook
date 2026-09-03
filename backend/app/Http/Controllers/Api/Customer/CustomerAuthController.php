@@ -65,6 +65,12 @@ class CustomerAuthController extends Controller
 
         $user = User::where('phone', $request->phone)->first();
 
+        if ($user && $user->role !== 'customer') {
+            return response()->json([
+                'message' => 'This account is registered as a partner. Please use the Partner App to log in.',
+            ], 403);
+        }
+
         if (!$user) {
             return response()->json([
                 'message' => 'OTP verified. Profile completion required.',

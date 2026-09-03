@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../main.dart'; // To access DummyDashboardScreen
+import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart';
+import 'dashboard/dashboard_screen.dart';
+import 'registration/admin_registration_screen.dart';
+import 'dashboard/salon_selection_screen.dart';
+import 'dashboard/service_provider_dashboard.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -23,19 +28,45 @@ class _OtpScreenState extends State<OtpScreen> {
     if (otp.length < 6) return;
 
     setState(() => _isLoading = true);
-    final isValid = await _authService.verifyOtp(widget.phone, otp);
+    final response = await _authService.verifyOtp(widget.phone, otp);
     if (mounted) setState(() => _isLoading = false);
 
-    if (isValid) {
-      // Navigate to the Dashboard (removing history)
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const DummyDashboardScreen()),
-        (route) => false,
-      );
+    if (response['success'] == true) {
+      if (!mounted) return;
+
+      if (response['status'] == 'new_user') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => AdminRegistrationScreen(phone: widget.phone)),
+        );
+      } else if (response['status'] == 'existing_user') {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', response['token'] ?? '');
+        await prefs.setString('role', response['role'] ?? '');
+
+        if (!mounted) return;
+
+        if (response['role'] == 'admin') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SalonSelectionScreen(salons: response['salons'] ?? []),
+            ),
+            (route) => false,
+          );
+        } else if (response['role'] == 'service_provider') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ServiceProviderDashboard(salon: response['salon'] ?? {}),
+            ),
+            (route) => false,
+          );
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid OTP. Use 123456')),
+        SnackBar(content: Text(response['message'] ?? 'Invalid OTP')),
       );
     }
   }

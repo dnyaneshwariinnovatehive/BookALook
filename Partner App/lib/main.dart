@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:partner_app/theme/app_theme.dart';
-import 'screens/phone_screen.dart';
+import 'screens/splash_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(const PartnerApp());
 }
 
@@ -16,39 +19,8 @@ class PartnerApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const PhoneScreen(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-class DummyDashboardScreen extends StatelessWidget {
-  const DummyDashboardScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Partner Dashboard'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.storefront, size: 80, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 16),
-            Text(
-              'Welcome, Admin!',
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 24),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ready to register your Salon?',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

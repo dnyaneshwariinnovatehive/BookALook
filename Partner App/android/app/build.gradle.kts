@@ -43,3 +43,14 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+tasks.register<Exec>("adbReverse") {
+    commandLine("adb", "reverse", "tcp:8000", "tcp:8000")
+    isIgnoreExitValue = true
+}
+
+tasks.whenTaskAdded {
+    if (name == "preBuild") {
+        dependsOn("adbReverse")
+    }
+}

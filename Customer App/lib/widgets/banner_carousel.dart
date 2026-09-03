@@ -26,23 +26,20 @@ class _BannerCarouselState extends State<BannerCarousel> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
-    if (widget.banners.isNotEmpty && widget.autoPlay) {
+    // Start at a large multiple so the user can scroll left immediately
+    int initialPage = widget.banners.length > 1 ? widget.banners.length * 1000 : 0;
+    _currentPage = initialPage;
+    _pageController = PageController(initialPage: initialPage);
+    
+    if (widget.banners.length > 1 && widget.autoPlay) {
       _startAutoPlay();
     }
   }
 
   void _startAutoPlay() {
     _timer = Timer.periodic(Duration(seconds: 4), (Timer timer) {
-      if (_currentPage < widget.banners.length - 1) {
-        _currentPage++;
-      } else {
-        _currentPage = 0;
-      }
-      
       if (_pageController.hasClients) {
-        _pageController.animateToPage(
-          _currentPage,
+        _pageController.nextPage(
           duration: Duration(milliseconds: 350),
           curve: Curves.easeIn,
         );
@@ -89,6 +86,8 @@ class _BannerCarouselState extends State<BannerCarousel> {
       );
     }
 
+    final isInfinite = widget.banners.length > 1;
+
     return Column(
       children: [
         SizedBox(
@@ -100,9 +99,10 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 _currentPage = page;
               });
             },
-            itemCount: widget.banners.length,
+            itemCount: isInfinite ? null : widget.banners.length,
             itemBuilder: (context, index) {
-              final banner = widget.banners[index];
+              final realIndex = isInfinite ? index % widget.banners.length : index;
+              final banner = widget.banners[realIndex];
               return GestureDetector(
                 onTap: () async {
                   if (banner.actionUrl != null && banner.actionUrl!.isNotEmpty) {
@@ -128,22 +128,26 @@ class _BannerCarouselState extends State<BannerCarousel> {
           ),
         ),
         SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            widget.banners.length,
-            (index) => AnimatedContainer(
-              duration: Duration(milliseconds: 300),
-              margin: EdgeInsets.symmetric(horizontal: 4),
-              height: 8,
-              width: _currentPage == index ? 24 : 8,
-              decoration: BoxDecoration(
-                color: _currentPage == index ? AppTheme.accentColor : AppTheme.lightBorder,
-                borderRadius: BorderRadius.circular(4),
-              ),
+        if (widget.banners.length > 1)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              widget.banners.length,
+              (index) {
+                final realCurrentPage = _currentPage % widget.banners.length;
+                return AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  margin: EdgeInsets.symmetric(horizontal: 4),
+                  height: 8,
+                  width: realCurrentPage == index ? 24 : 8,
+                  decoration: BoxDecoration(
+                    color: realCurrentPage == index ? AppTheme.accentColor : AppTheme.lightBorder,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }
             ),
           ),
-        ),
       ],
     );
   }

@@ -10,15 +10,42 @@ class SalonController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DB::table('salons')->select('id', 'name', 'city');
+        $query = \App\Models\Salon::with(['admin', 'city']);
 
-        if ($request->has('search')) {
+        if ($request->has('search') && $request->search != '') {
             $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhereHas('city', function($qc) use ($search) {
+                      $qc->where('name', 'like', "%{$search}%");
+                  });
+            });
         }
 
-        $salons = $query->limit(50)->get();
+        if ($request->has('status') && $request->status != '') {
+            $query->where('status', $request->input('status'));
+        }
 
-        return response()->json($salons);
+        $salons = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        return response()->json([
+            'success' => true,
+            'data' => $salons->items(),
+            'meta' => [
+                'current_page' => $salons->currentPage(),
+                'last_page' => $salons->lastPage(),
+                'total' => $salons->total(),
+            ]
+        ]);
+    }
+
+    public function show($id)
+    {
+        $salon = \App\Models\Salon::with(['admin', 'city'])->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $salon
+        ]);
     }
 }

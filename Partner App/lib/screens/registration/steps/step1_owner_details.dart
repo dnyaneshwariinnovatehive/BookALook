@@ -4,8 +4,9 @@ import '../../../theme/app_theme.dart';
 class Step1OwnerDetails extends StatefulWidget {
   final Function(Map<String, dynamic>) onNext;
   final VoidCallback onCancel;
+  final String? phone;
 
-  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel});
+  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel, this.phone});
 
   @override
   State<Step1OwnerDetails> createState() => _Step1OwnerDetailsState();
@@ -18,6 +19,14 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.phone != null) {
+      _phoneController.text = widget.phone!;
+    }
+  }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {

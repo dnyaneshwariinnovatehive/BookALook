@@ -4,9 +4,12 @@ import 'steps/step1_owner_details.dart';
 import 'steps/step2_salon_details.dart';
 import 'steps/step3_terms.dart';
 import '../../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../dashboard/salon_selection_screen.dart';
 
 class AdminRegistrationScreen extends StatefulWidget {
-  const AdminRegistrationScreen({super.key});
+  final String? phone;
+  const AdminRegistrationScreen({super.key, this.phone});
 
   @override
   State<AdminRegistrationScreen> createState() => _AdminRegistrationScreenState();
@@ -53,23 +56,18 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
     if (mounted) setState(() => _isLoading = false);
 
     if (result['success']) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isRegistered', true);
+      
       if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Registration Successful'),
-            content: const Text('Your salon has been registered and is pending SuperAdmin approval. You can log in once approved.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // Close Dialog
-                  Navigator.pop(context); // Go back to login
-                },
-                child: const Text('OK'),
-              )
-            ],
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SalonSelectionScreen(
+              salons: result['data']?['salon'] != null ? [result['data']['salon']] : [],
+            ),
           ),
+          (route) => false,
         );
       }
     } else {
@@ -119,7 +117,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(), // Disable swipe to navigate
         children: [
-          Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep),
+          Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep, phone: widget.phone),
           Step2SalonDetails(onNext: _nextStep, onBack: _previousStep),
           Step3Terms(onSubmit: _nextStep, onBack: _previousStep, isLoading: _isLoading),
         ],

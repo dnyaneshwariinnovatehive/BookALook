@@ -24,8 +24,14 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   String _genderFocus = 'Unisex';
   
   List<dynamic> _cities = [];
+  List<String> _states = [];
+  List<dynamic> _filteredCities = [];
+  
   String? _selectedCityId;
+  String? _selectedState;
   bool _isLoadingCities = true;
+
+  bool get _useDropdowns => _cities.isNotEmpty && _states.isNotEmpty;
 
   @override
   void initState() {
@@ -38,24 +44,47 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
     if (mounted) {
       setState(() {
         _cities = cities;
+        if (_cities.isNotEmpty) {
+          final statesSet = <String>{};
+          for (var city in _cities) {
+            if (city['state'] != null && city['state'].toString().trim().isNotEmpty) {
+              statesSet.add(city['state'].toString().trim());
+            }
+          }
+          _states = statesSet.toList()..sort();
+        }
         _isLoadingCities = false;
       });
     }
   }
 
+  void _onStateChanged(String? newState) {
+    setState(() {
+      _selectedState = newState;
+      _selectedCityId = null;
+      if (newState != null) {
+        _filteredCities = _cities.where((c) => c['state']?.toString().trim() == newState).toList();
+      } else {
+        _filteredCities = [];
+      }
+    });
+  }
+
   void _submit() {
     if (_formKey.currentState!.validate()) {
       // Append state to address to respect the schema
+      String stateVal = _useDropdowns ? (_selectedState ?? '') : _stateController.text.trim();
       String fullStreet = _addressController.text.trim();
-      if (_stateController.text.trim().isNotEmpty) {
-        fullStreet += ', ' + _stateController.text.trim();
+      if (stateVal.isNotEmpty) {
+        fullStreet += ', ' + stateVal;
       }
 
       widget.onNext({
         'salon_name': _salonNameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'street_address': fullStreet,
-        'city_id': _selectedCityId,
+        'city_id': _useDropdowns ? _selectedCityId : null,
+        if (!_useDropdowns) 'city_name': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'gender_focus': _genderFocus,
       });
@@ -118,7 +147,50 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
             const SizedBox(height: 16),
 
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('State *'),
+                      if (_isLoadingCities)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_useDropdowns)
+                        DropdownButtonFormField<String>(
+                          value: _selectedState,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            hintText: 'State',
+                            hintStyle: const TextStyle(color: Colors.black26),
+                            prefixIcon: const Icon(Icons.map_outlined, color: Colors.black38, size: 20),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
+                          ),
+                          items: _states.map((state) {
+                            return DropdownMenuItem<String>(
+                              value: state,
+                              child: Text(state, overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: _onStateChanged,
+                          validator: (v) => v == null ? 'Required' : null,
+                        )
+                      else
+                        _buildTextField(
+                          controller: _stateController,
+                          hint: 'State',
+                          icon: Icons.map_outlined,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,9 +198,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                       _buildLabel('City *'),
                       if (_isLoadingCities)
                         const Center(child: CircularProgressIndicator())
-                      else
+                      else if (_useDropdowns)
                         DropdownButtonFormField<String>(
                           value: _selectedCityId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'City',
                             hintStyle: const TextStyle(color: Colors.black26),
@@ -140,10 +213,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
                           ),
-                          items: _cities.map<DropdownMenuItem<String>>((city) {
+                          items: _filteredCities.map<DropdownMenuItem<String>>((city) {
                             return DropdownMenuItem<String>(
-                              value: city['id'],
-                              child: Text(city['name'] + (city['state'] != null ? ' (\${city['state']})' : '')),
+                              value: city['id'].toString(),
+                              child: Text(city['name'].toString(), overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -152,22 +225,14 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                             });
                           },
                           validator: (v) => v == null ? 'Required' : null,
+                        )
+                      else
+                        _buildTextField(
+                          controller: _cityController,
+                          hint: 'City',
+                          icon: Icons.location_city_outlined,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('State *'),
-                      _buildTextField(
-                        controller: _stateController,
-                        hint: 'State',
-                        icon: Icons.map_outlined,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
                     ],
                   ),
                 ),
