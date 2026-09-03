@@ -25,8 +25,9 @@ async function handleRequest(req: NextRequest, { params }: { params: Promise<{ p
   let body: any;
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     if (contentType?.includes('multipart/form-data')) {
-      // Pass the raw ArrayBuffer so binary data isn't corrupted
-      body = await req.arrayBuffer();
+      // Reconstruct FormData to ensure Next.js fetch sends it with the correct boundary
+      body = await req.formData();
+      delete headers['Content-Type']; // Let fetch automatically set the boundary
     } else {
       body = await req.text();
     }
