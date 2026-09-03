@@ -5,7 +5,8 @@ import '../../../../models/service_models.dart';
 
 class AddComboScreen extends StatefulWidget {
   final String salonId;
-  const AddComboScreen({super.key, required this.salonId});
+  final Map<String, dynamic>? existingCombo;
+  const AddComboScreen({super.key, required this.salonId, this.existingCombo});
 
   @override
   State<AddComboScreen> createState() => _AddComboScreenState();
@@ -14,6 +15,8 @@ class AddComboScreen extends StatefulWidget {
 class _AddComboScreenState extends State<AddComboScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _advanceController = TextEditingController(text: '25'); // Default matching backend
+  bool _refundAdvance = false;
   
   bool _isLoading = true;
   String? _error;
@@ -27,6 +30,22 @@ class _AddComboScreenState extends State<AddComboScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.existingCombo != null) {
+      _nameController.text = widget.existingCombo!['name'] ?? '';
+      _advanceController.text = (widget.existingCombo!['advance_percentage'] ?? 25).toString();
+      final refundVal = widget.existingCombo!['will_refund_advance_if_cancelled'];
+      _refundAdvance = refundVal == 1 || refundVal == true;
+
+      final servicesList = widget.existingCombo!['services'] as List?;
+      if (servicesList != null) {
+        for (var s in servicesList) {
+          _selectedServices.add({
+            'service_id': s['id'],
+            'special_price': double.tryParse(s['pivot']['combo_special_price']?.toString() ?? '0') ?? 0.0,
+          });
+        }
+      }
+    }
     _fetchServices();
   }
 
@@ -109,11 +128,24 @@ class _AddComboScreenState extends State<AddComboScreen> {
 
     setState(() { _isSaving = true; });
     try {
-      await ServiceManagementApi.createCombo(
-        salonId: widget.salonId,
-        name: _nameController.text,
-        services: validServices,
-      );
+      if (widget.existingCombo != null) {
+        await ServiceManagementApi.updateCombo(
+          salonId: widget.salonId,
+          comboId: widget.existingCombo!['id'],
+          name: _nameController.text,
+          services: validServices,
+          advancePercentage: double.tryParse(_advanceController.text),
+          willRefundAdvanceIfCancelled: _refundAdvance,
+        );
+      } else {
+        await ServiceManagementApi.createCombo(
+          salonId: widget.salonId,
+          name: _nameController.text,
+          services: validServices,
+          advancePercentage: double.tryParse(_advanceController.text),
+          willRefundAdvanceIfCancelled: _refundAdvance,
+        );
+      }
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -129,10 +161,39 @@ class _AddComboScreenState extends State<AddComboScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Combo'),
+        title: Text(widget.existingCombo != null ? 'Edit Combo' : 'Add Combo'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          if (widget.existingCombo != null)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Combo'),
+                    content: const Text('Are you sure you want to delete this combo?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  setState(() => _isLoading = true);
+                  try {
+                    await ServiceManagementApi.deleteCombo(widget.salonId, widget.existingCombo!['id']);
+                    if (mounted) Navigator.pop(context, true);
+                  } catch (e) {
+                    setState(() => _isLoading = false);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+        ],
       ),
       body: _buildBody(),
       bottomNavigationBar: _isLoading ? null : Padding(
@@ -143,7 +204,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
             backgroundColor: AppTheme.accentColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: _isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface) : Text('Create Combo', style: TextStyle(fontSize: 16)),
+          child: _isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface) : Text(widget.existingCombo != null ? 'Save Changes' : 'Create Combo', style: TextStyle(fontSize: 16)),
         ),
       ),
     );
@@ -163,7 +224,33 @@ class _AddComboScreenState extends State<AddComboScreen> {
             decoration: const InputDecoration(labelText: 'Combo Name', border: OutlineInputBorder()),
             validator: (v) => v!.isEmpty ? 'Required' : null,
           ),
+          const SizedBox(height: 16),
+          
+          TextFormField(
+            controller: _advanceController,
+            decoration: const InputDecoration(labelText: 'Min Advance %', border: OutlineInputBorder()),
+            keyboardType: TextInputType.number,
+            validator: (v) => v!.isEmpty ? 'Required' : null,
+          ),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _refundAdvance,
+                  onChanged: (val) => setState(() => _refundAdvance = val!),
+                  activeColor: AppTheme.accentColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
+            ],
+          ),
           const SizedBox(height: 24),
+          
           const Text('Services Included:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           

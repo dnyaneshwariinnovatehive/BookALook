@@ -25,6 +25,7 @@ Route::prefix('customer')->group(function () {
 
 // Public global routes
 Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']);
+Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
 Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']);
 
 Route::prefix('superadmin')->group(function () {
@@ -40,10 +41,27 @@ Route::prefix('superadmin')->group(function () {
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
 
+
+    // Public Enquiries API (Unprotected for now to ease frontend testing)
+    Route::get('/enquiries', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'index']);
+    Route::get('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'getCollaborators']);
+    Route::post('/enquiries/{id}/assign', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'assignCollaborator']);
+
+    // Collaborator Management
+    Route::get('/collaborators/stats', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'index']);
+    Route::post('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'store']);
+
     // Protected superadmin routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
         Route::apiResource('banners', \App\Http\Controllers\Api\SuperAdmin\BannerController::class);
+
+        // Subscriptions
+        Route::get('/subscriptions/plans', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);
+        Route::post('/subscriptions/plans', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'store']);
+        Route::put('/subscriptions/plans/{id}', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'update']);
+        Route::delete('/subscriptions/plans/{id}', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'destroy']);
+        Route::post('/salons/{id}/subscription', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'assignToSalon']);
 
         // Catalog Management
         Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
@@ -76,6 +94,8 @@ Route::prefix('partner')->group(function () {
         // Combos
         Route::get('/salons/{salon_id}/combos', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getCombos']);
         Route::post('/salons/{salon_id}/combos', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'createCombo']);
+        Route::put('/salons/{salon_id}/combos/{combo_id}', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'updateCombo']);
+        Route::delete('/salons/{salon_id}/combos/{combo_id}', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'deleteCombo']);
         
         // Staff Assignment
         Route::get('/salons/{salon_id}/services/{service_id}/staff', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getServiceStaff']);
@@ -88,6 +108,8 @@ Route::prefix('partner')->group(function () {
         // Staff Management
         Route::get('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'index']);
         Route::post('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'store']);
+        Route::put('/salons/{salon_id}/staff/{staff_id}', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'update']);
+        Route::delete('/salons/{salon_id}/staff/{staff_id}', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'destroy']);
         
         // Staff Leaves
         Route::get('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'getLeaves']);

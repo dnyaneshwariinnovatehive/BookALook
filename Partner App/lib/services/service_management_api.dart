@@ -54,6 +54,9 @@ class ServiceManagementApi {
     String? customCategoryName,
     String? customTemplateName,
     int? estimatedDurationMinutes,
+    double? advancePercentage,
+    String? genderFocus,
+    bool? willRefundAdvanceIfCancelled,
   }) async {
     final body = {
       'is_custom': isCustom,
@@ -64,6 +67,9 @@ class ServiceManagementApi {
       if (isCustom && categoryId == 'new_custom') 'custom_category_name': customCategoryName,
       if (isCustom) 'custom_template_name': customTemplateName,
       if (isCustom) 'estimated_duration_minutes': estimatedDurationMinutes,
+      if (advancePercentage != null) 'advance_percentage': advancePercentage,
+      if (genderFocus != null) 'gender_focus': genderFocus,
+      if (willRefundAdvanceIfCancelled != null) 'will_refund_advance_if_cancelled': willRefundAdvanceIfCancelled,
     };
 
     final response = await http.post(
@@ -131,10 +137,14 @@ class ServiceManagementApi {
     required String salonId,
     required String name,
     required List<Map<String, dynamic>> services,
+    double? advancePercentage,
+    bool? willRefundAdvanceIfCancelled,
   }) async {
     final body = {
       'name': name,
       'services': services,
+      if (advancePercentage != null) 'advance_percentage': advancePercentage,
+      if (willRefundAdvanceIfCancelled != null) 'will_refund_advance_if_cancelled': willRefundAdvanceIfCancelled,
     };
     final response = await http.post(
       Uri.parse('$baseUrl/salons/$salonId/combos'),
@@ -145,6 +155,44 @@ class ServiceManagementApi {
       return jsonDecode(response.body)['combo'];
     } else {
       throw Exception('Failed to create combo: ${response.body}');
+    }
+  }
+
+  static Future<dynamic> updateCombo({
+    required String salonId,
+    required String comboId,
+    String? name,
+    List<Map<String, dynamic>>? services,
+    double? advancePercentage,
+    bool? willRefundAdvanceIfCancelled,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (services != null) body['services'] = services;
+    if (advancePercentage != null) body['advance_percentage'] = advancePercentage;
+    if (willRefundAdvanceIfCancelled != null) body['will_refund_advance_if_cancelled'] = willRefundAdvanceIfCancelled;
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/salons/$salonId/combos/$comboId'),
+      headers: await _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body)['combo'];
+    } else {
+      throw Exception('Failed to update combo: ${response.body}');
+    }
+  }
+
+  static Future<void> deleteCombo(String salonId, String comboId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/salons/$salonId/combos/$comboId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete combo: ${response.body}');
     }
   }
 

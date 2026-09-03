@@ -8,6 +8,7 @@ import 'dashboard/dashboard_screen.dart';
 import 'registration/admin_registration_screen.dart';
 import 'dashboard/salon_selection_screen.dart';
 import 'dashboard/service_provider_dashboard.dart';
+import 'dashboard/collaborator_dashboard.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -63,6 +64,14 @@ class _OtpScreenState extends State<OtpScreen> {
                 provider: response['provider'] ?? {},
                 user: response['user'] ?? {},
               ),
+            ),
+            (route) => false,
+          );
+        } else if (response['role'] == 'collaborator') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CollaboratorDashboardScreen(),
             ),
             (route) => false,
           );

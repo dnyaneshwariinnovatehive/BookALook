@@ -9,7 +9,8 @@ import '../../../../theme/app_theme.dart';
 
 class AddStaffScreen extends StatefulWidget {
   final String salonId;
-  const AddStaffScreen({super.key, required this.salonId});
+  final StaffMember? existingStaff;
+  const AddStaffScreen({super.key, required this.salonId, this.existingStaff});
 
   @override
   State<AddStaffScreen> createState() => _AddStaffScreenState();
@@ -46,6 +47,21 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.existingStaff != null) {
+      _nameController.text = widget.existingStaff!.user?['name'] ?? '';
+      _phoneController.text = widget.existingStaff!.user?['phone'] ?? '';
+      _emailController.text = widget.existingStaff!.user?['email'] ?? '';
+      _salaryController.text = widget.existingStaff!.baseSalary.toString();
+      _commissionController.text = widget.existingStaff!.commissionPercentage.toString();
+      
+      final svcs = widget.existingStaff!.services;
+      if (svcs != null) {
+        _selectedServiceIds.addAll(svcs.map((s) => s['id'].toString()));
+      }
+      
+      // We don't have working hours fetched in the list view, so it will fall back to default or use salon hours
+      // In a real app we'd fetch the provider's specific hours here if we want to edit them.
+    }
     _fetchInitialData();
   }
 
@@ -71,26 +87,42 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     
     setState(() => _isSaving = true);
     try {
-      await StaffApi.addStaff(
-        salonId: widget.salonId,
-        name: _nameController.text,
-        phone: _phoneController.text,
-        email: _emailController.text.isNotEmpty ? _emailController.text : null,
-        specialization: null,
-        baseSalary: double.tryParse(_salaryController.text) ?? 0,
-        commissionPercentage: double.tryParse(_commissionController.text) ?? 0,
-        serviceIds: _selectedServiceIds.toList(),
-        workingHours: _useSalonWorkingHours 
+      final workingHoursToSave = _useSalonWorkingHours 
             ? _salonWorkingHours.map((h) => StaffWorkingHour(
                 dayOfWeek: h.dayOfWeek,
                 isWeeklyOff: h.isClosed,
                 shiftStart: h.openTime,
                 shiftEnd: h.closeTime,
               )).toList()
-            : _workingHours,
-      );
+            : _workingHours;
+
+      if (widget.existingStaff != null) {
+        await StaffApi.updateStaff(
+          salonId: widget.salonId,
+          staffId: widget.existingStaff!.id,
+          name: _nameController.text,
+          phone: _phoneController.text,
+          email: _emailController.text.isNotEmpty ? _emailController.text : null,
+          baseSalary: double.tryParse(_salaryController.text) ?? 0,
+          commissionPercentage: double.tryParse(_commissionController.text) ?? 0,
+          serviceIds: _selectedServiceIds.toList(),
+          workingHours: workingHoursToSave,
+        );
+      } else {
+        await StaffApi.addStaff(
+          salonId: widget.salonId,
+          name: _nameController.text,
+          phone: _phoneController.text,
+          email: _emailController.text.isNotEmpty ? _emailController.text : null,
+          specialization: null,
+          baseSalary: double.tryParse(_salaryController.text) ?? 0,
+          commissionPercentage: double.tryParse(_commissionController.text) ?? 0,
+          serviceIds: _selectedServiceIds.toList(),
+          workingHours: workingHoursToSave,
+        );
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff added successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff saved successfully')));
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -239,10 +271,39 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Service Provider'),
+        title: Text(widget.existingStaff != null ? 'Edit Service Provider' : 'Add Service Provider'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         foregroundColor: Colors.black,
+        actions: [
+          if (widget.existingStaff != null)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Staff'),
+                    content: const Text('Are you sure you want to delete this staff member?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  setState(() => _isLoading = true);
+                  try {
+                    await StaffApi.deleteStaff(widget.salonId, widget.existingStaff!.id);
+                    if (mounted) Navigator.pop(context, true);
+                  } catch (e) {
+                    setState(() => _isLoading = false);
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                }
+              },
+            ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -346,7 +407,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
               ),
               child: _isSaving
                   ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface)
-                  : const Text('Save Provider', style: TextStyle(fontSize: 16)),
+                  : Text(widget.existingStaff != null ? 'Save Changes' : 'Save Provider', style: const TextStyle(fontSize: 16)),
             ),
             const SizedBox(height: 32),
           ],

@@ -35,4 +35,14 @@ class Salon extends Model
     {
         return $this->hasMany(Combo::class);
     }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(SalonSubscription::class);
+    }
+
+    public function currentSubscription()
+    {
+        return $this->hasOne(SalonSubscription::class)->where('status', 'active')->latest('start_date');
+    }
 }

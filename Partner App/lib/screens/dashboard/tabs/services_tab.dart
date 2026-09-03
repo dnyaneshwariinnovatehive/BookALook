@@ -14,7 +14,8 @@ class ServicesTab extends StatefulWidget {
   State<ServicesTab> createState() => _ServicesTabState();
 }
 
-class _ServicesTabState extends State<ServicesTab> {
+class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isLoading = true;
   List<Map<String, dynamic>> _groupedServices = [];
   String? _error;
@@ -26,8 +27,15 @@ class _ServicesTabState extends State<ServicesTab> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _fetchServices();
     _fetchCombos();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchServices() async {
@@ -73,80 +81,85 @@ class _ServicesTabState extends State<ServicesTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
         backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
-          backgroundColor: theme.scaffoldBackgroundColor,
-          elevation: 0,
-          centerTitle: false,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  final isCombo = DefaultTabController.of(context).index == 1;
-                  if (isCombo) {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => AddComboScreen(salonId: widget.salonId)),
-                    );
-                    if (result == true) _fetchCombos();
-                  } else {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => AddServiceFlow(salonId: widget.salonId)),
-                    );
-                    if (result == true) _fetchServices();
-                  }
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-              ),
-            )
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(60),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3E5F5), // Light purple background
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: TabBar(
-                  indicator: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 4, offset: Offset(0, 2))
-                    ],
-                  ),
-                  labelColor: theme.textTheme.bodyLarge?.color,
-                  unselectedLabelColor: Colors.grey[600],
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(text: 'Services'),
-                    Tab(text: 'Combos'),
-                  ],
-                ),
+        elevation: 0,
+        centerTitle: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final isCombo = _tabController.index == 1;
+                if (isCombo) {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => AddComboScreen(salonId: widget.salonId)),
+                  );
+                  if (result == true) _fetchCombos();
+                } else {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => AddServiceFlow(salonId: widget.salonId)),
+                  );
+                  if (result == true) _fetchServices();
+                }
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          // Segmented Tab Bar
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(color: theme.colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 4, offset: Offset(0, 2))
+                ]
+              ),
+              labelColor: theme.textTheme.bodyLarge?.color,
+              unselectedLabelColor: AppTheme.accentColor,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              tabs: const [
+                Tab(text: 'Services'),
+                Tab(text: 'Combos'),
+              ],
+            ),
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildServicesTab(),
-            _buildCombosTab(),
-          ],
-        ),
+          
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildServicesTab(),
+                _buildCombosTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -176,22 +189,30 @@ class _ServicesTabState extends State<ServicesTab> {
           double originalPrice = 0;
           List<String> serviceNames = [];
           for (var s in services) {
-            totalPrice += double.parse(s['pivot']['combo_special_price'] ?? '0');
-            originalPrice += double.parse(s['price'] ?? '0');
+            totalPrice += double.parse(s['pivot']['combo_special_price']?.toString() ?? '0');
+            originalPrice += double.parse(s['price']?.toString() ?? '0');
             serviceNames.add(s['template']['name']);
           }
           final savings = originalPrice - totalPrice;
 
           return GestureDetector(
-            onTap: () {
-              // TODO: Edit Combo logic
+            onTap: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddComboScreen(salonId: widget.salonId, existingCombo: combo),
+                ),
+              );
+              if (result == true) {
+                _fetchCombos();
+              }
             },
             child: Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                 boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
               ),
@@ -282,7 +303,7 @@ class _ServicesTabState extends State<ServicesTab> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                 boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
               ),

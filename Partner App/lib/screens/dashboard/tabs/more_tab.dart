@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../phone_screen.dart';
 import 'settings/salon_timings_screen.dart';
+import '../more/subscription_billing_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 
 class MoreTab extends StatelessWidget {

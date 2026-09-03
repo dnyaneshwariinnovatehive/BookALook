@@ -7,6 +7,7 @@ class StaffMember {
   final double commissionPercentage;
   final bool isActive;
   final Map<String, dynamic>? user;
+  final List<dynamic>? services;
 
   StaffMember({
     required this.id,
@@ -17,6 +18,7 @@ class StaffMember {
     required this.commissionPercentage,
     required this.isActive,
     this.user,
+    this.services,
   });
 
   factory StaffMember.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class StaffMember {
       commissionPercentage: double.tryParse(json['commission_percentage'].toString()) ?? 0.0,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
       user: json['user'],
+      services: json['services'],
     );
   }
 }

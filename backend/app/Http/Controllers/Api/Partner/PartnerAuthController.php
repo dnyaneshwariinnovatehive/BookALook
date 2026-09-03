@@ -41,7 +41,7 @@ class PartnerAuthController extends Controller
         }
 
         $user = User::where('phone', $request->phone)
-            ->whereIn('role', ['admin', 'service_provider'])
+            ->whereIn('role', ['admin', 'service_provider', 'collaborator'])
             ->first();
 
         if (!$user) {
@@ -85,6 +85,14 @@ class PartnerAuthController extends Controller
                 'token' => $token,
                 'user' => $user,
                 'provider' => $serviceProvider,
+            ]);
+        } elseif ($user->role === 'collaborator') {
+            return response()->json([
+                'success' => true,
+                'status' => 'existing_user',
+                'role' => 'collaborator',
+                'token' => $token,
+                'user' => $user,
             ]);
         }
 

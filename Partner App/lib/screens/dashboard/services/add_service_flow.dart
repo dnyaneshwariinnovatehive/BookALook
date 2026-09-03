@@ -27,6 +27,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   final _priceController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController(); // For custom
+  final _advanceController = TextEditingController(text: '20'); // Added advance controller
 
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
@@ -46,6 +47,16 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       final categories = await ServiceManagementApi.getMasterCatalog(widget.salonId);
       setState(() {
         _masterCategories = categories;
+        if (_selectedCategory == null && _masterCategories.isNotEmpty) {
+          _selectedCategory = _masterCategories.first;
+          if (_selectedCategory!.templates != null && _selectedCategory!.templates!.isNotEmpty) {
+            _selectedTemplate = _selectedCategory!.templates!.first;
+            _isCustom = false;
+          } else {
+            _selectedTemplate = null;
+            _isCustom = true;
+          }
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -69,9 +80,12 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
         price: double.parse(_priceController.text),
         description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
         categoryId: _selectedCategory?.id ?? 'new_custom',
-        customCategoryName: _customCategoryController.text.isNotEmpty ? _customCategoryController.text : null,
-        customTemplateName: _customTemplateController.text.isNotEmpty ? _customTemplateController.text : null,
-        estimatedDurationMinutes: _durationController.text.isNotEmpty ? int.parse(_durationController.text) : null,
+        customCategoryName: _isCustom && _customCategoryController.text.isNotEmpty ? _customCategoryController.text : null,
+        customTemplateName: _isCustom && _customTemplateController.text.isNotEmpty ? _customTemplateController.text : null,
+        estimatedDurationMinutes: _isCustom && _durationController.text.isNotEmpty ? int.parse(_durationController.text) : null,
+        advancePercentage: _advanceController.text.isNotEmpty ? double.tryParse(_advanceController.text) : null,
+        genderFocus: _genderFocus,
+        willRefundAdvanceIfCancelled: _refundAdvance,
       );
 
       if (mounted) {
@@ -118,9 +132,73 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildLabel('Name'),
-          _buildTextField(_customTemplateController),
+          _buildLabel('Category'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ServiceCategory>(
+                isExpanded: true,
+                value: _selectedCategory ?? (_masterCategories.isNotEmpty ? _masterCategories.first : null),
+                items: _masterCategories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedCategory = val;
+                    if (val != null && val.templates != null && val.templates!.isNotEmpty) {
+                      _selectedTemplate = val.templates!.first;
+                      _isCustom = false;
+                    } else {
+                      _selectedTemplate = null;
+                      _isCustom = true;
+                    }
+                  });
+                },
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
+          
+          _buildLabel('Template'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ServiceTemplate?>(
+                isExpanded: true,
+                value: _isCustom ? null : _selectedTemplate,
+                items: [
+                  if (_selectedCategory?.templates != null)
+                    ..._selectedCategory!.templates!.map((t) => DropdownMenuItem(value: t, child: Text(t.name))),
+                  const DropdownMenuItem(value: null, child: Text('➕ Create Custom Service', style: TextStyle(fontWeight: FontWeight.bold))),
+                ],
+                onChanged: (val) {
+                  setState(() {
+                    if (val == null) {
+                      _isCustom = true;
+                      _selectedTemplate = null;
+                    } else {
+                      _isCustom = false;
+                      _selectedTemplate = val;
+                    }
+                  });
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_isCustom) ...[
+            _buildLabel('Name'),
+            _buildTextField(_customTemplateController),
+            const SizedBox(height: 16),
+          ],
+
           
           _buildLabel('Description'),
           _buildTextField(_descriptionController),
@@ -143,31 +221,44 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildLabel('Duration (min)'),
-                    Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-                        borderRadius: BorderRadius.circular(8),
+                    if (_isCustom)
+                      Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove, size: 18),
+                              onPressed: () {
+                                if (_duration > 30) setState(() => _duration -= 30);
+                              },
+                            ),
+                            Text('$_duration', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            IconButton(
+                              icon: const Icon(Icons.add, size: 18),
+                              onPressed: () {
+                                setState(() => _duration += 30);
+                              },
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        height: 48,
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('${_selectedTemplate?.estimatedDurationMinutes ?? 30}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.grey)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove, size: 18),
-                            onPressed: () {
-                              if (_duration > 5) setState(() => _duration -= 5);
-                            },
-                          ),
-                          Text('$_duration', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          IconButton(
-                            icon: const Icon(Icons.add, size: 18),
-                            onPressed: () {
-                              setState(() => _duration += 5);
-                            },
-                          ),
-                        ],
-                      ),
-                    )
                   ],
                 ),
               ),
@@ -176,28 +267,10 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           const SizedBox(height: 16),
           
           _buildLabel('Min Advance %'),
-          _buildTextField(TextEditingController(text: '20'), isNumber: true), // Placeholder for advance
+          _buildTextField(_advanceController, isNumber: true),
           const SizedBox(height: 16),
           
-          _buildLabel('Category'),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<ServiceCategory>(
-                isExpanded: true,
-                value: _selectedCategory ?? (_masterCategories.isNotEmpty ? _masterCategories.first : null),
-                items: _masterCategories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
-                onChanged: (val) {
-                  setState(() => _selectedCategory = val);
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+          // Category dropdown was moved up
           
           _buildLabel('Gender Focus'),
           Container(
@@ -210,7 +283,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
               child: DropdownButton<String>(
                 isExpanded: true,
                 value: _genderFocus,
-                items: ['Unisex', 'Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                items: ['Unisex', 'Men Only', 'Women Only'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                 onChanged: (val) {
                   setState(() => _genderFocus = val!);
                 },
@@ -239,8 +312,9 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           ElevatedButton(
             onPressed: _isSaving ? null : () {
               // Ensure we save properly using the single form data
-              _isCustom = true;
-              _durationController.text = _duration.toString();
+              if (_isCustom) {
+                _durationController.text = _duration.toString();
+              }
               _saveService();
             },
             style: ElevatedButton.styleFrom(

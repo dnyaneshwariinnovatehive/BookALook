@@ -85,6 +85,9 @@ class ServiceManagementController extends Controller
             'custom_category_name' => 'required_if:category_id,new_custom|string|max:80',
             'custom_template_name' => 'required_if:is_custom,true|string|max:150',
             'estimated_duration_minutes' => 'required_if:is_custom,true|integer|multiple_of:30|min:30',
+            'advance_percentage' => 'nullable|numeric|min:0|max:100',
+            'gender_focus' => 'nullable|string|in:Unisex,Men Only,Women Only',
+            'will_refund_advance_if_cancelled' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -115,18 +118,37 @@ class ServiceManagementController extends Controller
             $templateId = $template->id;
         }
 
-        // Check if service already exists
-        $exists = Service::where('salon_id', $salon_id)->where('template_id', $templateId)->first();
+        // Check if service already exists (including soft-deleted ones)
+        $exists = Service::withTrashed()->where('salon_id', $salon_id)->where('template_id', $templateId)->first();
+        
         if ($exists) {
-            return response()->json(['message' => 'Service already exists in this salon'], 400);
+            if (!$exists->trashed()) {
+                return response()->json(['message' => 'Service already exists in this salon'], 400);
+            }
+            
+            // If it was soft-deleted, restore it and update the details
+            $exists->restore();
+            $exists->update([
+                'price' => $request->price,
+                'description' => $request->description,
+                'advance_percentage' => $request->advance_percentage,
+                'gender_focus' => $request->gender_focus ?? 'Unisex',
+                'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
+                'is_active' => true,
+            ]);
+            
+            $service = $exists;
+        } else {
+            $service = Service::create([
+                'salon_id' => $salon_id,
+                'template_id' => $templateId,
+                'price' => $request->price,
+                'description' => $request->description,
+                'advance_percentage' => $request->advance_percentage,
+                'gender_focus' => $request->gender_focus ?? 'Unisex',
+                'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
+            ]);
         }
-
-        $service = Service::create([
-            'salon_id' => $salon_id,
-            'template_id' => $templateId,
-            'price' => $request->price,
-            'description' => $request->description,
-        ]);
 
         return response()->json([
             'message' => 'Service added successfully',
@@ -199,6 +221,8 @@ class ServiceManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:150',
+            'advance_percentage' => 'nullable|numeric|min:0|max:100',
+            'will_refund_advance_if_cancelled' => 'nullable|boolean',
             'services' => 'required|array|min:2',
             'services.*.service_id' => 'required|uuid|exists:services,id',
             'services.*.special_price' => 'required|numeric|min:0',
@@ -211,6 +235,8 @@ class ServiceManagementController extends Controller
         $combo = \App\Models\Combo::create([
             'salon_id' => $salon_id,
             'name' => $request->name,
+            'advance_percentage' => $request->advance_percentage ?? 25.00,
+            'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
         ]);
 
         foreach ($request->services as $serviceData) {
@@ -225,6 +251,72 @@ class ServiceManagementController extends Controller
             'message' => 'Combo created successfully',
             'combo' => $combo->load('services.template')
         ]);
+    }
+
+    public function updateCombo($salon_id, $combo_id, Request $request)
+    {
+        $salon = Salon::findOrFail($salon_id);
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $combo = \App\Models\Combo::where('salon_id', $salon_id)->findOrFail($combo_id);
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:150',
+            'advance_percentage' => 'nullable|numeric|min:0|max:100',
+            'will_refund_advance_if_cancelled' => 'nullable|boolean',
+            'services' => 'sometimes|required|array|min:2',
+            'services.*.service_id' => 'required|uuid|exists:services,id',
+            'services.*.special_price' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($request->has('name')) {
+            $combo->name = $request->name;
+        }
+        if ($request->has('advance_percentage')) {
+            $combo->advance_percentage = $request->advance_percentage;
+        }
+        if ($request->has('will_refund_advance_if_cancelled')) {
+            $combo->will_refund_advance_if_cancelled = $request->will_refund_advance_if_cancelled;
+        }
+        
+        $combo->save();
+
+        if ($request->has('services')) {
+            $syncData = [];
+            foreach ($request->services as $serviceData) {
+                $syncData[$serviceData['service_id']] = ['combo_special_price' => $serviceData['special_price']];
+            }
+            $combo->services()->sync($syncData);
+        }
+
+        return response()->json([
+            'message' => 'Combo updated successfully',
+            'combo' => $combo->load('services.template')
+        ]);
+    }
+
+    public function deleteCombo($salon_id, $combo_id, Request $request)
+    {
+        $salon = Salon::findOrFail($salon_id);
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $combo = \App\Models\Combo::where('salon_id', $salon_id)->findOrFail($combo_id);
+        
+        // Detach services to clean up pivot table
+        $combo->services()->detach();
+        
+        // Hard delete the combo
+        $combo->delete();
+
+        return response()->json(['message' => 'Combo deleted successfully']);
     }
 
     public function getServiceStaff($salon_id, $service_id, Request $request)

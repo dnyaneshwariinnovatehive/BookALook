@@ -96,6 +96,100 @@ class StaffManagementController extends Controller
         }
     }
 
+    public function update(Request $request, $salonId, $staffId)
+    {
+        $provider = ServiceProvider::where('salon_id', $salonId)->findOrFail($staffId);
+        $user = $provider->user;
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'phone' => 'sometimes|required|string|unique:users,phone,' . $user->id,
+            'email' => 'nullable|email|unique:users,email,' . $user->id,
+            'specialization' => 'nullable|string|max:150',
+            'base_salary' => 'sometimes|numeric|min:0',
+            'commission_percentage' => 'sometimes|numeric|min:0|max:100',
+            'service_ids' => 'sometimes|array',
+            'service_ids.*' => 'exists:services,id',
+            'working_hours' => 'sometimes|required|array|size:7',
+            'working_hours.*.day_of_week' => 'required_with:working_hours|integer|min:0|max:6',
+            'working_hours.*.is_weekly_off' => 'required_with:working_hours|boolean',
+            'working_hours.*.shift_start' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_weekly_off,false',
+            'working_hours.*.shift_end' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_weekly_off,false',
+            'working_hours.*.break_start' => 'nullable|date_format:H:i:s',
+            'working_hours.*.break_end' => 'nullable|date_format:H:i:s',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if ($request->has('name')) $user->name = $request->name;
+            if ($request->has('phone')) $user->phone = $request->phone;
+            if ($request->has('email')) $user->email = $request->email;
+            $user->save();
+
+            if ($request->has('specialization')) $provider->specialization = $request->specialization;
+            if ($request->has('base_salary')) $provider->base_salary = $request->base_salary;
+            if ($request->has('commission_percentage')) $provider->commission_percentage = $request->commission_percentage;
+            $provider->save();
+
+            if ($request->has('service_ids')) {
+                $provider->services()->sync($request->service_ids);
+            }
+
+            if ($request->has('working_hours')) {
+                ProviderWorkingHour::where('provider_id', $provider->id)->delete();
+                foreach ($request->working_hours as $hour) {
+                    ProviderWorkingHour::create([
+                        'provider_id' => $provider->id,
+                        'day_of_week' => $hour['day_of_week'],
+                        'is_weekly_off' => $hour['is_weekly_off'],
+                        'shift_start' => $hour['is_weekly_off'] ? null : $hour['shift_start'],
+                        'shift_end' => $hour['is_weekly_off'] ? null : $hour['shift_end'],
+                        'break_start' => $hour['break_start'] ?? null,
+                        'break_end' => $hour['break_end'] ?? null,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json(['message' => 'Staff updated successfully', 'provider' => $provider->load('user')], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update staff', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($salonId, $staffId)
+    {
+        try {
+            DB::beginTransaction();
+            $provider = ServiceProvider::where('salon_id', $salonId)->findOrFail($staffId);
+            
+            // Delete working hours
+            ProviderWorkingHour::where('provider_id', $provider->id)->delete();
+            
+            // Detach services
+            $provider->services()->detach();
+            
+            // Delete provider profile (hard delete)
+            $provider->delete();
+            
+            // Note: Not deleting the User model here because they might have other roles (like customer)
+            // or historical appointments tied to them. In a real system, you might anonymize or deactivate.
+            
+            DB::commit();
+            return response()->json(['message' => 'Staff deleted successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete staff', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function getLeaves($salonId)
     {
         // Get all providers for this salon
