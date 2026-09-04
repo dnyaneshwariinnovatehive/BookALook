@@ -187,7 +187,7 @@ class _HomeTabState extends State<HomeTab> {
                   border: Border.all(color: Theme.of(context).dividerColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Theme.of(context).shadowColor,
                       blurRadius: 10,
                       offset: Offset(0, 4),
                     ),
@@ -217,7 +217,7 @@ class _HomeTabState extends State<HomeTab> {
                         border: Border.all(color: Theme.of(context).dividerColor),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Theme.of(context).shadowColor,
                             blurRadius: 8,
                             offset: Offset(0, 2),
                           ),
@@ -305,7 +305,7 @@ class _HomeTabState extends State<HomeTab> {
                 border: Border.all(color: Theme.of(context).dividerColor),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Theme.of(context).shadowColor,
                     blurRadius: 10,
                     offset: Offset(0, 4),
                   ),

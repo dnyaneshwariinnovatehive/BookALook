@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../phone_screen.dart';
 import 'settings/salon_timings_screen.dart';
 import '../more/subscription_billing_screen.dart';
+import '../more/wallet_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 
 class MoreTab extends StatelessWidget {
@@ -29,7 +30,7 @@ class MoreTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        title: Text('More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -55,9 +56,9 @@ class MoreTab extends StatelessWidget {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Container(
                       height: 120,
-                      color: isDark ? Colors.grey[800] : Colors.grey[300],
+                      color: isDark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor,
                       // Placeholder for actual salon image
-                      child: Icon(Icons.image, size: 50, color: isDark ? Colors.grey[600] : Colors.grey),
+                      child: Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                     ),
                   ),
                   Padding(
@@ -68,7 +69,7 @@ class MoreTab extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Luxe Studio Salon', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              Text('Luxe Studio Salon', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text('Shop 4, Royal Avenue, Koregaon Park, Pune - 411001', style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color)),
                             ],
@@ -107,10 +108,10 @@ class MoreTab extends StatelessWidget {
                     title: 'Switch Salon',
                     onTap: () => _logout(context), // Using logout as placeholder per old logic
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56),
                   _buildOptionTile(context, 
                     icon: Icons.access_time,
-                    iconColor: Colors.orange,
+                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning),
                     title: 'Change Salon Timings',
                     onTap: () {
                       Navigator.push(
@@ -119,17 +120,41 @@ class MoreTab extends StatelessWidget {
                       );
                     },
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56),
+                  _buildOptionTile(context, 
+                    icon: Icons.receipt_long,
+                    iconColor: Colors.teal,
+                    title: 'Subscription & Billing',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SubscriptionBillingScreen()),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  _buildOptionTile(context, 
+                    icon: Icons.account_balance_wallet,
+                    iconColor: Colors.amber,
+                    title: 'My Wallet',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WalletScreen()),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
                   _buildOptionTile(context, 
                     icon: Icons.manage_accounts,
-                    iconColor: Colors.blue,
+                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkInfo : AppTheme.lightInfo),
                     title: 'Switch Account',
                     onTap: () => _logout(context),
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56),
                   _buildOptionTile(context, 
                     icon: Icons.help_outline,
-                    iconColor: Colors.green,
+                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                     title: 'Help & Support',
                     onTap: () {},
                   ),
@@ -145,13 +170,13 @@ class MoreTab extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.red.withOpacity(0.15) : const Color(0xFFFDECEE),
+                  color: isDark ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.15) : const Color(0xFFFDECEE),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
+                child: Text(
                   'Logout',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger), fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
@@ -165,7 +190,7 @@ class MoreTab extends StatelessWidget {
   Widget _buildOptionTile(BuildContext context, {required IconData icon, required Color iconColor, required String title, required VoidCallback onTap}) {
     return ListTile(
       leading: Icon(icon, color: iconColor),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

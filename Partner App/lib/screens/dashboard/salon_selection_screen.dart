@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'dashboard_screen.dart';
@@ -15,15 +16,15 @@ class SalonSelectionScreen extends StatelessWidget {
         context: context,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Approval Pending', style: TextStyle(fontWeight: FontWeight.bold)),
-          content: const Text(
+          title: Text('Approval Pending', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(
             'This salon is pending for approval. Contact on +91 9876543210 for more info.',
             style: TextStyle(color: AppTheme.lightTextBody, fontSize: 14),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
+              child: Text('OK', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -65,7 +66,7 @@ class SalonSelectionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        title: const Text('bookalook', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, fontFamily: 'InstagramLogo')), // Fallback to standard bold if font not found
+        title: Text('bookalook', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, fontFamily: 'InstagramLogo')), // Fallback to standard bold if font not found
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
@@ -114,7 +115,7 @@ class SalonSelectionScreen extends StatelessWidget {
                               child: salon['cover_photo_url'] == null
                                   ? Text(
                                       salon['name']?.substring(0, 1).toUpperCase() ?? 'S',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading, fontSize: 24),
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading, fontSize: 24),
                                     )
                                   : null,
                             ),
@@ -136,10 +137,10 @@ class SalonSelectionScreen extends StatelessWidget {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.orange.withOpacity(0.1),
+                                            color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning).withOpacity(0.1),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
-                                          child: const Text('Pending', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
+                                          child: Text('Pending', style: TextStyle(fontSize: 10, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning), fontWeight: FontWeight.bold)),
                                         ),
                                       ],
                                     ],

@@ -1,3 +1,4 @@
+import 'package:customer_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/guest_restricted_view.dart';
@@ -22,6 +23,9 @@ class ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dangerColor = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
     if (isGuest) {
       return GuestRestrictedView(
         title: 'Sign In Required',
@@ -86,14 +90,15 @@ class ProfileTab extends StatelessWidget {
             // Logout Button
             OutlinedButton.icon(
               onPressed: () => _logout(context),
-              icon: Icon(Icons.logout, color: Colors.red),
+              icon: Icon(Icons.logout, color: dangerColor),
               label: Text(
                 'Log Out',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                style: TextStyle(color: dangerColor, fontWeight: FontWeight.bold),
               ),
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(color: Colors.red.shade200),
+                side: BorderSide.none,
+                backgroundColor: dangerBg,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),

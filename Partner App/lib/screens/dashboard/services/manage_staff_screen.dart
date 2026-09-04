@@ -73,7 +73,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
       appBar: AppBar(
         title: Text('Manage Staff: ${widget.serviceName}'),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Colors.black,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
       ),
       body: _buildBody(),

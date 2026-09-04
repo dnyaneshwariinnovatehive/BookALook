@@ -60,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           type: BottomNavigationBarType.fixed,
           backgroundColor: Theme.of(context).colorScheme.surface,
           selectedItemColor: AppTheme.accentColor,
-          unselectedItemColor: Colors.grey,
+          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
           showUnselectedLabels: true,
           selectedFontSize: 12,
           unselectedFontSize: 12,

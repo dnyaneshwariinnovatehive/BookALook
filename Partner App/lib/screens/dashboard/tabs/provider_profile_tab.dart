@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
 
@@ -83,7 +84,7 @@ class ProviderProfileTab extends StatelessWidget {
                               color: AppTheme.accentColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Service Provider',
                               style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
@@ -123,13 +124,13 @@ class ProviderProfileTab extends StatelessWidget {
                 const SizedBox(height: 24),
                 
                 _buildInfoRow(context, 'FULL NAME', user['name'] ?? '', actionIcon: Icons.lock_outline),
-                const Divider(height: 32, color: Colors.black12),
+                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
                 _buildInfoRow(context, 'PHONE NUMBER', user['phone'] ?? '', actionText: 'Edit'),
-                const Divider(height: 32, color: Colors.black12),
+                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
                 _buildInfoRow(context, 'EMAIL ADDRESS', user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
-                const Divider(height: 32, color: Colors.black12),
+                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
                 _buildPhotoUploadRow(context),
                 
@@ -162,7 +163,7 @@ class ProviderProfileTab extends StatelessWidget {
                       children: [
                         _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
                         if (index < workingHours.length - 1)
-                          const Divider(height: 32, color: Colors.black12),
+                          Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                       ],
                     );
                   }),
@@ -185,7 +186,7 @@ class ProviderProfileTab extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+        style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -211,11 +212,11 @@ class ProviderProfileTab extends StatelessWidget {
           ),
         ),
         if (actionIcon != null)
-          Icon(actionIcon, size: 20, color: Colors.black26),
+          Icon(actionIcon, size: 20, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
         if (actionText != null)
           Text(
             actionText,
-            style: const TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
           ),
       ],
     );
@@ -248,16 +249,16 @@ class ProviderProfileTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Text(
+                  Text(
                     'Tap to change photo',
-                    style: TextStyle(color: Colors.black38, fontSize: 14),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), fontSize: 14),
                   ),
                 ],
               ),
             ],
           ),
         ),
-        const Text(
+        Text(
           'Upload',
           style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
         ),
@@ -281,19 +282,19 @@ class ProviderProfileTab extends StatelessWidget {
               children: [
                 Text(
                   workTime,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54)),
                 ),
                 if (breakTime != null) ...[
                   const SizedBox(height: 4),
                   Text(
                     'Break: $breakTime',
-                    style: const TextStyle(fontSize: 12, color: Colors.black38),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38)),
                   ),
                 ]
               ],
             ),
             const SizedBox(width: 12),
-            const Icon(Icons.lock_outline, size: 16, color: Colors.black26),
+            Icon(Icons.lock_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
           ],
         ),
       ],

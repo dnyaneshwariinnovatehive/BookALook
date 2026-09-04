@@ -56,12 +56,18 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
         Route::apiResource('banners', \App\Http\Controllers\Api\SuperAdmin\BannerController::class);
 
-        // Subscriptions
-        Route::get('/subscriptions/plans', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);
-        Route::post('/subscriptions/plans', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'store']);
-        Route::put('/subscriptions/plans/{id}', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'update']);
-        Route::delete('/subscriptions/plans/{id}', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'destroy']);
-        Route::post('/salons/{id}/subscription', [App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'assignToSalon']);
+        // Subscriptions & Wallet Schemes
+        Route::get('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);
+        Route::post('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'store']);
+        Route::put('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'update']);
+        Route::delete('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'destroy']);
+        Route::post('/salons/{id}/subscription', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'assignToSalon']);
+
+        Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);
+        Route::put('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updatePolicySettings']);
+        
+        Route::apiResource('wallet-schemes', \App\Http\Controllers\Api\SuperAdmin\WalletSchemeController::class);
+
 
         // Catalog Management
         Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
@@ -114,5 +120,16 @@ Route::prefix('partner')->group(function () {
         // Staff Leaves
         Route::get('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'getLeaves']);
         Route::put('/salons/{salon_id}/leaves/{leave_id}/status', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'updateLeaveStatus']);
+
+        // Wallet & Subscriptions
+        Route::get('/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
+        Route::post('/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
+        Route::post('/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
+        Route::post('/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
+        Route::get('/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
+        Route::post('/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
+        
+        // Appointments
+        Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
     });
 });

@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/api_service.dart';
@@ -100,12 +101,12 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Salon Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Tell us about your salon.',
               style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
             ),
@@ -126,10 +127,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Brief description of your salon...',
-                hintStyle: const TextStyle(color: Colors.black26),
-                prefixIcon: const Icon(Icons.description_outlined, color: Colors.black38, size: 20),
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+                prefixIcon: Icon(Icons.description_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
@@ -162,10 +163,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'State',
-                            hintStyle: const TextStyle(color: Colors.black26),
-                            prefixIcon: const Icon(Icons.map_outlined, color: Colors.black38, size: 20),
+                            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+                            prefixIcon: Icon(Icons.map_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: Theme.of(context).colorScheme.surface,
                             contentPadding: const EdgeInsets.symmetric(vertical: 16),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
@@ -204,10 +205,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'City',
-                            hintStyle: const TextStyle(color: Colors.black26),
-                            prefixIcon: const Icon(Icons.location_city_outlined, color: Colors.black38, size: 20),
+                            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+                            prefixIcon: Icon(Icons.location_city_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: Theme.of(context).colorScheme.surface,
                             contentPadding: const EdgeInsets.symmetric(vertical: 16),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
@@ -272,7 +273,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                       side: const BorderSide(color: AppTheme.lightBorder),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
+                    child: Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -282,11 +283,11 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                     onPressed: _submit,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.black,
+                      backgroundColor: Theme.of(context).colorScheme.onSurface,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Next'),
+                    child: Text('Next'),
                   ),
                 ),
               ],
@@ -326,7 +327,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
 
@@ -343,10 +344,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black26),
-        prefixIcon: Icon(icon, color: Colors.black38, size: 20),
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),

@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/staff_models.dart';
@@ -159,7 +160,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
+          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
           boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
         ),
         padding: const EdgeInsets.all(16),
@@ -168,7 +169,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: Theme.of(context).dividerColor,
               // Placeholder for image, using Icon as fallback
               child: Icon(Icons.person, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), size: 32),
             ),
@@ -181,7 +182,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                     children: [
                       Text(
                         member.user?['name'] ?? 'Unknown',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(width: 8),
                       if (member.isActive)
@@ -191,7 +192,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                             color: const Color(0xFFE8F5E9),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text('Active', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                          child: Text('Active', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
                     ],
                   ),
@@ -225,7 +226,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
       ),
       child: Text(
         label,
-        style: const TextStyle(color: Color(0xFF9C27B0), fontSize: 11, fontWeight: FontWeight.bold),
+        style: TextStyle(color: Color(0xFF9C27B0), fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -235,11 +236,11 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     String statusText = leave.status.capitalize();
     
     if (leave.status == 'approved') {
-      statusColor = Colors.green;
+      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess);
     } else if (leave.status == 'rejected') {
-      statusColor = Colors.red;
+      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger);
     } else {
-      statusColor = Colors.orange;
+      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning);
     }
 
     return Container(
@@ -247,7 +248,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
       ),
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -255,8 +256,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: Colors.orange.shade50,
-            child: Icon(Icons.person_outline, color: Colors.orange),
+            backgroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning).withValues(alpha: 0.05),
+            child: Icon(Icons.person_outline, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning)),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -265,7 +266,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
               children: [
                 Text(
                   leave.provider?['user']?['name'] ?? 'Unknown Provider',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -295,7 +296,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                       onTap: () => _updateLeaveStatus(leave.id, 'approved'),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                        decoration: BoxDecoration(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                         child: Icon(Icons.check, color: Theme.of(context).colorScheme.surface, size: 16),
                       ),
                     ),
@@ -304,7 +305,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                       onTap: () => _updateLeaveStatus(leave.id, 'rejected'),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: Colors.red.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                        decoration: BoxDecoration(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                         child: Icon(Icons.close, color: Theme.of(context).colorScheme.surface, size: 16),
                       ),
                     ),
@@ -326,7 +327,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+        title: Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -343,8 +344,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                   _fetchStaff();
                 }
               },
-              icon: const Icon(Icons.person_add_alt_1, size: 18),
-              label: const Text('Add'),
+              icon: Icon(Icons.person_add_alt_1, size: 18),
+              label: Text('Add'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -374,7 +375,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
               ),
               labelColor: Theme.of(context).textTheme.bodyLarge?.color,
               unselectedLabelColor: AppTheme.accentColor,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              labelStyle: TextStyle(fontWeight: FontWeight.bold),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
               tabs: const [

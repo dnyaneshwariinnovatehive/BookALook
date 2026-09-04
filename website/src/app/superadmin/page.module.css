@@ -19,7 +19,7 @@
 .logo {
   font-size: 1.5rem;
   font-weight: 700;
-  background: linear-gradient(to right, #2563eb, #38bdf8);
+  background: linear-gradient(to right, var(--color-info), var(--accent-color));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.02em;

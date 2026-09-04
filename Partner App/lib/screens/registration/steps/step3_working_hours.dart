@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
@@ -72,12 +73,12 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Working Hours',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Set your salon\'s general operating hours.',
                   style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
                 ),
@@ -107,7 +108,7 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
                     side: const BorderSide(color: AppTheme.lightBorder),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
+                  child: Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
                 ),
               ),
               const SizedBox(width: 16),
@@ -117,11 +118,11 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
                   onPressed: _submit,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.black,
+                    backgroundColor: Theme.of(context).colorScheme.onSurface,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Next'),
+                  child: Text('Next'),
                 ),
               ),
             ],
@@ -146,10 +147,10 @@ class _Step3WorkingHoursState extends State<Step3WorkingHours> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(day['day'], style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(day['day'], style: TextStyle(fontWeight: FontWeight.bold)),
               Row(
                 children: [
-                  const Text('Closed', style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
+                  Text('Closed', style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
                   Switch(
                     value: isClosed,
                     onChanged: (val) {

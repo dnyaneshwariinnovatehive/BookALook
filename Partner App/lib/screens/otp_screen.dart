@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
@@ -90,7 +91,7 @@ class _OtpScreenState extends State<OtpScreen> {
       backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -100,7 +101,7 @@ class _OtpScreenState extends State<OtpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Verify Phone',
                 style: TextStyle(
                   fontSize: 28,
@@ -111,12 +112,12 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 8),
               RichText(
                 text: TextSpan(
-                  style: const TextStyle(color: AppTheme.lightTextBody, fontSize: 16),
+                  style: TextStyle(color: AppTheme.lightTextBody, fontSize: 16),
                   children: [
                     const TextSpan(text: 'Code sent to '),
                     TextSpan(
                       text: widget.phone,
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
                     ),
                   ],
                 ),
@@ -133,13 +134,13 @@ class _OtpScreenState extends State<OtpScreen> {
                       focusNode: _focusNodes[index],
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       maxLength: 1,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
                         counterText: '',
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: AppTheme.lightBorder),
@@ -174,7 +175,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
                 child: _isLoading
                     ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
-                    : const Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : Text('Verify', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),

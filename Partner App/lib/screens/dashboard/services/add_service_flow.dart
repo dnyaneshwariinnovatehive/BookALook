@@ -106,11 +106,11 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        title: Text('Add Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -232,14 +232,14 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
+                              icon: Icon(Icons.remove, size: 18),
                               onPressed: () {
                                 if (_duration > 30) setState(() => _duration -= 30);
                               },
                             ),
-                            Text('$_duration', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            Text('$_duration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                             IconButton(
-                              icon: const Icon(Icons.add, size: 18),
+                              icon: Icon(Icons.add, size: 18),
                               onPressed: () {
                                 setState(() => _duration += 30);
                               },
@@ -257,7 +257,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                           border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text('${_selectedTemplate?.estimatedDurationMinutes ?? 30}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.grey)),
+                        child: Text('${_selectedTemplate?.estimatedDurationMinutes ?? 30}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
                       ),
                   ],
                 ),
@@ -304,7 +304,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
+              Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
             ],
           ),
           const SizedBox(height: 32),
@@ -337,7 +337,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8.0),
-          child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87)),
+          child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).textTheme.bodyLarge?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.87))),
         );
       }
     );

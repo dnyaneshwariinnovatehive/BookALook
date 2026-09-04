@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'steps/step1_owner_details.dart';
@@ -85,10 +86,10 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
       backgroundColor: AppTheme.lightBg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Register Your Salon', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text('Register Your Salon', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(40),
@@ -107,7 +108,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Step ${_currentStep + 1} of 3', style: const TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
+                Text('Step ${_currentStep + 1} of 3', style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
               ],
             ),
           ),

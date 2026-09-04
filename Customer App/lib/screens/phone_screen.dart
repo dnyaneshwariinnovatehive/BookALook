@@ -88,7 +88,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                             child: Container(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _isLogin ? Colors.white : Colors.transparent,
+                                color: _isLogin ? Theme.of(context).colorScheme.surface : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: _isLogin
                                     ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
@@ -111,7 +111,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                             child: Container(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: !_isLogin ? Colors.white : Colors.transparent,
+                                color: !_isLogin ? Theme.of(context).colorScheme.surface : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: !_isLogin
                                     ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
@@ -158,7 +158,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                       borderSide: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Theme.of(context).colorScheme.surface,
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
                 ),
@@ -170,7 +170,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                     elevation: 0,
                   ),

@@ -52,11 +52,11 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Service'),
-        content: const Text('Are you sure you want to remove this service from your menu?'),
+        title: Text('Delete Service'),
+        content: Text('Are you sure you want to remove this service from your menu?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)))),
         ],
       ),
     );
@@ -91,18 +91,18 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Edit ${widget.service.template?.name}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Edit ${widget.service.template?.name}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
             TextFormField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Price (₹)', border: OutlineInputBorder()),
               keyboardType: TextInputType.number,
               validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description (Optional)', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Description (Optional)', border: OutlineInputBorder()),
               maxLines: 3,
             ),
             const SizedBox(height: 24),
@@ -128,8 +128,8 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
                   ),
                 );
               },
-              icon: const Icon(Icons.people),
-              label: const Text('Manage Assigned Staff'),
+              icon: Icon(Icons.people),
+              label: Text('Manage Assigned Staff'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
@@ -137,8 +137,8 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: _isDeleting ? null : _deleteService,
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: _isDeleting ? const CircularProgressIndicator() : const Text('Delete Service'),
+              style: TextButton.styleFrom(foregroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)),
+              child: _isDeleting ? const CircularProgressIndicator() : Text('Delete Service'),
             ),
             const SizedBox(height: 16),
           ],

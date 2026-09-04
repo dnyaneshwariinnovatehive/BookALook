@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../../models/salon_working_hour.dart';
 import '../../../../../services/salon_settings_api.dart';
@@ -116,7 +117,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Copied ${_daysOfWeek[sourceHour.dayOfWeek]}\'s schedule to all days'),
-        backgroundColor: Colors.green,
+        backgroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -126,10 +127,10 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Change Salon Timings'),
+        title: Text('Change Salon Timings'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -158,7 +159,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                         ),
                         child: _isSaving
                             ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface)
-                            : const Text('Save Timings', style: TextStyle(fontSize: 16)),
+                            : Text('Save Timings', style: TextStyle(fontSize: 16)),
                       ),
                     ),
                   ],
@@ -172,9 +173,9 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: hour.isClosed ? Colors.grey.shade200 : AppTheme.accentColor.withOpacity(0.3), width: 1.5),
+        side: BorderSide(color: hour.isClosed ? Theme.of(context).dividerColor : AppTheme.accentColor.withOpacity(0.3), width: 1.5),
       ),
-      color: hour.isClosed ? Colors.grey.shade50 : Colors.white,
+      color: hour.isClosed ? Theme.of(context).dividerColor : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -190,13 +191,13 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                       style: TextStyle(
                         fontSize: 18, 
                         fontWeight: FontWeight.bold,
-                        color: hour.isClosed ? Colors.grey : Colors.black,
+                        color: hour.isClosed ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     if (!hour.isClosed) ...[
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.copy_all, color: AppTheme.accentColor, size: 20),
+                        icon: Icon(Icons.copy_all, color: AppTheme.accentColor, size: 20),
                         tooltip: 'Apply to all days',
                         onPressed: () => _applyToAll(hour),
                         padding: EdgeInsets.zero,
@@ -210,13 +211,13 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: hour.isClosed ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                        color: hour.isClosed ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.1) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         hour.isClosed ? 'Closed' : 'Open', 
                         style: TextStyle(
-                          color: hour.isClosed ? Colors.red : Colors.green, 
+                          color: hour.isClosed ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), 
                           fontWeight: FontWeight.bold,
                           fontSize: 12
                         )
@@ -225,7 +226,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                     const SizedBox(width: 8),
                     Switch(
                       value: !hour.isClosed,
-                      activeColor: Colors.green,
+                      activeColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                       onChanged: (val) {
                         setState(() {
                           hour.isClosed = !val;
@@ -260,13 +261,13 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.wb_sunny_outlined, size: 18, color: AppTheme.accentColor),
+                            Icon(Icons.wb_sunny_outlined, size: 18, color: AppTheme.accentColor),
                             const SizedBox(width: 8),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Opens At', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-                                Text(_formatTimeDisplay(hour.openTime), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                                Text(_formatTimeDisplay(hour.openTime), style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
                               ],
                             ),
                           ],
@@ -288,13 +289,13 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.nights_stay_outlined, size: 18, color: AppTheme.accentColor),
+                            Icon(Icons.nights_stay_outlined, size: 18, color: AppTheme.accentColor),
                             const SizedBox(width: 8),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Closes At', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-                                Text(_formatTimeDisplay(hour.closeTime), style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                                Text(_formatTimeDisplay(hour.closeTime), style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
                               ],
                             ),
                           ],

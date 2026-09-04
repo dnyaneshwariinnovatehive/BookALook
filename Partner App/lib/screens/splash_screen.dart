@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'phone_screen.dart';
 import '../theme/app_theme.dart';

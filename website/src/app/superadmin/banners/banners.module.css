@@ -190,7 +190,7 @@
 
 .statusActive {
   background-color: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--color-success);
 }
 
 .statusInactive {
@@ -216,7 +216,7 @@
 }
 
 .deleteButton {
-  color: #ef4444;
+  color: var(--color-danger);
   background-color: rgba(239, 68, 68, 0.15);
 }
 
@@ -225,7 +225,7 @@
 }
 
 .editButton {
-  color: #f59e0b;
+  color: var(--color-warning);
   background-color: rgba(245, 158, 11, 0.15);
 }
 

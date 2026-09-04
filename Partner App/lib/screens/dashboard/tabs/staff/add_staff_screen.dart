@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../models/staff_models.dart';
 import '../../../../models/service_models.dart';
@@ -189,7 +190,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Select Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('Select Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                           TextButton(
                             onPressed: () {
                               setModalState(() {
@@ -212,7 +213,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                         ],
                       ),
                     ),
-                    const Divider(height: 1),
+                    Divider(height: 1),
                     Expanded(
                       child: ListView(
                         controller: scrollController,
@@ -247,7 +248,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                           backgroundColor: AppTheme.accentColor,
                           minimumSize: const Size(double.infinity, 50),
                         ),
-                        child: const Text('Done', style: TextStyle(fontSize: 16)),
+                        child: Text('Done', style: TextStyle(fontSize: 16)),
                       ),
                     )
                   ],
@@ -264,7 +265,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Add Service Provider')),
+        appBar: AppBar(title: Text('Add Service Provider')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -274,20 +275,20 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         title: Text(widget.existingStaff != null ? 'Edit Service Provider' : 'Add Service Provider'),
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         actions: [
           if (widget.existingStaff != null)
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: Icon(Icons.delete, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)),
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Delete Staff'),
-                    content: const Text('Are you sure you want to delete this staff member?'),
+                    title: Text('Delete Staff'),
+                    content: Text('Are you sure you want to delete this staff member?'),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)))),
                     ],
                   ),
                 );
@@ -310,24 +311,24 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('Basic Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Basic Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
               validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
-              decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
               keyboardType: TextInputType.phone,
               validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email (Optional)', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Email (Optional)', border: OutlineInputBorder()),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
@@ -336,7 +337,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _salaryController,
-                    decoration: const InputDecoration(labelText: 'Base Salary (₹)', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: 'Base Salary (₹)', border: OutlineInputBorder()),
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -344,7 +345,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _commissionController,
-                    decoration: const InputDecoration(labelText: 'Commission (%)', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: 'Commission (%)', border: OutlineInputBorder()),
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -352,7 +353,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             ),
             const SizedBox(height: 32),
 
-            const Text('Assigned Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Assigned Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(16),
@@ -365,7 +366,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 children: [
                   Text(
                     '${_selectedServiceIds.length} services selected',
-                    style: const TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16),
                   ),
                   ElevatedButton(
                     onPressed: _salonServicesGrouped.isEmpty ? null : _showServicesModal,
@@ -373,17 +374,17 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                       backgroundColor: AppTheme.accentColor,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: const Text('Select Services'),
+                    child: Text('Select Services'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
 
-            const Text('Working Hours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Working Hours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             CheckboxListTile(
-              title: const Text('Use same working hours as salon'),
+              title: Text('Use same working hours as salon'),
               value: _useSalonWorkingHours,
               onChanged: (val) {
                 setState(() => _useSalonWorkingHours = val ?? true);
@@ -393,7 +394,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
             ),
             if (!_useSalonWorkingHours) ...[
               const SizedBox(height: 16),
-              const Text('Advanced Customization', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Advanced Customization', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               ..._workingHours.map((hour) => _buildDayRow(hour)),
             ],
@@ -407,7 +408,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
               ),
               child: _isSaving
                   ? CircularProgressIndicator(color: Theme.of(context).colorScheme.surface)
-                  : Text(widget.existingStaff != null ? 'Save Changes' : 'Save Provider', style: const TextStyle(fontSize: 16)),
+                  : Text(widget.existingStaff != null ? 'Save Changes' : 'Save Provider', style: TextStyle(fontSize: 16)),
             ),
             const SizedBox(height: 32),
           ],
@@ -425,13 +426,13 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_daysOfWeek[hour.dayOfWeek], style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(_daysOfWeek[hour.dayOfWeek], style: TextStyle(fontWeight: FontWeight.bold)),
               Row(
                 children: [
-                  Text(hour.isWeeklyOff ? 'Off' : 'Working', style: TextStyle(color: hour.isWeeklyOff ? Colors.red : Colors.green)),
+                  Text(hour.isWeeklyOff ? 'Off' : 'Working', style: TextStyle(color: hour.isWeeklyOff ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess))),
                   Switch(
                     value: !hour.isWeeklyOff,
-                    activeColor: Colors.green,
+                    activeColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                     onChanged: (val) {
                       setState(() {
                         hour.isWeeklyOff = !val;
@@ -463,7 +464,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                         children: [
                           Text('Shift Start', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                           const SizedBox(height: 4),
-                          Text(_formatTime(hour.shiftStart), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(_formatTime(hour.shiftStart), style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -481,7 +482,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                         children: [
                           Text('Shift End', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
                           const SizedBox(height: 4),
-                          Text(_formatTime(hour.shiftEnd), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(_formatTime(hour.shiftEnd), style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),

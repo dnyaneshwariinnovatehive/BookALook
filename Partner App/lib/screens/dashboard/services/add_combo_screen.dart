@@ -76,7 +76,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Select Services'),
+              title: Text('Select Services'),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ListView(
@@ -107,7 +107,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Done'),
+                  child: Text('Done'),
                 ),
               ],
             );
@@ -163,21 +163,21 @@ class _AddComboScreenState extends State<AddComboScreen> {
       appBar: AppBar(
         title: Text(widget.existingCombo != null ? 'Edit Combo' : 'Add Combo'),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Colors.black,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         actions: [
           if (widget.existingCombo != null)
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: Icon(Icons.delete, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)),
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Delete Combo'),
-                    content: const Text('Are you sure you want to delete this combo?'),
+                    title: Text('Delete Combo'),
+                    content: Text('Are you sure you want to delete this combo?'),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)))),
                     ],
                   ),
                 );
@@ -221,14 +221,14 @@ class _AddComboScreenState extends State<AddComboScreen> {
         children: [
           TextFormField(
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Combo Name', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: 'Combo Name', border: OutlineInputBorder()),
             validator: (v) => v!.isEmpty ? 'Required' : null,
           ),
           const SizedBox(height: 16),
           
           TextFormField(
             controller: _advanceController,
-            decoration: const InputDecoration(labelText: 'Min Advance %', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: 'Min Advance %', border: OutlineInputBorder()),
             keyboardType: TextInputType.number,
             validator: (v) => v!.isEmpty ? 'Required' : null,
           ),
@@ -246,18 +246,18 @@ class _AddComboScreenState extends State<AddComboScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
+              Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
             ],
           ),
           const SizedBox(height: 24),
           
-          const Text('Services Included:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('Services Included:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           
           OutlinedButton.icon(
             onPressed: _showMultiSelectDropdown,
-            icon: const Icon(Icons.arrow_drop_down),
-            label: const Text('Select Services from Dropdown'),
+            icon: Icon(Icons.arrow_drop_down),
+            label: Text('Select Services from Dropdown'),
           ),
           const SizedBox(height: 16),
           
@@ -275,11 +275,11 @@ class _AddComboScreenState extends State<AddComboScreen> {
                   children: [
                     Text(
                       '${selectedService.template?.name} (Original: \u20B9${selectedService.price.toStringAsFixed(0)})',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
-                      decoration: const InputDecoration(labelText: 'Combo Price (\u20B9)', prefixIcon: Icon(Icons.currency_rupee, size: 16)),
+                      decoration: InputDecoration(labelText: 'Combo Price (\u20B9)', prefixIcon: Icon(Icons.currency_rupee, size: 16)),
                       initialValue: item['special_price'].toString(),
                       keyboardType: TextInputType.number,
                       onChanged: (val) {
@@ -292,8 +292,8 @@ class _AddComboScreenState extends State<AddComboScreen> {
                         onPressed: () {
                           setState(() { _selectedServices.removeAt(idx); });
                         },
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text('Remove', style: TextStyle(color: Colors.red)),
+                        icon: Icon(Icons.delete, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger)),
+                        label: Text('Remove', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger))),
                       ),
                     )
                   ],

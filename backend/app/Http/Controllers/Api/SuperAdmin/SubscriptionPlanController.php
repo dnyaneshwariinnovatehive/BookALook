@@ -27,6 +27,7 @@ class SubscriptionPlanController extends Controller
                 'current_plan' => $salon->currentSubscription ? $salon->currentSubscription->plan->name : 'None',
                 'billing_type' => $salon->currentSubscription ? $salon->currentSubscription->billing_type : 'N/A',
                 'commission_percentage' => $salon->currentSubscription ? $salon->currentSubscription->commission_percentage : null,
+                'commission_opt_in' => $salon->commission_opt_in,
                 'expiry' => $salon->currentSubscription ? $salon->currentSubscription->end_date->format('Y-m-d') : null,
                 'status' => $salon->currentSubscription ? $salon->currentSubscription->status : 'N/A',
             ];
@@ -47,6 +48,7 @@ class SubscriptionPlanController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:50',
             'price' => 'required|numeric',
+            'validity_days' => 'required|integer|min:1',
             'whatsapp_campaign_limit' => 'required|integer',
             'has_customer_segmentation' => 'boolean',
             'has_service_based_targeting' => 'boolean',
@@ -78,6 +80,7 @@ class SubscriptionPlanController extends Controller
         $validated = $request->validate([
             'name' => 'string|max:50',
             'price' => 'numeric',
+            'validity_days' => 'integer|min:1',
             'whatsapp_campaign_limit' => 'integer',
             'has_customer_segmentation' => 'boolean',
             'has_service_based_targeting' => 'boolean',
@@ -132,7 +135,6 @@ class SubscriptionPlanController extends Controller
             'plan_id' => 'required|exists:subscription_plans,id',
             'billing_type' => 'required|in:flat,commission',
             'commission_percentage' => 'nullable|numeric|min:0|max:100',
-            'feature_level' => 'required|in:starter,growth',
         ]);
 
         // Cancel previous active subscription if exists
@@ -148,19 +150,36 @@ class SubscriptionPlanController extends Controller
         $subscription = SalonSubscription::create([
             'salon_id' => $salon->id,
             'plan_id' => $plan->id,
-            'feature_level' => $request->feature_level,
             'billing_type' => $request->billing_type,
             'commission_percentage' => $request->billing_type === 'commission' ? $request->commission_percentage : null,
             'plan_price_snapshot' => $plan->price,
             'start_date' => Carbon::now(),
-            'end_date' => Carbon::now()->addMonth(),
+            'end_date' => Carbon::now()->addDays($plan->validity_days),
             'status' => 'active',
         ]);
+
+        // Mark any pending payment requests as approved
+        \App\Models\SubscriptionPaymentRequest::where('salon_id', $salon->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'approved']);
 
         return response()->json([
             'success' => true,
             'message' => 'Subscription assigned to salon successfully',
             'subscription' => $subscription->load('plan')
+        ]);
+    }
+
+    public function getSubscriptionRequests()
+    {
+        $requests = \App\Models\SubscriptionPaymentRequest::with(['salon.admin', 'plan'])
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'requests' => $requests
         ]);
     }
 }

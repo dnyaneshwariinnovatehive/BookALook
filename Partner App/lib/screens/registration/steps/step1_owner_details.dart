@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../theme/app_theme.dart';
 
@@ -48,12 +49,12 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Owner Account Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Create your admin credentials for managing your salon.',
               style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
             ),
@@ -118,7 +119,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
                       side: const BorderSide(color: AppTheme.lightBorder),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel', style: TextStyle(color: AppTheme.lightTextBody)),
+                    child: Text('Cancel', style: TextStyle(color: AppTheme.lightTextBody)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -128,11 +129,11 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
                     onPressed: _submit,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.black,
+                      backgroundColor: Theme.of(context).colorScheme.onSurface,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Next'),
+                    child: Text('Next'),
                   ),
                 ),
               ],
@@ -146,7 +147,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
 
@@ -165,10 +166,10 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black26),
-        prefixIcon: Icon(icon, color: Colors.black38, size: 20),
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+        prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),

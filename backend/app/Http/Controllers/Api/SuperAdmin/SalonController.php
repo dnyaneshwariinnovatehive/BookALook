@@ -10,7 +10,7 @@ class SalonController extends Controller
 {
     public function index(Request $request)
     {
-        $query = \App\Models\Salon::with(['admin', 'city']);
+        $query = \App\Models\Salon::with(['admin', 'city', 'currentSubscription']);
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->input('search');
@@ -46,7 +46,8 @@ class SalonController extends Controller
             'city',
             'services.template.category',
             'providers.user',
-            'combos.services'
+            'combos.services',
+            'currentSubscription'
         ])->findOrFail($id);
 
         return response()->json([

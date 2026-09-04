@@ -1,3 +1,4 @@
+import 'package:customer_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/auth_service.dart';

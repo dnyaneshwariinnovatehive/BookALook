@@ -84,7 +84,7 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+        title: Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -108,8 +108,8 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
                   if (result == true) _fetchServices();
                 }
               },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add'),
+              icon: Icon(Icons.add, size: 18),
+              label: Text('Add'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -140,7 +140,7 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
               ),
               labelColor: theme.textTheme.bodyLarge?.color,
               unselectedLabelColor: AppTheme.accentColor,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              labelStyle: TextStyle(fontWeight: FontWeight.bold),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
               tabs: const [
@@ -213,7 +213,7 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
+                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
                 boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
               ),
               child: Column(
@@ -223,12 +223,12 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(combo['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: Text(combo['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
-                        child: const Text('Active', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text('Active', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), fontSize: 12, fontWeight: FontWeight.bold)),
                       )
                     ],
                   ),
@@ -237,10 +237,10 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Text('\u20B9${totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.accentColor)),
+                      Text('\u20B9${totalPrice.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.accentColor)),
                       const SizedBox(width: 12),
                       if (savings > 0)
-                        Text('Save \u20B9${savings.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green)),
+                        Text('Save \u20B9${savings.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess))),
                       const SizedBox(width: 12),
                       Text('Adv: ${combo['advance_percentage'] ?? 0}%', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
                     ],
@@ -304,7 +304,7 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
+                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
                 boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
               ),
               child: Column(
@@ -314,12 +314,12 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(service.template?.name ?? 'Unknown Service', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: Text(service.template?.name ?? 'Unknown Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
-                        child: const Text('Active', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text('Active', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), fontSize: 12, fontWeight: FontWeight.bold)),
                       )
                     ],
                   ),
@@ -329,7 +329,7 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(color: const Color(0xFFF3E5F5), borderRadius: BorderRadius.circular(8)),
-                        child: Text(category.name, style: const TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text(category.name, style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                       const SizedBox(width: 12),
                       Text('\u20B9${service.price.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),

@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../phone_screen.dart';
@@ -29,13 +30,13 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 50,
             backgroundColor: Colors.blueGrey,
-            child: Icon(Icons.person, size: 50, color: Colors.white),
+            child: Icon(Icons.person, size: 50, color: Theme.of(context).colorScheme.surface),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Collaborator Profile',
             style: TextStyle(
               fontSize: 24,
@@ -43,26 +44,26 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
             ),
           ),
           const SizedBox(height: 16),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32.0),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: Text(
               'View and manage your personal profile and contact details.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.black54,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54),
               ),
             ),
           ),
           const SizedBox(height: 48),
           ElevatedButton.icon(
             onPressed: _logout,
-            icon: const Icon(Icons.logout),
-            label: const Text('Log Out'),
+            icon: Icon(Icons.logout),
+            label: Text('Log Out'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              backgroundColor: Colors.red[50],
-              foregroundColor: Colors.red,
+              backgroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withValues(alpha: 0.05),
+              foregroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger),
             ),
           ),
         ],

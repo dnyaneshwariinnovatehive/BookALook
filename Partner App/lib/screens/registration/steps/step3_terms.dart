@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../theme/app_theme.dart';
 
@@ -28,12 +29,12 @@ class _Step3TermsState extends State<Step3Terms> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Terms & Conditions',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Please review and accept the partner terms.',
             style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
           ),
@@ -91,7 +92,7 @@ class _Step3TermsState extends State<Step3Terms> {
                     side: const BorderSide(color: AppTheme.lightBorder),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
+                  child: Text('Back', style: TextStyle(color: AppTheme.lightTextBody)),
                 ),
               ),
               const SizedBox(width: 16),
@@ -101,13 +102,13 @@ class _Step3TermsState extends State<Step3Terms> {
                   onPressed: _agreed && !widget.isLoading ? _submit : null,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: _agreed ? Colors.black : Colors.grey.shade400,
+                    backgroundColor: _agreed ? Theme.of(context).colorScheme.onSurface : Theme.of(context).dividerColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: widget.isLoading 
                       ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
-                      : const Text('Register Salon'),
+                      : Text('Register Salon'),
                 ),
               ),
             ],

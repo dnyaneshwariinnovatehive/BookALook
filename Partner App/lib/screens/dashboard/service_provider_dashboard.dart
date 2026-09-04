@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,11 +68,11 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
           type: BottomNavigationBarType.fixed,
           backgroundColor: Theme.of(context).colorScheme.surface,
           selectedItemColor: AppTheme.accentColor,
-          unselectedItemColor: Colors.grey,
+          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
           showSelectedLabels: true,
           showUnselectedLabels: true,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
+          selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),

@@ -26,7 +26,7 @@ class _CollaboratorDashboardScreenState extends State<CollaboratorDashboardScree
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Collaborator Dashboard'),
+        title: Text('Collaborator Dashboard'),
       ),
       body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
@@ -38,7 +38,7 @@ class _CollaboratorDashboardScreenState extends State<CollaboratorDashboardScree
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),

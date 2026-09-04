@@ -1,3 +1,4 @@
+import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
@@ -62,7 +63,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Manage your salon, services, and staff seamlessly',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -136,7 +137,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 const SizedBox(height: 32),
 
                 // Phone Number Input
-                const Text(
+                Text(
                   'Phone Number',
                   style: TextStyle(
                     fontSize: 14,
@@ -148,7 +149,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  style: const TextStyle(fontSize: 16),
+                  style: TextStyle(fontSize: 16),
                   decoration: InputDecoration(
                     hintText: 'Enter your mobile no.',
                     border: OutlineInputBorder(
@@ -160,7 +161,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                       borderSide: const BorderSide(color: AppTheme.lightBorder),
                     ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Theme.of(context).colorScheme.surface,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
                 ),
@@ -193,12 +194,12 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Don\'t have an account? ', style: TextStyle(color: AppTheme.lightTextBody)),
+                      Text('Don\'t have an account? ', style: TextStyle(color: AppTheme.lightTextBody)),
                       GestureDetector(
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));
                         },
-                        child: const Text(
+                        child: Text(
                           'Register here',
                           style: TextStyle(
                             color: AppTheme.accentColor,

@@ -13,6 +13,7 @@ class SubscriptionPlan extends Model
     protected $fillable = [
         'name',
         'price',
+        'validity_days',
         'whatsapp_campaign_limit',
         'has_customer_segmentation',
         'has_service_based_targeting',

@@ -6,6 +6,8 @@ import styles from './page.module.css';
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [salons, setSalons] = useState<any[]>([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState<any[]>([]);
+  const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Form State for Creating/Editing Plans
@@ -23,13 +25,13 @@ export default function SubscriptionsPage() {
     has_cross_sell_recommendations: 'none',
     has_priority_visibility: false,
     is_active: true,
+    validity_days: '30',
   });
 
   // Form State for Assigning Salon Plan
   const [assigningSalon, setAssigningSalon] = useState<any>(null);
   const [billingType, setBillingType] = useState('flat');
   const [commissionPercentage, setCommissionPercentage] = useState('');
-  const [featureLevel, setFeatureLevel] = useState('starter');
   const [selectedPlanId, setSelectedPlanId] = useState('');
 
   useEffect(() => {
@@ -46,6 +48,12 @@ export default function SubscriptionsPage() {
         if (data.plans.length > 0) {
           setSelectedPlanId(data.plans[0].id);
         }
+      }
+
+      const reqRes = await fetch('/api/superadmin/subscription-requests');
+      const reqData = await reqRes.json();
+      if (reqData.success) {
+        setSubscriptionRequests(reqData.requests);
       }
     } catch (e) {
       console.error(e);
@@ -68,6 +76,7 @@ export default function SubscriptionsPage() {
       has_cross_sell_recommendations: 'none',
       has_priority_visibility: false,
       is_active: true,
+      validity_days: '30',
     });
     setIsPlanModalOpen(true);
   };
@@ -86,6 +95,7 @@ export default function SubscriptionsPage() {
       has_cross_sell_recommendations: plan.has_cross_sell_recommendations,
       has_priority_visibility: plan.has_priority_visibility,
       is_active: plan.is_active,
+      validity_days: plan.validity_days.toString(),
     });
     setIsPlanModalOpen(true);
   };
@@ -142,8 +152,7 @@ export default function SubscriptionsPage() {
         body: JSON.stringify({
           plan_id: selectedPlanId,
           billing_type: billingType,
-          commission_percentage: commissionPercentage ? parseFloat(commissionPercentage) : null,
-          feature_level: featureLevel
+          commission_percentage: commissionPercentage ? parseFloat(commissionPercentage) : null
         })
       });
       if (res.ok) {
@@ -162,6 +171,65 @@ export default function SubscriptionsPage() {
     <div className={styles.container}>
       <h1 className={styles.title}>Subscription Plan Management</h1>
       
+      {subscriptionRequests.length > 0 && (
+        <div className={styles.section} style={{ border: '2px solid #eab308', padding: '24px', borderRadius: '8px', marginBottom: '32px' }}>
+          <h2 style={{ color: '#eab308', marginTop: 0 }}>Pending Payment Approvals</h2>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Salon Name</th>
+                <th>Requested Plan</th>
+                <th>Billing Type</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {subscriptionRequests.map(req => (
+                <tr key={req.id}>
+                  <td>{req.salon?.name}</td>
+                  <td>{req.plan?.name || 'N/A'}</td>
+                  <td>{req.billing_type === 'commission' ? 'Commission Based' : 'Subscription Based'}</td>
+                  <td>{new Date(req.created_at).toLocaleDateString()}</td>
+                  <td>
+                    <button 
+                      className={styles.button} 
+                      style={{ marginRight: '8px', background: '#3b82f6' }}
+                      onClick={() => setViewingScreenshot(req.screenshot_url)}
+                    >
+                      View Screenshot
+                    </button>
+                    <button 
+                      className={styles.button} 
+                      style={{ background: '#22c55e' }}
+                      onClick={() => {
+                        setAssigningSalon(req.salon);
+                        setSelectedPlanId(req.plan?.id || plans[0]?.id);
+                        setBillingType(req.billing_type);
+                      }}
+                    >
+                      Approve & Assign
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {viewingScreenshot && (
+        <div className={styles.modalOverlay} onClick={() => setViewingScreenshot(null)}>
+          <div className={styles.modalContent} style={{ maxWidth: '800px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <h3>Payment Screenshot</h3>
+            <img src={viewingScreenshot} alt="Payment Screenshot" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', margin: '16px 0' }} />
+            <div className={styles.formActions}>
+              <button type="button" onClick={() => setViewingScreenshot(null)} className={styles.cancelButton}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.section}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Master Plans</h2>
@@ -172,6 +240,7 @@ export default function SubscriptionsPage() {
             <div key={plan.id} className={styles.card}>
               <h3>{plan.name} Plan</h3>
               <p><strong>Price:</strong> ₹{plan.price}</p>
+              <p><strong>Validity:</strong> {plan.validity_days} Days</p>
               <p><strong>WhatsApp Limit:</strong> {plan.whatsapp_campaign_limit}</p>
               <p><strong>Status:</strong> {plan.is_active ? 'Active' : 'Inactive'}</p>
               
@@ -218,6 +287,16 @@ export default function SubscriptionsPage() {
                     value={planFormData.price}
                     onChange={(e) => setPlanFormData({...planFormData, price: e.target.value})}
                     required
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Validity Days</label>
+                  <input 
+                    type="number" 
+                    value={planFormData.validity_days}
+                    onChange={(e) => setPlanFormData({...planFormData, validity_days: e.target.value})}
+                    required
+                    min="1"
                   />
                 </div>
                 <div className={styles.formGroup} style={{ gridColumn: 'span 2' }}>
@@ -328,7 +407,14 @@ export default function SubscriptionsPage() {
           <tbody>
             {salons.map(salon => (
               <tr key={salon.id}>
-                <td>{salon.name}</td>
+                <td>
+                  {salon.name}
+                  {salon.commission_opt_in ? (
+                    <span style={{fontSize: '11px', background: '#eab308', color: '#fff', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 'bold'}}>
+                      Opted Commission
+                    </span>
+                  ) : null}
+                </td>
                 <td>{salon.owner}</td>
                 <td>{salon.current_plan}</td>
                 <td>
@@ -357,22 +443,14 @@ export default function SubscriptionsPage() {
               <div className={styles.formGroup}>
                 <label>Base Plan Template</label>
                 <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)}>
-                  {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Feature Level</label>
-                <select value={featureLevel} onChange={(e) => setFeatureLevel(e.target.value)}>
-                  <option value="starter">Starter Features</option>
-                  <option value="growth">Growth Features</option>
+                  {plans.map(p => <option key={p.id} value={p.id}>{p.name} - ₹{p.price} ({p.validity_days} Days)</option>)}
                 </select>
               </div>
 
               <div className={styles.formGroup}>
                 <label>Billing Type</label>
                 <select value={billingType} onChange={(e) => setBillingType(e.target.value)}>
-                  <option value="flat">Flat Fee</option>
+                  <option value="flat">Subscription Based</option>
                   <option value="commission">Commission Based</option>
                 </select>
               </div>
