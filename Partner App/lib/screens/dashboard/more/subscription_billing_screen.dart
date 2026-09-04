@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:partner_app/services/api_config.dart';
 
 class SubscriptionBillingScreen extends StatefulWidget {
   const SubscriptionBillingScreen({super.key});
@@ -18,7 +19,8 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   int _daysRemaining = 0;
   int _warningThresholdDays = 3;
   Map<String, dynamic>? _pendingRequest;
-  final String _baseUrl = 'http://localhost:8000/api';
+  List<dynamic> _history = [];
+  final String _baseUrl = ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -47,8 +49,11 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
             _subscription = data['subscription'];
             _daysRemaining = data['days_remaining'];
             _warningThresholdDays = data['warning_threshold_days'] ?? 3;
+          } else {
+            _subscription = null;
           }
           _pendingRequest = data['pending_request'];
+          _history = data['history'] ?? [];
         });
       }
     } catch (e) {
@@ -208,24 +213,31 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: _renewSubscription,
+                icon: const Icon(Icons.autorenew),
+                label: const Text('Renew Subscription (Mock)'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Renew Subscription (Mock)'),
               ),
               const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/upgrade_plan');
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final submitted = await Navigator.pushNamed(context, '/upgrade_plan');
+                  if (submitted == true && mounted) {
+                    _fetchSubscription();
+                  }
                 },
+                icon: const Icon(Icons.workspace_premium),
+                label: const Text('Upgrade Plan & Redeem Coins'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Upgrade Plan & Redeem Coins'),
               ),
             ] else ...[
               Icon(Icons.receipt_long, size: 80, color: colorScheme.onSurfaceVariant),
@@ -267,18 +279,34 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/upgrade_plan');
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final submitted = await Navigator.pushNamed(context, '/upgrade_plan');
+                    if (submitted == true && mounted) {
+                      _fetchSubscription();
+                    }
                   },
+                  icon: const Icon(Icons.shopping_cart_checkout),
+                  label: const Text('Purchase Subscription'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Purchase Subscription'),
                 ),
               ]
-            ]
+            ],
+            if (_history.isNotEmpty) ...[
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 24),
+              const Text(
+                'Subscription History',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ..._history.map((item) => _buildHistoryCard(item, colorScheme, theme)).toList(),
+            ],
           ],
         ),
       ),
@@ -292,6 +320,71 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
         Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ],
+    );
+  }
+
+  Widget _buildHistoryCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {
+    final String status = item['status'] ?? 'unknown';
+    final String planName = item['plan'] != null ? item['plan']['name'] : 'Unknown';
+    final String startDate = item['start_date'] ?? 'N/A';
+    final String endDate = item['end_date'] ?? 'N/A';
+
+    Color statusColor;
+    if (status == 'active') {
+      statusColor = Colors.green;
+    } else if (status == 'expired' || status == 'cancelled') {
+      statusColor = Colors.redAccent;
+    } else {
+      statusColor = Colors.orange;
+    }
+
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor.withOpacity(0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$planName Plan',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor.withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 14, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(
+                  '$startDate to $endDate',
+                  style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

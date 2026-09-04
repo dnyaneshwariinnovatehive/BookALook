@@ -41,7 +41,7 @@
 }
 
 .navLink:hover {
-  color: var(--text-body);
+  color: var(--accent-color);
 }
 
 .logoutButton {
@@ -57,8 +57,9 @@
 }
 
 .logoutButton:hover {
-  background-color: var(--border-color);
-  color: var(--text-body);
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--color-danger);
 }
 
 .main {

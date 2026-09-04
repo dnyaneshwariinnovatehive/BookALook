@@ -217,7 +217,7 @@
 }
 
 .tr:hover {
-  background-color: var(--bg-color);
+  background-color: var(--accent-soft);
 }
 
 .badge {
@@ -256,6 +256,6 @@
 }
 
 .actionBtn:hover {
-  background-color: var(--bg-color);
-  color: var(--text-body);
+  background-color: var(--accent-soft);
+  color: var(--accent-color);
 }

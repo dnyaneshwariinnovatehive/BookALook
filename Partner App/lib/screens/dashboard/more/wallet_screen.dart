@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:partner_app/services/api_config.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -15,7 +16,7 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isLoading = true;
   double _balance = 0;
   List<dynamic> _transactions = [];
-  final String _baseUrl = 'http://localhost:8000/api';
+  final String _baseUrl = ApiConfig.baseUrl;
 
   @override
   void initState() {
