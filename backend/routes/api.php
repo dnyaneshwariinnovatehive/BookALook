@@ -20,6 +20,19 @@ Route::prefix('customer')->group(function () {
         Route::get('/profile', function (Request $request) {
             return $request->user();
         });
+        
+        // Cart Routes
+        Route::get('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getCart']);
+        Route::post('/salons/{salon_id}/cart/items', [\App\Http\Controllers\Api\Customer\CartController::class, 'addItem']);
+        Route::delete('/cart/items/{item_id}', [\App\Http\Controllers\Api\Customer\CartController::class, 'removeItem']);
+        Route::delete('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'clearCart']);
+
+        // Appointment Routes
+        Route::get('/salons/{salon_id}/availability', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'getAvailableSlots']);
+        Route::post('/salons/{salon_id}/appointments/book', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'book']);
+        Route::get('/appointments', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'index']);
+        Route::post('/appointments/{id}/cancel', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'cancel']);
+        Route::post('/appointments/{id}/generate-qr', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'generateQr']);
     });
 });
 
@@ -80,6 +93,11 @@ Route::prefix('superadmin')->group(function () {
         Route::delete('/catalog/categories/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteCategory']);
         Route::put('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'updateTemplate']);
         Route::delete('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteTemplate']);
+        
+        // Appointments
+        Route::get('/appointments', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'index']);
+        Route::post('/appointments/verify-qr', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'verifyQrAndStartSession']);
+        Route::post('/appointments/{id}/add-service', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'addServiceMidAppointment']);
     });
 });
 
@@ -130,6 +148,11 @@ Route::prefix('partner')->group(function () {
         Route::post('/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
         
         // Appointments
+        Route::get('/salons/{salon_id}/appointments', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'index']);
+        Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'walkIn']);
+        Route::post('/salons/{salon_id}/appointments/verify-qr', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'verifyQrAndStartSession']);
+        Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'addServiceMidAppointment']);
+        Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
     });
 });

@@ -8,6 +8,7 @@ import styles from './layout.module.css';
 
 const navItems = [
   { name: 'Dashboard', path: '/superadmin' },
+  { name: 'Appointments', path: '/superadmin/appointments' },
   { name: 'Salon Approval Queue', path: '/superadmin/salon-approval' },
   { name: 'Salon Directory', path: '/superadmin/salons' },
   { name: 'Master Catalog', path: '/superadmin/catalog' },

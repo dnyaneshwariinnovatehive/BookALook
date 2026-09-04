@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../provider_dashboard_screen.dart';
 
 class AppointmentsTab extends StatelessWidget {
-  const AppointmentsTab({super.key});
+  final String salonId;
+  const AppointmentsTab({super.key, required this.salonId});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Appointments'),
-      ),
-      body: const Center(
-        child: Text('Appointments Tab'),
-      ),
-    );
+    // We return ProviderDashboardScreen directly as it has its own Scaffold and AppBar.
+    // ProviderDashboardScreen was built to display appointments for the salon.
+    return ProviderDashboardScreen(salonId: salonId);
   }
 }

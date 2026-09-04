@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/guest_restricted_view.dart';
+import '../my_bookings_screen.dart';
 
 class BookingsTab extends StatelessWidget {
   final bool isGuest;
@@ -17,35 +18,11 @@ class BookingsTab extends StatelessWidget {
       );
     }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_note, size: 80, color: Theme.of(context).dividerColor),
-            SizedBox(height: 24),
-            Text(
-              'No Bookings Yet',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 12),
-            Text(
-              'When you book an appointment, it will appear here.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+    // Wrap MyBookingsScreen inside a basic scaffold if it doesn't fit or just return it directly.
+    // Since MyBookingsScreen is a full Scaffold itself, we can return it directly as a tab content.
+    // The only issue might be double AppBars if the parent tab view has one, but typically tabs don't.
+    // If double AppBars appear, MyBookingsScreen's appbar can be refactored, but returning it directly is standard.
+    return MyBookingsScreen();
   }
 }
+

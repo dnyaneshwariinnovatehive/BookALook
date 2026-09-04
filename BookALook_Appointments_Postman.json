@@ -1,0 +1,142 @@
+{
+    "info": {
+        "name": "BookALook Appointments API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Customer - Appointments",
+            "item": [
+                {
+                    "name": "Get Cart",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "url": {"raw": "{{base_url}}/api/customer/salons/{{salon_id}}/cart", "host": ["{{base_url}}"], "path": ["api", "customer", "salons", "{{salon_id}}", "cart"]}
+                    }
+                },
+                {
+                    "name": "Add Item to Cart",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"service_id\": 1,\n    \"quantity\": 1\n}"
+                        },
+                        "url": {"raw": "{{base_url}}/api/customer/salons/{{salon_id}}/cart/items", "host": ["{{base_url}}"], "path": ["api", "customer", "salons", "{{salon_id}}", "cart", "items"]}
+                    }
+                },
+                {
+                    "name": "Get Availability",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/customer/salons/{{salon_id}}/availability?date=2026-10-01", 
+                            "host": ["{{base_url}}"], 
+                            "path": ["api", "customer", "salons", "{{salon_id}}", "availability"],
+                            "query": [{"key": "date", "value": "2026-10-01"}]
+                        }
+                    }
+                },
+                {
+                    "name": "Book Appointment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"date\": \"2026-10-01\",\n    \"time\": \"10:00\"\n}"
+                        },
+                        "url": {"raw": "{{base_url}}/api/customer/salons/{{salon_id}}/appointments/book", "host": ["{{base_url}}"], "path": ["api", "customer", "salons", "{{salon_id}}", "appointments", "book"]}
+                    }
+                },
+                {
+                    "name": "My Bookings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "url": {"raw": "{{base_url}}/api/customer/appointments", "host": ["{{base_url}}"], "path": ["api", "customer", "appointments"]}
+                    }
+                },
+                {
+                    "name": "Generate QR Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{customer_token}}"}
+                        ],
+                        "url": {"raw": "{{base_url}}/api/customer/appointments/{{appointment_id}}/generate-qr", "host": ["{{base_url}}"], "path": ["api", "customer", "appointments", "{{appointment_id}}", "generate-qr"]}
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Partner - Appointments",
+            "item": [
+                {
+                    "name": "Assigned Appointments",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{partner_token}}"}
+                        ],
+                        "url": {"raw": "{{base_url}}/api/partner/salons/{{salon_id}}/appointments", "host": ["{{base_url}}"], "path": ["api", "partner", "salons", "{{salon_id}}", "appointments"]}
+                    }
+                },
+                {
+                    "name": "Verify QR & Start Session",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{partner_token}}"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"qr_token\": \"PASTE_QR_TOKEN_HERE\"\n}"
+                        },
+                        "url": {"raw": "{{base_url}}/api/partner/salons/{{salon_id}}/appointments/verify-qr", "host": ["{{base_url}}"], "path": ["api", "partner", "salons", "{{salon_id}}", "appointments", "verify-qr"]}
+                    }
+                },
+                {
+                    "name": "Add Mid-Appointment Service",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Accept", "value": "application/json"},
+                            {"key": "Content-Type", "value": "application/json"},
+                            {"key": "Authorization", "value": "Bearer {{partner_token}}"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"service_id\": 2,\n    \"provider_id\": 1\n}"
+                        },
+                        "url": {"raw": "{{base_url}}/api/partner/salons/{{salon_id}}/appointments/{{appointment_id}}/add-service", "host": ["{{base_url}}"], "path": ["api", "partner", "salons", "{{salon_id}}", "appointments", "{{appointment_id}}", "add-service"]}
+                    }
+                }
+            ]
+        }
+    ]
+}

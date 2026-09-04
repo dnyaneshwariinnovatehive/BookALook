@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
 import 'tabs/provider_profile_tab.dart';
+import '../provider_dashboard_screen.dart';
 
 class ServiceProviderDashboard extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -40,7 +41,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       const Center(child: Text('Home')),
-      const Center(child: Text('Schedule')),
+      ProviderDashboardScreen(salonId: widget.salon['id'].toString()),
       const Center(child: Text('Add Walk-in')),
       ProviderProfileTab(
         salon: widget.salon,
