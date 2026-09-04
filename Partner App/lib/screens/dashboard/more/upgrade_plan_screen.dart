@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:partner_app/services/api_config.dart';
 
 class UpgradePlanScreen extends StatefulWidget {
   const UpgradePlanScreen({super.key});
@@ -21,7 +22,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool _applyCoins = true;
   String? _selectedPlanId;
   File? _screenshot;
-  final String _baseUrl = 'http://localhost:8000/api';
+  final String _baseUrl = ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -36,7 +37,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
 
       // Note: Ideal implementation would fetch everything in one API call for this screen, 
       // but we will fetch plans and wallet balance for the demo.
-      final plansRes = await http.get(Uri.parse('$_baseUrl/superadmin/subscriptions/plans'), headers: {
+      final plansRes = await http.get(Uri.parse('$_baseUrl/partner/subscription/plans'), headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
@@ -103,7 +104,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Failed')));
       }

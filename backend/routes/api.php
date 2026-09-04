@@ -75,6 +75,7 @@ Route::prefix('superadmin')->group(function () {
         Route::put('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'update']);
         Route::delete('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'destroy']);
         Route::post('/salons/{id}/subscription', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'assignToSalon']);
+        Route::get('/subscription-requests', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'getSubscriptionRequests']);
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);
         Route::put('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updatePolicySettings']);
@@ -141,6 +142,7 @@ Route::prefix('partner')->group(function () {
 
         // Wallet & Subscriptions
         Route::get('/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
+        Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
         Route::post('/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
         Route::post('/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
         Route::post('/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);

@@ -288,7 +288,7 @@
 }
 
 .editBtn:hover {
-  background-color: var(--accent-color);
+  background-color: var(--accent-hover);
 }
 
 .deleteBtn {

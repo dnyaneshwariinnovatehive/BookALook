@@ -26,11 +26,15 @@ class SubscriptionController extends Controller
         }
 
         $subscription = $salon->currentSubscription()->with('plan')->first();
+        $history = $salon->subscriptions()->with('plan')->orderBy('created_at', 'desc')->get();
+        $pendingRequest = \App\Models\SubscriptionPaymentRequest::where('salon_id', $salon->id)->where('status', 'pending')->with('plan')->first();
 
         if (!$subscription) {
             return response()->json([
                 'success' => true,
                 'has_subscription' => false,
+                'history' => $history,
+                'pending_request' => $pendingRequest,
                 'message' => 'No active subscription found.'
             ]);
         }
@@ -41,7 +45,9 @@ class SubscriptionController extends Controller
             'success' => true,
             'has_subscription' => true,
             'subscription' => $subscription,
-            'days_remaining' => (int) $daysRemaining
+            'days_remaining' => (int) $daysRemaining,
+            'history' => $history,
+            'pending_request' => $pendingRequest
         ]);
     }
 

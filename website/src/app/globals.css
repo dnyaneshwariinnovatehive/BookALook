@@ -3,6 +3,7 @@
 :root {
   /* Brand / Accent */
   --accent-color: #9C54F2;
+  --accent-hover: #7B32EC;
   --accent-gradient: linear-gradient(135deg, #9C54F2 0%, #7B32EC 100%);
   --accent-soft: #F3EBFE;
   --accent-soft-hover: #E9DAFD;
@@ -66,6 +67,7 @@
   --text-light: #676275;
   --border-color: #2B2738;
 
+  --accent-hover: #8D41EA;
   --accent-soft: #2C223C;
   --accent-soft-hover: #3B2D50;
 

@@ -59,7 +59,7 @@
 }
 
 .tr:hover {
-  background-color: var(--bg-color);
+  background-color: var(--accent-soft);
 }
 
 .salonName {
