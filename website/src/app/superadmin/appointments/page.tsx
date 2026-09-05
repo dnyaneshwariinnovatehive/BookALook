@@ -28,7 +28,10 @@ export default function GlobalAppointmentsDashboard() {
   const [error, setError] = useState('');
   
   // Filters
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
 
@@ -48,8 +51,8 @@ export default function GlobalAppointmentsDashboard() {
   // We should ideally fetch services and providers based on the selected salon, 
   // but for the demo, we'll keep it simple.
 
-  const fetchAppointments = async () => {
-    setLoading(true);
+  const fetchAppointments = async (isPolling = false) => {
+    if (!isPolling) setLoading(true);
     try {
       const queryParams = new URLSearchParams();
       if (date) queryParams.append('date', date);
@@ -63,7 +66,10 @@ export default function GlobalAppointmentsDashboard() {
         }
       });
       
-      if (!res.ok) throw new Error('Failed to fetch appointments');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to fetch appointments');
+      }
       
       const json = await res.json();
       setAppointments(json.data);
@@ -72,15 +78,23 @@ export default function GlobalAppointmentsDashboard() {
         last_page: json.last_page,
         total: json.total
       });
+      setError(''); // Clear error if fetch succeeds
     } catch (err: any) {
-      setError(err.message);
+      if (!isPolling) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchAppointments();
+    
+    // Poll every 5 seconds for real-time updates
+    const intervalId = setInterval(() => {
+      fetchAppointments(true);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [date, status, page]);
 
   const getStatusBadgeClass = (status: string) => {
@@ -166,6 +180,18 @@ export default function GlobalAppointmentsDashboard() {
     }
   };
 
+  // Generate date strip (-3 days to +10 days)
+  const generateDateStrip = () => {
+    const dates = [];
+    for (let i = -3; i <= 10; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  };
+  const dateStrip = generateDateStrip();
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -180,13 +206,42 @@ export default function GlobalAppointmentsDashboard() {
         </div>
       </div>
 
+      <div className={styles.dateStripContainer}>
+        <div className={styles.dateStrip}>
+          {dateStrip.map((d) => {
+            const dateStr = d.toISOString().split('T')[0];
+            const isSelected = date === dateStr;
+            const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+            const dayNum = d.getDate();
+            const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+            return (
+              <button 
+                key={dateStr}
+                className={`${styles.dateCard} ${isSelected ? styles.dateCardSelected : ''}`}
+                onClick={() => { setDate(dateStr); setPage(1); }}
+              >
+                <span className={styles.dateCardMonth}>{monthName}</span>
+                <span className={styles.dateCardNum}>{dayNum}</span>
+                <span className={styles.dateCardDay}>{isToday ? 'Today' : dayName}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className={styles.datePickerWrapper}>
+           <input 
+              type="date" 
+              className={styles.hiddenDateInput}
+              value={date}
+              onChange={(e) => { setDate(e.target.value); setPage(1); }}
+              title="Pick a date"
+           />
+           <span className={styles.calendarIcon}>📅</span>
+        </div>
+      </div>
+
       <div className={styles.filters}>
-        <input 
-          type="date" 
-          className={styles.dateInput}
-          value={date}
-          onChange={(e) => { setDate(e.target.value); setPage(1); }}
-        />
         <select 
           className={styles.selectInput} 
           value={status} 

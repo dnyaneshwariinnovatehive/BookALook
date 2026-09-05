@@ -15,4 +15,29 @@ class Appointment extends Model
     {
         return $this->belongsTo(Salon::class);
     }
+
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function appointedProvider()
+    {
+        return $this->belongsTo(ServiceProvider::class, 'appointed_provider_id');
+    }
+
+    public function servingProvider()
+    {
+        return $this->belongsTo(ServiceProvider::class, 'serving_provider_id');
+    }
+
+    public function services()
+    {
+        return $this->hasMany(AppointmentService::class);
+    }
+
+    public function serviceAdditions()
+    {
+        return $this->hasMany(AppointmentServiceAddition::class);
+    }
 }

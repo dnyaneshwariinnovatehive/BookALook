@@ -13,20 +13,35 @@ class AppointmentController extends Controller
 {
     public function index(Request $request, $salon_id)
     {
-        $provider = \App\Models\ServiceProvider::where('user_id', $request->user()->id)->first();
-        if (!$provider) {
-            return response()->json(['message' => 'You are not a registered service provider.'], 403);
-        }
+        $user = $request->user();
 
         $query = Appointment::with(['customer', 'services.service', 'serviceAdditions.service'])
-            ->where('salon_id', $salon_id)
-            ->where(function($q) use ($provider) {
-                $q->where('appointed_provider_id', $provider->id)
-                  ->orWhere('serving_provider_id', $provider->id);
-            });
+            ->where('salon_id', $salon_id);
 
-        if ($request->has('date')) {
+        if ($user->role === 'service_provider') {
+            $provider = \App\Models\ServiceProvider::where('user_id', $user->id)->first();
+            if ($provider) {
+                $query->where(function($q) use ($provider) {
+                    $q->where('appointed_provider_id', $provider->id)
+                      ->orWhere('serving_provider_id', $provider->id);
+                });
+            } else {
+                return response()->json(['message' => 'You are not a registered service provider.'], 403);
+            }
+        } elseif (!in_array($user->role, ['admin', 'superadmin'])) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        if ($request->has('date') && !empty($request->date) && $request->date !== 'All') {
             $query->whereDate('appointment_date', $request->date);
+        }
+
+        if ($request->has('provider_id') && !empty($request->provider_id) && $request->provider_id !== 'All') {
+            $query->where('appointed_provider_id', $request->provider_id);
+        }
+
+        if ($request->has('status') && !empty($request->status) && $request->status !== 'All') {
+            $query->where('status', strtolower($request->status));
         }
 
         $appointments = $query->orderBy('start_time', 'asc')->get();
@@ -37,7 +52,9 @@ class AppointmentController extends Controller
     {
         $request->validate([
             'customer_name' => 'required|string',
-            'customer_phone' => 'required|string',
+            'customer_phone' => 'nullable|string',
+            'gender' => 'nullable|in:Male,Female,Other',
+            'start_time' => 'nullable|date_format:Y-m-d H:i:s',
             'services' => 'required|array',
             'services.*' => 'exists:services,id'
         ]);
@@ -48,25 +65,31 @@ class AppointmentController extends Controller
         $services = \App\Models\Service::whereIn('id', $request->services)->get();
         $totalAmount = $services->sum('price');
         $totalDuration = $services->sum('duration_minutes');
+        
+        $startTime = $request->start_time ? \Carbon\Carbon::parse($request->start_time) : now();
+        $endTime = (clone $startTime)->addMinutes($totalDuration);
+        $status = $request->start_time ? 'scheduled' : 'in_progress';
+        $startedAt = $request->start_time ? null : now();
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
             $appointment = new Appointment([
                 'salon_id' => $salon_id,
                 'appointed_provider_id' => $provider->id,
-                'serving_provider_id' => $provider->id,
+                'serving_provider_id' => $request->start_time ? null : $provider->id, // If it's for later, serving provider is decided when they scan/start
                 'booking_source' => 'walk_in',
                 'walk_in_customer_name' => $request->customer_name,
                 'walk_in_customer_phone' => $request->customer_phone,
-                'appointment_date' => now()->format('Y-m-d'),
-                'start_time' => now()->format('H:i:s'),
-                'end_time' => now()->addMinutes($totalDuration)->format('H:i:s'),
-                'status' => 'in_progress',
+                'walk_in_customer_gender' => $request->gender,
+                'appointment_date' => $startTime->format('Y-m-d'),
+                'start_time' => $startTime->format('H:i:s'),
+                'end_time' => $endTime->format('H:i:s'),
+                'status' => $status,
                 'payment_option' => 'full_at_venue',
                 'total_amount' => $totalAmount,
                 'advance_amount' => 0,
                 'balance_amount' => $totalAmount,
-                'started_at' => now(),
+                'started_at' => $startedAt,
             ]);
             $appointment->save();
 
@@ -74,16 +97,16 @@ class AppointmentController extends Controller
                 \App\Models\AppointmentService::create([
                     'appointment_id' => $appointment->id,
                     'service_id' => $service->id,
-                    'serving_provider_id' => $provider->id,
+                    'serving_provider_id' => $startedAt ? $provider->id : null,
                     'price_at_booking' => $service->price,
                     'original_service_price' => $service->price,
                     'duration_minutes_at_booking' => $service->duration_minutes,
-                    'line_status' => 'in_progress'
+                    'line_status' => $status
                 ]);
             }
 
             \Illuminate\Support\Facades\DB::commit();
-            return response()->json(['message' => 'Walk-in started', 'appointment' => $appointment]);
+            return response()->json(['message' => 'Walk-in created', 'appointment' => $appointment]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);

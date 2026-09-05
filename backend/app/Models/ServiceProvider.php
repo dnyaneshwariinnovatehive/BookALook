@@ -45,4 +45,9 @@ class ServiceProvider extends Model
     {
         return $this->belongsToMany(Service::class, 'provider_services', 'provider_id', 'service_id');
     }
+
+    public function workingHours()
+    {
+        return $this->hasMany(ProviderWorkingHour::class, 'provider_id');
+    }
 }

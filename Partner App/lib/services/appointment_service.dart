@@ -26,13 +26,22 @@ class PartnerAppointmentService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body)['appointments'];
     } else {
+      print('Failed to load appointments: ${response.statusCode} - ${response.body}');
       throw Exception('Failed to load appointments');
     }
   }
 
-  Future<Map<String, dynamic>> walkIn(String salonId, String name, String phone, List<String> serviceIds) async {
+  Future<Map<String, dynamic>> walkIn(String salonId, String name, String phone, List<String> serviceIds, {String? gender, String? startTime}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+
+    final Map<String, dynamic> body = {
+      'customer_name': name,
+      'customer_phone': phone,
+      'services': serviceIds,
+    };
+    if (gender != null) body['gender'] = gender;
+    if (startTime != null) body['start_time'] = startTime;
 
     final response = await http.post(
       Uri.parse('$baseUrl/partner/salons/$salonId/appointments/walk-in'),
@@ -41,11 +50,7 @@ class PartnerAppointmentService {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'customer_name': name,
-        'customer_phone': phone,
-        'services': serviceIds,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {

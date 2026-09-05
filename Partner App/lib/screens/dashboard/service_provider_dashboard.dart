@@ -4,6 +4,8 @@ import '../../theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
 import 'tabs/provider_profile_tab.dart';
+import 'tabs/provider_home_tab.dart';
+import 'tabs/provider_walk_in_tab.dart';
 import '../provider_dashboard_screen.dart';
 
 class ServiceProviderDashboard extends StatefulWidget {
@@ -40,9 +42,9 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      const Center(child: Text('Home')),
+      ProviderHomeTab(salon: widget.salon, provider: widget.provider, user: widget.user),
       ProviderDashboardScreen(salonId: widget.salon['id'].toString()),
-      const Center(child: Text('Add Walk-in')),
+      ProviderWalkInTab(salon: widget.salon, provider: widget.provider),
       ProviderProfileTab(
         salon: widget.salon,
         provider: widget.provider,
