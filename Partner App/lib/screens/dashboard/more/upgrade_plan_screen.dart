@@ -50,12 +50,13 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       final walletData = jsonDecode(walletRes.body);
 
       setState(() {
-        if (plansData['success']) {
-          _plans = plansData['plans'] ?? [];
+        if (plansData != null && plansData['success'] == true) {
+          _plans = plansData['plans'] as List<dynamic>? ?? [];
           if (_plans.isNotEmpty) _selectedPlanId = _plans.first['id'].toString();
         }
-        if (walletData['success']) {
-          _walletBalance = (walletData['balance'] ?? 0).toDouble();
+        if (walletData != null && walletData['success'] == true) {
+          final balance = walletData['balance'] ?? 0;
+          _walletBalance = balance is num ? balance.toDouble() : (double.tryParse(balance.toString()) ?? 0.0);
         }
       });
     } catch (e) {

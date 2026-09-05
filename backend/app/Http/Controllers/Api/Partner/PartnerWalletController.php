@@ -12,20 +12,22 @@ class PartnerWalletController extends Controller
     {
         $user = $request->user();
         
-        // For simplicity, assuming user is an admin of the first salon they belong to
-        // If your logic maps user->salon differently, adjust here.
-        $salonId = $user->salon_id ?? 1; 
+        $salon = \App\Models\Salon::where('admin_id', $user->id)->first();
+        if (!$salon) {
+            return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
+        }
+        $salonId = $salon->id; 
 
         $wallet = SalonWallet::firstOrCreate(
             ['salon_id' => $salonId],
-            ['balance' => 0]
+            ['coin_balance' => 0]
         );
 
         $transactions = $wallet->transactions()->orderBy('created_at', 'desc')->get();
 
         return response()->json([
             'success' => true,
-            'balance' => $wallet->balance,
+            'balance' => $wallet->coin_balance,
             'transactions' => $transactions
         ]);
     }
@@ -38,7 +40,11 @@ class PartnerWalletController extends Controller
         ]);
 
         $user = $request->user();
-        $salonId = $user->salon_id ?? 1;
+        $salon = \App\Models\Salon::where('admin_id', $user->id)->first();
+        if (!$salon) {
+            return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
+        }
+        $salonId = $salon->id;
 
         $wallet = SalonWallet::where('salon_id', $salonId)->first();
         if (!$wallet || $wallet->coin_balance < $request->coins_to_redeem) {

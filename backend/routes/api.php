@@ -156,5 +156,8 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'addServiceMidAppointment']);
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
+        
+        // Collaborator APIs
+        Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
     });
 });

@@ -195,7 +195,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                         ],
                       ),
                       Divider(height: 32),
-                      _buildDetailRow('Feature Level', _subscription!['feature_level'].toString().toUpperCase(), colorScheme),
+                      _buildDetailRow('Feature Level', _subscription!['plan']['has_priority_visibility'] == true ? 'PREMIUM' : 'STANDARD', colorScheme),
                       const SizedBox(height: 12),
                       _buildDetailRow(
                         'Billing Type', 
