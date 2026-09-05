@@ -87,7 +87,7 @@ class PartnerSubscriptionController extends Controller
         $salonId = $salon->id;
 
         $plan = SubscriptionPlan::findOrFail($request->plan_id);
-        $wallet = SalonWallet::firstOrCreate(['salon_id' => $salonId], ['balance' => 0]);
+        $wallet = SalonWallet::firstOrCreate(['salon_id' => $salonId], ['coin_balance' => 0]);
         $scheme = WalletScheme::where('is_active', true)->first();
         $coinValue = $scheme ? $scheme->coin_value : 0;
 
@@ -95,8 +95,8 @@ class PartnerSubscriptionController extends Controller
         $discount = 0;
         $coinsApplied = 0;
 
-        if ($request->apply_coins && $wallet->balance > 0 && $coinValue > 0) {
-            $maxCoinsValue = $wallet->balance * $coinValue;
+        if ($request->apply_coins && $wallet->coin_balance > 0 && $coinValue > 0) {
+            $maxCoinsValue = $wallet->coin_balance * $coinValue;
             
             if ($maxCoinsValue >= $price) {
                 // Costs zero, deduct partial coins
@@ -104,7 +104,7 @@ class PartnerSubscriptionController extends Controller
                 $discount = $price;
             } else {
                 // Costs > 0, deduct all coins
-                $coinsApplied = $wallet->balance;
+                $coinsApplied = $wallet->coin_balance;
                 $discount = $maxCoinsValue;
             }
         }
@@ -116,7 +116,7 @@ class PartnerSubscriptionController extends Controller
         // For now, process immediately.
 
         if ($coinsApplied > 0) {
-            $wallet->balance -= $coinsApplied;
+            $wallet->coin_balance -= $coinsApplied;
             $wallet->save();
 
             $wallet->transactions()->create([

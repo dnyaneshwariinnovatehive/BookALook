@@ -133,5 +133,8 @@ Route::prefix('partner')->group(function () {
         
         // Appointments
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
+        
+        // Collaborator APIs
+        Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
     });
 });
