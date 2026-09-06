@@ -13,6 +13,7 @@ Route::prefix('customer')->group(function () {
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
     Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
+    Route::get('/salons/{id}', [\App\Http\Controllers\Api\Customer\SalonController::class, 'show']);
 
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -30,10 +31,14 @@ Route::prefix('customer')->group(function () {
         Route::delete('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'clearCart']);
 
         // Appointment Routes
+        Route::get('/salons/{salon_id}/providers', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'getProviders']);
         Route::get('/salons/{salon_id}/availability', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'getAvailableSlots']);
         Route::post('/salons/{salon_id}/appointments/book', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'book']);
         Route::get('/appointments', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'index']);
+        Route::get('/appointments/{id}', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'show']);
         Route::post('/appointments/{id}/cancel', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'cancel']);
+        Route::get('/appointments/{id}/reschedule-options', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'rescheduleOptions']);
+        Route::post('/appointments/{id}/reschedule', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{id}/generate-qr', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'generateQr']);
     });
 });

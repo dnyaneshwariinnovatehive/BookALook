@@ -21,6 +21,11 @@ class AppointmentService extends Model
         return $this->belongsTo(Service::class);
     }
 
+    public function combo()
+    {
+        return $this->belongsTo(Combo::class);
+    }
+
     public function servingProvider()
     {
         return $this->belongsTo(ServiceProvider::class, 'serving_provider_id');

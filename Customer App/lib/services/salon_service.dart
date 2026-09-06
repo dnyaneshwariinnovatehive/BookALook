@@ -21,16 +21,20 @@ class SalonService {
     }
   }
 
+  /// Full customer-facing salon profile: photos, hours, categories, services,
+  /// combo packages, team and ratings, plus whether it can be booked at all.
   Future<Map<String, dynamic>> fetchSalonDetails(String id) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/superadmin/salons/$id'),
+      Uri.parse('$baseUrl/customer/salons/$id'),
       headers: {
         'Accept': 'application/json',
       },
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body)['data'];
+      return jsonDecode(response.body)['salon'];
+    } else if (response.statusCode == 404) {
+      throw Exception('Salon not found');
     } else {
       throw Exception('Failed to load salon details');
     }

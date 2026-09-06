@@ -73,7 +73,15 @@ class CartService {
     }
   }
 
-  Future<void> addItem(String salonId, String serviceId, {int quantity = 1}) async {
+  Future<void> addItem(String salonId, String serviceId, {int quantity = 1}) =>
+      _addToCart(salonId, {'service_id': serviceId, 'quantity': quantity});
+
+  /// Adds a whole combo package. The backend explodes it into its constituent
+  /// services when the appointment is booked.
+  Future<void> addCombo(String salonId, String comboId, {int quantity = 1}) =>
+      _addToCart(salonId, {'combo_id': comboId, 'quantity': quantity});
+
+  Future<void> _addToCart(String salonId, Map<String, dynamic> body) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -84,10 +92,7 @@ class CartService {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'service_id': serviceId,
-        'quantity': quantity,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 409) {

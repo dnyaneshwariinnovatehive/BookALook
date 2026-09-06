@@ -17,7 +17,7 @@ class CartController extends Controller
      */
     public function getCart(Request $request, $salon_id)
     {
-        $cart = Cart::with(['items.service.template', 'items.combo', 'items.preferredProvider.user'])
+        $cart = Cart::with(['items.service.template', 'items.combo.services.template', 'items.preferredProvider.user'])
             ->where('customer_id', $request->user()->id)
             ->where('salon_id', $salon_id)
             ->where('status', 'active')
@@ -35,7 +35,7 @@ class CartController extends Controller
      */
     public function getGlobalCart(Request $request)
     {
-        $cart = Cart::with(['items.service.template', 'items.combo', 'items.preferredProvider.user', 'salon'])
+        $cart = Cart::with(['items.service.template', 'items.combo.services.template', 'items.preferredProvider.user', 'salon'])
             ->where('customer_id', $request->user()->id)
             ->where('status', 'active')
             ->first();

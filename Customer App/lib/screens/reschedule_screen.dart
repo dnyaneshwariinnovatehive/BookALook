@@ -7,72 +7,86 @@ import '../services/appointment_service.dart';
 /// Sentinel provider key for the "Any Available" option.
 const String _kAnyProvider = '__any__';
 
-class CheckoutScreen extends StatefulWidget {
-  final String salonId;
-  const CheckoutScreen({Key? key, required this.salonId}) : super(key: key);
+/// Moves an existing booking to a new provider / date / slot. Same availability
+/// rules as checkout — the booking's own slot does not block itself.
+class RescheduleScreen extends StatefulWidget {
+  final String appointmentId;
+
+  /// Salon-announced closure on the original date: the reschedule is free and
+  /// the cancellation cutoff is waived.
+  final bool freeReschedule;
+
+  const RescheduleScreen({
+    Key? key,
+    required this.appointmentId,
+    this.freeReschedule = false,
+  }) : super(key: key);
 
   @override
-  State<CheckoutScreen> createState() => _CheckoutScreenState();
+  State<RescheduleScreen> createState() => _RescheduleScreenState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _RescheduleScreenState extends State<RescheduleScreen> {
   final AppointmentService _appointmentService = AppointmentService();
 
   List<dynamic> _providers = [];
-  bool _isLoadingProviders = true;
-  String _providersError = '';
+  bool _isLoadingOptions = true;
+  String _error = '';
 
-  /// null = nothing picked yet, [_kAnyProvider] = Any Available.
   String? _selectedProviderKey;
-
-  DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedDate;
   String? _selectedTime;
+
   List<dynamic> _slots = [];
   bool _isLoadingSlots = false;
   bool _isClosed = false;
   String? _closedReason;
 
-  double _totalAmount = 0;
-  double _advanceAmount = 0;
   int _totalDuration = 0;
+  String? _currentDate;
+  String? _currentTime;
 
-  bool _isBooking = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _loadProviders();
+    _loadOptions();
   }
 
-  /// The id sent to the API: null for "Any Available".
   String? get _providerIdForApi =>
       _selectedProviderKey == _kAnyProvider ? null : _selectedProviderKey;
 
-  Future<void> _loadProviders() async {
+  Future<void> _loadOptions() async {
     setState(() {
-      _isLoadingProviders = true;
-      _providersError = '';
+      _isLoadingOptions = true;
+      _error = '';
     });
 
     try {
-      final data = await _appointmentService.getSalonProviders(widget.salonId);
+      final data = await _appointmentService.getRescheduleOptions(widget.appointmentId);
       setState(() {
         _providers = data['providers'] ?? [];
-        _totalAmount = _toDouble(data['total_amount']);
-        _advanceAmount = _toDouble(data['advance_amount']);
         _totalDuration = (data['total_duration_minutes'] ?? 0) as int;
-        _isLoadingProviders = false;
+        _currentDate = data['current_date'];
+        _currentTime = data['current_time'];
+        // Pre-select the staff member who is already assigned.
+        _selectedProviderKey = data['current_provider_id']?.toString();
+        _selectedDate = _currentDate != null ? DateTime.parse(_currentDate!) : DateTime.now();
+        _isLoadingOptions = false;
       });
+
+      if (_selectedProviderKey != null) _fetchSlots();
     } catch (e) {
       setState(() {
-        _providersError = 'Could not load service providers.';
-        _isLoadingProviders = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingOptions = false;
       });
     }
   }
 
   Future<void> _fetchSlots() async {
-    if (_selectedProviderKey == null) return;
+    if (_selectedProviderKey == null || _selectedDate == null) return;
 
     setState(() {
       _isLoadingSlots = true;
@@ -83,10 +97,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      final data = await _appointmentService.getAvailableSlots(
-        widget.salonId,
-        dateStr,
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      final data = await _appointmentService.getRescheduleOptions(
+        widget.appointmentId,
+        date: dateStr,
         providerId: _providerIdForApi,
       );
 
@@ -94,9 +108,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _slots = data['slots'] ?? [];
         _isClosed = data['closed'] == true;
         _closedReason = data['closed_reason'];
-        _totalAmount = _toDouble(data['total_amount']);
-        _advanceAmount = _toDouble(data['advance_amount']);
-        _totalDuration = (data['total_duration_minutes'] ?? _totalDuration) as int;
         _isLoadingSlots = false;
       });
     } catch (e) {
@@ -108,28 +119,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  void _selectProvider(String key) {
-    setState(() {
-      _selectedProviderKey = key;
-      _selectedTime = null;
-    });
-    _fetchSlots();
-  }
-
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(Duration(days: 30)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: AppTheme.accentColor),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(primary: AppTheme.accentColor),
+        ),
+        child: child!,
+      ),
     );
 
     if (date != null) {
@@ -138,56 +139,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  Future<void> _bookAppointment() async {
-    if (_selectedTime == null || _selectedProviderKey == null) return;
+  Future<void> _confirm() async {
+    if (_selectedTime == null || _selectedDate == null) return;
 
-    setState(() => _isBooking = true);
+    setState(() => _isSaving = true);
 
     try {
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      await _appointmentService.bookAppointment(
-        widget.salonId,
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      final result = await _appointmentService.rescheduleAppointment(
+        widget.appointmentId,
         dateStr,
         _selectedTime!,
         providerId: _providerIdForApi,
       );
 
-      setState(() => _isBooking = false);
-
       if (!mounted) return;
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: AppTheme.lightSuccess, size: 80),
-              SizedBox(height: 16),
-              Text('Booking Confirmed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
-              SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext); // Close dialog
-                  // `true` tells the cart screen the cart was consumed.
-                  Navigator.pop(context, true);
-                },
-                style: AppTheme.lightTheme.elevatedButtonTheme.style,
-                child: Center(child: Text('View My Bookings')),
-              )
-            ],
-          ),
-        ),
-      );
+      setState(() => _isSaving = false);
+      Navigator.pop(context, true);
+      _showMessage(result['message'] ?? 'Appointment rescheduled.');
     } catch (e) {
-      setState(() => _isBooking = false);
+      setState(() => _isSaving = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
-      // The slot may have been taken while the customer was deciding.
-      _fetchSlots();
+      _fetchSlots(); // the slot may have been taken meanwhile
     }
   }
 
@@ -196,9 +169,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  double _toDouble(dynamic value) => double.tryParse('${value ?? 0}') ?? 0.0;
-
-  /// Human wording for why a block cannot be booked.
   String _reasonLabel(String? reason) {
     switch (reason) {
       case 'booked':
@@ -223,45 +193,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Book Appointment')),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('1. Choose Service Provider'),
-            SizedBox(height: 4),
-            Text(
-              'Staff who cannot perform every service in your cart are shown greyed out.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
-            ),
-            SizedBox(height: 12),
-            _buildProviderList(),
+      appBar: AppBar(title: Text('Reschedule')),
+      body: _isLoadingOptions
+          ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
+          : _error.isNotEmpty
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text(_error,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontSize: 16)),
+                  ),
+                )
+              : _buildBody(),
+      bottomNavigationBar: _isLoadingOptions || _error.isNotEmpty ? null : _buildBottomBar(),
+    );
+  }
 
-            SizedBox(height: 32),
-
-            _sectionTitle('2. Select Date'),
-            SizedBox(height: 12),
-            _buildDateField(),
-
-            SizedBox(height: 32),
-
-            _sectionTitle('3. Select Time'),
-            if (_totalDuration > 0) ...[
-              SizedBox(height: 4),
-              Text(
-                'Your services take about $_totalDuration minutes.',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+  Widget _buildBody() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.freeReschedule)
+            Container(
+              width: double.infinity,
+              margin: EdgeInsets.only(bottom: 20),
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.lightInfoBg,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-            SizedBox(height: 16),
-            _buildSlots(),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppTheme.lightInfo),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'The salon is closed on your original date. This reschedule is free — your advance carries over.',
+                      style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightInfo),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-            SizedBox(height: 24),
+          if (_currentDate != null)
+            Padding(
+              padding: EdgeInsets.only(bottom: 20),
+              child: Text(
+                'Currently booked for ${DateFormat('EEE, MMM d').format(DateTime.parse(_currentDate!))} at $_currentTime.',
+                style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody),
+              ),
+            ),
+
+          _sectionTitle('1. Service Provider'),
+          SizedBox(height: 12),
+          _buildProviderList(),
+
+          SizedBox(height: 32),
+          _sectionTitle('2. New Date'),
+          SizedBox(height: 12),
+          _buildDateField(),
+
+          SizedBox(height: 32),
+          _sectionTitle('3. New Time'),
+          if (_totalDuration > 0) ...[
+            SizedBox(height: 4),
+            Text('Your services take about $_totalDuration minutes.',
+                style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody)),
           ],
-        ),
+          SizedBox(height: 16),
+          _buildSlots(),
+          SizedBox(height: 24),
+        ],
       ),
-      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
@@ -271,17 +278,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
   Widget _buildProviderList() {
-    if (_isLoadingProviders) {
-      return Center(child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: CircularProgressIndicator(color: AppTheme.accentColor),
-      ));
-    }
-
-    if (_providersError.isNotEmpty) {
-      return Text(_providersError, style: GoogleFonts.outfit(color: AppTheme.lightDanger));
-    }
-
     if (_providers.isEmpty) {
       return Text('This salon has no staff available right now.',
           style: GoogleFonts.outfit(color: AppTheme.lightTextBody));
@@ -331,8 +327,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: isEligible
-            ? () => _selectProvider(key)
-            : () => _showMessage('$name cannot perform every service in your cart.'),
+            ? () {
+                setState(() {
+                  _selectedProviderKey = key;
+                  _selectedTime = null;
+                });
+                _fetchSlots();
+              }
+            : () => _showMessage('$name cannot perform every service in this booking.'),
         child: Opacity(
           opacity: isEligible ? 1.0 : 0.5,
           child: Container(
@@ -359,9 +361,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     children: [
                       Text(name,
                           style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.lightTextHeading)),
+                              fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading)),
                       if (subtitle != null && subtitle.isNotEmpty) ...[
                         SizedBox(height: 2),
                         Text(subtitle,
@@ -398,8 +398,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
-                  style: GoogleFonts.outfit(fontSize: 16)),
+              Text(
+                _selectedDate == null
+                    ? 'Pick a date'
+                    : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate!),
+                style: GoogleFonts.outfit(fontSize: 16),
+              ),
               Icon(Icons.calendar_today, color: AppTheme.accentColor),
             ],
           ),
@@ -412,21 +416,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (_selectedProviderKey == null) {
       return _hintBox('Choose a service provider above to see their free time slots.');
     }
-
     if (_isLoadingSlots) {
       return Center(child: Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
         child: CircularProgressIndicator(color: AppTheme.accentColor),
       ));
     }
-
-    if (_isClosed) {
-      return _hintBox(_closedReason ?? 'No slots available for this date.');
-    }
-
-    if (_slots.isEmpty) {
-      return _hintBox('No slots available for this date.');
-    }
+    if (_isClosed) return _hintBox(_closedReason ?? 'No slots available for this date.');
+    if (_slots.isEmpty) return _hintBox('No slots available for this date.');
 
     final hasAnyAvailable = _slots.any((s) => s['available'] == true);
 
@@ -462,9 +459,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       : isAvailable
                           ? AppTheme.lightSurface
                           : AppTheme.lightBorder,
-                  border: Border.all(
-                    color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
-                  ),
+                  border: Border.all(color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -506,45 +501,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
   Widget _buildBottomBar() {
-    final canBook = _selectedProviderKey != null && _selectedTime != null && !_isBooking;
+    final canSave = _selectedTime != null && !_isSaving;
 
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-                Text('₹${_totalAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading)),
-              ],
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: canSave ? _confirm : null,
+            style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
+              padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
             ),
-            SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Advance payable now', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-                Text('₹${_advanceAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
-              ],
-            ),
-            SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: canBook ? _bookAppointment : null,
-                style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
-                  padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
-                ),
-                child: _isBooking
-                    ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text('Confirm & Pay Advance', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ],
+            child: _isSaving
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text('Confirm New Slot', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
         ),
       ),
     );

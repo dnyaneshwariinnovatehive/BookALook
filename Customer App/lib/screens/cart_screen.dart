@@ -97,6 +97,15 @@ class _CartScreenState extends State<CartScreen> {
       itemBuilder: (context, index) {
         final item = items[index];
         final service = item['service'];
+        final combo = item['combo'];
+        final isCombo = combo != null;
+        final title = isCombo
+            ? (combo['name'] ?? 'Package')
+            : (service != null ? (service['template']?['name'] ?? 'Unknown Service') : 'Unknown Service');
+        final subtitle = isCombo
+            ? '${(combo['services'] as List?)?.length ?? 0} services in this package'
+            : null;
+
         return Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -113,7 +122,7 @@ class _CartScreenState extends State<CartScreen> {
                   color: AppTheme.lightAccentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.spa, color: AppTheme.accentColor),
+                child: Icon(isCombo ? Icons.card_giftcard : Icons.spa, color: AppTheme.accentColor),
               ),
               SizedBox(width: 16),
               Expanded(
@@ -121,12 +130,16 @@ class _CartScreenState extends State<CartScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      service != null ? (service['template']?['name'] ?? 'Unknown Service') : 'Unknown Service',
+                      title,
                       style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading),
                     ),
+                    if (subtitle != null) ...[
+                      SizedBox(height: 2),
+                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+                    ],
                     SizedBox(height: 4),
                     Text(
-                      service != null ? '₹${service['price']}' : '₹0',
+                      '₹${_lineTotal(item).toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.accentColor),
                     ),
                   ],
@@ -143,14 +156,33 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  /// Price of one cart line. A combo is priced from its own special prices,
+  /// not from the services' list prices.
+  double _lineTotal(dynamic item) {
+    final quantity = (item['quantity'] ?? 1) as int;
+
+    if (item['combo'] != null) {
+      double comboPrice = 0.0;
+      for (final service in (item['combo']['services'] as List? ?? [])) {
+        final special = service['pivot']?['combo_special_price'] ?? service['price'];
+        comboPrice += double.tryParse('$special') ?? 0.0;
+      }
+      return comboPrice * quantity;
+    }
+
+    if (item['service'] != null) {
+      return (double.tryParse('${item['service']['price']}') ?? 0.0) * quantity;
+    }
+
+    return 0.0;
+  }
+
   Widget? _buildCheckoutBar() {
     if (_cart == null || (_cart!['items'] as List).isEmpty) return null;
 
     double total = 0.0;
     for (var item in _cart!['items']) {
-      if (item['service'] != null) {
-        total += double.tryParse(item['service']['price'].toString()) ?? 0.0;
-      }
+      total += _lineTotal(item);
     }
 
     return Container(
@@ -179,10 +211,14 @@ class _CartScreenState extends State<CartScreen> {
               ],
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(
+              onPressed: () async {
+                final booked = await Navigator.push<bool>(context, MaterialPageRoute(
                   builder: (context) => CheckoutScreen(salonId: _cart!['salon_id'].toString())
                 ));
+                // The booking consumed the cart server-side — reflect that here.
+                if (booked == true) {
+                  _loadCart();
+                }
               },
               style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
                 padding: MaterialStateProperty.all(EdgeInsets.symmetric(horizontal: 32, vertical: 16)),
