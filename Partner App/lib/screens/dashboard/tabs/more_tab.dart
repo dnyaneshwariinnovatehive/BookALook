@@ -128,7 +128,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SubscriptionBillingScreen()),
+                        MaterialPageRoute(builder: (context) => SubscriptionBillingScreen(salonId: salonId)),
                       );
                     },
                   ),
@@ -140,7 +140,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const WalletScreen()),
+                        MaterialPageRoute(builder: (context) => WalletScreen(salonId: salonId)),
                       );
                     },
                   ),

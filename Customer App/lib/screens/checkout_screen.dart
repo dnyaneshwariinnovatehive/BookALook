@@ -90,8 +90,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         providerId: _providerIdForApi,
       );
 
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final isToday = dateStr == todayStr;
+      final nowTime = TimeOfDay.now();
+
+      final processedSlots = (data['slots'] as List? ?? []).map((slot) {
+        if (slot['available'] == true && isToday) {
+           final timeStr = slot['time'] as String;
+           final parts = timeStr.split(':');
+           if (parts.length >= 2) {
+             final hour = int.tryParse(parts[0]) ?? 0;
+             final minute = int.tryParse(parts[1]) ?? 0;
+             if (hour < nowTime.hour || (hour == nowTime.hour && minute <= nowTime.minute)) {
+                return {
+                  ...slot as Map<String, dynamic>,
+                  'available': false,
+                  'reason': 'past',
+                };
+             }
+           }
+        }
+        return slot;
+      }).toList();
+
       setState(() {
-        _slots = data['slots'] ?? [];
+        _slots = processedSlots;
         _isClosed = data['closed'] == true;
         _closedReason = data['closed_reason'];
         _totalAmount = _toDouble(data['total_amount']);

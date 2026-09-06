@@ -7,6 +7,8 @@ use App\Models\Appointment;
 use App\Models\AppointmentServiceAddition;
 use App\Models\Service;
 use App\Models\ServiceProvider;
+use App\Models\PlatformPolicySetting;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -118,6 +120,15 @@ class SuperAdminAppointmentController extends Controller
 
         if ($appointment->qr_expires_at && now()->greaterThan($appointment->qr_expires_at)) {
             return response()->json(['message' => 'QR Code has expired.'], 400);
+        }
+
+        $earlyAllowance = (int) PlatformPolicySetting::value('appointment_start_early_minutes');
+        $appointmentStart = Carbon::parse(
+            Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
+        );
+
+        if (now()->addMinutes($earlyAllowance)->lessThan($appointmentStart)) {
+            return response()->json(['message' => 'It is too early to start this appointment.'], 400);
         }
 
         $appointment->status = 'in_progress';

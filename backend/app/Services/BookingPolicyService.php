@@ -45,6 +45,11 @@ class BookingPolicyService
         return (int) PlatformPolicySetting::value('cancellation_cutoff_minutes');
     }
 
+    public function rescheduleCutoffMinutes(): int
+    {
+        return (int) PlatformPolicySetting::value('reschedule_cutoff_minutes');
+    }
+
     public function abuseThreshold(): int
     {
         return (int) PlatformPolicySetting::value('same_day_change_abuse_threshold');
@@ -69,14 +74,8 @@ class BookingPolicyService
             ->exists();
     }
 
-    /**
-     * Whether this booking can still be changed, and why not when it cannot.
-     *
-     * @return array{allowed: bool, reason: ?string, cutoff_minutes: int, free_reschedule: bool}
-     */
-    public function changeWindow(Appointment $appointment): array
+    private function baseWindow(Appointment $appointment, int $cutoff): array
     {
-        $cutoff = $this->cancellationCutoffMinutes();
         $freeReschedule = $this->isSalonClosedOn(
             $appointment->salon_id,
             Carbon::parse($appointment->appointment_date)->format('Y-m-d')
@@ -91,8 +90,6 @@ class BookingPolicyService
             ];
         }
 
-        // A salon-announced closure overrides the cutoff — the change is not
-        // the customer's fault, so they may always move the booking.
         if ($freeReschedule) {
             return $base + ['allowed' => true, 'reason' => null];
         }
@@ -109,6 +106,16 @@ class BookingPolicyService
         }
 
         return $base + ['allowed' => true, 'reason' => null];
+    }
+
+    public function cancellationWindow(Appointment $appointment): array
+    {
+        return $this->baseWindow($appointment, $this->cancellationCutoffMinutes());
+    }
+
+    public function rescheduleWindow(Appointment $appointment): array
+    {
+        return $this->baseWindow($appointment, $this->rescheduleCutoffMinutes());
     }
 
     /**

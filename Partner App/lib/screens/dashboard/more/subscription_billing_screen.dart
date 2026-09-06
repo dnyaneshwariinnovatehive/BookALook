@@ -4,9 +4,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/services/api_config.dart';
+import 'upgrade_plan_screen.dart';
 
 class SubscriptionBillingScreen extends StatefulWidget {
-  const SubscriptionBillingScreen({super.key});
+  final String salonId;
+  const SubscriptionBillingScreen({super.key, required this.salonId});
 
   @override
   State<SubscriptionBillingScreen> createState() => _SubscriptionBillingScreenState();
@@ -34,7 +36,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final token = prefs.getString('auth_token');
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/partner/subscription'),
+        Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/subscription'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -72,7 +74,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final token = prefs.getString('auth_token');
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/partner/subscription/renew'),
+        Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/subscription/renew'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -226,7 +228,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final submitted = await Navigator.pushNamed(context, '/upgrade_plan');
+                  final submitted = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => UpgradePlanScreen(salonId: widget.salonId)),
+                  );
                   if (submitted == true && mounted) {
                     _fetchSubscription();
                   }
@@ -281,7 +286,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 const SizedBox(height: 32),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final submitted = await Navigator.pushNamed(context, '/upgrade_plan');
+                    final submitted = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => UpgradePlanScreen(salonId: widget.salonId)),
+                    );
                     if (submitted == true && mounted) {
                       _fetchSubscription();
                     }

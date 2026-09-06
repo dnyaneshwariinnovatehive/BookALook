@@ -317,6 +317,7 @@ class AppointmentController extends Controller
             'upcoming' => $upcoming,
             'past' => $past,
             'cancellation_cutoff_minutes' => $this->policy->cancellationCutoffMinutes(),
+            'reschedule_cutoff_minutes' => $this->policy->rescheduleCutoffMinutes(),
         ]);
     }
 
@@ -342,7 +343,7 @@ class AppointmentController extends Controller
             ->where('customer_id', $request->user()->id)
             ->findOrFail($id);
 
-        $window = $this->policy->changeWindow($appointment);
+        $window = $this->policy->cancellationWindow($appointment);
 
         if (! $window['allowed']) {
             return response()->json(['message' => $window['reason']], 422);
@@ -399,7 +400,7 @@ class AppointmentController extends Controller
             ->where('customer_id', $request->user()->id)
             ->findOrFail($id);
 
-        $window = $this->policy->changeWindow($appointment);
+        $window = $this->policy->rescheduleWindow($appointment);
 
         if (! $window['allowed']) {
             return response()->json(['message' => $window['reason']], 422);
@@ -472,7 +473,7 @@ class AppointmentController extends Controller
             ->where('customer_id', $request->user()->id)
             ->findOrFail($id);
 
-        $window = $this->policy->changeWindow($appointment);
+        $window = $this->policy->rescheduleWindow($appointment);
 
         if (! $window['allowed']) {
             return response()->json(['message' => $window['reason']], 422);
@@ -614,7 +615,8 @@ class AppointmentController extends Controller
      */
     private function presentBooking(Appointment $appointment): array
     {
-        $window = $this->policy->changeWindow($appointment);
+        $cancelWindow = $this->policy->cancellationWindow($appointment);
+        $rescheduleWindow = $this->policy->rescheduleWindow($appointment);
         $refund = $this->policy->refundBreakdown($appointment);
         $date = Carbon::parse($appointment->appointment_date)->format('Y-m-d');
 
@@ -652,11 +654,13 @@ class AppointmentController extends Controller
             'rescheduled_from_id' => $appointment->rescheduled_from_id,
 
             // What the customer may do right now.
-            'can_cancel' => $window['allowed'],
-            'can_reschedule' => $window['allowed'],
-            'change_blocked_reason' => $window['reason'],
-            'cutoff_minutes' => $window['cutoff_minutes'],
-            'free_reschedule' => $window['free_reschedule'],
+            'can_cancel' => $cancelWindow['allowed'],
+            'can_reschedule' => $rescheduleWindow['allowed'],
+            'cancel_blocked_reason' => $cancelWindow['reason'],
+            'reschedule_blocked_reason' => $rescheduleWindow['reason'],
+            'cancellation_cutoff_minutes' => $cancelWindow['cutoff_minutes'],
+            'reschedule_cutoff_minutes' => $rescheduleWindow['cutoff_minutes'],
+            'free_reschedule' => $rescheduleWindow['free_reschedule'],
             'refundable_advance' => $refund['refundable'],
             'forfeited_advance' => $refund['forfeited'],
             'can_generate_qr' => in_array($appointment->status, BookingPolicyService::ACTIVE_STATUSES, true)

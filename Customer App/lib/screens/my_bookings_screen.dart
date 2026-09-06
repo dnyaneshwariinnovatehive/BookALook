@@ -19,7 +19,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
   List<dynamic> _past = [];
   bool _isLoading = true;
   String _error = '';
-  int _cutoffMinutes = 90;
+  int _cancelCutoffMinutes = 90;
+  int _rescheduleCutoffMinutes = 90;
 
   @override
   void initState() {
@@ -43,7 +44,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
       setState(() {
         _upcoming = data['upcoming'] ?? [];
         _past = data['past'] ?? [];
-        _cutoffMinutes = (data['cancellation_cutoff_minutes'] ?? 90) as int;
+        _cancelCutoffMinutes = (data['cancellation_cutoff_minutes'] ?? 90) as int;
+        _rescheduleCutoffMinutes = (data['reschedule_cutoff_minutes'] ?? 90) as int;
         _isLoading = false;
       });
     } catch (e) {
@@ -245,7 +247,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
         itemBuilder: (context, index) {
           if (isUpcoming && index == 0) {
             return Text(
-              'Bookings can be cancelled or rescheduled up to $_cutoffMinutes minutes before the start time.',
+              'Bookings can be cancelled up to $_cancelCutoffMinutes minutes or rescheduled up to $_rescheduleCutoffMinutes minutes before the start time.',
               style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
             );
           }
@@ -266,7 +268,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     final canCancel = booking['can_cancel'] == true;
     final canReschedule = booking['can_reschedule'] == true;
     final canGenerateQr = booking['can_generate_qr'] == true;
-    final blockedReason = booking['change_blocked_reason'];
+    final cancelBlockedReason = booking['cancel_blocked_reason'];
+    final rescheduleBlockedReason = booking['reschedule_blocked_reason'];
 
     return Container(
       padding: EdgeInsets.all(20),
@@ -376,9 +379,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
             ),
           ],
 
-          if (isUpcoming && !canCancel && blockedReason != null) ...[
+          if (isUpcoming && !canCancel && cancelBlockedReason != null) ...[
             SizedBox(height: 12),
-            Text(blockedReason, style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+            Text('Cannot cancel: $cancelBlockedReason', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+          ],
+
+          if (isUpcoming && !canReschedule && rescheduleBlockedReason != null) ...[
+            SizedBox(height: 6),
+            Text('Cannot reschedule: $rescheduleBlockedReason', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
           ],
 
           if (isUpcoming) ...[

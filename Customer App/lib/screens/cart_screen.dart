@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/cart_service.dart';
 import 'checkout_screen.dart';
+import 'main_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -217,7 +218,13 @@ class _CartScreenState extends State<CartScreen> {
                 ));
                 // The booking consumed the cart server-side — reflect that here.
                 if (booked == true) {
-                  _loadCart();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MainScreen(initialIndex: 2),
+                    ),
+                    (route) => false,
+                  );
                 }
               },
               style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(

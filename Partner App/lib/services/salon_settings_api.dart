@@ -9,7 +9,7 @@ class SalonSettingsApi {
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
+    final token = prefs.getString('auth_token');
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

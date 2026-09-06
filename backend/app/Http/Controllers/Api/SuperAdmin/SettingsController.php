@@ -12,17 +12,9 @@ class SettingsController extends Controller
     public function getPolicySettings()
     {
         $settings = PlatformPolicySetting::all();
-        // If empty, return a default
-        if ($settings->isEmpty()) {
-            return response()->json([
-                'success' => true,
-                'settings' => [
-                    'subscription_expiry_warning_days' => 3
-                ]
-            ]);
-        }
-
-        $formatted = [];
+        
+        $formatted = PlatformPolicySetting::DEFAULTS; // Start with defaults
+        
         foreach ($settings as $setting) {
             $value = $setting->setting_value;
             if ($setting->data_type === 'integer') {
@@ -44,20 +36,34 @@ class SettingsController extends Controller
     public function updatePolicySettings(Request $request)
     {
         $request->validate([
-            'subscription_expiry_warning_days' => 'required|integer|min:1|max:30',
+            'subscription_expiry_warning_days' => 'sometimes|integer|min:1|max:30',
+            'cancellation_cutoff_minutes' => 'sometimes|integer|min:0',
+            'reschedule_cutoff_minutes' => 'sometimes|integer|min:0',
+            'appointment_start_early_minutes' => 'sometimes|integer|min:0',
         ]);
 
         $user = $request->user();
 
-        PlatformPolicySetting::updateOrCreate(
-            ['setting_key' => 'subscription_expiry_warning_days'],
-            [
-                'setting_value' => (string)$request->subscription_expiry_warning_days,
-                'data_type' => 'integer',
-                'description' => 'Number of days before subscription expiry to show a warning banner',
-                'updated_by' => $user->id
-            ]
-        );
+        $allowedSettings = [
+            'subscription_expiry_warning_days' => 'Number of days before subscription expiry to show a warning banner',
+            'cancellation_cutoff_minutes' => 'Number of minutes before an appointment when cancellation is blocked',
+            'reschedule_cutoff_minutes' => 'Number of minutes before an appointment when rescheduling is blocked',
+            'appointment_start_early_minutes' => 'Number of minutes before an appointment start time when a provider can start it',
+        ];
+
+        foreach ($allowedSettings as $key => $description) {
+            if ($request->has($key)) {
+                PlatformPolicySetting::updateOrCreate(
+                    ['setting_key' => $key],
+                    [
+                        'setting_value' => (string)$request->input($key),
+                        'data_type' => 'integer',
+                        'description' => $description,
+                        'updated_by' => $user->id
+                    ]
+                );
+            }
+        }
 
         return response()->json([
             'success' => true,

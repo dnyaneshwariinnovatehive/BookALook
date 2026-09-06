@@ -4,9 +4,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/services/api_config.dart';
+import 'upgrade_plan_screen.dart';
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key});
+  final String salonId;
+  const WalletScreen({super.key, required this.salonId});
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -30,7 +32,7 @@ class _WalletScreenState extends State<WalletScreen> {
       final token = prefs.getString('auth_token');
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/partner/wallet'),
+        Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/wallet'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -71,7 +73,7 @@ class _WalletScreenState extends State<WalletScreen> {
       final token = prefs.getString('auth_token');
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/partner/wallet/redeem-commission'),
+        Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/wallet/redeem-commission'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -140,7 +142,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/upgrade_plan');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => UpgradePlanScreen(salonId: widget.salonId)),
+                    );
                   },
                   child: Text('Redeem on Subscription Upgrade'),
                 ),

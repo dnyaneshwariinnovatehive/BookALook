@@ -17,10 +17,10 @@ use Illuminate\Support\Facades\DB;
 
 class PartnerSubscriptionController extends Controller
 {
-    public function getSubscription(Request $request)
+    public function getSubscription(Request $request, $salon_id)
     {
         $user = $request->user();
-        $salon = Salon::where('admin_id', $user->id)->first();
+        $salon = Salon::where('admin_id', $user->id)->findOrFail($salon_id);
 
         if (!$salon) {
             return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
@@ -71,7 +71,7 @@ class PartnerSubscriptionController extends Controller
         ]);
     }
 
-    public function upgradeSubscription(Request $request)
+    public function upgradeSubscription(Request $request, $salon_id)
     {
         $request->validate([
             'plan_id' => 'required|exists:subscription_plans,id',
@@ -79,7 +79,7 @@ class PartnerSubscriptionController extends Controller
         ]);
 
         $user = $request->user();
-        $salon = Salon::where('admin_id', $user->id)->first();
+        $salon = Salon::where('admin_id', $user->id)->findOrFail($salon_id);
 
         if (!$salon) {
             return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
@@ -152,11 +152,11 @@ class PartnerSubscriptionController extends Controller
         ]);
     }
 
-    public function renew(Request $request)
+    public function renew(Request $request, $salon_id)
     {
         // Simple mock renew for the existing button
         $user = $request->user();
-        $salon = Salon::where('admin_id', $user->id)->first();
+        $salon = Salon::where('admin_id', $user->id)->findOrFail($salon_id);
 
         if (!$salon) {
             return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
@@ -182,7 +182,7 @@ class PartnerSubscriptionController extends Controller
         ]);
     }
 
-    public function paymentRequest(Request $request)
+    public function paymentRequest(Request $request, $salon_id)
     {
         $request->validate([
             'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:5120',
@@ -191,7 +191,7 @@ class PartnerSubscriptionController extends Controller
         ]);
 
         $user = $request->user();
-        $salon = Salon::where('admin_id', $user->id)->first();
+        $salon = Salon::where('admin_id', $user->id)->findOrFail($salon_id);
 
         if (!$salon) {
             return response()->json(['success' => false, 'message' => 'Salon not found'], 404);

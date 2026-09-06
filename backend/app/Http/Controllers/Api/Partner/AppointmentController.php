@@ -124,6 +124,15 @@ class AppointmentController extends Controller
         if (!$appointment) return response()->json(['message' => 'Invalid QR Code.'], 404);
         if ($appointment->status !== 'scheduled') return response()->json(['message' => 'Not scheduled.'], 400);
 
+        $earlyAllowance = (int) \App\Models\PlatformPolicySetting::value('appointment_start_early_minutes');
+        $appointmentStart = \Carbon\Carbon::parse(
+            \Carbon\Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
+        );
+
+        if (now()->addMinutes($earlyAllowance)->lessThan($appointmentStart)) {
+            return response()->json(['message' => 'It is too early to start this appointment.'], 400);
+        }
+
         $appointment->status = 'in_progress';
         $appointment->serving_provider_id = $provider->id; // Assign to whoever scanned
         $appointment->qr_verified_at = now();

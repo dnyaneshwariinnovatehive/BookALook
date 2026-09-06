@@ -24,6 +24,8 @@ class PlatformPolicySetting extends Model
      */
     public const DEFAULTS = [
         'cancellation_cutoff_minutes' => 90,
+        'reschedule_cutoff_minutes' => 90,
+        'appointment_start_early_minutes' => 30,
         'qr_validity_minutes' => 60,
         'same_day_change_abuse_threshold' => 2,
         'subscription_expiry_warning_days' => 3,

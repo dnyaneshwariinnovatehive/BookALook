@@ -8,8 +8,9 @@ import 'tabs/profile_tab.dart';
 
 class MainScreen extends StatefulWidget {
   final bool isGuest;
+  final int initialIndex;
 
-  const MainScreen({Key? key, this.isGuest = false}) : super(key: key);
+  const MainScreen({Key? key, this.isGuest = false, this.initialIndex = 0}) : super(key: key);
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -23,6 +24,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
       ExploreTab(),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'screens/splash_screen.dart';
-import 'screens/dashboard/more/upgrade_plan_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,9 +20,6 @@ class PartnerApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
       home: const SplashScreen(),
-      routes: {
-        '/upgrade_plan': (context) => const UpgradePlanScreen(),
-      },
       debugShowCheckedModeBanner: false,
     );
   }

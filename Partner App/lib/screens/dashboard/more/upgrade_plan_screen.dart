@@ -8,7 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:partner_app/services/api_config.dart';
 
 class UpgradePlanScreen extends StatefulWidget {
-  const UpgradePlanScreen({super.key});
+  final String salonId;
+  const UpgradePlanScreen({super.key, required this.salonId});
 
   @override
   State<UpgradePlanScreen> createState() => _UpgradePlanScreenState();
@@ -41,7 +42,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
-      final walletRes = await http.get(Uri.parse('$_baseUrl/partner/wallet'), headers: {
+      final walletRes = await http.get(Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/wallet'), headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
@@ -90,7 +91,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
-      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/partner/subscription/payment-request'));
+      var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/subscription/payment-request'));
       request.headers['Authorization'] = 'Bearer $token';
       request.headers['Accept'] = 'application/json';
       

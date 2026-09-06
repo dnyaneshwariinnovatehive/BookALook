@@ -8,14 +8,11 @@ use App\Models\SalonWallet;
 
 class PartnerWalletController extends Controller
 {
-    public function getWallet(Request $request)
+    public function getWallet(Request $request, $salon_id)
     {
         $user = $request->user();
         
-        $salon = \App\Models\Salon::where('admin_id', $user->id)->first();
-        if (!$salon) {
-            return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
-        }
+        $salon = \App\Models\Salon::where('admin_id', $user->id)->findOrFail($salon_id);
         $salonId = $salon->id; 
 
         $wallet = SalonWallet::firstOrCreate(
@@ -32,7 +29,7 @@ class PartnerWalletController extends Controller
         ]);
     }
 
-    public function redeemCommission(Request $request)
+    public function redeemCommission(Request $request, $salon_id)
     {
         $request->validate([
             'payout_id' => 'required|uuid',
@@ -40,10 +37,7 @@ class PartnerWalletController extends Controller
         ]);
 
         $user = $request->user();
-        $salon = \App\Models\Salon::where('admin_id', $user->id)->first();
-        if (!$salon) {
-            return response()->json(['success' => false, 'message' => 'Salon not found'], 404);
-        }
+        $salon = \App\Models\Salon::where('admin_id', $user->id)->findOrFail($salon_id);
         $salonId = $salon->id;
 
         $wallet = SalonWallet::where('salon_id', $salonId)->first();

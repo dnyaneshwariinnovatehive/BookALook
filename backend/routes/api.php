@@ -148,13 +148,13 @@ Route::prefix('partner')->group(function () {
         Route::put('/salons/{salon_id}/leaves/{leave_id}/status', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'updateLeaveStatus']);
 
         // Wallet & Subscriptions
-        Route::get('/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
         Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
-        Route::post('/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
-        Route::post('/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
-        Route::post('/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
-        Route::get('/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
-        Route::post('/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
+        Route::get('/salons/{salon_id}/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
+        Route::post('/salons/{salon_id}/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
+        Route::post('/salons/{salon_id}/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
+        Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
+        Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
+        Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
         
         // Appointments
         Route::get('/salons/{salon_id}/appointments', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'index']);
