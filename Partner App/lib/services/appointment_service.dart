@@ -25,6 +25,9 @@ class PartnerAppointmentService {
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body)['appointments'];
+    } else if (response.statusCode == 401) {
+      prefs.remove('auth_token');
+      throw Exception('Session expired. Please log in again.');
     } else {
       print('Failed to load appointments: ${response.statusCode} - ${response.body}');
       throw Exception('Failed to load appointments');

@@ -60,13 +60,18 @@ export default function GlobalAppointmentsDashboard() {
       queryParams.append('page', page.toString());
 
       const token = localStorage.getItem('sa_token');
-      const res = await fetch(`http://localhost:8000/api/superadmin/appointments?${queryParams.toString()}`, {
+      const res = await fetch(`/api/proxy/superadmin/appointments?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
       if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem('sa_token');
+          window.location.href = '/superadmin/login';
+          return;
+        }
         const errorData = await res.json().catch(() => null);
         throw new Error(errorData?.message || 'Failed to fetch appointments');
       }
@@ -123,7 +128,8 @@ export default function GlobalAppointmentsDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           qr_token: qrToken,
@@ -140,6 +146,11 @@ export default function GlobalAppointmentsDashboard() {
         fetchAppointments();
         setTimeout(() => setIsQrModalOpen(false), 2000);
       } else {
+        if (res.status === 401) {
+          localStorage.removeItem('sa_token');
+          window.location.href = '/superadmin/login';
+          return;
+        }
         setQrError(data.message || 'Failed to verify QR Code.');
       }
     } catch (err: any) {
@@ -157,7 +168,8 @@ export default function GlobalAppointmentsDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           service_id: serviceId,
@@ -173,6 +185,11 @@ export default function GlobalAppointmentsDashboard() {
         setProviderId('');
         fetchAppointments();
       } else {
+        if (res.status === 401) {
+          localStorage.removeItem('sa_token');
+          window.location.href = '/superadmin/login';
+          return;
+        }
         setAddServiceError(data.message || 'Failed to add service.');
       }
     } catch (err: any) {

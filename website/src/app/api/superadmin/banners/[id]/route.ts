@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 
 const getBackendUrl = (id: string) => `http://localhost:8000/api/superadmin/banners/${id}`;
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const token = cookieStore.get('superadmin_token')?.value;
 
@@ -12,9 +12,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 
   try {
+    const { id } = await params;
     const body = await request.json();
     
-    const backendRes = await fetch(getBackendUrl(params.id), {
+    const backendRes = await fetch(getBackendUrl(id), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -31,7 +32,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();
   const token = cookieStore.get('superadmin_token')?.value;
 
@@ -40,7 +41,8 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 
   try {
-    const backendRes = await fetch(getBackendUrl(params.id), {
+    const { id } = await params;
+    const backendRes = await fetch(getBackendUrl(id), {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json',
