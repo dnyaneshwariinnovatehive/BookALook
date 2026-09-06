@@ -19,8 +19,8 @@ class SuperAdminAppointmentController extends Controller
     public function index(Request $request)
     {
         $query = Appointment::with([
-            'salon:id,name',
-            'customer:id,name,phone',
+            'salon:id,name,address,phone,email,status',
+            'customer:id,name,phone,email',
             'appointedProvider:id,user_id,salon_id',
             'servingProvider:id,user_id,salon_id',
             'appointedProvider.user:id,name',
@@ -51,6 +51,25 @@ class SuperAdminAppointmentController extends Controller
                 $q->where('service_id', $request->service_id);
             })->orWhereHas('serviceAdditions', function ($q) use ($request) {
                 $q->where('service_id', $request->service_id);
+            });
+        }
+
+        // Filter by Salon
+        if ($request->has('salon_id') && $request->salon_id != '') {
+            $query->where('salon_id', $request->salon_id);
+        }
+
+        // Filter by Search (Customer Name, Phone, Email, or Appointment ID)
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($cq) use ($search) {
+                    $cq->where('name', 'like', "%{$search}%")
+                       ->orWhere('phone', 'like', "%{$search}%")
+                       ->orWhere('email', 'like', "%{$search}%");
+                })->orWhere('id', 'like', "%{$search}%")
+                  ->orWhere('walk_in_customer_name', 'like', "%{$search}%")
+                  ->orWhere('walk_in_customer_phone', 'like', "%{$search}%");
             });
         }
 

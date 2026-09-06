@@ -22,6 +22,8 @@ Route::prefix('customer')->group(function () {
         });
         
         // Cart Routes
+        Route::get('/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getGlobalCart']);
+        Route::delete('/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'clearGlobalCart']);
         Route::get('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getCart']);
         Route::post('/salons/{salon_id}/cart/items', [\App\Http\Controllers\Api\Customer\CartController::class, 'addItem']);
         Route::delete('/cart/items/{item_id}', [\App\Http\Controllers\Api\Customer\CartController::class, 'removeItem']);

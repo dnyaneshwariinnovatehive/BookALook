@@ -5,8 +5,8 @@ import styles from './page.module.css';
 
 interface Appointment {
   id: string;
-  salon: { name: string };
-  customer?: { name: string; phone: string };
+  salon: { id: string; name: string; phone?: string; email?: string; address?: string; status?: string };
+  customer?: { id: string; name: string; phone?: string; email?: string };
   appointedProvider: { user: { name: string } };
   servingProvider?: { user: { name: string } };
   appointment_date: string;
@@ -21,6 +21,11 @@ interface Meta {
   total: number;
 }
 
+interface Salon {
+  id: string;
+  name: string;
+}
+
 export default function GlobalAppointmentsDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -28,25 +33,24 @@ export default function GlobalAppointmentsDashboard() {
   const [error, setError] = useState('');
   
   // Filters
+  const [dateMode, setDateMode] = useState('specific');
   const [date, setDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   const [status, setStatus] = useState('');
+  const [salonId, setSalonId] = useState('');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [salons, setSalons] = useState<Salon[]>([]);
 
   // Modal states
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-  const [qrToken, setQrToken] = useState('');
-  const [servingProviderId, setServingProviderId] = useState('');
-  const [qrError, setQrError] = useState('');
-  const [qrSuccess, setQrSuccess] = useState('');
-
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [providerId, setProviderId] = useState('');
   const [addServiceError, setAddServiceError] = useState('');
+  const [infoModalData, setInfoModalData] = useState<{type: 'salon' | 'customer', data: any} | null>(null);
 
   // We should ideally fetch services and providers based on the selected salon, 
   // but for the demo, we'll keep it simple.
@@ -55,8 +59,25 @@ export default function GlobalAppointmentsDashboard() {
     if (!isPolling) setLoading(true);
     try {
       const queryParams = new URLSearchParams();
-      if (date) queryParams.append('date', date);
+      if (dateMode === 'specific' && date) {
+        queryParams.append('date', date);
+      } else if (dateMode === 'week') {
+        const today = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        queryParams.append('start_date', today.toISOString().split('T')[0]);
+        queryParams.append('end_date', nextWeek.toISOString().split('T')[0]);
+      } else if (dateMode === 'month') {
+        const d = new Date();
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        queryParams.append('start_date', start.toISOString().split('T')[0]);
+        queryParams.append('end_date', end.toISOString().split('T')[0]);
+      }
+
       if (status) queryParams.append('status', status);
+      if (salonId) queryParams.append('salon_id', salonId);
+      if (search) queryParams.append('search', search);
       queryParams.append('page', page.toString());
 
       const token = localStorage.getItem('sa_token');
@@ -91,6 +112,25 @@ export default function GlobalAppointmentsDashboard() {
     }
   };
 
+  const fetchSalons = async () => {
+    try {
+      const token = localStorage.getItem('sa_token');
+      const res = await fetch('/api/proxy/superadmin/salons?per_page=100', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSalons(json.data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch salons', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchSalons();
+  }, []);
+
   useEffect(() => {
     fetchAppointments();
     
@@ -100,7 +140,7 @@ export default function GlobalAppointmentsDashboard() {
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [date, status, page]);
+  }, [date, dateMode, status, salonId, search, page]);
 
   const getStatusBadgeClass = (status: string) => {
     switch(status) {
@@ -115,47 +155,6 @@ export default function GlobalAppointmentsDashboard() {
 
   const formatStatus = (status: string) => {
     return status.replace('_', ' ');
-  };
-
-  const handleVerifyQr = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setQrError('');
-    setQrSuccess('');
-    
-    try {
-      const token = localStorage.getItem('sa_token');
-      const res = await fetch(`http://localhost:8000/api/superadmin/appointments/verify-qr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          qr_token: qrToken,
-          serving_provider_id: servingProviderId
-        })
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        setQrSuccess('Session started successfully!');
-        setQrToken('');
-        setServingProviderId('');
-        fetchAppointments();
-        setTimeout(() => setIsQrModalOpen(false), 2000);
-      } else {
-        if (res.status === 401) {
-          localStorage.removeItem('sa_token');
-          window.location.href = '/superadmin/login';
-          return;
-        }
-        setQrError(data.message || 'Failed to verify QR Code.');
-      }
-    } catch (err: any) {
-      setQrError(err.message);
-    }
   };
 
   const handleAddService = async (e: React.FormEvent) => {
@@ -216,49 +215,31 @@ export default function GlobalAppointmentsDashboard() {
           <h1 className={styles.title}>Global Appointments</h1>
           <p className={styles.subtitle}>View and manage all appointments across all salons.</p>
         </div>
-        <div style={{ marginTop: '16px', display: 'flex', gap: '12px' }}>
-            <button className={styles.primaryButton} onClick={() => setIsQrModalOpen(true)}>
-                Scan QR / Start Session
-            </button>
-        </div>
       </div>
 
-      <div className={styles.dateStripContainer}>
-        <div className={styles.dateStrip}>
-          {dateStrip.map((d) => {
-            const dateStr = d.toISOString().split('T')[0];
-            const isSelected = date === dateStr;
-            const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-            const dayNum = d.getDate();
-            const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      <div className={styles.filters} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        <select 
+          className={styles.selectInput} 
+          value={dateMode} 
+          onChange={(e) => { setDateMode(e.target.value); setPage(1); }}
+        >
+          <option value="specific">Specific Date</option>
+          <option value="week">Next 7 Days</option>
+          <option value="month">This Month</option>
+          <option value="lifetime">Lifetime</option>
+        </select>
 
-            return (
-              <button 
-                key={dateStr}
-                className={`${styles.dateCard} ${isSelected ? styles.dateCardSelected : ''}`}
-                onClick={() => { setDate(dateStr); setPage(1); }}
-              >
-                <span className={styles.dateCardMonth}>{monthName}</span>
-                <span className={styles.dateCardNum}>{dayNum}</span>
-                <span className={styles.dateCardDay}>{isToday ? 'Today' : dayName}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className={styles.datePickerWrapper}>
-           <input 
-              type="date" 
-              className={styles.hiddenDateInput}
-              value={date}
-              onChange={(e) => { setDate(e.target.value); setPage(1); }}
-              title="Pick a date"
-           />
-           <span className={styles.calendarIcon}>📅</span>
-        </div>
-      </div>
+        <select 
+          className={styles.selectInput} 
+          value={salonId} 
+          onChange={(e) => { setSalonId(e.target.value); setPage(1); }}
+        >
+          <option value="">All Salons</option>
+          {salons.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
 
-      <div className={styles.filters}>
         <select 
           className={styles.selectInput} 
           value={status} 
@@ -271,7 +252,53 @@ export default function GlobalAppointmentsDashboard() {
           <option value="cancelled">Cancelled</option>
           <option value="no_show">No Show</option>
         </select>
+
+        <input
+          type="text"
+          className={styles.formInput}
+          style={{ width: '250px' }}
+          placeholder="Search by customer name, phone, etc..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        />
       </div>
+
+      {dateMode === 'specific' && (
+        <div className={styles.dateStripContainer}>
+          <div className={styles.dateStrip}>
+            {dateStrip.map((d) => {
+              const dateStr = d.toISOString().split('T')[0];
+              const isSelected = date === dateStr;
+              const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+              const dayNum = d.getDate();
+              const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+              const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+              return (
+                <button 
+                  key={dateStr}
+                  className={`${styles.dateCard} ${isSelected ? styles.dateCardSelected : ''}`}
+                  onClick={() => { setDate(dateStr); setPage(1); }}
+                >
+                  <span className={styles.dateCardMonth}>{monthName}</span>
+                  <span className={styles.dateCardNum}>{dayNum}</span>
+                  <span className={styles.dateCardDay}>{isToday ? 'Today' : dayName}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className={styles.datePickerWrapper}>
+             <input 
+                type="date" 
+                className={styles.hiddenDateInput}
+                value={date}
+                onChange={(e) => { setDate(e.target.value); setPage(1); }}
+                title="Pick a date"
+             />
+             <span className={styles.calendarIcon}>📅</span>
+          </div>
+        </div>
+      )}
 
       <div className={styles.tableContainer}>
         <table className={styles.table}>
@@ -306,8 +333,28 @@ export default function GlobalAppointmentsDashboard() {
                     {new Date(apt.appointment_date).toLocaleDateString()} <br/>
                     <small style={{ color: '#6B7280' }}>{apt.start_time}</small>
                   </td>
-                  <td className={styles.td}>{apt.customer?.name || 'Walk-in'}</td>
-                  <td className={styles.td}>{apt.salon.name}</td>
+                  <td className={styles.td}>
+                    {apt.customer?.name || 'Walk-in'}
+                    {apt.customer && (
+                      <button 
+                        style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: '#3B82F6' }}
+                        onClick={() => setInfoModalData({ type: 'customer', data: apt.customer })}
+                        title="View Customer Info"
+                      >
+                        &#9432;
+                      </button>
+                    )}
+                  </td>
+                  <td className={styles.td}>
+                    {apt.salon.name}
+                    <button 
+                      style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: '#3B82F6' }}
+                      onClick={() => setInfoModalData({ type: 'salon', data: apt.salon })}
+                      title="View Salon Info"
+                    >
+                      &#9432;
+                    </button>
+                  </td>
                   <td className={styles.td}>
                     {apt.servingProvider?.user?.name || apt.appointedProvider?.user?.name}
                   </td>
@@ -362,50 +409,6 @@ export default function GlobalAppointmentsDashboard() {
         )}
       </div>
 
-      {/* Verify QR Modal */}
-      {isQrModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Scan QR & Start Session</h2>
-              <button className={styles.closeButton} onClick={() => setIsQrModalOpen(false)}>&times;</button>
-            </div>
-            <div className={styles.modalBody}>
-              {qrError && <p style={{ color: 'red', marginBottom: '12px' }}>{qrError}</p>}
-              {qrSuccess && <p style={{ color: 'green', marginBottom: '12px' }}>{qrSuccess}</p>}
-              <form id="qrForm" onSubmit={handleVerifyQr}>
-                <div className={styles.formGroup}>
-                  <label>QR Token (Simulated Scan)</label>
-                  <input 
-                    type="text" 
-                    className={styles.formInput} 
-                    value={qrToken}
-                    onChange={(e) => setQrToken(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Serving Provider ID</label>
-                  <input 
-                    type="text" 
-                    className={styles.formInput} 
-                    value={servingProviderId}
-                    onChange={(e) => setServingProviderId(e.target.value)}
-                    required
-                    placeholder="Enter Provider UUID"
-                  />
-                  <small style={{ color: '#6B7280' }}>*In a real app, this would be a dropdown of staff in the salon.</small>
-                </div>
-              </form>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.secondaryButton} onClick={() => setIsQrModalOpen(false)}>Cancel</button>
-              <button type="submit" form="qrForm" className={styles.primaryButton}>Verify & Start</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Add Service Modal */}
       {isAddServiceModalOpen && (
         <div className={styles.modalOverlay}>
@@ -444,6 +447,32 @@ export default function GlobalAppointmentsDashboard() {
             <div className={styles.modalFooter}>
               <button className={styles.secondaryButton} onClick={() => setIsAddServiceModalOpen(false)}>Cancel</button>
               <button type="submit" form="addServiceForm" className={styles.primaryButton}>Add Service</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {infoModalData && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>
+                {infoModalData.type === 'salon' ? 'Salon Info' : 'Customer Info'}
+              </h2>
+              <button className={styles.closeButton} onClick={() => setInfoModalData(null)}>&times;</button>
+            </div>
+            <div className={styles.modalBody}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p><strong>Name:</strong> {infoModalData.data.name}</p>
+                {infoModalData.data.phone && <p><strong>Phone:</strong> {infoModalData.data.phone}</p>}
+                {infoModalData.data.email && <p><strong>Email:</strong> {infoModalData.data.email}</p>}
+                {infoModalData.data.address && <p><strong>Address:</strong> {infoModalData.data.address}</p>}
+                {infoModalData.data.status && <p><strong>Status:</strong> {infoModalData.data.status}</p>}
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.primaryButton} onClick={() => setInfoModalData(null)}>Close</button>
             </div>
           </div>
         </div>

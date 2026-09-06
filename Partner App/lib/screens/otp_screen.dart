@@ -43,7 +43,7 @@ class _OtpScreenState extends State<OtpScreen> {
         );
       } else if (response['status'] == 'existing_user') {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', response['token'] ?? '');
+        await prefs.setString('auth_token', response['token'] ?? '');
         await prefs.setString('role', response['role'] ?? '');
 
         if (!mounted) return;

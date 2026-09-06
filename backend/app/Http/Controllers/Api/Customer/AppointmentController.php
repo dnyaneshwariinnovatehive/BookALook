@@ -79,7 +79,7 @@ class AppointmentController extends Controller
 
         $user = $request->user();
         
-        $cart = Cart::with('items.service', 'items.combo')
+        $cart = Cart::with('items.service.template', 'items.combo')
             ->where('customer_id', $user->id)
             ->where('salon_id', $salon_id)
             ->where('status', 'active')
@@ -107,7 +107,8 @@ class AppointmentController extends Controller
             foreach ($cart->items as $item) {
                 if ($item->service) {
                     $totalAmount += $item->service->price * $item->quantity;
-                    $totalDuration += $item->service->duration_minutes * $item->quantity;
+                    $duration = $item->service->template ? $item->service->template->estimated_duration_minutes : 30;
+                    $totalDuration += $duration * $item->quantity;
                 }
             }
 
@@ -144,7 +145,7 @@ class AppointmentController extends Controller
                             'service_id' => $item->service_id,
                             'price_at_booking' => $item->service->price,
                             'original_service_price' => $item->service->price,
-                            'duration_minutes_at_booking' => $item->service->duration_minutes,
+                            'duration_minutes_at_booking' => $item->service->template ? $item->service->template->estimated_duration_minutes : 30,
                             'line_status' => 'booked'
                         ]);
                     }

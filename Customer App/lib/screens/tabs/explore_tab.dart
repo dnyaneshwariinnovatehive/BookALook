@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/salon_service.dart';
 import '../salon_detail_screen.dart';
+import '../../services/cart_service.dart';
+import '../cart_screen.dart';
 
 class ExploreTab extends StatefulWidget {
   @override
@@ -15,6 +17,9 @@ class _ExploreTabState extends State<ExploreTab> {
   bool _isLoading = true;
   String _error = '';
 
+  final CartService _cartService = CartService();
+  Map<String, dynamic>? _globalCart;
+
   @override
   void initState() {
     super.initState();
@@ -24,8 +29,10 @@ class _ExploreTabState extends State<ExploreTab> {
   Future<void> _loadSalons() async {
     try {
       final salons = await _salonService.fetchSalons();
+      final globalCart = await _cartService.getGlobalCart();
       setState(() {
         _salons = salons;
+        _globalCart = globalCart;
         _isLoading = false;
       });
     } catch (e) {
@@ -45,8 +52,10 @@ class _ExploreTabState extends State<ExploreTab> {
       return Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)));
     }
 
-    return SafeArea(
-      child: Column(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
@@ -123,6 +132,23 @@ class _ExploreTabState extends State<ExploreTab> {
           ),
         ],
       ),
+      ),
+      floatingActionButton: _globalCart != null && (_globalCart!['items'] as List).isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(
+                  // Pass the salonId from the global cart
+                  builder: (context) => CartScreen()
+                )).then((_) {
+                  // Reload when returning from cart
+                  _loadSalons();
+                });
+              },
+              backgroundColor: AppTheme.accentColor,
+              icon: Icon(Icons.shopping_cart, color: Colors.white),
+              label: Text('View Cart (${_globalCart!['salon']?['name'] ?? 'Cart'})', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+            )
+          : null,
     );
   }
 }

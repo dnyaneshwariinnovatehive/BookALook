@@ -5,8 +5,7 @@ import '../services/cart_service.dart';
 import 'checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
-  final String salonId;
-  const CartScreen({Key? key, required this.salonId}) : super(key: key);
+  const CartScreen({Key? key}) : super(key: key);
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -30,7 +29,7 @@ class _CartScreenState extends State<CartScreen> {
       _error = '';
     });
     try {
-      final cart = await _cartService.getCart(widget.salonId);
+      final cart = await _cartService.getGlobalCart();
       setState(() {
         _cart = cart;
         _isLoading = false;
@@ -58,7 +57,10 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Your Cart', style: AppTheme.lightTheme.appBarTheme.titleTextStyle),
+        title: Text(
+          _cart != null && _cart!['salon'] != null ? 'Cart - ${_cart!['salon']['name']}' : 'Your Cart',
+          style: AppTheme.lightTheme.appBarTheme.titleTextStyle
+        ),
         centerTitle: true,
       ),
       body: _buildBody(),
@@ -119,12 +121,12 @@ class _CartScreenState extends State<CartScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      service != null ? service['name'] : 'Unknown Service',
+                      service != null ? (service['template']?['name'] ?? 'Unknown Service') : 'Unknown Service',
                       style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      service != null ? '\$${service['price']}' : '\$0',
+                      service != null ? '₹${service['price']}' : '₹0',
                       style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.accentColor),
                     ),
                   ],
@@ -173,13 +175,13 @@ class _CartScreenState extends State<CartScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-                Text('\$${total.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                Text('₹${total.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
               ],
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => CheckoutScreen(salonId: widget.salonId)
+                  builder: (context) => CheckoutScreen(salonId: _cart!['salon_id'].toString())
                 ));
               },
               style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(

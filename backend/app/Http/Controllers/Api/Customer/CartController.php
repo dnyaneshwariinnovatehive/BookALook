@@ -17,9 +17,26 @@ class CartController extends Controller
      */
     public function getCart(Request $request, $salon_id)
     {
-        $cart = Cart::with(['items.service', 'items.combo', 'items.preferredProvider.user'])
+        $cart = Cart::with(['items.service.template', 'items.combo', 'items.preferredProvider.user'])
             ->where('customer_id', $request->user()->id)
             ->where('salon_id', $salon_id)
+            ->where('status', 'active')
+            ->first();
+
+        if (!$cart) {
+            return response()->json(['message' => 'Cart is empty', 'cart' => null]);
+        }
+
+        return response()->json(['cart' => $cart]);
+    }
+
+    /**
+     * Get the current user's global active cart across all salons.
+     */
+    public function getGlobalCart(Request $request)
+    {
+        $cart = Cart::with(['items.service.template', 'items.combo', 'items.preferredProvider.user', 'salon'])
+            ->where('customer_id', $request->user()->id)
             ->where('status', 'active')
             ->first();
 
@@ -49,6 +66,19 @@ class CartController extends Controller
 
         if (!$request->service_id && !$request->combo_id) {
             return response()->json(['message' => 'Either service_id or combo_id is required.'], 400);
+        }
+
+        // Enforce single active cart rule
+        $activeCart = Cart::with('salon')->where('customer_id', $request->user()->id)
+            ->where('status', 'active')
+            ->first();
+            
+        if ($activeCart && $activeCart->salon_id != $salon_id) {
+            return response()->json([
+                'message' => 'Your cart contains items from another salon.',
+                'different_salon' => true,
+                'current_salon_name' => $activeCart->salon->name ?? 'another salon'
+            ], 409);
         }
 
         $cart = Cart::firstOrCreate(
@@ -114,5 +144,22 @@ class CartController extends Controller
         }
 
         return response()->json(['message' => 'Cart cleared.']);
+    }
+
+    /**
+     * Clear the user's global active cart.
+     */
+    public function clearGlobalCart(Request $request)
+    {
+        $cart = Cart::where('customer_id', $request->user()->id)
+            ->where('status', 'active')
+            ->first();
+
+        if ($cart) {
+            $cart->items()->delete();
+            $cart->delete();
+        }
+
+        return response()->json(['message' => 'Global cart cleared.']);
     }
 }

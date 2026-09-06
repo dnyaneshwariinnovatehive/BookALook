@@ -42,6 +42,32 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     try {
       await _cartService.addItem(widget.salonId, serviceId);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added to cart!')));
+    } on CartConflictException catch (e) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Replace cart items?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          content: Text(
+            'Your cart contains items from ${e.otherSalonName}. Do you want to discard the selection and add items from this salon?',
+            style: GoogleFonts.outfit(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _cartService.clearGlobalCart();
+                _addToCart(serviceId); // Retry adding
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
+              child: Text('Replace', style: GoogleFonts.outfit(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
@@ -84,7 +110,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 icon: Icon(Icons.shopping_bag_outlined),
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(
-                    builder: (context) => CartScreen(salonId: widget.salonId)
+                    builder: (context) => CartScreen()
                   ));
                 },
               )
@@ -145,7 +171,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('\$${service['price']}', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                            Text('₹${service['price']}', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
                             SizedBox(height: 8),
                             ElevatedButton(
                               onPressed: () => _addToCart(service['id'].toString()),
@@ -173,7 +199,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(context, MaterialPageRoute(
-            builder: (context) => CartScreen(salonId: widget.salonId)
+            builder: (context) => CartScreen()
           ));
         },
         backgroundColor: AppTheme.accentColor,

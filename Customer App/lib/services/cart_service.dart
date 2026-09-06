@@ -3,8 +3,53 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+class CartConflictException implements Exception {
+  final String message;
+  final String otherSalonName;
+  CartConflictException(this.message, this.otherSalonName);
+}
+
 class CartService {
   final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+
+  Future<Map<String, dynamic>?> getGlobalCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    if (token == null) return null;
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/customer/cart'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return json['cart'];
+    } else {
+      return null;
+    }
+  }
+
+  Future<void> clearGlobalCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/customer/cart'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to clear global cart');
+    }
+  }
 
   Future<Map<String, dynamic>?> getCart(String salonId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -44,6 +89,13 @@ class CartService {
         'quantity': quantity,
       }),
     );
+
+    if (response.statusCode == 409) {
+      final json = jsonDecode(response.body);
+      if (json['different_salon'] == true) {
+        throw CartConflictException(json['message'], json['current_salon_name']);
+      }
+    }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to add item to cart');

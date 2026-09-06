@@ -1,30 +1,26 @@
 <?php
-require __DIR__.'/vendor/autoload.php';
-$app = require_once __DIR__.'/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
+use App\Models\User;
+use App\Models\Salon;
 
-use Illuminate\Http\Request;
+$salon = Salon::where('name', 'like', '%salon 2%')->first();
+$admin = User::where('id', $salon->admin_id)->first();
+if (!$admin) {
+    $admin = User::where('role', 'admin')->first();
+}
 
-// 1. Get Service Provider token
-$providerUser = App\Models\User::where('role', 'service_provider')->first();
-$token = $providerUser->createToken('test')->plainTextToken;
-$provider = App\Models\ServiceProvider::where('user_id', $providerUser->id)->first();
-$salonId = $provider->salon_id;
+// Generate token manually
+$token = $admin->createToken('test-token')->plainTextToken;
 
-echo "Provider Token: $token\n";
-echo "Salon ID: $salonId\n";
+// Fetch appointments
+$ch2 = curl_init('http://localhost:8000/api/partner/salons/' . $salon->id . '/appointments');
+curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch2, CURLOPT_HTTPHEADER, [
+    'Authorization: Bearer ' . $token,
+    'Accept: application/json'
+]);
+$response2 = curl_exec($ch2);
+$httpcode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+curl_close($ch2);
 
-// Use built-in HTTP client to simulate request
-$appointment = App\Models\Appointment::with(['customer', 'services.service', 'serviceAdditions.service'])->where('salon_id', $salonId)->first();
-echo json_encode($appointment, JSON_PRETTY_PRINT) . "\n";
-
-// 2. Get Admin token
-$adminUser = App\Models\User::where('role', 'admin')->first();
-$adminToken = $adminUser->createToken('test')->plainTextToken;
-
-$response = Illuminate\Support\Facades\Http::withToken($adminToken)
-    ->get("http://localhost:8000/api/partner/salons/{$salonId}/appointments?date=".date('Y-m-d'));
-
-echo "Admin Status: " . $response->status() . "\n";
-echo "Admin Body: " . substr($response->body(), 0, 500) . "\n";
+echo "Appointments Status: $httpcode2\n";
+echo "Appointments Response: " . substr($response2, 0, 500) . "\n";
