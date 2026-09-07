@@ -1077,6 +1077,26 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   // ------------------------------------------------------------- sticky bar
 
+  /// Price of one cart line. A combo is priced from its own special prices,
+  /// not from the member services' list prices.
+  double _lineTotal(dynamic item) {
+    final quantity = (item['quantity'] ?? 1) as int;
+
+    if (item['combo'] != null) {
+      double comboPrice = 0;
+      for (final service in (item['combo']['services'] as List? ?? [])) {
+        comboPrice += _toDouble(service['pivot']?['combo_special_price'] ?? service['price']);
+      }
+      return comboPrice * quantity;
+    }
+
+    if (item['service'] != null) {
+      return _toDouble(item['service']['price']) * quantity;
+    }
+
+    return 0;
+  }
+
   /// Running total for the doc's sticky "View Cart" bar. Only counts a cart
   /// that belongs to this salon.
   Widget? _buildStickyBar() {
@@ -1084,14 +1104,20 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     if (_cart == null || items.isEmpty) return null;
     if (_cart!['salon_id'].toString() != widget.salonId) return null;
 
+    // The server sends the figures the booking will actually charge; only fall
+    // back to a local sum if an older API build leaves them out.
+    final summary = _cart!['summary'] as Map<String, dynamic>?;
+
     double total = 0;
     int count = 0;
     for (final item in items) {
-      final quantity = (item['quantity'] ?? 1) as int;
-      count += quantity;
-      if (item['service'] != null) {
-        total += _toDouble(item['service']['price']) * quantity;
-      }
+      count += (item['quantity'] ?? 1) as int;
+      total += _lineTotal(item);
+    }
+
+    if (summary != null) {
+      total = _toDouble(summary['total_amount']);
+      count = (summary['item_count'] ?? count) as int;
     }
 
     return Container(

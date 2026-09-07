@@ -313,9 +313,17 @@ class AppointmentController extends Controller
         // Upcoming reads best soonest-first; history reads best newest-first.
         $upcoming = array_reverse($upcoming);
 
+        // Bookings the salon released. Surfaced separately so the home tab can
+        // raise an alert without downloading and filtering the whole list.
+        $actionRequired = array_values(array_filter(
+            $upcoming,
+            fn ($booking) => $booking['needs_reschedule'] === true
+        ));
+
         return response()->json([
             'upcoming' => $upcoming,
             'past' => $past,
+            'action_required' => $actionRequired,
             'cancellation_cutoff_minutes' => $this->policy->cancellationCutoffMinutes(),
             'reschedule_cutoff_minutes' => $this->policy->rescheduleCutoffMinutes(),
         ]);
@@ -353,6 +361,8 @@ class AppointmentController extends Controller
 
         DB::beginTransaction();
         try {
+            $releasedBySalon = $this->policy->wasReleasedBySalon($appointment);
+
             $appointment->status = 'cancelled';
             $appointment->cancelled_by = 'customer';
             $appointment->cancelled_by_user_id = $request->user()->id;
@@ -362,7 +372,14 @@ class AppointmentController extends Controller
 
             $appointment->services()->update(['line_status' => 'cancelled']);
 
-            $this->raiseRefund($appointment, $refund['refundable'], 'Customer cancellation', $request->user()->id);
+            $this->raiseRefund(
+                $appointment,
+                $refund['refundable'],
+                $releasedBySalon
+                    ? 'Salon closed the day — full advance returned'
+                    : 'Customer cancellation',
+                $request->user()->id
+            );
 
             DB::commit();
         } catch (\Exception $e) {
@@ -606,6 +623,7 @@ class AppointmentController extends Controller
             'services.service.template:id,name,estimated_duration_minutes',
             'services.combo:id,name,will_refund_advance_if_cancelled',
             'appointedProvider.user:id,name',
+            'salonClosure:id,closed_date,reason',
         ];
     }
 
@@ -652,6 +670,12 @@ class AppointmentController extends Controller
             'payment_option' => $appointment->payment_option,
             'cancellation_reason' => $appointment->cancellation_reason,
             'rescheduled_from_id' => $appointment->rescheduled_from_id,
+
+            // The salon closed this day. The booking still holds the money and
+            // the services — the customer just has to pick a new slot.
+            'needs_reschedule' => $appointment->status === BookingPolicyService::AWAITING_RESCHEDULE,
+            'released_by_salon' => $this->policy->wasReleasedBySalon($appointment),
+            'closure_reason' => $appointment->salonClosure->reason ?? null,
 
             // What the customer may do right now.
             'can_cancel' => $cancelWindow['allowed'],

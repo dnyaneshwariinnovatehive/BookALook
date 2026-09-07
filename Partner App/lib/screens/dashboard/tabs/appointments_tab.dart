@@ -1,7 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart'; // Ensure correct path
 import '../../appointment_details_screen.dart'; // Fixed relative path
+import '../close_day_sheet.dart';
+
+const String _kAllDates = 'All Dates';
+const String _kAllProviders = 'All Providers';
+const String _kAllServices = 'All Services';
+const String _kAllStatus = 'All Status';
+const String _kAllSources = 'All Sources';
+const String _kCustomDate = 'Custom Date';
+
+/// Labels shown in the status dropdown mapped to the values the API stores.
+const Map<String, String> _kStatusValues = {
+  'Scheduled': 'scheduled',
+  'In Progress': 'in_progress',
+  'Completed': 'completed',
+  'Cancelled': 'cancelled',
+  'No Show': 'no_show',
+  'Awaiting Reschedule': 'awaiting_reschedule',
+};
+
+const List<String> _kStatusLabels = [
+  'Scheduled',
+  'In Progress',
+  'Completed',
+  'Cancelled',
+  'No Show',
+  'Awaiting Reschedule',
+];
+
+/// Labels shown in the source dropdown mapped to `booking_source` values.
+const Map<String, String> _kSourceValues = {
+  'App': 'online',
+  'Walk-in': 'walk_in',
+  'Phone': 'phone',
+};
+
+const List<String> _kSourceLabels = ['App', 'Walk-in', 'Phone'];
 
 class AppointmentsTab extends StatefulWidget {
   final String salonId;
@@ -16,11 +53,16 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
   List<dynamic> _appointments = [];
   bool _isLoading = true;
 
+  // Today is what an admin is running the salon against; the full history is
+  // one dropdown away.
   String _selectedDate = 'Today';
-  String _selectedProvider = 'All Providers';
-  String _selectedService = 'All Services';
-  String _selectedStatus = 'All Status';
-  String _selectedSource = 'All Sources';
+  String _selectedProvider = _kAllProviders;
+  String _selectedService = _kAllServices;
+  String _selectedStatus = _kAllStatus;
+  String _selectedSource = _kAllSources;
+
+  /// Set when the date filter is "Custom Date".
+  DateTime? _customDate;
 
   @override
   void initState() {
@@ -45,8 +87,162 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     }
   }
 
+  /// Emergency closure. Defaults to whatever day the admin is looking at, so
+  /// the button means what it says on screen.
+  Future<void> _openCloseDay() async {
+    final closed = await CloseDaySheet.show(
+      context,
+      salonId: widget.salonId,
+      initialDate: _filterDate ?? DateTime.now(),
+    );
+
+    if (closed) _loadAppointments();
+  }
+
+  // ------------------------------------------------------------- filter data
+
+  /// Assigned provider's name, or null when the booking has no provider yet.
+  String? _providerName(Map<String, dynamic> apt) {
+    final provider = apt['appointed_provider'] ?? apt['serving_provider'];
+    final name = provider?['user']?['name'] ?? provider?['name'];
+    return (name is String && name.isNotEmpty) ? name : null;
+  }
+
+  /// Names of every service on the booking, including mid-appointment additions.
+  List<String> _serviceNames(Map<String, dynamic> apt) {
+    final lines = [
+      ...(apt['services'] as List? ?? []),
+      ...(apt['service_additions'] as List? ?? []),
+    ];
+
+    return lines
+        .map((line) => line['service']?['template']?['name'] ?? line['service']?['name'])
+        .whereType<String>()
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
+  /// The date filter resolved to a concrete day, or null for "All Dates".
+  DateTime? get _filterDate {
+    final today = DateUtils.dateOnly(DateTime.now());
+    switch (_selectedDate) {
+      case 'Today':
+        return today;
+      case 'Yesterday':
+        return today.subtract(const Duration(days: 1));
+      case 'Tomorrow':
+        return today.add(const Duration(days: 1));
+      case _kCustomDate:
+        return _customDate;
+      default:
+        return null;
+    }
+  }
+
+  /// Options built from the appointments actually on screen, so the dropdowns
+  /// can never offer a value that filters everything away.
+  List<String> get _providerOptions {
+    final names = _appointments
+        .map((apt) => _providerName(apt as Map<String, dynamic>))
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    return [_kAllProviders, ...names];
+  }
+
+  List<String> get _serviceOptions {
+    final names = <String>{};
+    for (final apt in _appointments) {
+      names.addAll(_serviceNames(apt as Map<String, dynamic>));
+    }
+    final sorted = names.toList()..sort();
+    return [_kAllServices, ...sorted];
+  }
+
+  /// The 5 filters applied together.
+  List<dynamic> get _filteredAppointments {
+    final date = _filterDate;
+
+    return _appointments.where((raw) {
+      final apt = raw as Map<String, dynamic>;
+
+      if (date != null) {
+        final aptDate = DateTime.tryParse('${apt['appointment_date']}');
+        if (aptDate == null || !DateUtils.isSameDay(aptDate, date)) return false;
+      }
+
+      if (_selectedProvider != _kAllProviders && _providerName(apt) != _selectedProvider) {
+        return false;
+      }
+
+      if (_selectedService != _kAllServices &&
+          !_serviceNames(apt).contains(_selectedService)) {
+        return false;
+      }
+
+      if (_selectedStatus != _kAllStatus &&
+          '${apt['status']}'.toLowerCase() != _kStatusValues[_selectedStatus]) {
+        return false;
+      }
+
+      if (_selectedSource != _kAllSources &&
+          '${apt['booking_source']}'.toLowerCase() != _kSourceValues[_selectedSource]) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  bool get _hasActiveFilter =>
+      _selectedDate != 'Today' ||
+      _selectedProvider != _kAllProviders ||
+      _selectedService != _kAllServices ||
+      _selectedStatus != _kAllStatus ||
+      _selectedSource != _kAllSources;
+
+  void _clearFilters() {
+    setState(() {
+      // Back to the default view, not to every appointment ever taken.
+      _selectedDate = 'Today';
+      _selectedProvider = _kAllProviders;
+      _selectedService = _kAllServices;
+      _selectedStatus = _kAllStatus;
+      _selectedSource = _kAllSources;
+      _customDate = null;
+    });
+  }
+
+  Future<void> _onDateFilterChanged(String? value) async {
+    if (value == null) return;
+
+    if (value != _kCustomDate) {
+      setState(() {
+        _selectedDate = value;
+        _customDate = null;
+      });
+      return;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _customDate ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (picked == null) return;
+    setState(() {
+      _selectedDate = _kCustomDate;
+      _customDate = picked;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final visible = _isLoading ? const <dynamic>[] : _filteredAppointments;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE), // Light background
       body: SafeArea(
@@ -55,20 +251,55 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             _buildHeader(),
             _buildFilters(),
             Expanded(
-              child: _isLoading 
+              child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
-                : _appointments.isEmpty
-                  ? Center(child: Text('No appointments found', style: GoogleFonts.outfit(color: Colors.grey)))
+                : visible.isEmpty
+                  ? _buildEmptyState()
                   : ListView.separated(
                       padding: const EdgeInsets.all(16.0),
-                      itemCount: _appointments.length,
+                      itemCount: visible.length,
                       separatorBuilder: (context, index) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
-                        final apt = _appointments[index];
+                        final apt = visible[index];
                         return _buildDynamicAppointmentCard(apt);
                       },
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final filtered = _appointments.isNotEmpty && _hasActiveFilter;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              filtered
+                  ? 'No appointments match these filters'
+                  : 'No appointments found',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(color: Colors.grey),
+            ),
+            if (filtered) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _clearFilters,
+                child: Text(
+                  'Clear filters',
+                  style: GoogleFonts.outfit(
+                    color: const Color(0xFF9C54F2),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -89,18 +320,29 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               color: const Color(0xFF1F2937),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'Cancel This Day',
-              style: GoogleFonts.outfit(
-                color: const Color(0xFFDC2626),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
+          InkWell(
+            onTap: _openCloseDay,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.event_busy, size: 15, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Cancel This Day',
+                    style: GoogleFonts.outfit(
+                      color: const Color(0xFFDC2626),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -118,15 +360,19 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             children: [
               Expanded(
                 child: _buildDropdown(
-                  ['All Dates', 'Today', 'Yesterday', 'Tomorrow', 'Custom Date'],
+                  const [_kAllDates, 'Today', 'Yesterday', 'Tomorrow', _kCustomDate],
                   _selectedDate,
-                  (v) => setState(() => _selectedDate = v!),
+                  _onDateFilterChanged,
+                  // Show the day the admin picked rather than the generic label.
+                  labelFor: (item) => item == _kCustomDate && _customDate != null
+                      ? DateFormat('d MMM').format(_customDate!)
+                      : item,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildDropdown(
-                  ['All Providers', 'Rahul Sharma', 'Vikram Singh'],
+                  _providerOptions,
                   _selectedProvider,
                   (v) => setState(() => _selectedProvider = v!),
                 ),
@@ -134,7 +380,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildDropdown(
-                  ['All Services', 'Haircut', 'Massage'],
+                  _serviceOptions,
                   _selectedService,
                   (v) => setState(() => _selectedService = v!),
                 ),
@@ -142,7 +388,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildDropdown(
-                  ['All Status', 'Scheduled', 'In Progress', 'Completed', 'Cancelled', 'No Show'],
+                  const [_kAllStatus, ..._kStatusLabels],
                   _selectedStatus,
                   (v) => setState(() => _selectedStatus = v!),
                 ),
@@ -150,18 +396,47 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildDropdown(
-            ['All Sources', 'App', 'Walk-in', 'Phone'],
-            _selectedSource,
-            (v) => setState(() => _selectedSource = v!),
-            isFullWidth: true,
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropdown(
+                  const [_kAllSources, ..._kSourceLabels],
+                  _selectedSource,
+                  (v) => setState(() => _selectedSource = v!),
+                ),
+              ),
+              if (_hasActiveFilter) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: _clearFilters,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text(
+                    'Clear',
+                    style: GoogleFonts.outfit(
+                      color: const Color(0xFF9C54F2),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDropdown(List<String> items, String value, ValueChanged<String?> onChanged, {bool isFullWidth = false}) {
+  Widget _buildDropdown(
+    List<String> items,
+    String value,
+    ValueChanged<String?> onChanged, {
+    bool isFullWidth = false,
+    String Function(String)? labelFor,
+  }) {
     if (!items.contains(value)) value = items.first;
 
     return Container(
@@ -182,7 +457,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
           items: items.map((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(item, overflow: TextOverflow.ellipsis),
+              child: Text(labelFor?.call(item) ?? item, overflow: TextOverflow.ellipsis),
             );
           }).toList(),
           onChanged: onChanged,
@@ -213,6 +488,10 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     } else if (status == 'CANCELLED' || status == 'NO_SHOW') {
       statusColor = const Color(0xFFFEE2E2);
       statusTextColor = const Color(0xFFDC2626);
+    } else if (status == 'AWAITING_RESCHEDULE') {
+      // Released by a day closure — waiting on the customer to pick a new slot.
+      statusColor = const Color(0xFFFEF3C7);
+      statusTextColor = const Color(0xFFB45309);
     }
 
     // Determine icon based on source
@@ -226,11 +505,10 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
       sourceName = 'Phone';
     }
 
-    String provider = apt['appointed_provider'] != null ? apt['appointed_provider']['name'] : 'Any Staff';
-    
+    String provider = _providerName(apt) ?? 'Any Staff';
+
     // Parse services
-    List services = apt['services'] ?? [];
-    String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(', ');
+    String serviceNames = _serviceNames(apt).join(', ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
 
     return GestureDetector(

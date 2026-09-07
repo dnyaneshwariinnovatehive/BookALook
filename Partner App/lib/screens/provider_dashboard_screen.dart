@@ -312,7 +312,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     return GestureDetector(
       onTap: () {
         Navigator.push(context, MaterialPageRoute(
-          builder: (context) => ProviderAppointmentDetailsScreen(appointment: apt)
+          builder: (context) => ProviderAppointmentDetailsScreen(
+            appointment: apt,
+            salonId: widget.salonId,
+          )
         )).then((val) {
           if (val == true) _loadAppointments();
         });

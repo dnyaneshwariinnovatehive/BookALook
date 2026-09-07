@@ -20,8 +20,28 @@ class BookingPolicyService
     /** Statuses that still count as a live, changeable booking. */
     public const ACTIVE_STATUSES = ['scheduled', 'confirmed', 'pending_payment'];
 
+    /**
+     * The salon closed the day and released this booking. It holds the
+     * customer's money and their service lines but owns no slot until they
+     * pick a new one.
+     */
+    public const AWAITING_RESCHEDULE = 'awaiting_reschedule';
+
     /** Statuses that close a booking for good — these always belong to history. */
     public const TERMINAL_STATUSES = ['completed', 'cancelled', 'no_show', 'rescheduled'];
+
+    /** Statuses the customer may still cancel or move. */
+    public const CHANGEABLE_STATUSES = [
+        'scheduled', 'confirmed', 'pending_payment', self::AWAITING_RESCHEDULE,
+    ];
+
+    /**
+     * Statuses that actually occupy the chair. Anything outside this list must
+     * not block a slot — a released booking has given its time back.
+     */
+    public const BLOCKING_STATUSES = [
+        'pending_payment', 'scheduled', 'confirmed', 'in_progress', 'completed',
+    ];
 
     /**
      * Which tab a booking belongs to.
@@ -37,7 +57,20 @@ class BookingPolicyService
             return false;
         }
 
+        // A released booking is an outstanding obligation with the customer's
+        // money in it. It stays in Upcoming even once its original date has
+        // passed, otherwise it would vanish into history unresolved.
+        if ($appointment->status === self::AWAITING_RESCHEDULE) {
+            return true;
+        }
+
         return ! Carbon::parse($appointment->appointment_date)->startOfDay()->isBefore(Carbon::today());
+    }
+
+    /** Was this booking released by an emergency closure? */
+    public function wasReleasedBySalon(Appointment $appointment): bool
+    {
+        return $appointment->salon_closure_id !== null;
     }
 
     public function cancellationCutoffMinutes(): int
@@ -71,19 +104,23 @@ class BookingPolicyService
         return DB::table('salon_closures')
             ->where('salon_id', $salonId)
             ->whereDate('closed_date', $date)
+            ->whereNull('reopened_at')
             ->exists();
     }
 
     private function baseWindow(Appointment $appointment, int $cutoff): array
     {
-        $freeReschedule = $this->isSalonClosedOn(
+        // The link to the closure is the durable entitlement: an admin deleting
+        // the closure row later must not quietly withdraw the customer's free
+        // reschedule.
+        $freeReschedule = $this->wasReleasedBySalon($appointment) || $this->isSalonClosedOn(
             $appointment->salon_id,
             Carbon::parse($appointment->appointment_date)->format('Y-m-d')
         );
 
         $base = ['cutoff_minutes' => $cutoff, 'free_reschedule' => $freeReschedule];
 
-        if (! in_array($appointment->status, self::ACTIVE_STATUSES, true)) {
+        if (! in_array($appointment->status, self::CHANGEABLE_STATUSES, true)) {
             return $base + [
                 'allowed' => false,
                 'reason' => 'This appointment is already ' . str_replace('_', ' ', $appointment->status) . '.',
@@ -134,6 +171,19 @@ class BookingPolicyService
         $lineTotal = (float) $lines->sum('price_at_booking');
         $advancePaid = (float) $appointment->advance_amount;
 
+        // The salon closed the day, not the customer. Forfeiting any part of
+        // their advance would be charging them for the salon's emergency, so
+        // every rupee comes back if they choose not to rebook.
+        if ($this->wasReleasedBySalon($appointment)) {
+            return [
+                'refundable' => round($advancePaid, 2),
+                'forfeited' => 0.0,
+                'refundable_service_names' => $lines
+                    ->map(fn ($line) => $line->service->template->name ?? 'Service')
+                    ->unique()->values()->all(),
+            ];
+        }
+
         foreach ($lines as $line) {
             // Split the advance across lines in proportion to their price, so a
             // partly-refundable basket refunds only its refundable share.
@@ -168,6 +218,9 @@ class BookingPolicyService
     {
         return Appointment::where('customer_id', $customerId)
             ->whereDate('appointment_date', $date)
+            // Changes forced by a salon closure are not the customer's doing
+            // and must never push them towards the full-upfront penalty.
+            ->whereNull('salon_closure_id')
             ->where(function ($q) {
                 $q->where(function ($q) {
                     $q->where('status', 'cancelled')->where('cancelled_by', 'customer');

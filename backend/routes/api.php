@@ -40,6 +40,11 @@ Route::prefix('customer')->group(function () {
         Route::get('/appointments/{id}/reschedule-options', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'rescheduleOptions']);
         Route::post('/appointments/{id}/reschedule', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{id}/generate-qr', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'generateQr']);
+
+        // In-app notification inbox
+        Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markRead']);
     });
 });
 
@@ -137,6 +142,12 @@ Route::prefix('partner')->group(function () {
         Route::get('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getWorkingHours']);
         Route::put('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateWorkingHours']);
 
+        // Emergency day closure + mass reschedule
+        Route::get('/salons/{salon_id}/closures', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'index']);
+        Route::get('/salons/{salon_id}/closures/preview', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'preview']);
+        Route::post('/salons/{salon_id}/closures', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'store']);
+        Route::delete('/salons/{salon_id}/closures/{closure_id}', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'destroy']);
+
         // Staff Management
         Route::get('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'index']);
         Route::post('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'store']);
@@ -161,6 +172,13 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'walkIn']);
         Route::post('/salons/{salon_id}/appointments/verify-qr', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'verifyQrAndStartSession']);
         Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'addServiceMidAppointment']);
+
+        // Check-in, billing and payment collection
+        Route::get('/salons/{salon_id}/check-in/pending', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'pending']);
+        Route::post('/salons/{salon_id}/check-in/resolve', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'resolve']);
+        Route::post('/salons/{salon_id}/appointments/{id}/start', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'start']);
+        Route::get('/salons/{salon_id}/appointments/{id}/bill', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'bill']);
+        Route::post('/salons/{salon_id}/appointments/{id}/collect-payment', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'collectPayment']);
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
         

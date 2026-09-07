@@ -1,18 +1,56 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../theme/app_theme.dart';
+import '../../phone_screen.dart';
 
 class ProviderProfileTab extends StatelessWidget {
   final Map<String, dynamic> salon;
   final Map<String, dynamic> provider;
   final Map<String, dynamic> user;
-  
+
   const ProviderProfileTab({
-    super.key, 
+    super.key,
     required this.salon,
     required this.provider,
     required this.user,
   });
+
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Log out'),
+        content: const Text('You will need your phone number to sign back in.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Log out',
+              style: TextStyle(
+                color: Theme.of(ctx).brightness == Brightness.dark
+                    ? AppTheme.darkDanger
+                    : AppTheme.lightDanger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    if (!context.mounted) return;
+    // Has to replace the whole shell, not just this tab's stack.
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const PhoneScreen()),
+      (route) => false,
+    );
+  }
 
   String _formatTime(String? timeStr) {
     if (timeStr == null || timeStr.isEmpty) return 'Closed';
@@ -167,8 +205,52 @@ class ProviderProfileTab extends StatelessWidget {
                       ],
                     );
                   }),
-                
-                const SizedBox(height: 80), // Padding for bottom nav
+
+                const SizedBox(height: 40),
+
+                // Logout
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: () => _logout(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: (Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.darkDanger
+                                : AppTheme.lightDanger)
+                            .withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.logout,
+                            size: 18,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.darkDanger
+                                : AppTheme.lightDanger,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? AppTheme.darkDanger
+                                  : AppTheme.lightDanger,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
               ],
             ),
           ),

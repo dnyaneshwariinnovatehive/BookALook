@@ -328,7 +328,10 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
     return GestureDetector(
       onTap: () {
         Navigator.push(context, MaterialPageRoute(
-          builder: (context) => ProviderAppointmentDetailsScreen(appointment: apt)
+          builder: (context) => ProviderAppointmentDetailsScreen(
+            appointment: apt,
+            salonId: widget.salon['id'].toString(),
+          )
         )).then((_) => _loadAppointments());
       },
       child: Container(

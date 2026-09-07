@@ -14,8 +14,8 @@ class ProfileTab extends StatelessWidget {
     final authService = AuthService();
     await authService.logout();
     
-    Navigator.pushAndRemoveUntil(
-      context,
+    // Logging out has to replace the whole shell, not just this tab's stack.
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => PhoneScreen()),
       (route) => false,
     );

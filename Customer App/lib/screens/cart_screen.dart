@@ -181,9 +181,16 @@ class _CartScreenState extends State<CartScreen> {
   Widget? _buildCheckoutBar() {
     if (_cart == null || (_cart!['items'] as List).isEmpty) return null;
 
+    // Prefer the server's figure — it is what checkout will charge.
+    final summary = _cart!['summary'] as Map<String, dynamic>?;
+
     double total = 0.0;
-    for (var item in _cart!['items']) {
-      total += _lineTotal(item);
+    if (summary != null) {
+      total = double.tryParse('${summary['total_amount'] ?? 0}') ?? 0.0;
+    } else {
+      for (var item in _cart!['items']) {
+        total += _lineTotal(item);
+      }
     }
 
     return Container(
@@ -218,8 +225,10 @@ class _CartScreenState extends State<CartScreen> {
                 ));
                 // The booking consumed the cart server-side — reflect that here.
                 if (booked == true) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
+                  // Rebuild the shell on the Bookings tab. This has to go
+                  // through the root navigator — the cart lives inside a tab.
+                  Navigator.of(context, rootNavigator: true)
+                      .pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (context) => const MainScreen(initialIndex: 2),
                     ),

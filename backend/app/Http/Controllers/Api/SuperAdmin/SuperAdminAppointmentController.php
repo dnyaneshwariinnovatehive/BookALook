@@ -25,11 +25,16 @@ class SuperAdminAppointmentController extends Controller
             'customer:id,name,phone,email',
             'appointedProvider:id,user_id,salon_id',
             'servingProvider:id,user_id,salon_id',
-            'appointedProvider.user:id,name',
-            'servingProvider.user:id,name',
-            'services.service',
-            'serviceAdditions.service',
-            'serviceAdditions.provider.user:id,name'
+            'appointedProvider.user:id,name,phone',
+            'servingProvider.user:id,name,phone',
+            // The template carries the service name and standard duration.
+            'services.service.template',
+            'services.servingProvider.user:id,name',
+            'serviceAdditions.service.template',
+            'serviceAdditions.provider.user:id,name',
+            'serviceAdditions.addedBy:id,name,role',
+            'cancelledByUser:id,name,role',
+            'salonClosure:id,closed_date,reason',
         ]);
 
         // Filter by Date

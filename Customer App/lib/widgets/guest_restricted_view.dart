@@ -45,8 +45,9 @@ class GuestRestrictedView extends StatelessWidget {
             SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
+                // Signing in has to replace the whole shell, not just the
+                // stack of the tab this view is embedded in.
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => PhoneScreen()),
                   (route) => false,
                 );

@@ -87,7 +87,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
               ],
               SizedBox(height: 12),
               Text(
-                'Refunds follow each service\'s own refund policy.',
+                booking['released_by_salon'] == true
+                    ? 'The salon closed this day, so your whole advance comes back. '
+                        'You can also keep the booking and just pick a new time.'
+                    : 'Refunds follow each service\'s own refund policy.',
                 style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
               ),
             ] else
@@ -265,6 +268,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     final advance = _toDouble(booking['advance_paid']);
     final balance = _toDouble(booking['balance_amount']);
     final freeReschedule = booking['free_reschedule'] == true;
+    // The salon closed the day and released this booking — only the customer
+    // can resolve it, so the card is styled to demand attention.
+    final needsReschedule = booking['needs_reschedule'] == true;
     final canCancel = booking['can_cancel'] == true;
     final canReschedule = booking['can_reschedule'] == true;
     final canGenerateQr = booking['can_generate_qr'] == true;
@@ -276,7 +282,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
       decoration: BoxDecoration(
         color: AppTheme.lightSurface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.lightBorder),
+        border: Border.all(
+          color: needsReschedule ? AppTheme.lightWarning : AppTheme.lightBorder,
+          width: needsReschedule ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: Offset(0, 4))
         ],
@@ -356,7 +365,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
                 style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextLight)),
           ],
 
-          if (isUpcoming && freeReschedule) ...[
+          if (isUpcoming && (freeReschedule || needsReschedule)) ...[
             SizedBox(height: 14),
             Container(
               padding: EdgeInsets.all(12),
@@ -365,13 +374,31 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.event_busy, size: 18, color: AppTheme.lightWarning),
                   SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      'The salon is closed on this date. Reschedule free of cost — your advance carries over.',
-                      style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightWarning),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          needsReschedule
+                              ? 'This booking has been released — pick a new time'
+                              : 'The salon is closed on this date',
+                          style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.lightWarning),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          booking['closure_reason'] != null
+                              ? '${booking['closure_reason']}. Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.'
+                              : 'Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.',
+                          style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightWarning),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -389,7 +416,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
             Text('Cannot reschedule: $rescheduleBlockedReason', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
           ],
 
-          if (isUpcoming) ...[
+          // A released booking has one job: get a new time. Rescheduling is the
+          // primary action and the QR is meaningless until it has a slot again.
+          if (isUpcoming && needsReschedule) ...[
+            SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: canReschedule ? () => _openReschedule(booking) : null,
+                child: Text('Pick a new time — free'),
+              ),
+            ),
+            SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: canCancel ? () => _confirmCancel(booking) : null,
+                child: Text('Cancel and refund ₹${_toDouble(booking['refundable_advance']).toStringAsFixed(0)}'),
+              ),
+            ),
+          ] else if (isUpcoming) ...[
             SizedBox(height: 16),
             Row(
               children: [
@@ -469,6 +515,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
       case 'pending_payment':
       case 'in_progress':
       case 'rescheduled':
+      case 'awaiting_reschedule':
         return AppTheme.lightWarning;
       case 'completed':
         return AppTheme.lightSuccess;

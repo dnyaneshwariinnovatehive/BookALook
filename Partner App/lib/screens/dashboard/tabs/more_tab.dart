@@ -14,8 +14,8 @@ class MoreTab extends StatelessWidget {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
+      // Logging out has to replace the whole shell, not just this tab's stack.
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const PhoneScreen()),
         (route) => false,
       );

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/check_in_api.dart';
+import 'check_in_confirm_sheet.dart';
+import 'collect_payment_sheet.dart';
 import 'qr_scanner_screen.dart';
 
-class AppointmentDetailsScreen extends StatelessWidget {
+class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> appointment;
   final String salonId;
 
@@ -12,70 +15,81 @@ class AppointmentDetailsScreen extends StatelessWidget {
     required this.salonId,
   }) : super(key: key);
 
-  void _showScanQrBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        String selectedStaff = 'Rahul Sharma'; // Placeholder for Staff selection
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Start Session', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Text('Assign Staff Member:', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade700)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedStaff,
-                        isExpanded: true,
-                        items: ['Rahul Sharma', 'Vikram Singh', 'Neha Gupta']
-                            .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                            .toList(),
-                        onChanged: (v) => setState(() => selectedStaff = v!),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9C54F2), // Accent Color
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-                      label: Text('Scan QR & Confirm', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Open Scanner
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (context) => QrScannerScreen(salonId: salonId),
-                        ));
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
+  @override
+  State<AppointmentDetailsScreen> createState() => _AppointmentDetailsScreenState();
+}
+
+class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
+  late Map<String, dynamic> appointment = Map<String, dynamic>.from(widget.appointment);
+  String get salonId => widget.salonId;
+  bool _isBusy = false;
+
+  /// Reloads the row so the buttons reflect what actually happened.
+  Future<void> _refresh() async {
+    try {
+      final target = await CheckInApi.bill(salonId, appointment['id'].toString());
+      if (!mounted) return;
+      setState(() {
+        appointment['status'] = target.appointment.status;
+        appointment['serving_provider_id'] = target.appointment.servingProviderId;
+        appointment['total_amount'] = target.appointment.totalAmount;
+        appointment['balance_amount'] = target.appointment.balanceAmount;
+        appointment['payment_mode'] = target.appointment.paymentMode;
+      });
+    } catch (_) {
+      // The screen stays usable on a refresh failure.
+    }
+  }
+
+  /// Start the session for this specific booking. The admin can scan the
+  /// customer's code, or start it by hand when they cannot show one.
+  Future<void> _startSession({required bool scan}) async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+
+    try {
+      if (scan) {
+        final started = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QrScannerScreen(
+              salonId: salonId,
+              expectedAppointmentId: appointment['id'].toString(),
+            ),
+          ),
         );
-      },
+        if (started == true) await _refresh();
+      } else {
+        final target = await CheckInApi.resolve(
+          salonId,
+          appointmentId: appointment['id'].toString(),
+        );
+        if (!mounted) return;
+        final started = await CheckInConfirmSheet.show(
+          context,
+          salonId: salonId,
+          target: target,
+        );
+        if (started) await _refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
+
+  Future<void> _openBill() async {
+    final collected = await CollectPaymentSheet.show(
+      context,
+      salonId: salonId,
+      appointmentId: appointment['id'].toString(),
     );
+    if (collected) await _refresh();
   }
 
   @override
@@ -90,6 +104,8 @@ class AppointmentDetailsScreen extends StatelessWidget {
 
     final String status = (appointment['status'] ?? '').toString().toUpperCase();
     final bool isScheduled = appointment['status'] == 'scheduled';
+    final bool isInProgress = appointment['status'] == 'in_progress';
+    final bool isCompleted = appointment['status'] == 'completed';
 
     // Parse Services
     final List services = appointment['services'] ?? [];
@@ -138,13 +154,53 @@ class AppointmentDetailsScreen extends StatelessWidget {
                         backgroundColor: const Color(0xFF16A34A),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      icon: const Icon(Icons.qr_code, color: Colors.white, size: 18),
+                      icon: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 18),
                       label: Text('Scan QR', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-                      onPressed: () => _showScanQrBottomSheet(context),
+                      onPressed: _isBusy ? null : () => _startSession(scan: true),
+                    )
+                  else if (isInProgress)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF9C54F2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.receipt_long, color: Colors.white, size: 18),
+                      label: Text('Bill & collect', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: _openBill,
                     ),
                 ],
               ),
             ),
+
+            // The customer cannot always show a code — a dead phone should not
+            // stop the salon working. Recorded as a manual check-in.
+            if (isScheduled) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _isBusy ? null : () => _startSession(scan: false),
+                  icon: const Icon(Icons.play_circle_outline, size: 18),
+                  label: Text('Start without scanning',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+            if (isCompleted) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Settled${appointment['payment_mode'] != null ? ' by ${appointment['payment_mode']}' : ''}.',
+                  style: GoogleFonts.outfit(color: const Color(0xFF15803D), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
 
             // Customer Info

@@ -11,6 +11,9 @@ class Appointment extends Model
 
     protected $guarded = [];
 
+    /** The QR hash is a credential — never ship it to a client. */
+    protected $hidden = ['qr_token_hash'];
+
     public function salon()
     {
         return $this->belongsTo(Salon::class);
@@ -39,5 +42,16 @@ class Appointment extends Model
     public function serviceAdditions()
     {
         return $this->hasMany(AppointmentServiceAddition::class);
+    }
+
+    public function cancelledByUser()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    /** Set when an emergency closure released this booking. */
+    public function salonClosure()
+    {
+        return $this->belongsTo(SalonClosure::class, 'salon_closure_id');
     }
 }

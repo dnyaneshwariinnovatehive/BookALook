@@ -1,40 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/appointment_service.dart';
+import '../services/check_in_api.dart';
+import 'check_in_confirm_sheet.dart';
+import 'collect_payment_sheet.dart';
+import 'qr_scanner_screen.dart';
 
 class ProviderAppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> appointment;
+  final String salonId;
 
-  const ProviderAppointmentDetailsScreen({Key? key, required this.appointment}) : super(key: key);
+  const ProviderAppointmentDetailsScreen({
+    Key? key,
+    required this.appointment,
+    required this.salonId,
+  }) : super(key: key);
 
   @override
   State<ProviderAppointmentDetailsScreen> createState() => _ProviderAppointmentDetailsScreenState();
 }
 
 class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDetailsScreen> {
-  final PartnerAppointmentService _service = PartnerAppointmentService();
+  late Map<String, dynamic> _apt = Map<String, dynamic>.from(widget.appointment);
   bool _isProcessing = false;
 
-  Future<void> _markCompleted() async {
-    setState(() => _isProcessing = true);
+  String get _appointmentId => _apt['id'].toString();
+
+  Future<void> _refresh() async {
     try {
-      final response = await _service.completeAppointment(widget.appointment['id'].toString());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Completed! You earned ${response['coins_earned_this_time']} coins.'),
-          backgroundColor: Colors.green,
-        ));
-        Navigator.pop(context, true); // Return true to signal a reload is needed
+      final target = await CheckInApi.bill(widget.salonId, _appointmentId);
+      if (!mounted) return;
+      setState(() {
+        _apt['status'] = target.appointment.status;
+        _apt['total_amount'] = target.appointment.totalAmount;
+        _apt['balance_amount'] = target.appointment.balanceAmount;
+        _apt['payment_mode'] = target.appointment.paymentMode;
+      });
+    } catch (_) {
+      // Leave the screen usable if the refresh fails.
+    }
+  }
+
+  /// Scan the customer's code to begin. Falls back to a manual start when they
+  /// cannot show one.
+  Future<void> _startSession({required bool scan}) async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      if (scan) {
+        final started = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QrScannerScreen(
+              salonId: widget.salonId,
+              expectedAppointmentId: _appointmentId,
+            ),
+          ),
+        );
+        if (started == true) await _refresh();
+      } else {
+        final target = await CheckInApi.resolve(widget.salonId, appointmentId: _appointmentId);
+        if (!mounted) return;
+        final started = await CheckInConfirmSheet.show(
+          context,
+          salonId: widget.salonId,
+          target: target,
+        );
+        if (started) await _refresh();
       }
     } catch (e) {
-      setState(() => _isProcessing = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  /// Bill summary and payment. Completing the job and taking the money are the
+  /// same action — there is no tab.
+  Future<void> _openBill() async {
+    final collected = await CollectPaymentSheet.show(
+      context,
+      salonId: widget.salonId,
+      appointmentId: _appointmentId,
+    );
+
+    if (collected) {
+      await _refresh();
+      if (mounted) Navigator.pop(context, true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final apt = widget.appointment;
+    final apt = _apt;
     final bool isWalkIn = apt['booking_source'] == 'walk_in';
     
     final customer = apt['customer'] ?? {};
@@ -43,7 +106,9 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
     final String customerEmail = customer['email'] ?? ''; // Might be empty for walk-ins
 
     final String status = (apt['status'] ?? '').toString().toUpperCase();
-    final bool canComplete = (apt['status'] == 'in_progress' || apt['status'] == 'scheduled');
+    final bool isScheduled = apt['status'] == 'scheduled';
+    final bool isInProgress = apt['status'] == 'in_progress';
+    final bool canComplete = isScheduled || isInProgress;
 
     final num totalAmount = apt['total_amount'] ?? 0;
     final num advancePaid = apt['advance_amount'] ?? 0;
@@ -227,19 +292,60 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
-                ),
-                child: SizedBox(
-                  height: 54,
-                  child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _markCompleted,
-                    icon: _isProcessing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.check_circle_outline, color: Colors.white),
-                    label: Text(_isProcessing ? 'Processing...' : 'Mark Completed', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A), // Green action button
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5),
                     ),
-                  ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // The customer cannot always show a code — a dead phone
+                    // should not stop the salon working.
+                    if (isScheduled)
+                      TextButton.icon(
+                        onPressed: _isProcessing ? null : () => _startSession(scan: false),
+                        icon: const Icon(Icons.play_circle_outline, size: 18),
+                        label: Text('Start without scanning',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                      ),
+                    SizedBox(
+                      height: 54,
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isProcessing
+                            ? null
+                            : isScheduled
+                                ? () => _startSession(scan: true)
+                                : _openBill,
+                        icon: _isProcessing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Icon(isScheduled ? Icons.qr_code_scanner : Icons.receipt_long,
+                                color: Colors.white),
+                        label: Text(
+                          _isProcessing
+                              ? 'Processing...'
+                              : isScheduled
+                                  ? 'Scan QR to start'
+                                  : 'Bill & collect payment',
+                          style: GoogleFonts.outfit(
+                              fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isScheduled
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF9C54F2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

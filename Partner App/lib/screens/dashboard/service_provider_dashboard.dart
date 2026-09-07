@@ -1,8 +1,9 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../phone_screen.dart';
+import '../../widgets/tab_navigator.dart';
+import '../qr_scanner_screen.dart';
 import 'tabs/provider_profile_tab.dart';
 import 'tabs/provider_home_tab.dart';
 import 'tabs/provider_walk_in_tab.dart';
@@ -27,20 +28,57 @@ class ServiceProviderDashboard extends StatefulWidget {
 class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   int _currentIndex = 0; // Default to home tab as requested
 
-  void _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const PhoneScreen()),
-        (route) => false,
-      );
+  /// One navigator per tab so a page pushed from inside a tab stays inside
+  /// that tab and the bottom navigation bar remains visible.
+  final List<GlobalKey<NavigatorState>> _navigatorKeys =
+      List.generate(4, (_) => GlobalKey<NavigatorState>());
+
+  void _onItemTapped(int index) {
+    if (index == _currentIndex) {
+      // Tapping the tab you are already on goes back to its first page.
+      _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+      return;
     }
+    setState(() => _currentIndex = index);
+  }
+
+  /// Back unwinds the active tab first, then falls back to Home and only then
+  /// leaves the app.
+  void _handleBack(bool didPop, Object? result) {
+    if (didPop) return;
+
+    final navigator = _navigatorKeys[_currentIndex].currentState;
+    if (navigator != null && navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    SystemNavigator.pop();
+  }
+
+  Future<void> _openScanner() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QrScannerScreen(salonId: widget.salon['id'].toString()),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _handleBack,
+      child: _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     final List<Widget> pages = [
       ProviderHomeTab(salon: widget.salon, provider: widget.provider, user: widget.user),
       ProviderDashboardScreen(salonId: widget.salon['id'].toString()),
@@ -54,7 +92,22 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
 
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
-      body: pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          for (var i = 0; i < pages.length; i++)
+            TabNavigator(navigatorKey: _navigatorKeys[i], root: pages[i]),
+        ],
+      ),
+      // Scanning is the provider's most common action, so it sits on the shell
+      // and is reachable from every tab and every page inside them.
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openScanner,
+        backgroundColor: AppTheme.accentColor,
+        foregroundColor: Colors.white,
+        tooltip: 'Scan customer QR',
+        child: const Icon(Icons.qr_code_scanner, size: 28),
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -67,7 +120,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Theme.of(context).colorScheme.surface,
           selectedItemColor: AppTheme.accentColor,

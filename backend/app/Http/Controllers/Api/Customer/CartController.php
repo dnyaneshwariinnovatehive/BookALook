@@ -7,11 +7,16 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Service;
 use App\Models\Combo;
+use App\Services\AvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CartController extends Controller
 {
+    public function __construct(private AvailabilityService $availability)
+    {
+    }
+
     /**
      * Get the current user's cart for a specific salon.
      */
@@ -27,7 +32,7 @@ class CartController extends Controller
             return response()->json(['message' => 'Cart is empty', 'cart' => null]);
         }
 
-        return response()->json(['cart' => $cart]);
+        return response()->json(['cart' => $this->withSummary($cart)]);
     }
 
     /**
@@ -44,7 +49,28 @@ class CartController extends Controller
             return response()->json(['message' => 'Cart is empty', 'cart' => null]);
         }
 
-        return response()->json(['cart' => $cart]);
+        return response()->json(['cart' => $this->withSummary($cart)]);
+    }
+
+    /**
+     * Serialise a cart with the money and duration the booking engine will
+     * actually charge, so the app never has to re-derive prices itself. Combo
+     * lines in particular are priced from their special prices, not from the
+     * member services' list prices.
+     */
+    private function withSummary(Cart $cart): array
+    {
+        $requirements = $this->availability->summariseCart($cart);
+
+        $payload = $cart->toArray();
+        $payload['summary'] = [
+            'item_count' => (int) $cart->items->sum(fn ($item) => max(1, (int) $item->quantity)),
+            'total_amount' => $requirements['total'],
+            'advance_amount' => $requirements['advance'],
+            'total_duration_minutes' => $requirements['duration'],
+        ];
+
+        return $payload;
     }
 
     /**

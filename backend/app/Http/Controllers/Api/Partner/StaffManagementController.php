@@ -16,7 +16,12 @@ class StaffManagementController extends Controller
 {
     public function index($salonId)
     {
-        $staff = ServiceProvider::with(['user', 'services'])->where('salon_id', $salonId)->get();
+        // workingHours is loaded so the edit screen can show what is actually
+        // stored instead of falling back to defaults.
+        $staff = ServiceProvider::with(['user', 'services', 'workingHours'])
+            ->where('salon_id', $salonId)
+            ->get();
+
         return response()->json(['staff' => $staff]);
     }
 

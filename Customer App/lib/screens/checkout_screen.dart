@@ -7,6 +7,10 @@ import '../services/appointment_service.dart';
 /// Sentinel provider key for the "Any Available" option.
 const String _kAnyProvider = '__any__';
 
+/// Granularity of the booking grid the API returns. Mirrors
+/// `AvailabilityService::SLOT_MINUTES` on the server.
+const int _kSlotMinutes = 30;
+
 class CheckoutScreen extends StatefulWidget {
   final String salonId;
   const CheckoutScreen({Key? key, required this.salonId}) : super(key: key);
@@ -220,6 +224,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double _toDouble(dynamic value) => double.tryParse('${value ?? 0}') ?? 0.0;
+
+  /// "HH:mm" (or "HH:mm:ss") as minutes past midnight, or null if unparseable.
+  int? _minutesOfDay(dynamic timeStr) {
+    final parts = '$timeStr'.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return hour * 60 + minute;
+  }
+
+  /// True for the blocks after the chosen start that the appointment will run
+  /// into. A 180-minute booking starting at 10:00 covers 10:30 through 12:30.
+  bool _isWithinSelectedBooking(dynamic slotTime) {
+    if (_selectedTime == null || _totalDuration <= 0) return false;
+
+    final start = _minutesOfDay(_selectedTime);
+    final slot = _minutesOfDay(slotTime);
+    if (start == null || slot == null) return false;
+
+    return slot > start && slot < start + _totalDuration;
+  }
 
   /// Human wording for why a block cannot be booked.
   String _reasonLabel(String? reason) {
@@ -470,9 +496,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: _slots.map<Widget>((slot) {
             final isAvailable = slot['available'] == true;
             final isSelected = _selectedTime == slot['time'];
+            // Blocks the chosen start time will run into. They are filled the
+            // same purple as the start block so the whole appointment reads as
+            // one continuous booking.
+            final isOccupied = !isSelected && _isWithinSelectedBooking(slot['time']);
+
+            Color background;
+            Color textColor;
+            Color borderColor = AppTheme.lightBorder;
+
+            if (isSelected || isOccupied) {
+              background = AppTheme.accentColor;
+              textColor = Colors.white;
+              borderColor = AppTheme.accentColor;
+            } else if (isAvailable) {
+              background = AppTheme.lightSurface;
+              textColor = AppTheme.lightTextHeading;
+            } else {
+              background = AppTheme.lightBorder;
+              textColor = AppTheme.lightTextLight;
+            }
 
             return InkWell(
               borderRadius: BorderRadius.circular(12),
+              // Greying a block is only a preview of the span — tapping a free
+              // one still moves the start time there.
               onTap: isAvailable
                   ? () => setState(() => _selectedTime = slot['time'])
                   : () => _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}'),
@@ -480,14 +528,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 width: (MediaQuery.of(context).size.width - 64) / 3,
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accentColor
-                      : isAvailable
-                          ? AppTheme.lightSurface
-                          : AppTheme.lightBorder,
-                  border: Border.all(
-                    color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
-                  ),
+                  color: background,
+                  border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -496,12 +538,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : isAvailable
-                              ? AppTheme.lightTextHeading
-                              : AppTheme.lightTextLight,
-                      decoration: isAvailable ? TextDecoration.none : TextDecoration.lineThrough,
+                      color: textColor,
+                      decoration: isAvailable || isOccupied
+                          ? TextDecoration.none
+                          : TextDecoration.lineThrough,
                     ),
                   ),
                 ),
@@ -511,7 +551,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         SizedBox(height: 12),
         Text(
-          'Greyed out slots are outside working hours or already booked. Tap one to see why.',
+          _selectedTime != null && _totalDuration > _kSlotMinutes
+              ? 'All the purple blocks together are your $_totalDuration minute appointment, starting at $_selectedTime.'
+              : 'Greyed out slots are outside working hours or already booked. Tap one to see why.',
           style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
         ),
       ],

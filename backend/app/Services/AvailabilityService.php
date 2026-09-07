@@ -157,9 +157,11 @@ class AvailabilityService
             return $this->closed('The salon has not published hours for this day.');
         }
 
+        // A re-opened closure no longer blocks the day.
         $isClosureDay = DB::table('salon_closures')
             ->where('salon_id', $salonId)
             ->whereDate('closed_date', $date)
+            ->whereNull('reopened_at')
             ->exists();
 
         if ($isClosureDay) {
@@ -290,9 +292,13 @@ class AvailabilityService
             }
         }
 
+        // Only statuses that actually hold the chair block a slot. A booking
+        // released by an emergency closure has given its time back, so the
+        // freed-up slot must be offered to everyone — including the customer
+        // who is rebooking it.
         $appointments = Appointment::where('appointed_provider_id', $providerId)
             ->whereDate('appointment_date', $date)
-            ->where('status', '!=', 'cancelled')
+            ->whereIn('status', BookingPolicyService::BLOCKING_STATUSES)
             ->when($ignoreAppointmentId, fn ($q) => $q->where('id', '!=', $ignoreAppointmentId))
             ->get(['start_time', 'end_time']);
 

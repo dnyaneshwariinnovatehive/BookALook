@@ -285,6 +285,7 @@ class SalonController extends Controller
         $closedToday = DB::table('salon_closures')
             ->where('salon_id', $salon->id)
             ->whereDate('closed_date', $today->format('Y-m-d'))
+            ->whereNull('reopened_at')
             ->first();
 
         if ($closedToday) {
@@ -329,6 +330,7 @@ class SalonController extends Controller
     {
         return DB::table('salon_closures')
             ->where('salon_id', $salonId)
+            ->whereNull('reopened_at')
             ->whereDate('closed_date', '>=', now()->format('Y-m-d'))
             ->whereDate('closed_date', '<=', now()->addDays(30)->format('Y-m-d'))
             ->orderBy('closed_date')

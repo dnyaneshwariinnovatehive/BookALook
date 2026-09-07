@@ -1,5 +1,7 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../../../services/api_config.dart';
 import '../../../../models/staff_models.dart';
 import '../../../../models/service_models.dart';
 import '../../../../services/staff_api.dart';
@@ -36,7 +38,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   // Working Hours
   bool _useSalonWorkingHours = true;
   List<SalonWorkingHour> _salonWorkingHours = [];
-  final List<StaffWorkingHour> _workingHours = List.generate(7, (index) => StaffWorkingHour(
+  List<StaffWorkingHour> _workingHours = List.generate(7, (index) => StaffWorkingHour(
     dayOfWeek: index,
     isWeeklyOff: index == 0, // Sunday off by default
     shiftStart: index == 0 ? null : '09:00:00',
@@ -59,9 +61,13 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       if (svcs != null) {
         _selectedServiceIds.addAll(svcs.map((s) => s['id'].toString()));
       }
-      
-      // We don't have working hours fetched in the list view, so it will fall back to default or use salon hours
-      // In a real app we'd fetch the provider's specific hours here if we want to edit them.
+
+      // Show the shift that is actually stored, not the blank-form defaults —
+      // otherwise saving any other field silently overwrites it.
+      final stored = widget.existingStaff!.workingHours;
+      if (stored.length == 7) {
+        _workingHours = stored.map((h) => h.copy()).toList();
+      }
     }
     _fetchInitialData();
   }
@@ -73,6 +79,12 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       setState(() {
         _salonServicesGrouped = services;
         _salonWorkingHours = hours;
+        // Only keep the "same as salon" shortcut checked while the provider's
+        // shift really does match the salon's; a custom shift must stay visible
+        // and editable.
+        if (widget.existingStaff != null) {
+          _useSalonWorkingHours = _matchesSalonHours();
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -83,19 +95,55 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     }
   }
 
+  /// Whether the loaded provider shift is identical to the salon's opening
+  /// hours for every day of the week.
+  bool _matchesSalonHours() {
+    if (_salonWorkingHours.length != 7 || _workingHours.length != 7) return false;
+
+    for (final salonHour in _salonWorkingHours) {
+      final providerHour = _workingHours.firstWhere(
+        (h) => h.dayOfWeek == salonHour.dayOfWeek,
+        orElse: () => StaffWorkingHour(dayOfWeek: salonHour.dayOfWeek, isWeeklyOff: true),
+      );
+      // A break is something the salon hours cannot express, so it counts as a
+      // custom shift.
+      if (providerHour.breakStart != null || providerHour.breakEnd != null) return false;
+      if (!providerHour.sameShiftAs(_salonHourAsStaffHour(salonHour))) return false;
+    }
+
+    return true;
+  }
+
+  StaffWorkingHour _salonHourAsStaffHour(SalonWorkingHour hour) => StaffWorkingHour(
+        dayOfWeek: hour.dayOfWeek,
+        isWeeklyOff: hour.isClosed,
+        shiftStart: hour.isClosed ? null : StaffWorkingHour.normaliseTime(hour.openTime),
+        shiftEnd: hour.isClosed ? null : StaffWorkingHour.normaliseTime(hour.closeTime),
+      );
+
   Future<void> _saveStaff() async {
     if (!_formKey.currentState!.validate()) return;
     
     setState(() => _isSaving = true);
     try {
-      final workingHoursToSave = _useSalonWorkingHours 
-            ? _salonWorkingHours.map((h) => StaffWorkingHour(
-                dayOfWeek: h.dayOfWeek,
-                isWeeklyOff: h.isClosed,
-                shiftStart: h.openTime,
-                shiftEnd: h.closeTime,
-              )).toList()
-            : _workingHours;
+      final workingHoursToSave = _useSalonWorkingHours
+          ? _salonWorkingHours.map(_salonHourAsStaffHour).toList()
+          : _workingHours;
+
+      // The API needs one entry per weekday with a start and end on every
+      // working day; say so plainly rather than surfacing a raw 422.
+      final invalid = workingHoursToSave.length != 7 ||
+          workingHoursToSave.any((h) =>
+              !h.isWeeklyOff && (h.shiftStart == null || h.shiftEnd == null));
+      if (invalid) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Set a shift start and end for every working day before saving.',
+          ),
+        ));
+        return;
+      }
 
       if (widget.existingStaff != null) {
         await StaffApi.updateStaff(
@@ -128,10 +176,51 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isSaving = false);
+        // A save that never reached the server must not be dismissible by
+        // looking away — a snackbar here is how "I saved it but nothing
+        // changed" happens.
+        await _showSaveFailed(e);
       }
     }
+  }
+
+  /// Blocking report of a failed save, naming the host that was written to so
+  /// a misconfigured API address is obvious rather than silent.
+  Future<void> _showSaveFailed(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '');
+    final isNetwork = error is http.ClientException ||
+        message.contains('SocketException') ||
+        message.contains('Connection refused') ||
+        message.contains('Failed host lookup');
+
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Not saved'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isNetwork
+                    ? 'The app could not reach the server, so nothing was changed.'
+                    : 'The server rejected the change, so nothing was changed.',
+              ),
+              const SizedBox(height: 12),
+              Text('Server: ${ApiConfig.baseUrl}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(message, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
   }
 
   Future<void> _selectTime(StaffWorkingHour hour, bool isStart) async {

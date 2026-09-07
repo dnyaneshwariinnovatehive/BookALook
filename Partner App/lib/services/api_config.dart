@@ -1,20 +1,32 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io' show Platform;
 
+/// The single source of truth for the API host.
+///
+/// Every service must go through [baseUrl]. Reading `API_BASE_URL` from dotenv
+/// directly is what let the appointments service drift onto a different host
+/// from the rest of the app, so writes and reads could land on different
+/// backends.
 class ApiConfig {
-  // Replace this with your computer's actual local IPv4 address for physical device testing
+  // Used for physical device testing when .env does not set API_BASE_URL.
   static const String _physicalDeviceIp = '192.168.41.204';
-  
+
   static String get baseUrl {
+    // An explicit .env value always wins, so a build can be pointed at
+    // staging or a different machine without touching code.
+    final configured = dotenv.env['API_BASE_URL'];
+    if (configured != null && configured.trim().isNotEmpty) {
+      return configured.trim();
+    }
+
     if (kIsWeb) {
       // Chrome/Web testing
       return 'http://localhost:8000/api';
     } else if (Platform.isAndroid) {
-      // Android Emulator uses 10.0.2.2 to point to host's localhost
-      // If you are using a physical device via USB, it needs the network IP
-      // We assume physical device if it's not the emulator IP, but for safety:
-      return 'http://$_physicalDeviceIp:8000/api'; 
-      // Change to 'http://10.0.2.2:8000/api' if testing on Android Emulator
+      // Android Emulator uses 10.0.2.2 to point to host's localhost.
+      // A physical device needs the machine's network IP instead.
+      return 'http://$_physicalDeviceIp:8000/api';
     } else if (Platform.isIOS) {
       // iOS Simulator
       return 'http://localhost:8000/api';

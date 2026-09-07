@@ -226,6 +226,12 @@
   color: #374151;
 }
 
+/* Released by an emergency closure, waiting on the customer to rebook. */
+.badgeAwaitingReschedule {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
 .emptyState {
   padding: 48px;
   text-align: center;
@@ -439,4 +445,76 @@
   background: #374151;
   color: #E5E7EB;
   border-color: #4B5563;
+}
+
+/* ------------------------------------------------ full appointment details */
+
+.detailsModal {
+  max-width: 860px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.detailsModal .modalBody {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.detailsSectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6B7280;
+  margin: 24px 0 10px;
+}
+
+.detailsSectionTitle:first-child {
+  margin-top: 0;
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) 1fr;
+  gap: 8px 20px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.detailsGrid dt {
+  color: #6B7280;
+}
+
+.detailsGrid dd {
+  margin: 0;
+  color: #111827;
+  word-break: break-word;
+}
+
+.detailsMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.detailsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.detailsTable th {
+  text-align: left;
+  padding: 8px 10px;
+  color: #6B7280;
+  font-weight: 600;
+  border-bottom: 1px solid #E5E7EB;
+  white-space: nowrap;
+}
+
+.detailsTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #F3F4F6;
+  color: #111827;
+  vertical-align: top;
 }

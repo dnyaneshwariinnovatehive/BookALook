@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'api_config.dart';
 
 class PartnerAppointmentService {
-  final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+  // Must match the rest of the app — see ApiConfig.
+  String get baseUrl => ApiConfig.baseUrl;
 
   Future<List<dynamic>> getAppointments(String salonId, {String? date}) async {
     final prefs = await SharedPreferences.getInstance();

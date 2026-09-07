@@ -35,4 +35,30 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Business
+    |--------------------------------------------------------------------------
+    |
+    | No provider is connected yet. The `log` driver records what would be sent
+    | and leaves the row queued in whatsapp_messages; swap `driver` once a
+    | WhatsApp Business account exists and bind the implementation in
+    | AppServiceProvider.
+    |
+    */
+    'whatsapp' => [
+        'driver' => env('WHATSAPP_DRIVER', 'log'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '91'),
+        'templates' => [
+            'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),
+        ],
+    ],
+
+    'customer_app' => [
+        // Used to build the free-reschedule link sent to customers.
+        'deeplink_base' => env('CUSTOMER_APP_DEEPLINK_BASE', 'bookalook://customer'),
+    ],
+
 ];
