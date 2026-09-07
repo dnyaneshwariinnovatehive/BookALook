@@ -6,6 +6,10 @@ class StaffMember {
   final double baseSalary;
   final double commissionPercentage;
   final bool isActive;
+
+  /// Whether this person's leave is granted without the admin looking at it.
+  final bool autoApproveLeave;
+
   final Map<String, dynamic>? user;
   final List<dynamic>? services;
 
@@ -21,6 +25,7 @@ class StaffMember {
     required this.baseSalary,
     required this.commissionPercentage,
     required this.isActive,
+    this.autoApproveLeave = false,
     this.user,
     this.services,
     this.workingHours = const [],
@@ -41,6 +46,7 @@ class StaffMember {
       baseSalary: double.tryParse(json['base_salary'].toString()) ?? 0.0,
       commissionPercentage: double.tryParse(json['commission_percentage'].toString()) ?? 0.0,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
+      autoApproveLeave: json['auto_approve_leave'] == 1 || json['auto_approve_leave'] == true,
       user: json['user'],
       services: json['services'],
       workingHours: hours,

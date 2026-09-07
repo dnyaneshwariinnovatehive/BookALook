@@ -13,6 +13,7 @@ Route::prefix('customer')->group(function () {
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
     Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
+    Route::get('/salons', [\App\Http\Controllers\Api\Customer\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\Customer\SalonController::class, 'show']);
 
     // Protected customer routes
@@ -40,6 +41,12 @@ Route::prefix('customer')->group(function () {
         Route::get('/appointments/{id}/reschedule-options', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'rescheduleOptions']);
         Route::post('/appointments/{id}/reschedule', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{id}/generate-qr', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'generateQr']);
+
+        // Booking payment (Razorpay). Appointment advances only — salon
+        // subscriptions are paid by transfer and verified from a screenshot.
+        Route::post('/appointments/{id}/payment/confirm', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'confirmPayment']);
+        Route::post('/appointments/{id}/payment/demo-pay', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'demoPay']);
+        Route::post('/appointments/{id}/payment/abandon', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'abandonPayment']);
 
         // In-app notification inbox
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
@@ -94,6 +101,13 @@ Route::prefix('superadmin')->group(function () {
         
         Route::apiResource('wallet-schemes', \App\Http\Controllers\Api\SuperAdmin\WalletSchemeController::class);
 
+        // Weekly payout & distribution
+        Route::get('/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'index']);
+        Route::post('/payouts/generate', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'generate']);
+        Route::get('/payouts/{id}', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'show']);
+        Route::post('/payouts/{id}/approve', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'approve']);
+        Route::post('/payouts/{id}/distribute', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'distribute']);
+
 
         // Catalog Management
         Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
@@ -121,6 +135,29 @@ Route::prefix('partner')->group(function () {
     Route::post('/register', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'register']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        // Always reachable, even when the plan has lapsed — otherwise a salon
+        // that cannot reach the renew button could never get out of the lock.
+        Route::get('/salons/{salon_id}/access', [\App\Http\Controllers\Api\Partner\SalonAccessController::class, 'show']);
+        Route::get('/notifications', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'index']);
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markRead']);
+
+        // Renewal and the wallet that pays for it.
+        Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
+        Route::get('/salons/{salon_id}/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
+        Route::post('/salons/{salon_id}/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
+        Route::post('/salons/{salon_id}/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
+        Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
+        Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
+        Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
+        Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
+
+        // Collaborators work across salons, not inside one.
+        Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
+    });
+
+    // Everything a salon actually operates with. Closed while the plan is lapsed.
+    Route::middleware(['auth:sanctum', 'salon.active'])->group(function () {
         // Service Management
         Route::get('/salons/{salon_id}/master-catalog', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getMasterCatalog']);
         Route::get('/salons/{salon_id}/services', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getSalonServices']);
@@ -157,21 +194,31 @@ Route::prefix('partner')->group(function () {
         // Staff Leaves
         Route::get('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'getLeaves']);
         Route::put('/salons/{salon_id}/leaves/{leave_id}/status', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'updateLeaveStatus']);
+        Route::post('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'requestLeave']);
+        Route::get('/salons/{salon_id}/my-leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'myLeaves']);
 
-        // Wallet & Subscriptions
-        Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
-        Route::get('/salons/{salon_id}/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
-        Route::post('/salons/{salon_id}/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
-        Route::post('/salons/{salon_id}/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
-        Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
-        Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
-        Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
-        
+        // Payroll
+        Route::get('/me/payroll', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'mine']);
+        Route::get('/salons/{salon_id}/payroll', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'index']);
+        Route::post('/salons/{salon_id}/payroll/recalculate', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'recalculate']);
+        Route::get('/salons/{salon_id}/payroll/staff/{provider_id}', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'show']);
+        Route::post('/salons/{salon_id}/payroll/{payslip_id}/mark-paid', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'markPaid']);
+        Route::post('/salons/{salon_id}/payroll/{payslip_id}/mark-unpaid', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'markUnpaid']);
+
+        // The salon's own copy of the weekly settlement
+        Route::get('/salons/{salon_id}/payouts', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'salonPayouts']);
+
+
         // Appointments
         Route::get('/salons/{salon_id}/appointments', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'index']);
-        Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'walkIn']);
+        // Walk-ins. Staff serve themselves; an admin picks who is serving.
+        Route::get('/salons/{salon_id}/walk-in/options', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'options']);
+        Route::post('/salons/{salon_id}/walk-in/preview', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'preview']);
+        Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'store']);
         Route::post('/salons/{salon_id}/appointments/verify-qr', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'verifyQrAndStartSession']);
-        Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'addServiceMidAppointment']);
+        // Dynamic bill adjustment while an appointment is in progress
+        Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'addService']);
+        Route::delete('/salons/{salon_id}/appointments/{id}/additions/{addition_id}', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'removeService']);
 
         // Check-in, billing and payment collection
         Route::get('/salons/{salon_id}/check-in/pending', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'pending']);
@@ -182,7 +229,5 @@ Route::prefix('partner')->group(function () {
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
         
-        // Collaborator APIs
-        Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
     });
 });

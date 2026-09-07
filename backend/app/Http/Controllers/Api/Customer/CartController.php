@@ -8,13 +8,16 @@ use App\Models\CartItem;
 use App\Models\Service;
 use App\Models\Combo;
 use App\Services\AvailabilityService;
+use App\Services\CartPricingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class CartController extends Controller
 {
-    public function __construct(private AvailabilityService $availability)
-    {
+    public function __construct(
+        private AvailabilityService $availability,
+        private CartPricingService $pricing,
+    ) {
     }
 
     /**
@@ -60,15 +63,37 @@ class CartController extends Controller
      */
     private function withSummary(Cart $cart): array
     {
-        $requirements = $this->availability->summariseCart($cart);
+        $priced = $this->pricing->price($cart);
 
         $payload = $cart->toArray();
+
         $payload['summary'] = [
-            'item_count' => (int) $cart->items->sum(fn ($item) => max(1, (int) $item->quantity)),
-            'total_amount' => $requirements['total'],
-            'advance_amount' => $requirements['advance'],
-            'total_duration_minutes' => $requirements['duration'],
+            'item_count' => $priced['item_count'],
+            'total_amount' => $priced['total'],
+            // What the same services would cost bought separately, so a
+            // discount can be shown as a saving rather than just a lower number.
+            'list_total' => $priced['list_total'],
+            'saving' => $priced['saving'],
+            'advance_amount' => $priced['advance'],
+            'total_duration_minutes' => $priced['duration'],
         ];
+
+        // Packages the cart already qualifies for, applied automatically.
+        $payload['applied_combos'] = array_map(fn ($combo) => [
+            'combo_id' => $combo['combo_id'],
+            'name' => $combo['name'],
+            'applications' => $combo['applications'],
+            'combo_total' => $combo['combo_total'],
+            'list_total' => $combo['list_total'],
+            'saving' => $combo['saving'],
+            'service_names' => array_column($combo['services'], 'name'),
+        ], $priced['applied_combos']);
+
+        // Packages they are one or two services away from.
+        $payload['combo_offers'] = $this->pricing->comboOffers($cart);
+
+        // What this salon's customers usually add alongside.
+        $payload['suggestions'] = $this->pricing->suggestions($cart);
 
         return $payload;
     }
@@ -133,7 +158,15 @@ class CartController extends Controller
             ]);
         }
 
-        return response()->json(['message' => 'Item added to cart', 'cart' => $cart->load('items')]);
+        // The enriched cart comes straight back so the app can show what this
+        // unlocked — a completed package, or what to add next — at the moment
+        // the customer is still deciding.
+        $cart->load(['items.service.template', 'items.combo.services.template']);
+
+        return response()->json([
+            'message' => 'Item added to cart',
+            'cart' => $this->withSummary($cart),
+        ]);
     }
 
     /**

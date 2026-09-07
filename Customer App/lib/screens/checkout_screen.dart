@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 
@@ -41,11 +42,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int _totalDuration = 0;
 
   bool _isBooking = false;
+  String? _pendingPaymentAppointmentId;
+  late Razorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadProviders();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    if (_pendingPaymentAppointmentId == null) return;
+    
+    setState(() => _isBooking = true);
+    try {
+      await _appointmentService.confirmPayment(
+        _pendingPaymentAppointmentId!,
+        response.paymentId ?? '',
+        response.signature ?? ''
+      );
+      _showSuccessDialog();
+    } catch (e) {
+      _showMessage('Payment confirmation failed: ${e.toString()}');
+    } finally {
+      setState(() => _isBooking = false);
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    _showMessage('Payment failed: ${response.message}');
+    if (_pendingPaymentAppointmentId != null) {
+      _appointmentService.abandonPayment(_pendingPaymentAppointmentId!);
+      _pendingPaymentAppointmentId = null;
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    _showMessage('External Wallet Selected: ${response.walletName}');
   }
 
   /// The id sent to the API: null for "Any Available".
@@ -172,7 +215,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      await _appointmentService.bookAppointment(
+      final response = await _appointmentService.bookAppointment(
         widget.salonId,
         dateStr,
         _selectedTime!,
@@ -181,41 +224,100 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       setState(() => _isBooking = false);
 
-      if (!mounted) return;
+      final isPaymentRequired = response['payment_required'] == true;
+      
+      if (!isPaymentRequired) {
+        _showSuccessDialog();
+        return;
+      }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: AppTheme.lightSuccess, size: 80),
-              SizedBox(height: 16),
-              Text('Booking Confirmed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
-              SizedBox(height: 24),
-              ElevatedButton(
+      final payment = response['payment'];
+      final appointmentId = payment['appointment_id'];
+      _pendingPaymentAppointmentId = appointmentId;
+
+      if (payment['is_demo'] == true) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: Text('Demo Payment'),
+            content: Text('Simulate a successful payment for ₹${payment['amount']}?'),
+            actions: [
+              TextButton(
                 onPressed: () {
-                  Navigator.pop(dialogContext); // Close dialog
-                  // `true` tells the cart screen the cart was consumed.
-                  Navigator.pop(context, true);
+                  Navigator.pop(dialogContext);
+                  _appointmentService.abandonPayment(appointmentId);
+                  _pendingPaymentAppointmentId = null;
                 },
-                style: AppTheme.lightTheme.elevatedButtonTheme.style,
-                child: Center(child: Text('View My Bookings')),
-              )
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  setState(() => _isBooking = true);
+                  try {
+                    await _appointmentService.demoPay(appointmentId);
+                    _showSuccessDialog();
+                  } catch (e) {
+                    _showMessage(e.toString().replaceFirst('Exception: ', ''));
+                  } finally {
+                    setState(() => _isBooking = false);
+                  }
+                },
+                child: Text('Pay (Demo)'),
+              ),
             ],
           ),
-        ),
-      );
+        );
+      } else {
+        var options = {
+          'key': payment['key'],
+          'amount': payment['amount_in_paise'],
+          'name': payment['name'],
+          'description': 'Appointment Booking',
+          'order_id': payment['order_id'],
+        };
+        _razorpay.open(options);
+      }
     } catch (e) {
       setState(() => _isBooking = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
       // The slot may have been taken while the customer was deciding.
       _fetchSlots();
     }
+  }
+
+  void _showSuccessDialog() {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, color: AppTheme.lightSuccess, size: 80),
+            SizedBox(height: 16),
+            Text('Booking Confirmed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext); // Close dialog
+                // `true` tells the cart screen the cart was consumed.
+                Navigator.pop(context, true);
+              },
+              style: AppTheme.lightTheme.elevatedButtonTheme.style,
+              child: Center(child: Text('View My Bookings')),
+            )
+          ],
+        ),
+      ),
+    );
   }
 
   void _showMessage(String text) {

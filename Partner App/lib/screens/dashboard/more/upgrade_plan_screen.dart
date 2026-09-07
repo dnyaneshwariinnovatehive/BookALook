@@ -2,7 +2,6 @@ import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:partner_app/services/api_config.dart';
@@ -22,7 +21,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   double _walletBalance = 0;
   bool _applyCoins = true;
   String? _selectedPlanId;
-  File? _screenshot;
+  XFile? _screenshot;
   final String _baseUrl = ApiConfig.baseUrl;
 
   @override
@@ -74,7 +73,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
-        _screenshot = File(pickedFile.path);
+        _screenshot = pickedFile;
       });
     }
   }
@@ -98,7 +97,14 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       request.fields['plan_id'] = _selectedPlanId!;
       request.fields['billing_type'] = 'flat';
 
-      request.files.add(await http.MultipartFile.fromPath('screenshot', _screenshot!.path));
+      if (_screenshot != null) {
+        final bytes = await _screenshot!.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes(
+          'screenshot', 
+          bytes,
+          filename: _screenshot!.name
+        ));
+      }
 
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);

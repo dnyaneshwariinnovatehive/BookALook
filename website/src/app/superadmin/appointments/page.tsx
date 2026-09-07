@@ -675,7 +675,8 @@ export default function GlobalAppointmentsDashboard() {
                     </dl>
 
                     <h3 className={styles.detailsSectionTitle}>
-                      Services ({lines.length + additions.length})
+                      Services ({lines.length} booked
+                      {additions.length > 0 ? ` + ${additions.length} added mid-appointment` : ''})
                     </h3>
                     <table className={styles.detailsTable}>
                       <thead>
@@ -721,9 +722,17 @@ export default function GlobalAppointmentsDashboard() {
                             <td>{add.duration_minutes_at_addition ? `${add.duration_minutes_at_addition} min` : '—'}</td>
                             <td>{money(add.price_at_addition)}</td>
                             <td>
-                              {add.status || '—'}
+                              {/* Reads as a line status so a settled extra
+                                  matches the booked lines beside it. */}
+                              {add.status === 'voided' ? 'removed' : (add.status || '—')}
                               {add.added_by?.name && (
-                                <small style={{ color: '#6B7280' }}> by {add.added_by.name}</small>
+                                <>
+                                  <br/>
+                                  <small style={{ color: '#6B7280' }}>
+                                    by {add.added_by.name}
+                                    {add.added_at ? ` · ${dateTime(add.added_at)}` : ''}
+                                  </small>
+                                </>
                               )}
                             </td>
                           </tr>

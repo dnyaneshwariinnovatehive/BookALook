@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->alias([
+            // Closes a salon's features when its plan has lapsed.
+            'salon.active' => \App\Http\Middleware\EnsureSalonSubscriptionActive::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -24,7 +24,11 @@ class AppointmentController extends Controller
                 'services.service.template',
                 'serviceAdditions.service.template',
             ])
-            ->where('salon_id', $salon_id);
+            ->where('salon_id', $salon_id)
+            // Slots held while a customer is mid-payment block the time but are
+            // not bookings yet — the salon should not see a customer who may
+            // never pay.
+            ->where('status', '!=', 'pending_payment');
 
         if ($user->role === 'service_provider') {
             $provider = \App\Models\ServiceProvider::where('user_id', $user->id)->first();
@@ -56,71 +60,6 @@ class AppointmentController extends Controller
         return response()->json(['appointments' => $appointments]);
     }
 
-    public function walkIn(Request $request, $salon_id)
-    {
-        $request->validate([
-            'customer_name' => 'required|string',
-            'customer_phone' => 'nullable|string',
-            'gender' => 'nullable|in:Male,Female,Other',
-            'start_time' => 'nullable|date_format:Y-m-d H:i:s',
-            'services' => 'required|array',
-            'services.*' => 'exists:services,id'
-        ]);
-
-        $provider = \App\Models\ServiceProvider::where('user_id', $request->user()->id)->first();
-        if (!$provider) return response()->json(['message' => 'Not a service provider'], 403);
-
-        $services = \App\Models\Service::whereIn('id', $request->services)->get();
-        $totalAmount = $services->sum('price');
-        $totalDuration = $services->sum('duration_minutes');
-        
-        $startTime = $request->start_time ? \Carbon\Carbon::parse($request->start_time) : now();
-        $endTime = (clone $startTime)->addMinutes($totalDuration);
-        $status = $request->start_time ? 'scheduled' : 'in_progress';
-        $startedAt = $request->start_time ? null : now();
-
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        try {
-            $appointment = new Appointment([
-                'salon_id' => $salon_id,
-                'appointed_provider_id' => $provider->id,
-                'serving_provider_id' => $request->start_time ? null : $provider->id, // If it's for later, serving provider is decided when they scan/start
-                'booking_source' => 'walk_in',
-                'walk_in_customer_name' => $request->customer_name,
-                'walk_in_customer_phone' => $request->customer_phone,
-                'walk_in_customer_gender' => $request->gender,
-                'appointment_date' => $startTime->format('Y-m-d'),
-                'start_time' => $startTime->format('H:i:s'),
-                'end_time' => $endTime->format('H:i:s'),
-                'status' => $status,
-                'payment_option' => 'full_at_venue',
-                'total_amount' => $totalAmount,
-                'advance_amount' => 0,
-                'balance_amount' => $totalAmount,
-                'started_at' => $startedAt,
-            ]);
-            $appointment->save();
-
-            foreach ($services as $service) {
-                \App\Models\AppointmentService::create([
-                    'appointment_id' => $appointment->id,
-                    'service_id' => $service->id,
-                    'serving_provider_id' => $startedAt ? $provider->id : null,
-                    'price_at_booking' => $service->price,
-                    'original_service_price' => $service->price,
-                    'duration_minutes_at_booking' => $service->duration_minutes,
-                    'line_status' => $status
-                ]);
-            }
-
-            \Illuminate\Support\Facades\DB::commit();
-            return response()->json(['message' => 'Walk-in created', 'appointment' => $appointment]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
     public function verifyQrAndStartSession(Request $request, $salon_id)
     {
         $request->validate(['qr_token' => 'required|string']);
@@ -149,49 +88,6 @@ class AppointmentController extends Controller
         $appointment->save();
 
         return response()->json(['message' => 'Session started', 'appointment' => $appointment]);
-    }
-
-    public function addServiceMidAppointment(Request $request, $salon_id, $id)
-    {
-        $request->validate([
-            'service_id' => 'required|exists:services,id',
-            'provider_id' => 'required|exists:service_providers,id', // Can assign to a different provider
-        ]);
-
-        $appointment = Appointment::where('salon_id', $salon_id)->findOrFail($id);
-        if ($appointment->status !== 'in_progress') {
-            return response()->json(['message' => 'Can only add services to in-progress appointments.'], 400);
-        }
-
-        $service = \App\Models\Service::with('template')->findOrFail($request->service_id);
-
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        try {
-            \App\Models\AppointmentServiceAddition::create([
-                'appointment_id' => $appointment->id,
-                'service_id' => $service->id,
-                'provider_id' => $request->provider_id,
-                'added_by' => $request->user()->id,
-                'price_at_addition' => $service->price,
-                // Duration lives on the template, not the salon's service row.
-                'duration_minutes_at_addition' => $service->template->estimated_duration_minutes
-                    ?? \App\Services\AvailabilityService::SLOT_MINUTES,
-                'status' => 'active'
-            ]);
-
-            $baseAmount = $appointment->services()->sum('price_at_booking');
-            $additionsAmount = $appointment->serviceAdditions()->where('status', 'active')->sum('price_at_addition');
-            
-            $appointment->total_amount = $baseAmount + $additionsAmount;
-            $appointment->balance_amount = $appointment->total_amount - $appointment->advance_amount;
-            $appointment->save();
-
-            \Illuminate\Support\Facades\DB::commit();
-            return response()->json(['message' => 'Service added', 'appointment' => $appointment->load('serviceAdditions.service')]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
     }
 
     public function markNoShow(Request $request, $id)

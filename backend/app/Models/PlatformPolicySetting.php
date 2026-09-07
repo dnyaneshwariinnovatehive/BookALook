@@ -29,6 +29,11 @@ class PlatformPolicySetting extends Model
         'qr_validity_minutes' => 60,
         'same_day_change_abuse_threshold' => 2,
         'subscription_expiry_warning_days' => 3,
+        // What one reward coin is worth in rupees.
+        'coin_value_inr' => 1.0,
+        // Local hour (0-23) for the daily renewal reminder. Mid-morning: the
+        // owner is at the salon and not yet in the day's rush.
+        'subscription_reminder_hour' => 11,
     ];
 
     /**

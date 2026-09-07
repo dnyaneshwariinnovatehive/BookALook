@@ -2,7 +2,9 @@ import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../theme/app_theme.dart';
+import 'package:intl/intl.dart';
 import '../../phone_screen.dart';
+import '../more/my_salary_screen.dart';
 
 class ProviderProfileTab extends StatelessWidget {
   final Map<String, dynamic> salon;
@@ -206,7 +208,30 @@ class ProviderProfileTab extends StatelessWidget {
                     );
                   }),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
+
+                // A staff member should be able to check their own pay without
+                // having to ask the admin for it.
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MySalaryScreen(salonId: salon['id'].toString()),
+                      ),
+                    ),
+                    icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                    label: const Text('My salary & commission'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.accentColor,
+                      side: BorderSide(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // Logout
                 SizedBox(

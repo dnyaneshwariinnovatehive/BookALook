@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
 import '../qr_scanner_screen.dart';
+import '../subscription_locked_screen.dart';
+import '../../services/salon_access_api.dart';
 import 'tabs/provider_profile_tab.dart';
 import 'tabs/provider_home_tab.dart';
 import 'tabs/provider_walk_in_tab.dart';
@@ -32,6 +34,37 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   /// that tab and the bottom navigation bar remains visible.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(4, (_) => GlobalKey<NavigatorState>());
+
+  /// The salon's plan gates the whole shell, so it is checked before the tabs
+  /// are drawn rather than letting each screen fail on its own.
+  SalonAccess? _access;
+  bool _checkingAccess = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAccess();
+  }
+
+  Future<void> _checkAccess() async {
+    setState(() => _checkingAccess = true);
+
+    try {
+      final access = await SalonAccessApi.check(widget.salon['id'].toString());
+      if (!mounted) return;
+      setState(() {
+        _access = access;
+        _checkingAccess = false;
+      });
+    } catch (_) {
+      // A failed check must not lock staff out of a salon that has paid.
+      if (!mounted) return;
+      setState(() {
+        _access = null;
+        _checkingAccess = false;
+      });
+    }
+  }
 
   void _onItemTapped(int index) {
     if (index == _currentIndex) {
@@ -71,6 +104,17 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAccess) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_access != null && _access!.isLocked) {
+      return LockedSalonScope(
+        salonId: widget.salon['id'].toString(),
+        child: SubscriptionLockedScreen(access: _access!, onRecheck: _checkAccess),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _handleBack,

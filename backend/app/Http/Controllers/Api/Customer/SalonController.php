@@ -344,6 +344,56 @@ class SalonController extends Controller
     }
 
     /**
+     * The salon directory the customer app browses.
+     *
+     * Explore used to read the SuperAdmin directory, which knows nothing about
+     * subscriptions — so a salon whose plan had lapsed still looked open for
+     * business. Serviceability is decided here by the same rule the detail page
+     * uses, and unserviceable salons are marked rather than hidden so a
+     * returning customer can still find one they know.
+     */
+    public function index(Request $request)
+    {
+        $access = app(\App\Services\SalonAccessService::class);
+
+        // One sweep, rather than once per salon.
+        $access->expireStale();
+
+        $query = Salon::with(['currentSubscription'])
+            ->where('status', 'active');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")
+                ->orWhere('address', 'like', "%{$search}%"));
+        }
+
+        if ($request->filled('city_id')) {
+            $query->where('city_id', $request->city_id);
+        }
+
+        $salons = $query->orderBy('name')->get();
+
+        $rows = $salons->map(function (Salon $salon) use ($access) {
+            $status = $access->status($salon);
+
+            return [
+                'id' => $salon->id,
+                'name' => $salon->name,
+                'address' => $salon->address,
+                'cover_photo_url' => $salon->cover_photo_url,
+                'is_serviceable' => $status['is_active'],
+                'unavailable_reason' => $status['message'],
+            ];
+        });
+
+        // Salons that can be booked come first; the rest stay findable below.
+        return response()->json([
+            'salons' => $rows->sortByDesc('is_serviceable')->values(),
+        ]);
+    }
+
+    /**
      * Whether the salon can take bookings at all. An expired or missing
      * subscription makes the page a "temporarily unavailable" state rather than
      * hiding the salon outright.

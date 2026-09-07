@@ -95,6 +95,48 @@ class CheckInApi {
     throw Exception(_errorFrom(response));
   }
 
+  /// Put an extra service on a bill that is already running.
+  ///
+  /// [providerId] is who delivered it — it defaults to whoever is serving, but
+  /// a second staff member doing the extra is exactly the case this supports.
+  static Future<CheckInTarget> addExtraService(
+    String salonId,
+    String appointmentId, {
+    required String serviceId,
+    String? providerId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/salons/$salonId/appointments/$appointmentId/add-service'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'service_id': serviceId,
+        if (providerId != null) 'provider_id': providerId,
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return CheckInTarget.fromJson(jsonDecode(response.body));
+    }
+    throw Exception(_errorFrom(response));
+  }
+
+  /// Take an extra back off. Voided server-side, not deleted.
+  static Future<CheckInTarget> removeExtraService(
+    String salonId,
+    String appointmentId,
+    String additionId,
+  ) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/salons/$salonId/appointments/$appointmentId/additions/$additionId'),
+      headers: await _headers(),
+    );
+
+    if (response.statusCode == 200) {
+      return CheckInTarget.fromJson(jsonDecode(response.body));
+    }
+    throw Exception(_errorFrom(response));
+  }
+
   /// Today's bookings still waiting to be checked in or paid for. Backs the
   /// no-scan path when a customer cannot show their code.
   static Future<List<CheckInAppointment>> pending(String salonId, {String? date}) async {
@@ -187,26 +229,38 @@ class CheckInAppointment {
 }
 
 class BillLine {
+  /// The appointment_services row, or the addition row for an extra.
+  final String id;
   final String name;
   final double price;
   final int durationMinutes;
   final String? providerName;
   final bool addedMidAppointment;
 
+  /// Only set on extras: who put it on the bill and when.
+  final String? addedByName;
+  final DateTime? addedAt;
+
   BillLine({
+    required this.id,
     required this.name,
     required this.price,
     required this.durationMinutes,
     this.providerName,
     required this.addedMidAppointment,
+    this.addedByName,
+    this.addedAt,
   });
 
   factory BillLine.fromJson(Map<String, dynamic> json) => BillLine(
+        id: json['id']?.toString() ?? '',
         name: json['name'] ?? 'Service',
         price: CheckInAppointment._num(json['price']),
         durationMinutes: json['duration_minutes'] ?? 0,
         providerName: json['provider_name'],
         addedMidAppointment: json['added_mid_appointment'] == true,
+        addedByName: json['added_by_name'],
+        addedAt: DateTime.tryParse('${json['added_at']}'),
       );
 }
 

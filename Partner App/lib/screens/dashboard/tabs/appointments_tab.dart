@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart'; // Ensure correct path
 import '../../appointment_details_screen.dart'; // Fixed relative path
+import '../../walk_in_screen.dart';
 import '../close_day_sheet.dart';
 
 const String _kAllDates = 'All Dates';
@@ -89,6 +90,15 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
 
   /// Emergency closure. Defaults to whatever day the admin is looking at, so
   /// the button means what it says on screen.
+  /// An admin at the desk adds walk-ins too, and picks who serves them.
+  Future<void> _openWalkIn() async {
+    final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => WalkInScreen(salonId: widget.salonId)),
+    );
+
+    if (added == true) _loadAppointments();
+  }
+
   Future<void> _openCloseDay() async {
     final closed = await CloseDaySheet.show(
       context,
@@ -320,31 +330,63 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               color: const Color(0xFF1F2937),
             ),
           ),
-          InkWell(
-            onTap: _openCloseDay,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: _openWalkIn,
                 borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.event_busy, size: 15, color: Color(0xFFDC2626)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Cancel This Day',
-                    style: GoogleFonts.outfit(
-                      color: const Color(0xFFDC2626),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person_add_alt_1, size: 15, color: Color(0xFF9333EA)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Walk-in',
+                        style: GoogleFonts.outfit(
+                          color: const Color(0xFF9333EA),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _openCloseDay,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.event_busy, size: 15, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Close day',
+                        style: GoogleFonts.outfit(
+                          color: const Color(0xFFDC2626),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

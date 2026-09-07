@@ -264,6 +264,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
   Widget _buildCard(Map<String, dynamic> booking, {required bool isUpcoming}) {
     final date = DateTime.parse(booking['appointment_date']);
     final services = (booking['services'] as List?) ?? [];
+    // Extras the salon added while the customer was in the chair. Shown as
+    // their own group so it is obvious what was booked and what was not.
+    final addedServices = (booking['added_services'] as List?) ?? [];
     final total = _toDouble(booking['total_amount']);
     final advance = _toDouble(booking['advance_paid']);
     final balance = _toDouble(booking['balance_amount']);
@@ -318,10 +321,25 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
           SizedBox(height: 4),
           _iconLine(Icons.person_outline, booking['provider_name'] ?? 'Staff'),
 
-          if (services.isNotEmpty) ...[
+          if (addedServices.isNotEmpty) ...[
             SizedBox(height: 14),
             Divider(color: AppTheme.lightBorder, height: 1),
             SizedBox(height: 12),
+            Text('Booked',
+                style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.6,
+                    color: AppTheme.lightTextLight)),
+            SizedBox(height: 8),
+          ],
+
+          if (services.isNotEmpty) ...[
+            if (addedServices.isEmpty) ...[
+              SizedBox(height: 14),
+              Divider(color: AppTheme.lightBorder, height: 1),
+              SizedBox(height: 12),
+            ],
             ...services.map((service) => Padding(
                   padding: EdgeInsets.only(bottom: 6),
                   child: Row(
@@ -343,9 +361,62 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
                 )),
           ],
 
+          if (addedServices.isNotEmpty) ...[
+            SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 13, color: AppTheme.accentColor),
+                SizedBox(width: 5),
+                Text('ADDED AT THE SALON',
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.6,
+                        color: AppTheme.accentColor)),
+              ],
+            ),
+            SizedBox(height: 8),
+            ...addedServices.map((service) => Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(service['name'] ?? 'Service',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 14, color: AppTheme.lightTextBody)),
+                            if (service['provider_name'] != null)
+                              Text('by ${service['provider_name']}',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11, color: AppTheme.lightTextLight)),
+                          ],
+                        ),
+                      ),
+                      Text('₹${_toDouble(service['price']).toStringAsFixed(0)}',
+                          style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.accentColor)),
+                    ],
+                  ),
+                )),
+          ],
+
           SizedBox(height: 12),
           Divider(color: AppTheme.lightBorder, height: 1),
           SizedBox(height: 12),
+
+          if (addedServices.isNotEmpty) ...[
+            _moneyRow('Booked services', _toDouble(booking['booked_total']),
+                AppTheme.lightTextBody),
+            SizedBox(height: 4),
+            _moneyRow('Added at the salon', _toDouble(booking['added_total']),
+                AppTheme.accentColor),
+            SizedBox(height: 8),
+          ],
 
           _moneyRow('Total', total, AppTheme.lightTextHeading),
           SizedBox(height: 4),

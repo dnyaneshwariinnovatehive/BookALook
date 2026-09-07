@@ -35,35 +35,6 @@ class PartnerAppointmentService {
     }
   }
 
-  Future<Map<String, dynamic>> walkIn(String salonId, String name, String phone, List<String> serviceIds, {String? gender, String? startTime}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-
-    final Map<String, dynamic> body = {
-      'customer_name': name,
-      'customer_phone': phone,
-      'services': serviceIds,
-    };
-    if (gender != null) body['gender'] = gender;
-    if (startTime != null) body['start_time'] = startTime;
-
-    final response = await http.post(
-      Uri.parse('$baseUrl/partner/salons/$salonId/appointments/walk-in'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to create walk-in appointment');
-    }
-  }
-
   Future<Map<String, dynamic>> verifyQrAndStartSession(String salonId, String qrToken) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

@@ -73,15 +73,17 @@ class CartService {
     }
   }
 
-  Future<void> addItem(String salonId, String serviceId, {int quantity = 1}) =>
+  Future<Map<String, dynamic>?> addItem(String salonId, String serviceId, {int quantity = 1}) =>
       _addToCart(salonId, {'service_id': serviceId, 'quantity': quantity});
 
   /// Adds a whole combo package. The backend explodes it into its constituent
   /// services when the appointment is booked.
-  Future<void> addCombo(String salonId, String comboId, {int quantity = 1}) =>
+  Future<Map<String, dynamic>?> addCombo(String salonId, String comboId, {int quantity = 1}) =>
       _addToCart(salonId, {'combo_id': comboId, 'quantity': quantity});
 
-  Future<void> _addToCart(String salonId, Map<String, dynamic> body) async {
+  /// Returns the cart as it stands after the add, so the caller can show what
+  /// the customer just unlocked — a completed package, or what to add next.
+  Future<Map<String, dynamic>?> _addToCart(String salonId, Map<String, dynamic> body) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -105,6 +107,8 @@ class CartService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to add item to cart');
     }
+
+    return jsonDecode(response.body)['cart'] as Map<String, dynamic>?;
   }
 
   Future<void> removeItem(String itemId) async {

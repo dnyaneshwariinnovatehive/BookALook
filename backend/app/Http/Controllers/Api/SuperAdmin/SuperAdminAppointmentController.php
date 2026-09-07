@@ -188,7 +188,7 @@ class SuperAdminAppointmentController extends Controller
             // Recalculate total billed amount
             // existing total_amount + sum of additions
             $baseAmount = $appointment->services()->sum('price_at_booking');
-            $additionsAmount = $appointment->serviceAdditions()->where('status', 'active')->sum('price_at_addition');
+            $additionsAmount = $appointment->serviceAdditions()->live()->sum('price_at_addition');
             
             $appointment->total_amount = $baseAmount + $additionsAmount;
             

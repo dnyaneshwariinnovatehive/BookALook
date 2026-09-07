@@ -40,6 +40,8 @@ class SettingsController extends Controller
             'cancellation_cutoff_minutes' => 'sometimes|integer|min:0',
             'reschedule_cutoff_minutes' => 'sometimes|integer|min:0',
             'appointment_start_early_minutes' => 'sometimes|integer|min:0',
+            'coin_value_inr' => 'sometimes|numeric|min:0',
+            'subscription_reminder_hour' => 'sometimes|integer|min:0|max:23',
         ]);
 
         $user = $request->user();
@@ -49,7 +51,21 @@ class SettingsController extends Controller
             'cancellation_cutoff_minutes' => 'Number of minutes before an appointment when cancellation is blocked',
             'reschedule_cutoff_minutes' => 'Number of minutes before an appointment when rescheduling is blocked',
             'appointment_start_early_minutes' => 'Number of minutes before an appointment start time when a provider can start it',
+            'subscription_reminder_hour' => 'Hour of the day (0-23) when renewal reminders are sent to salon owners',
         ];
+
+        // Not an integer like the rest — a coin can be worth paise.
+        if ($request->has('coin_value_inr')) {
+            PlatformPolicySetting::updateOrCreate(
+                ['setting_key' => 'coin_value_inr'],
+                [
+                    'setting_value' => (string) $request->input('coin_value_inr'),
+                    'data_type' => 'decimal',
+                    'description' => 'What one reward coin is worth, in rupees',
+                    'updated_by' => $user->id,
+                ]
+            );
+        }
 
         foreach ($allowedSettings as $key => $description) {
             if ($request->has($key)) {

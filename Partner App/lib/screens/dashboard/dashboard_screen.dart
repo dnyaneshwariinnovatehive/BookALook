@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
 import '../qr_scanner_screen.dart';
+import '../subscription_locked_screen.dart';
+import '../../services/salon_access_api.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/appointments_tab.dart';
 import 'tabs/staff_tab.dart';
@@ -28,9 +30,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
+
+  /// The salon's plan gates the whole shell, so it is checked before the tabs
+  /// are drawn rather than letting each screen fail on its own.
+  SalonAccess? _access;
+  bool _checkingAccess = true;
+
+  Future<void> _checkAccess() async {
+    setState(() => _checkingAccess = true);
+
+    try {
+      final access = await SalonAccessApi.check(widget.salonData['id'].toString());
+      if (!mounted) return;
+      setState(() {
+        _access = access;
+        _checkingAccess = false;
+      });
+    } catch (_) {
+      // A failed check must not lock a paying salon out of its own app.
+      if (!mounted) return;
+      setState(() {
+        _access = null;
+        _checkingAccess = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _checkAccess();
     _tabs = [
       const HomeTab(),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
@@ -72,6 +101,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAccess) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_access != null && _access!.isLocked) {
+      return LockedSalonScope(
+        salonId: widget.salonData['id'].toString(),
+        child: SubscriptionLockedScreen(access: _access!, onRecheck: _checkAccess),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _handleBack,

@@ -11,7 +11,9 @@ use App\Models\PlatformPolicySetting;
 use App\Models\ServiceProvider;
 use App\Models\Salon;
 use App\Services\AvailabilityService;
+use App\Services\BookingPaymentService;
 use App\Services\BookingPolicyService;
+use App\Services\Payments\PaymentGatewayException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -23,6 +25,7 @@ class AppointmentController extends Controller
     public function __construct(
         private AvailabilityService $availability,
         private BookingPolicyService $policy,
+        private BookingPaymentService $payments,
     ) {
     }
 
@@ -105,7 +108,15 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Book an appointment from the cart, then empty the cart.
+     * Reserve the slot and open a payment for it.
+     *
+     * The booking is created as `pending_payment` and holds the chair while the
+     * customer is on the payment sheet, so nobody else can take the same time
+     * mid-checkout. It only becomes a real appointment once the payment is
+     * verified; an abandoned checkout gives the slot back when the hold expires.
+     *
+     * The cart is deliberately left alone until the payment lands — a customer
+     * whose payment fails should find their basket where they left it.
      */
     public function book(Request $request, $salon_id)
     {
@@ -132,6 +143,11 @@ class AppointmentController extends Controller
         if ($candidates instanceof \Illuminate\Http\JsonResponse) {
             return $candidates;
         }
+
+        // A previous attempt the customer abandoned is still sitting on a slot.
+        // Give it back before taking another one, so tapping Book twice cannot
+        // silently hold two chairs.
+        $this->releaseAbandonedAttempts($user->id, $salon_id);
 
         DB::beginTransaction();
         try {
@@ -170,7 +186,10 @@ class AppointmentController extends Controller
                 'appointment_date' => $request->date,
                 'start_time' => $request->time . ':00',
                 'end_time' => $endTime,
-                'status' => 'scheduled',
+                // Held, not booked. The slot is blocked but the customer owns
+                // nothing until the money is verified.
+                'status' => 'pending_payment',
+                'payment_hold_expires_at' => now()->addMinutes($this->payments->holdMinutes()),
                 'payment_option' => $requirement['full_upfront'] ? 'full_upfront' : 'advance_only',
                 'total_amount' => $requirements['total'],
                 'advance_amount' => $payableNow,
@@ -178,47 +197,244 @@ class AppointmentController extends Controller
             ]);
             $appointment->save();
 
-            // Snapshot every line. Combos are exploded into their constituent
-            // services, keeping combo_id so the origin stays traceable.
-            foreach ($cart->items as $item) {
-                $quantity = max(1, (int) $item->quantity);
+            // Snapshot every line at the price actually charged. A combo the
+            // customer assembled service by service is recorded as that combo,
+            // so the appointment agrees with the cart they were shown and the
+            // salon can see which package was sold.
+            $priced = app(\App\Services\CartPricingService::class)->price($cart);
+            $servicesById = $cart->items->filter(fn ($i) => $i->service)
+                ->mapWithKeys(fn ($i) => [$i->service_id => $i->service]);
 
-                if ($item->service) {
-                    for ($i = 0; $i < $quantity; $i++) {
-                        $this->createAppointmentService($appointment->id, $item->service, (float) $item->service->price);
-                    }
-                    continue;
-                }
+            foreach ($priced['applied_combos'] as $match) {
+                for ($i = 0; $i < $match['applications']; $i++) {
+                    foreach ($match['services'] as $line) {
+                        $service = $servicesById[$line['service_id']] ?? null;
 
-                if ($item->combo) {
-                    for ($i = 0; $i < $quantity; $i++) {
-                        foreach ($item->combo->services as $service) {
+                        if ($service) {
                             $this->createAppointmentService(
                                 $appointment->id,
                                 $service,
-                                (float) ($service->pivot->combo_special_price ?? $service->price),
-                                $item->combo_id
+                                (float) $line['combo_price'],
+                                $match['combo_id']
                             );
                         }
                     }
                 }
             }
 
-            // Empty the cart — the booking has replaced it.
-            $cart->items()->delete();
-            $cart->status = 'converted';
-            $cart->save();
+            foreach ($priced['loose_services'] as $line) {
+                $service = $servicesById[$line['service_id']] ?? null;
+
+                if (! $service) {
+                    continue;
+                }
+
+                for ($i = 0; $i < $line['quantity']; $i++) {
+                    $this->createAppointmentService($appointment->id, $service, (float) $line['price']);
+                }
+            }
+
+            // Packages the customer picked deliberately.
+            foreach ($cart->items as $item) {
+                if (! $item->combo) {
+                    continue;
+                }
+
+                for ($i = 0; $i < max(1, (int) $item->quantity); $i++) {
+                    foreach ($item->combo->services as $service) {
+                        $this->createAppointmentService(
+                            $appointment->id,
+                            $service,
+                            (float) ($service->pivot->combo_special_price ?? $service->price),
+                            $item->combo_id
+                        );
+                    }
+                }
+            }
 
             DB::commit();
-
-            return response()->json([
-                'message' => 'Appointment booked successfully.',
-                'appointment' => $appointment->load('services.service.template', 'appointedProvider.user')
-            ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to book appointment.', 'error' => $e->getMessage()], 500);
         }
+
+        // Nothing to collect (an all-free basket, or a policy that asks for no
+        // advance) — there is no point sending the customer to a payment sheet.
+        if ($payableNow <= 0) {
+            $this->settleBooking($appointment, $cart);
+
+            return response()->json([
+                'message' => 'Appointment booked successfully.',
+                'payment_required' => false,
+                'payment' => null,
+                'appointment' => $appointment->load('services.service.template', 'appointedProvider.user'),
+            ]);
+        }
+
+        // The gateway call is deliberately outside the transaction: it is a
+        // network round trip, and a slow provider must not hold a write lock.
+        try {
+            ['order' => $order] = $this->payments->openOrder($appointment, (float) $payableNow);
+        } catch (PaymentGatewayException $e) {
+            report($e);
+            $this->payments->release($appointment, 'Could not start the payment.');
+
+            return response()->json([
+                'message' => 'We could not start the payment. Please try again.',
+            ], 502);
+        }
+
+        return response()->json([
+            'message' => 'Slot held. Complete the payment to confirm your booking.',
+            'payment_required' => true,
+            'payment' => $this->payments->checkoutPayload($appointment, $order, (float) $payableNow),
+            'appointment' => $appointment->load('services.service.template', 'appointedProvider.user'),
+        ], 201);
+    }
+
+    /**
+     * Confirm a payment the gateway told the app succeeded.
+     *
+     * The signature is what makes this safe to expose: the app is telling us it
+     * paid, and only the provider (or, in demo, this server) can produce a
+     * signature that agrees.
+     */
+    public function confirmPayment(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'razorpay_payment_id' => 'required|string|max:150',
+            'razorpay_signature' => 'required|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $appointment = Appointment::where('customer_id', $request->user()->id)->findOrFail($id);
+
+        return $this->settlePayment(
+            $request,
+            $appointment,
+            $request->razorpay_payment_id,
+            $request->razorpay_signature
+        );
+    }
+
+    /**
+     * Complete a payment on the demo gateway.
+     *
+     * Exists so the whole order → pay → verify → confirm path can be exercised
+     * without live keys. It refuses outright once a real gateway is configured,
+     * so it can never become a way to book without paying.
+     */
+    public function demoPay(Request $request, $id)
+    {
+        $appointment = Appointment::where('customer_id', $request->user()->id)->findOrFail($id);
+
+        $simulated = $this->payments->simulatePayment($appointment);
+
+        if (! $simulated) {
+            return response()->json([
+                'message' => 'Demo payments are not available.',
+            ], 400);
+        }
+
+        return $this->settlePayment(
+            $request,
+            $appointment,
+            $simulated['payment_id'],
+            $simulated['signature']
+        );
+    }
+
+    /**
+     * Give up on a held slot straight away rather than waiting for the hold to
+     * lapse, so the chair goes back on sale the moment the customer backs out.
+     */
+    public function abandonPayment(Request $request, $id)
+    {
+        $appointment = Appointment::where('customer_id', $request->user()->id)->findOrFail($id);
+
+        if ($appointment->status !== 'pending_payment') {
+            return response()->json(['message' => 'This booking is not awaiting payment.'], 400);
+        }
+
+        $this->payments->release($appointment, 'Payment was cancelled by the customer.');
+
+        return response()->json(['message' => 'Booking cancelled. Your slot has been released.']);
+    }
+
+    /**
+     * Shared tail of both confirm paths: verify, then turn the hold into a
+     * real booking.
+     */
+    private function settlePayment(Request $request, Appointment $appointment, string $paymentId, string $signature)
+    {
+        if ($appointment->status === 'scheduled') {
+            // A retried confirmation — the first one already booked it.
+            return response()->json([
+                'message' => 'This booking is already confirmed.',
+                'appointment' => $this->presentBooking($appointment->load($this->bookingRelations())),
+            ]);
+        }
+
+        if ($appointment->status !== 'pending_payment') {
+            return response()->json(['message' => 'This booking is not awaiting payment.'], 400);
+        }
+
+        if ($appointment->payment_hold_expires_at && now()->greaterThan($appointment->payment_hold_expires_at)) {
+            $this->payments->release($appointment, 'Payment was not completed in time.');
+
+            return response()->json([
+                'message' => 'The hold on your slot expired before the payment came through. Please book again.',
+                'hold_expired' => true,
+            ], 409);
+        }
+
+        $result = $this->payments->confirm($appointment, $paymentId, $signature, $request->user()->id);
+
+        if (! $result['ok']) {
+            return response()->json(['message' => $result['message']], 422);
+        }
+
+        $this->settleBooking($appointment, $this->activeCart($request, $appointment->salon_id));
+
+        return response()->json([
+            'message' => 'Payment received. Your appointment is confirmed.',
+            'appointment' => $this->presentBooking($appointment->fresh()->load($this->bookingRelations())),
+        ]);
+    }
+
+    /**
+     * Turn a paid hold into a confirmed booking and retire the cart behind it.
+     */
+    private function settleBooking(Appointment $appointment, ?Cart $cart): void
+    {
+        DB::transaction(function () use ($appointment, $cart) {
+            $appointment->forceFill([
+                'status' => 'scheduled',
+                'payment_hold_expires_at' => null,
+            ])->save();
+
+            if ($cart) {
+                $cart->items()->delete();
+                $cart->status = 'converted';
+                $cart->save();
+            }
+        });
+    }
+
+    /**
+     * Drop any slot this customer is still holding at this salon from an
+     * earlier, unfinished checkout.
+     */
+    private function releaseAbandonedAttempts(string $customerId, string $salonId): void
+    {
+        Appointment::where('customer_id', $customerId)
+            ->where('salon_id', $salonId)
+            ->where('status', 'pending_payment')
+            ->get()
+            ->each(fn (Appointment $a) => $this->payments->release($a, 'Replaced by a newer booking attempt.'));
     }
 
     /**
@@ -293,6 +509,10 @@ class AppointmentController extends Controller
     {
         $appointments = Appointment::with($this->bookingRelations())
             ->where('customer_id', $request->user()->id)
+            // A slot held for an unfinished payment is not a booking yet, and
+            // listing it would tell the customer they have an appointment they
+            // have not actually paid for.
+            ->where('status', '!=', 'pending_payment')
             ->orderBy('appointment_date', 'desc')
             ->orderBy('start_time', 'desc')
             ->get();
@@ -624,6 +844,10 @@ class AppointmentController extends Controller
             'services.combo:id,name,will_refund_advance_if_cancelled',
             'appointedProvider.user:id,name',
             'salonClosure:id,closed_date,reason',
+            // Extras added in the chair — itemised for the customer, never
+            // folded into the booked lines.
+            'serviceAdditions.service.template:id,name,estimated_duration_minutes',
+            'serviceAdditions.provider.user:id,name',
         ];
     }
 
@@ -647,6 +871,28 @@ class AppointmentController extends Controller
             'line_status' => $line->line_status,
         ])->values();
 
+        // Anything the salon added while the customer was in the chair. Kept as
+        // its own list so the app can show it apart from what was booked —
+        // the customer should always be able to see exactly what was added,
+        // by whom, and what it cost.
+        $additions = $appointment->serviceAdditions
+            ->filter(fn ($addition) => $addition->isLive())
+            ->map(fn ($addition) => [
+                'id' => $addition->id,
+                'name' => $addition->service->template->name ?? 'Service',
+                'price' => (float) $addition->price_at_addition,
+                'duration_minutes' => (int) $addition->duration_minutes_at_addition,
+                'provider_name' => $addition->provider->user->name ?? null,
+                'added_at' => $addition->added_at,
+            ])->values();
+
+        $bookedTotal = (float) $appointment->services
+            ->where('line_status', '!=', 'cancelled')
+            ->sum('price_at_booking');
+        $addedTotal = (float) $appointment->serviceAdditions
+            ->filter(fn ($addition) => $addition->isLive())
+            ->sum('price_at_addition');
+
         return [
             'id' => $appointment->id,
             'status' => $appointment->status,
@@ -661,6 +907,9 @@ class AppointmentController extends Controller
             'start_time' => substr($appointment->start_time, 0, 5),
             'end_time' => substr($appointment->end_time, 0, 5),
             'services' => $services,
+            'added_services' => $additions,
+            'booked_total' => round($bookedTotal, 2),
+            'added_total' => round($addedTotal, 2),
             'total_amount' => (float) $appointment->total_amount,
             'advance_paid' => (float) $appointment->advance_amount,
             'balance_amount' => (float) $appointment->balance_amount,
@@ -693,9 +942,13 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Record a refund against the successful payments of an appointment.
-     * No-op when nothing was actually captured (no gateway wired up yet), so
-     * the ledger never invents a refund for money that was never taken.
+     * Record a refund against the successful payments of an appointment, and
+     * ask the gateway to send the money back.
+     *
+     * No-op when nothing was actually captured, so the ledger never invents a
+     * refund for money that was never taken. A refund the gateway would not
+     * accept stays `pending` for someone to chase rather than being recorded as
+     * done.
      */
     private function raiseRefund(Appointment $appointment, float $amount, string $reason, string $userId): void
     {
@@ -718,13 +971,19 @@ class AppointmentController extends Controller
 
             $slice = min($remaining, (float) $payment->amount);
 
+            $refundId = $payment->gateway_transaction_id
+                ? $this->payments->refund($payment->gateway_transaction_id, $slice, $reason)
+                : null;
+
             DB::table('payment_refunds')->insert([
                 'id' => (string) Str::uuid(),
                 'payment_id' => $payment->id,
                 'appointment_id' => $appointment->id,
                 'amount' => $slice,
                 'reason' => $reason,
-                'status' => 'pending',
+                'gateway_refund_id' => $refundId,
+                'status' => $refundId ? 'processed' : 'pending',
+                'processed_at' => $refundId ? now() : null,
                 'initiated_by' => $userId,
                 'created_at' => now(),
                 'updated_at' => now(),

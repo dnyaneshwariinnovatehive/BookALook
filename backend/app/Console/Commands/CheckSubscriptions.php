@@ -2,66 +2,161 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Notification;
+use App\Models\PlatformPolicySetting;
+use App\Models\Salon;
+use App\Models\SalonSubscription;
+use App\Services\SalonAccessService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 
+/**
+ * Keeps subscription state honest and chases owners to renew.
+ *
+ * Runs hourly. Expiring lapsed plans happens on every pass so nothing is a day
+ * stale; the reminders only go out once, at the hour SuperAdmin has configured,
+ * because a renewal nudge at 3am converts nobody.
+ */
 class CheckSubscriptions extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'app:check-subscriptions';
+    protected $signature = 'app:check-subscriptions {--force-reminders : Send reminders regardless of the configured hour}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Check and expire subscriptions, and send expiry alerts';
+    protected $description = 'Expire lapsed subscriptions and remind salon owners to renew';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    /** Notification types, so the app can route a tap to the renewal screen. */
+    public const TYPE_EXPIRING = 'subscription_expiring';
+    public const TYPE_EXPIRED = 'subscription_expired';
+
+    public function handle(SalonAccessService $access): int
     {
-        $this->info('Starting subscription check...');
-        $today = now()->format('Y-m-d');
+        $expired = $access->expireStale();
+        $this->info("Expired {$expired} subscription(s).");
 
-        // 1. Expire past subscriptions
-        $expiredCount = \App\Models\SalonSubscription::where('status', 'active')
-            ->whereDate('end_date', '<', $today)
-            ->update(['status' => 'expired']);
-        
-        $this->info("Expired {$expiredCount} subscriptions.");
+        if (! $this->option('force-reminders') && ! $this->isReminderHour()) {
+            $this->info('Not the reminder hour; skipping notifications.');
 
-        // 2. Alert for upcoming expiries
-        $policy = \App\Models\PlatformPolicySetting::where('key', 'subscription_expiry_warning_days')->first();
-        $warningDays = $policy ? (int) $policy->value : 3;
-        
-        $warningDate = now()->addDays($warningDays)->format('Y-m-d');
-
-        $expiringSubscriptions = \App\Models\SalonSubscription::where('status', 'active')
-            ->whereDate('end_date', '=', $warningDate)
-            ->with('salon')
-            ->get();
-
-        foreach ($expiringSubscriptions as $sub) {
-            // Check if salon has an assigned collaborator (from enquiries or a direct column)
-            // The document says "Salons assigned to this Collaborator... Receives an alert"
-            $collaboratorId = $sub->salon->admin_id; // For now, we alert the salon admin if we don't have a direct collaborator relationship
-            
-            // Generate Notification
-            \App\Models\Notification::create([
-                'user_id' => $collaboratorId,
-                'title' => 'Subscription Expiring Soon',
-                'message' => "The subscription for {$sub->salon->name} is expiring in {$warningDays} days.",
-                'type' => 'alert',
-                'is_read' => false
-            ]);
-            $this->info("Sent expiry alert to user {$collaboratorId} for salon {$sub->salon->name}.");
+            return self::SUCCESS;
         }
 
-        $this->info('Subscription check complete.');
+        $this->info('Sending renewal reminders…');
+        $this->remindExpiring();
+        $this->remindLapsed();
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Owners are at the salon and not yet busy at mid-morning, which is when a
+     * renewal actually gets acted on rather than dismissed.
+     */
+    private function isReminderHour(): bool
+    {
+        $hour = (int) PlatformPolicySetting::value('subscription_reminder_hour');
+
+        return now()->hour === $hour;
+    }
+
+    /**
+     * A heads-up while the plan is still running.
+     */
+    private function remindExpiring(): void
+    {
+        $warningDays = (int) PlatformPolicySetting::value('subscription_expiry_warning_days');
+
+        $expiring = SalonSubscription::with('salon.admin')
+            ->where('status', 'active')
+            ->whereDate('end_date', '<=', now()->addDays($warningDays)->toDateString())
+            ->whereDate('end_date', '>=', now()->toDateString())
+            ->get();
+
+        foreach ($expiring as $subscription) {
+            $salon = $subscription->salon;
+
+            if (! $salon?->admin_id) {
+                continue;
+            }
+
+            $daysLeft = (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false);
+
+            $this->notifyOnce($salon, self::TYPE_EXPIRING, [
+                'title' => $daysLeft <= 0
+                    ? 'Your plan ends today'
+                    : "Your plan ends in {$daysLeft} day" . ($daysLeft === 1 ? '' : 's'),
+                'message' => sprintf(
+                    '%s stops taking online bookings when the plan ends. Renew now to stay listed.',
+                    $salon->name
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * The daily nudge after it has lapsed. Sent every day until they renew,
+     * because the salon is invisible to customers the whole time.
+     */
+    private function remindLapsed(): void
+    {
+        $lapsed = Salon::with('admin')
+            ->where('status', 'active')
+            ->whereDoesntHave('subscriptions', fn ($q) => $q->where('status', 'active'))
+            ->get();
+
+        foreach ($lapsed as $salon) {
+            if (! $salon->admin_id) {
+                continue;
+            }
+
+            $last = SalonSubscription::where('salon_id', $salon->id)
+                ->orderByDesc('end_date')
+                ->first();
+
+            // Never subscribed at all — that is onboarding, not a renewal.
+            if (! $last) {
+                continue;
+            }
+
+            $daysDown = (int) Carbon::parse($last->end_date)->diffInDays(Carbon::today());
+
+            $this->notifyOnce($salon, self::TYPE_EXPIRED, [
+                'title' => 'Your salon is offline',
+                'message' => sprintf(
+                    '%s has been hidden from customers for %s. Your staff cannot use the app either. Renew to go back online.',
+                    $salon->name,
+                    $daysDown <= 1 ? 'a day' : "{$daysDown} days"
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * One reminder per salon per day. Re-running the command must not stack up
+     * duplicates in the owner's inbox.
+     */
+    private function notifyOnce(Salon $salon, string $type, array $content): void
+    {
+        $alreadySentToday = Notification::where('user_id', $salon->admin_id)
+            ->where('type', $type)
+            ->where('related_salon_id', $salon->id)
+            ->whereDate('created_at', Carbon::today())
+            ->exists();
+
+        if ($alreadySentToday) {
+            return;
+        }
+
+        Notification::create([
+            'user_id' => $salon->admin_id,
+            'type' => $type,
+            'title' => $content['title'],
+            'message' => $content['message'],
+            'data' => [
+                'action' => 'renew_subscription',
+                'salon_id' => $salon->id,
+            ],
+            'related_salon_id' => $salon->id,
+            'is_read' => false,
+        ]);
+
+        $this->info("Reminded {$salon->name} ({$type}).");
     }
 }

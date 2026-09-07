@@ -43,6 +43,7 @@ class StaffApi {
     required double commissionPercentage,
     required List<String> serviceIds,
     required List<StaffWorkingHour> workingHours,
+    bool autoApproveLeave = false,
   }) async {
     final body = {
       'name': name,
@@ -52,6 +53,7 @@ class StaffApi {
       'base_salary': baseSalary,
       'commission_percentage': commissionPercentage,
       'service_ids': serviceIds,
+      'auto_approve_leave': autoApproveLeave,
       'working_hours': workingHours.map((h) => h.toJson()).toList(),
     };
 
@@ -77,6 +79,7 @@ class StaffApi {
     double? commissionPercentage,
     List<String>? serviceIds,
     List<StaffWorkingHour>? workingHours,
+    bool? autoApproveLeave,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -86,6 +89,7 @@ class StaffApi {
     if (baseSalary != null) body['base_salary'] = baseSalary;
     if (commissionPercentage != null) body['commission_percentage'] = commissionPercentage;
     if (serviceIds != null) body['service_ids'] = serviceIds;
+    if (autoApproveLeave != null) body['auto_approve_leave'] = autoApproveLeave;
     if (workingHours != null) body['working_hours'] = workingHours.map((h) => h.toJson()).toList();
 
     final response = await http.put(

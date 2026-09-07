@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
 import '../services/cart_service.dart';
 import 'cart_screen.dart';
+import '../widgets/cart_offers.dart';
 
 class SalonDetailScreen extends StatefulWidget {
   final String salonId;
@@ -72,13 +73,19 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Future<void> _addToCart({String? serviceId, String? comboId, required String label}) async {
     try {
-      if (serviceId != null) {
-        await _cartService.addItem(widget.salonId, serviceId);
-      } else {
-        await _cartService.addCombo(widget.salonId, comboId!);
+      final cart = serviceId != null
+          ? await _cartService.addItem(widget.salonId, serviceId)
+          : await _cartService.addCombo(widget.salonId, comboId!);
+
+      if (!mounted) return;
+
+      setState(() => _cart = cart);
+
+      // The moment after adding is when a package nudge is worth anything, so
+      // it is shown here rather than waiting for the cart screen.
+      if (!_showOffersFor(cart, label)) {
+        _showMessage('$label added to cart');
       }
-      _showMessage('$label added to cart');
-      _loadCart();
     } on CartConflictException catch (e) {
       if (!mounted) return;
       showDialog(
@@ -115,6 +122,118 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Future<void> _openCart() async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen()));
     _loadCart();
+  }
+
+  /// Surfaces what the add unlocked. Returns true when something was shown, so
+  /// the caller does not also fire a plain confirmation.
+  bool _showOffersFor(Map<String, dynamic>? cart, String label) {
+    if (cart == null) return false;
+
+    final applied = (cart['applied_combos'] as List?) ?? const [];
+    final offers = (cart['combo_offers'] as List?) ?? const [];
+    final saving = _toDouble((cart['summary'] as Map<String, dynamic>?)?['saving']);
+
+    // Completing a package is the better news, so it wins.
+    if (applied.isNotEmpty && saving > 0) {
+      final names = applied
+          .map((c) => (c as Map<String, dynamic>)['name'] ?? 'Package')
+          .join(', ');
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: AppTheme.lightSuccess,
+        duration: const Duration(seconds: 4),
+        content: Text(
+          'That completes "$names" — you save ₹${saving.toStringAsFixed(0)}',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+        ),
+      ));
+      return true;
+    }
+
+    if (offers.isNotEmpty) {
+      _showComboOfferSheet(offers.first as Map<String, dynamic>, label);
+      return true;
+    }
+
+    return false;
+  }
+
+  /// A near-miss package, shown as a sheet so the missing services can be added
+  /// without leaving the salon page.
+  void _showComboOfferSheet(Map<String, dynamic> offer, String label) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Container(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.lightBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: EdgeInsets.only(bottom: 14),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text('$label added',
+                  style: GoogleFonts.outfit(
+                      fontSize: 15, color: AppTheme.lightTextBody)),
+              SizedBox(height: 14),
+              ComboOfferCard(
+                offer: offer,
+                onAddService: (serviceId) async {
+                  Navigator.pop(sheetContext);
+                  await _addToCart(serviceId: serviceId, label: 'Service');
+                },
+                onCompletePackage: (serviceIds) async {
+                  Navigator.pop(sheetContext);
+                  await _addMany(serviceIds);
+                },
+              ),
+              SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: Text('No thanks',
+                    style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Adds every remaining service of a package in one go.
+  Future<void> _addMany(List<String> serviceIds) async {
+    Map<String, dynamic>? cart;
+
+    try {
+      for (final id in serviceIds) {
+        cart = await _cartService.addItem(widget.salonId, id);
+      }
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      await _loadCart();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _cart = cart);
+    _showOffersFor(cart, 'Package');
   }
 
   void _showMessage(String text) {
@@ -1115,8 +1234,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       total += _lineTotal(item);
     }
 
+    double listTotal = total;
+    double saving = 0;
+
     if (summary != null) {
       total = _toDouble(summary['total_amount']);
+      listTotal = _toDouble(summary['list_total']);
+      saving = _toDouble(summary['saving']);
       count = (summary['item_count'] ?? count) as int;
     }
 
@@ -1140,11 +1264,34 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               children: [
                 Text('$count ${count == 1 ? 'item' : 'items'}',
                     style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                Text('₹${total.toStringAsFixed(0)}',
-                    style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.lightTextHeading)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('₹${total.toStringAsFixed(0)}',
+                        style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.lightTextHeading)),
+                    if (saving > 0) ...[
+                      SizedBox(width: 6),
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 3),
+                        child: Text('₹${listTotal.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: AppTheme.lightTextLight,
+                              decoration: TextDecoration.lineThrough,
+                            )),
+                      ),
+                    ],
+                  ],
+                ),
+                if (saving > 0)
+                  Text('Package saving ₹${saving.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.lightSuccess)),
               ],
             ),
             ElevatedButton.icon(

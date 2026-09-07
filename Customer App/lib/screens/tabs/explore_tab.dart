@@ -71,13 +71,20 @@ class _ExploreTabState extends State<ExploreTab> {
                     separatorBuilder: (context, index) => SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final salon = _salons[index];
+                      // A salon whose plan has lapsed stays findable — a
+                      // returning customer should not think it has vanished —
+                      // but it is plainly marked as not taking bookings.
+                      final isServiceable = salon['is_serviceable'] != false;
+
                       return InkWell(
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(
                             builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
                           ));
                         },
-                        child: Container(
+                        child: Opacity(
+                          opacity: isServiceable ? 1.0 : 0.6,
+                          child: Container(
                           padding: EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: AppTheme.lightSurface,
@@ -113,18 +120,35 @@ class _ExploreTabState extends State<ExploreTab> {
                                       ],
                                     ),
                                     SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.star, size: 14, color: AppTheme.starRating),
-                                        SizedBox(width: 4),
-                                        Text('4.5 (120 reviews)', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
-                                      ],
-                                    )
+                                    if (!isServiceable)
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.lightWarningBg,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          salon['unavailable_reason'] ?? 'Not taking bookings right now',
+                                          style: GoogleFonts.outfit(
+                                              color: AppTheme.lightWarning,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600),
+                                        ),
+                                      )
+                                    else
+                                      Row(
+                                        children: [
+                                          Icon(Icons.star, size: 14, color: AppTheme.starRating),
+                                          SizedBox(width: 4),
+                                          Text('4.5 (120 reviews)', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
+                                        ],
+                                      )
                                   ],
                                 ),
                               )
                             ],
                           ),
+                        ),
                         ),
                       );
                     },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/cart_service.dart';
+import '../widgets/cart_offers.dart';
 import 'checkout_screen.dart';
 import 'main_screen.dart';
 
@@ -41,6 +42,49 @@ class _CartScreenState extends State<CartScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  bool _isAdding = false;
+
+  /// Adds a suggested or missing service straight from the cart, then reloads
+  /// so a newly completed package re-prices immediately.
+  Future<void> _addService(String serviceId) async {
+    final salonId = _cart?['salon_id']?.toString();
+    if (salonId == null || _isAdding) return;
+
+    setState(() => _isAdding = true);
+
+    try {
+      await _cartService.addItem(salonId, serviceId);
+      await _loadCart();
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
+
+  Future<void> _addAll(List<String> serviceIds) async {
+    final salonId = _cart?['salon_id']?.toString();
+    if (salonId == null || _isAdding) return;
+
+    setState(() => _isAdding = true);
+
+    try {
+      for (final id in serviceIds) {
+        await _cartService.addItem(salonId, id);
+      }
+      await _loadCart();
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _removeItem(String itemId) async {
@@ -90,13 +134,58 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     final items = _cart!['items'] as List;
+    final summary = _cart!['summary'] as Map<String, dynamic>? ?? const {};
+    final applied = (_cart!['applied_combos'] as List?) ?? const [];
+    final offers = (_cart!['combo_offers'] as List?) ?? const [];
+    final suggestions = (_cart!['suggestions'] as List?) ?? const [];
+    final saving = double.tryParse('${summary['saving'] ?? 0}') ?? 0.0;
 
-    return ListView.separated(
-      padding: EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (context, index) => SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final item = items[index];
+    return RefreshIndicator(
+      color: AppTheme.accentColor,
+      onRefresh: _loadCart,
+      child: ListView(
+        physics: AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.all(16),
+        children: [
+          // What the cart already qualifies for comes first — the customer
+          // should see they are ahead before they see the bill.
+          if (applied.isNotEmpty) ...[
+            AppliedComboBanner(appliedCombos: applied, totalSaving: saving),
+            SizedBox(height: 16),
+          ],
+
+          ...items.map(_buildItemTile),
+
+          if (offers.isNotEmpty) ...[
+            SizedBox(height: 20),
+            ...offers.map((offer) => Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: ComboOfferCard(
+                    offer: offer as Map<String, dynamic>,
+                    onAddService: _isAdding ? null : _addService,
+                    onCompletePackage: _isAdding ? null : _addAll,
+                  ),
+                )),
+          ],
+
+          if (suggestions.isNotEmpty) ...[
+            SizedBox(height: 20),
+            SuggestionStrip(
+              suggestions: suggestions,
+              onAdd: _isAdding ? null : _addService,
+            ),
+          ],
+
+          SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemTile(dynamic raw) {
+    final item = raw as Map<String, dynamic>;
+    {
+      {
         final service = item['service'];
         final combo = item['combo'];
         final isCombo = combo != null;
@@ -108,6 +197,7 @@ class _CartScreenState extends State<CartScreen> {
             : null;
 
         return Container(
+          margin: EdgeInsets.only(bottom: 12),
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppTheme.lightSurface,
@@ -153,8 +243,8 @@ class _CartScreenState extends State<CartScreen> {
             ],
           ),
         );
-      },
-    );
+      }
+    }
   }
 
   /// Price of one cart line. A combo is priced from its own special prices,
@@ -183,6 +273,9 @@ class _CartScreenState extends State<CartScreen> {
 
     // Prefer the server's figure — it is what checkout will charge.
     final summary = _cart!['summary'] as Map<String, dynamic>?;
+
+    final listTotal = double.tryParse('${summary?['list_total'] ?? 0}') ?? 0.0;
+    final saving = double.tryParse('${summary?['saving'] ?? 0}') ?? 0.0;
 
     double total = 0.0;
     if (summary != null) {
@@ -215,7 +308,36 @@ class _CartScreenState extends State<CartScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-                Text('₹${total.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('₹${total.toStringAsFixed(2)}',
+                        style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.lightTextHeading)),
+                    // The struck-through list price is what makes the package
+                    // discount legible rather than just a smaller number.
+                    if (saving > 0) ...[
+                      SizedBox(width: 8),
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 3),
+                        child: Text('₹${listTotal.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              color: AppTheme.lightTextLight,
+                              decoration: TextDecoration.lineThrough,
+                            )),
+                      ),
+                    ],
+                  ],
+                ),
+                if (saving > 0)
+                  Text('You save ₹${saving.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.lightSuccess)),
               ],
             ),
             ElevatedButton(

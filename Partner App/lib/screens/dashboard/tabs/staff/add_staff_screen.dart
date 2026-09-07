@@ -36,6 +36,9 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   final Set<String> _selectedServiceIds = {};
 
   // Working Hours
+  /// Whether this person's leave is granted without the admin reviewing it.
+  bool _autoApproveLeave = false;
+
   bool _useSalonWorkingHours = true;
   List<SalonWorkingHour> _salonWorkingHours = [];
   List<StaffWorkingHour> _workingHours = List.generate(7, (index) => StaffWorkingHour(
@@ -56,6 +59,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       _emailController.text = widget.existingStaff!.user?['email'] ?? '';
       _salaryController.text = widget.existingStaff!.baseSalary.toString();
       _commissionController.text = widget.existingStaff!.commissionPercentage.toString();
+      _autoApproveLeave = widget.existingStaff!.autoApproveLeave;
       
       final svcs = widget.existingStaff!.services;
       if (svcs != null) {
@@ -156,6 +160,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           commissionPercentage: double.tryParse(_commissionController.text) ?? 0,
           serviceIds: _selectedServiceIds.toList(),
           workingHours: workingHoursToSave,
+          autoApproveLeave: _autoApproveLeave,
         );
       } else {
         await StaffApi.addStaff(
@@ -168,6 +173,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           commissionPercentage: double.tryParse(_commissionController.text) ?? 0,
           serviceIds: _selectedServiceIds.toList(),
           workingHours: workingHoursToSave,
+          autoApproveLeave: _autoApproveLeave,
         );
       }
       if (mounted) {
@@ -440,7 +446,31 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 8),
+            Text(
+              "Monthly salary and commission drive this person's payslip. "
+              'Commission is earned on each service they complete.',
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+
+            const SizedBox(height: 24),
+
+            Text('Leave', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SwitchListTile(
+              value: _autoApproveLeave,
+              onChanged: _isSaving ? null : (v) => setState(() => _autoApproveLeave = v),
+              activeThumbColor: AppTheme.accentColor,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Approve their leave automatically'),
+              subtitle: Text(
+                _autoApproveLeave
+                    ? 'Their leave requests are granted straight away.'
+                    : 'You review each request before it counts.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+
+            const SizedBox(height: 24),
 
             Text('Assigned Services', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),

@@ -87,68 +87,61 @@ class PartnerSubscriptionController extends Controller
         $salonId = $salon->id;
 
         $plan = SubscriptionPlan::findOrFail($request->plan_id);
-        $wallet = SalonWallet::firstOrCreate(['salon_id' => $salonId], ['coin_balance' => 0]);
-        $scheme = WalletScheme::where('is_active', true)->first();
-        $coinValue = $scheme ? $scheme->coin_value : 0;
+        $wallet = app(\App\Services\WalletService::class);
 
-        $price = $plan->price;
-        $discount = 0;
-        $coinsApplied = 0;
+        $price = (float) $plan->price;
 
-        if ($request->apply_coins && $wallet->coin_balance > 0 && $coinValue > 0) {
-            $maxCoinsValue = $wallet->coin_balance * $coinValue;
-            
-            if ($maxCoinsValue >= $price) {
-                // Costs zero, deduct partial coins
-                $coinsApplied = ceil($price / $coinValue);
-                $discount = $price;
-            } else {
-                // Costs > 0, deduct all coins
-                $coinsApplied = $wallet->coin_balance;
-                $discount = $maxCoinsValue;
-            }
+        // Coins are only worth what they cover; never spend more than the plan.
+        $quote = $request->boolean('apply_coins')
+            ? $wallet->quote($salonId, $price)
+            : ['coins' => 0, 'value' => 0.0];
+
+        $finalPrice = round(max($price - $quote['value'], 0), 2);
+
+        try {
+            // Coins leave the wallet inside the same transaction that creates
+            // the subscription, so a failed purchase cannot swallow them.
+            $newSub = DB::transaction(function () use ($salonId, $plan, $quote, $request, $wallet) {
+                SalonSubscription::where('salon_id', $salonId)
+                    ->where('status', 'active')
+                    ->update(['status' => 'cancelled', 'cancelled_at' => Carbon::now()]);
+
+                // The salon_subscriptions schema uses plan_id (a UUID), not
+                // subscription_plan_id. Keep the price and plan duration as a snapshot.
+                $subscription = SalonSubscription::create([
+                    'salon_id' => $salonId,
+                    'plan_id' => $plan->id,
+                    'plan_price_snapshot' => $plan->price,
+                    'status' => 'active',
+                    'start_date' => Carbon::today(),
+                    'end_date' => Carbon::today()->addDays($plan->validity_days),
+                    'billing_type' => 'flat',
+                ]);
+
+                if ($quote['coins'] > 0) {
+                    $wallet->redeemForSubscription(
+                        $salonId,
+                        $quote['coins'],
+                        (float) $plan->price,
+                        $request->user(),
+                        $subscription,
+                        "Applied to {$plan->name}"
+                    );
+                }
+
+                return $subscription;
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
-
-        $finalPrice = max(0, $price - $discount);
-
-        // MOCK PAYMENT PROCESS
-        // If this were real, we'd create an intent and return client_secret.
-        // For now, process immediately.
-
-        if ($coinsApplied > 0) {
-            $wallet->coin_balance -= $coinsApplied;
-            $wallet->save();
-
-            $wallet->transactions()->create([
-                'type' => 'redeemed',
-                'amount' => $coinsApplied,
-                'description' => "Redeemed for subscription upgrade to {$plan->name}"
-            ]);
-        }
-
-        $newSub = DB::transaction(function () use ($salonId, $plan) {
-            // Cancel old sub
-            SalonSubscription::where('salon_id', $salonId)
-                ->where('status', 'active')
-                ->update(['status' => 'cancelled', 'cancelled_at' => Carbon::now()]);
-
-            // The salon_subscriptions schema uses plan_id (a UUID), not
-            // subscription_plan_id. Keep the price and plan duration as a snapshot.
-            return SalonSubscription::create([
-                'salon_id' => $salonId,
-                'plan_id' => $plan->id,
-                'plan_price_snapshot' => $plan->price,
-                'status' => 'active',
-                'start_date' => Carbon::today(),
-                'end_date' => Carbon::today()->addDays($plan->validity_days),
-                'billing_type' => 'flat',
-            ]);
-        });
 
         return response()->json([
             'success' => true,
-            'message' => "Successfully upgraded to {$plan->name}. Total paid: ₹{$finalPrice}.",
-            'subscription' => $newSub
+            'message' => "Successfully upgraded to {$plan->name}. Total paid: " . $finalPrice . '.',
+            'coins_redeemed' => $quote['coins'],
+            'coin_discount' => $quote['value'],
+            'amount_payable' => $finalPrice,
+            'subscription' => $newSub,
         ]);
     }
 

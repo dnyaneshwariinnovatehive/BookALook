@@ -3,12 +3,11 @@
 namespace App\Services;
 
 use App\Models\Appointment;
+use App\Models\AppointmentServiceAddition;
 use App\Models\PlatformPolicySetting;
-use App\Models\SalonWallet;
+use App\Models\Service;
 use App\Models\ServiceProvider;
 use App\Models\User;
-use App\Models\WalletScheme;
-use App\Models\WalletTransaction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,6 +30,9 @@ class AppointmentCheckInService
     public const VERIFY_MANUAL = 'manual';
 
     public const PAYMENT_MODES = ['cash', 'upi', 'card', 'online'];
+
+    /** Used when a service template has no duration recorded. */
+    public const SLOT_FALLBACK_MINUTES = 30;
 
     /**
      * Find the appointment behind a scanned QR token.
@@ -189,7 +191,9 @@ class AppointmentCheckInService
         }
 
         foreach ($appointment->serviceAdditions as $addition) {
-            if ($addition->status !== 'active') {
+            // Only a voided addition leaves the bill; a completed one is still
+            // owed for.
+            if (! $addition->isLive()) {
                 continue;
             }
 
@@ -202,8 +206,13 @@ class AppointmentCheckInService
                 'kind' => 'service',
                 'price' => $price,
                 'duration_minutes' => (int) $addition->duration_minutes_at_addition,
+                // The provider who delivered this specific extra, which may not
+                // be the one handling the original booking.
+                'provider_id' => $addition->provider_id,
                 'provider_name' => $addition->provider->user->name ?? null,
                 'added_mid_appointment' => true,
+                'added_by_name' => $addition->addedBy->name ?? null,
+                'added_at' => $addition->added_at,
             ];
         }
 
@@ -218,6 +227,85 @@ class AppointmentCheckInService
             'balance_due' => round(max($total - $advance - $collected, 0), 2),
             'already_collected' => round($collected, 2),
         ];
+    }
+
+    /**
+     * Add a service to an appointment that is already under way.
+     *
+     * No digital approval is collected — the customer agreed in the chair. What
+     * matters is that the record is honest afterwards, so the addition is a
+     * separate row carrying its own price, duration, timestamp, who added it
+     * and, crucially, which provider actually delivered it. That last part may
+     * differ from whoever is handling the original booking, and it is what
+     * keeps commission right when two people contribute to one appointment.
+     *
+     * Nothing in the original booking is touched.
+     */
+    public function addExtraService(
+        Appointment $appointment,
+        Service $service,
+        string $providerId,
+        User $actor
+    ): AppointmentServiceAddition {
+        return DB::transaction(function () use ($appointment, $service, $providerId, $actor) {
+            $addition = AppointmentServiceAddition::create([
+                'appointment_id' => $appointment->id,
+                'service_id' => $service->id,
+                'provider_id' => $providerId,
+                'added_by' => $actor->id,
+                // Snapshotted: a later price change must not rewrite this bill.
+                'price_at_addition' => $service->price,
+                'duration_minutes_at_addition' => $service->template->estimated_duration_minutes
+                    ?? self::SLOT_FALLBACK_MINUTES,
+                'status' => AppointmentServiceAddition::STATUS_ACTIVE,
+                'added_at' => now(),
+            ]);
+
+            $this->recalculateTotals($appointment);
+
+            return $addition;
+        });
+    }
+
+    /**
+     * Undo an addition made by mistake.
+     *
+     * Voided rather than deleted, so the bill can still explain itself: the
+     * line stays in the record with who added it and who took it off.
+     */
+    public function voidAddition(Appointment $appointment, AppointmentServiceAddition $addition): void
+    {
+        DB::transaction(function () use ($appointment, $addition) {
+            $addition->status = AppointmentServiceAddition::STATUS_VOIDED;
+            $addition->save();
+
+            $this->recalculateTotals($appointment);
+        });
+    }
+
+    /**
+     * Re-derive the appointment total from its booked lines plus live
+     * additions. The advance never changes — it was paid against the original
+     * booking — so any extra simply raises the balance due at the counter.
+     */
+    public function recalculateTotals(Appointment $appointment): void
+    {
+        $booked = (float) $appointment->services()
+            ->where('line_status', '!=', 'cancelled')
+            ->sum('price_at_booking');
+
+        $added = (float) $appointment->serviceAdditions()
+            ->live()
+            ->sum('price_at_addition');
+
+        $appointment->total_amount = round($booked + $added, 2);
+        $appointment->balance_amount = round(
+            max($appointment->total_amount - (float) $appointment->advance_amount, 0),
+            2
+        );
+        $appointment->save();
+
+        $appointment->load(['services', 'serviceAdditions']);
     }
 
     /**
@@ -308,7 +396,7 @@ class AppointmentCheckInService
         }
 
         foreach ($appointment->serviceAdditions as $addition) {
-            if ($addition->status !== 'active') {
+            if (! $addition->isLive()) {
                 continue;
             }
 
@@ -316,46 +404,27 @@ class AppointmentCheckInService
 
             $addition->commission_percentage_snapshot = $rate;
             $addition->commission_amount = round((float) $addition->price_at_addition * $rate / 100, 2);
+            // Settled with the rest of the bill, so an extra reads the same as
+            // a booked line rather than sitting at 'active' forever.
+            $addition->status = AppointmentServiceAddition::STATUS_COMPLETED;
             $addition->save();
         }
     }
 
     /**
+     * Reward ladder coins for a completed booking. The ladder itself lives in
+     * WalletService — this only asks it to run.
+     *
      * @return array{coins_earned: int, new_balance: int}
      */
     private function awardWalletCoins(Appointment $appointment): array
     {
-        $wallet = SalonWallet::firstOrCreate(
-            ['salon_id' => $appointment->salon_id],
-            ['coin_balance' => 0, 'completed_online_appointments_count' => 0]
-        );
+        $result = app(WalletService::class)->awardForCompletedAppointment($appointment);
 
-        $wallet->completed_online_appointments_count += 1;
-
-        $coinsEarned = 0;
-
-        foreach (WalletScheme::where('is_active', true)->with('tiers')->get() as $scheme) {
-            foreach ($scheme->tiers as $tier) {
-                if ($tier->appointments_required == $wallet->completed_online_appointments_count) {
-                    $coinsEarned += $tier->coins_awarded;
-
-                    WalletTransaction::create([
-                        'salon_id' => $appointment->salon_id,
-                        'type' => 'earned',
-                        'coins' => $tier->coins_awarded,
-                        'balance_after' => $wallet->coin_balance + $coinsEarned,
-                        'related_scheme_tier_id' => $tier->id,
-                        'related_appointment_id' => $appointment->id,
-                        'note' => "Milestone reached for tier {$tier->tier_order} in scheme {$scheme->name}",
-                    ]);
-                }
-            }
-        }
-
-        $wallet->coin_balance += $coinsEarned;
-        $wallet->save();
-
-        return ['coins_earned' => $coinsEarned, 'new_balance' => (int) $wallet->coin_balance];
+        return [
+            'coins_earned' => $result['coins_earned'],
+            'new_balance' => $result['new_balance'],
+        ];
     }
 
     private function collectedSoFar(Appointment $appointment): float
@@ -374,6 +443,46 @@ class AppointmentCheckInService
         );
     }
 
+    /**
+     * Flatten an appointment into what the partner app's check-in, walk-in and
+     * billing screens all read. Shared so those screens cannot drift apart.
+     */
+    public function present(Appointment $appointment): array
+    {
+        $isWalkIn = $appointment->booking_source === 'walk_in';
+
+        return [
+            'id' => $appointment->id,
+            'status' => $appointment->status,
+            'booking_source' => $appointment->booking_source,
+            'appointment_date' => Carbon::parse($appointment->appointment_date)->toDateString(),
+            'start_time' => substr($appointment->start_time, 0, 5),
+            'end_time' => substr($appointment->end_time, 0, 5),
+            'customer_name' => $isWalkIn
+                ? ($appointment->walk_in_customer_name ?? 'Walk-in')
+                : ($appointment->customer->name ?? 'Customer'),
+            'customer_phone' => $isWalkIn
+                ? $appointment->walk_in_customer_phone
+                : ($appointment->customer->phone ?? null),
+            'booked_provider_id' => $appointment->appointed_provider_id,
+            'booked_provider_name' => $appointment->appointedProvider->user->name ?? 'Any staff',
+            'serving_provider_id' => $appointment->serving_provider_id,
+            'serving_provider_name' => $appointment->servingProvider->user->name ?? null,
+            'total_amount' => (float) $appointment->total_amount,
+            'advance_amount' => (float) $appointment->advance_amount,
+            'balance_amount' => (float) $appointment->balance_amount,
+            'final_billed_amount' => $appointment->final_billed_amount !== null
+                ? (float) $appointment->final_billed_amount
+                : null,
+            'verification_method' => $appointment->verification_method,
+            'manual_check_in_reason' => $appointment->manual_check_in_reason,
+            'started_at' => $appointment->started_at,
+            'completed_at' => $appointment->completed_at,
+            'payment_mode' => $appointment->payment_mode,
+            'payment_collected_at' => $appointment->payment_collected_at,
+        ];
+    }
+
     /** @return string[] */
     public function relations(): array
     {
@@ -385,6 +494,7 @@ class AppointmentCheckInService
             'services.servingProvider.user:id,name',
             'serviceAdditions.service.template:id,name,estimated_duration_minutes',
             'serviceAdditions.provider.user:id,name',
+            'serviceAdditions.addedBy:id,name,role',
         ];
     }
 }

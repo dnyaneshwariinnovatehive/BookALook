@@ -5,30 +5,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
+/**
+ * A day (or part of one) a staff member is away.
+ *
+ * `leave_type` decides whether it costs them anything: paid leave is time off
+ * without a deduction, unpaid leave reduces that month's salary.
+ */
 class ProviderLeave extends Model
 {
     use HasUuids;
 
     public $timestamps = false;
 
-    protected $table = 'provider_leaves';
+    public const TYPE_PAID = 'paid';
+    public const TYPE_UNPAID = 'unpaid';
 
-    protected $fillable = [
-        'provider_id',
-        'leave_date',
-        'leave_type',
-        'is_full_day',
-        'start_time',
-        'end_time',
-        'reason',
-        'status',
-        'reviewed_by',
-        'reviewed_at',
-    ];
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
+
+    protected $guarded = [];
 
     protected $casts = [
+        'leave_date' => 'date:Y-m-d',
         'is_full_day' => 'boolean',
-        'leave_date' => 'date',
         'reviewed_at' => 'datetime',
     ];
 
@@ -40,5 +40,11 @@ class ProviderLeave extends Model
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** Half a day off costs half a day's pay. */
+    public function dayFraction(): float
+    {
+        return $this->is_full_day ? 1.0 : 0.5;
     }
 }

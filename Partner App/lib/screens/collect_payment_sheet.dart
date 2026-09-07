@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../services/check_in_api.dart';
 import '../theme/app_theme.dart';
+import 'add_extra_service_sheet.dart';
 
 /// The bill at the counter: what the customer owes, how they paid, done.
 ///
@@ -74,6 +76,71 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
+      });
+    }
+  }
+
+  /// Extras agreed in the chair. Each becomes its own line rather than
+  /// inflating what was originally booked.
+  Future<void> _addExtra() async {
+    final apt = _target!.appointment;
+
+    final updated = await AddExtraServiceSheet.show(
+      context,
+      salonId: widget.salonId,
+      appointmentId: widget.appointmentId,
+      servingProviderId: apt.servingProviderId,
+      servingProviderName: apt.servingProviderName,
+    );
+
+    if (updated == null || !mounted) return;
+
+    setState(() => _target = updated);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Added to the bill.')),
+    );
+  }
+
+  Future<void> _removeExtra(BillLine line) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove from bill?'),
+        content: Text(
+          '${line.name} (₹${line.price.toStringAsFixed(0)}) will come off the total. '
+          'It stays on the record as removed.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Remove', style: TextStyle(color: AppTheme.lightDanger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final updated = await CheckInApi.removeExtraService(
+        widget.salonId,
+        widget.appointmentId,
+        line.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _target = updated;
+        _isSubmitting = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -193,9 +260,53 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
         ),
         const SizedBox(height: 20),
 
-        ...bill.lines.map(_buildLine),
+        // Booked and added are shown as separate, clearly itemised groups so
+        // the customer can see exactly what changed while they were in the chair.
+        ...bill.lines.where((l) => !l.addedMidAppointment).map(_buildLine),
+
+        if (bill.lines.any((l) => l.addedMidAppointment)) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.add_circle_outline, size: 15, color: AppTheme.accentColor),
+              const SizedBox(width: 6),
+              Text('ADDED DURING THE APPOINTMENT',
+                  style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.6,
+                      color: AppTheme.accentColor)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...bill.lines.where((l) => l.addedMidAppointment).map(_buildLine),
+        ],
+
+        if (!settled) ...[
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: _isSubmitting || apt.status != 'in_progress' ? null : _addExtra,
+            icon: const Icon(Icons.add, size: 18),
+            label: Text('Add extra service',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.accentColor,
+              side: BorderSide(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+              minimumSize: const Size(double.infinity, 46),
+            ),
+          ),
+        ],
 
         const Divider(height: 28),
+        if (bill.lines.any((l) => l.addedMidAppointment)) ...[
+          _amountRow('Booked services',
+              bill.lines.where((l) => !l.addedMidAppointment).fold(0.0, (t, l) => t + l.price)),
+          const SizedBox(height: 4),
+          _amountRow('Added during the appointment',
+              bill.lines.where((l) => l.addedMidAppointment).fold(0.0, (t, l) => t + l.price),
+              color: AppTheme.accentColor),
+          const SizedBox(height: 8),
+        ],
         _amountRow('Total', bill.total, size: 16, bold: true),
         const SizedBox(height: 6),
         _amountRow('Advance already paid', -bill.advancePaid, color: Colors.green.shade700),
@@ -280,34 +391,57 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
     );
   }
 
-  Widget _buildLine(BillLine line) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(line.name, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
+  Widget _buildLine(BillLine line) {
+    final settled = _target?.appointment.status == 'completed';
+    final canRemove = line.addedMidAppointment &&
+        !settled &&
+        _target?.appointment.status == 'in_progress' &&
+        !_isSubmitting;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(line.name,
+                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    '${line.durationMinutes} min',
+                    if (line.providerName != null) 'by ${line.providerName}',
+                  ].join(' · '),
+                  style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                // Who put an extra on the bill and when — the record should
+                // answer that without anyone having to remember.
+                if (line.addedMidAppointment && line.addedByName != null)
                   Text(
-                    [
-                      '${line.durationMinutes} min',
-                      if (line.providerName != null) line.providerName!,
-                      if (line.addedMidAppointment) 'added during the appointment',
-                    ].join(' · '),
-                    style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
+                    'added by ${line.addedByName}'
+                    '${line.addedAt != null ? ' at ${DateFormat('h:mm a').format(line.addedAt!.toLocal())}' : ''}',
+                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade500),
                   ),
-                ],
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text('₹${line.price.toStringAsFixed(0)}',
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(width: 12),
+          Text('₹${line.price.toStringAsFixed(0)}',
+              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
+          if (canRemove)
+            IconButton(
+              tooltip: 'Remove from bill',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.close, size: 18, color: AppTheme.lightDanger),
+              onPressed: () => _removeExtra(line),
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _amountRow(String label, double amount,
           {double size = 14, bool bold = false, Color? color}) =>

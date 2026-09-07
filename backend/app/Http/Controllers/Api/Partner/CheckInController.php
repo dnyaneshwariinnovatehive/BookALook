@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\AppointmentServiceAddition;
 use App\Models\Salon;
+use App\Models\Service;
 use App\Models\ServiceProvider;
 use App\Services\AppointmentCheckInService;
 use Carbon\Carbon;
@@ -136,6 +138,107 @@ class CheckInController extends Controller
     }
 
     /**
+     * Add a service to an appointment that is already under way.
+     *
+     * The customer agreed in the chair, so no digital approval is collected.
+     * The provider delivering the extra is chosen explicitly and defaults to
+     * whoever is serving — picking someone else is the whole point when two
+     * staff contribute to one appointment.
+     */
+    public function addService(Request $request, $salonId, $appointmentId)
+    {
+        if ($denied = $this->denyUnlessSalonStaff($request, $salonId)) {
+            return $denied;
+        }
+
+        $validator = Validator::make($request->all(), [
+            'service_id' => 'required|string|exists:services,id',
+            'provider_id' => 'nullable|exists:service_providers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $appointment = Appointment::with($this->checkIn->relations())
+            ->where('salon_id', $salonId)
+            ->findOrFail($appointmentId);
+
+        if ($appointment->status !== 'in_progress') {
+            return response()->json([
+                'message' => 'Extras can only be added while the appointment is in progress.',
+            ], 422);
+        }
+
+        // The service has to be this salon's, or another salon's price would
+        // land on this bill.
+        $service = Service::with('template')
+            ->where('salon_id', $salonId)
+            ->find($request->service_id);
+
+        if (! $service) {
+            return response()->json(['message' => 'That service is not offered by this salon.'], 422);
+        }
+
+        $providerId = $request->input('provider_id')
+            ?? $appointment->serving_provider_id
+            ?? $appointment->appointed_provider_id;
+
+        if (! $this->providerBelongsToSalon($providerId, $salonId)) {
+            return response()->json(['message' => 'That staff member does not work at this salon.'], 422);
+        }
+
+        $this->checkIn->addExtraService($appointment, $service, $providerId, $request->user());
+
+        $appointment = $appointment->fresh($this->checkIn->relations());
+
+        return response()->json([
+            'message' => "{$service->template->name} added to the bill.",
+            'appointment' => $this->present($appointment),
+            'bill' => $this->checkIn->bill($appointment),
+        ], 201);
+    }
+
+    /**
+     * Take an extra back off the bill. Voided rather than deleted so the record
+     * can still explain itself.
+     */
+    public function removeService(Request $request, $salonId, $appointmentId, $additionId)
+    {
+        if ($denied = $this->denyUnlessSalonStaff($request, $salonId)) {
+            return $denied;
+        }
+
+        $appointment = Appointment::with($this->checkIn->relations())
+            ->where('salon_id', $salonId)
+            ->findOrFail($appointmentId);
+
+        if ($appointment->status !== 'in_progress') {
+            return response()->json([
+                'message' => 'The bill can only be changed while the appointment is in progress.',
+            ], 422);
+        }
+
+        $addition = AppointmentServiceAddition::where('appointment_id', $appointment->id)
+            ->where('status', AppointmentServiceAddition::STATUS_ACTIVE)
+            ->find($additionId);
+
+        if (! $addition) {
+            return response()->json(['message' => 'That extra is not on this bill.'], 404);
+        }
+
+        $this->checkIn->voidAddition($appointment, $addition);
+
+        $appointment = $appointment->fresh($this->checkIn->relations());
+
+        return response()->json([
+            'message' => 'Extra removed from the bill.',
+            'appointment' => $this->present($appointment),
+            'bill' => $this->checkIn->bill($appointment),
+        ]);
+    }
+
+    /**
      * The bill as it stands, including anything added mid-appointment.
      */
     public function bill(Request $request, $salonId, $appointmentId)
@@ -243,43 +346,9 @@ class CheckInController extends Controller
 
     // ------------------------------------------------------------- internals
 
-    /**
-     * Flatten an appointment into what the partner app's check-in screens read.
-     */
     private function present(Appointment $appointment): array
     {
-        $isWalkIn = $appointment->booking_source === 'walk_in';
-
-        return [
-            'id' => $appointment->id,
-            'status' => $appointment->status,
-            'booking_source' => $appointment->booking_source,
-            'appointment_date' => Carbon::parse($appointment->appointment_date)->toDateString(),
-            'start_time' => substr($appointment->start_time, 0, 5),
-            'end_time' => substr($appointment->end_time, 0, 5),
-            'customer_name' => $isWalkIn
-                ? ($appointment->walk_in_customer_name ?? 'Walk-in')
-                : ($appointment->customer->name ?? 'Customer'),
-            'customer_phone' => $isWalkIn
-                ? $appointment->walk_in_customer_phone
-                : ($appointment->customer->phone ?? null),
-            'booked_provider_id' => $appointment->appointed_provider_id,
-            'booked_provider_name' => $appointment->appointedProvider->user->name ?? 'Any staff',
-            'serving_provider_id' => $appointment->serving_provider_id,
-            'serving_provider_name' => $appointment->servingProvider->user->name ?? null,
-            'total_amount' => (float) $appointment->total_amount,
-            'advance_amount' => (float) $appointment->advance_amount,
-            'balance_amount' => (float) $appointment->balance_amount,
-            'final_billed_amount' => $appointment->final_billed_amount !== null
-                ? (float) $appointment->final_billed_amount
-                : null,
-            'verification_method' => $appointment->verification_method,
-            'manual_check_in_reason' => $appointment->manual_check_in_reason,
-            'started_at' => $appointment->started_at,
-            'completed_at' => $appointment->completed_at,
-            'payment_mode' => $appointment->payment_mode,
-            'payment_collected_at' => $appointment->payment_collected_at,
-        ];
+        return $this->checkIn->present($appointment);
     }
 
     private function providerBelongsToSalon(?string $providerId, string $salonId): bool

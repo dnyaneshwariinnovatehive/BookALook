@@ -18,7 +18,7 @@ class StaffManagementController extends Controller
     {
         // workingHours is loaded so the edit screen can show what is actually
         // stored instead of falling back to defaults.
-        $staff = ServiceProvider::with(['user', 'services', 'workingHours'])
+        $staff = ServiceProvider::with(['user', 'services.template:id,name', 'workingHours'])
             ->where('salon_id', $salonId)
             ->get();
 
@@ -34,6 +34,7 @@ class StaffManagementController extends Controller
             'specialization' => 'nullable|string|max:150',
             'base_salary' => 'numeric|min:0',
             'commission_percentage' => 'numeric|min:0|max:100',
+            'auto_approve_leave' => 'boolean',
             'service_ids' => 'array',
             'service_ids.*' => 'exists:services,id',
             'working_hours' => 'required|array|size:7',
@@ -69,7 +70,7 @@ class StaffManagementController extends Controller
                 'specialization' => $request->specialization,
                 'base_salary' => $request->base_salary ?? 0,
                 'commission_percentage' => $request->commission_percentage ?? 0,
-                'auto_approve_leave' => false,
+                'auto_approve_leave' => $request->boolean('auto_approve_leave'),
                 'is_active' => true,
                 'joined_at' => now(),
             ]);
@@ -113,6 +114,7 @@ class StaffManagementController extends Controller
             'specialization' => 'nullable|string|max:150',
             'base_salary' => 'sometimes|numeric|min:0',
             'commission_percentage' => 'sometimes|numeric|min:0|max:100',
+            'auto_approve_leave' => 'sometimes|boolean',
             'service_ids' => 'sometimes|array',
             'service_ids.*' => 'exists:services,id',
             'working_hours' => 'sometimes|required|array|size:7',
@@ -139,6 +141,7 @@ class StaffManagementController extends Controller
             if ($request->has('specialization')) $provider->specialization = $request->specialization;
             if ($request->has('base_salary')) $provider->base_salary = $request->base_salary;
             if ($request->has('commission_percentage')) $provider->commission_percentage = $request->commission_percentage;
+            if ($request->has('auto_approve_leave')) $provider->auto_approve_leave = $request->boolean('auto_approve_leave');
             $provider->save();
 
             if ($request->has('service_ids')) {
@@ -206,6 +209,94 @@ class StaffManagementController extends Controller
             ->get();
 
         return response()->json(['leaves' => $leaves]);
+    }
+
+    /**
+     * A staff member asks for time off.
+     *
+     * Whether it needs the admin's say-so is set per person: some staff are
+     * trusted to book their own leave, others are not. Auto-approved leave is
+     * still recorded as approved by nobody in particular, so the audit trail is
+     * honest about how it was granted.
+     */
+    public function requestLeave(Request $request, $salonId)
+    {
+        $provider = ServiceProvider::where('user_id', $request->user()->id)
+            ->where('salon_id', $salonId)
+            ->first();
+
+        if (! $provider) {
+            return response()->json(['message' => 'You are not a service provider at this salon.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'leave_date' => 'required|date|after_or_equal:today',
+            'leave_type' => 'required|in:paid,unpaid',
+            'is_full_day' => 'boolean',
+            'start_time' => 'nullable|date_format:H:i:s|required_if:is_full_day,false',
+            'end_time' => 'nullable|date_format:H:i:s|required_if:is_full_day,false|after:start_time',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $alreadyBooked = ProviderLeave::where('provider_id', $provider->id)
+            ->whereDate('leave_date', $request->leave_date)
+            ->whereIn('status', [ProviderLeave::STATUS_PENDING, ProviderLeave::STATUS_APPROVED])
+            ->exists();
+
+        if ($alreadyBooked) {
+            return response()->json(['message' => 'You already have leave on that date.'], 422);
+        }
+
+        $isFullDay = $request->boolean('is_full_day', true);
+        $autoApprove = (bool) $provider->auto_approve_leave;
+
+        $leave = ProviderLeave::create([
+            'provider_id' => $provider->id,
+            'leave_date' => $request->leave_date,
+            'leave_type' => $request->leave_type,
+            'is_full_day' => $isFullDay,
+            'start_time' => $isFullDay ? null : $request->start_time,
+            'end_time' => $isFullDay ? null : $request->end_time,
+            'reason' => $request->reason,
+            'status' => $autoApprove ? ProviderLeave::STATUS_APPROVED : ProviderLeave::STATUS_PENDING,
+            'reviewed_at' => $autoApprove ? now() : null,
+        ]);
+
+        return response()->json([
+            'message' => $autoApprove
+                ? 'Leave approved automatically.'
+                : 'Leave requested. Waiting for the salon admin.',
+            'auto_approved' => $autoApprove,
+            'leave' => $leave,
+        ], 201);
+    }
+
+    /**
+     * A staff member's own leave record.
+     */
+    public function myLeaves(Request $request, $salonId)
+    {
+        $provider = ServiceProvider::where('user_id', $request->user()->id)
+            ->where('salon_id', $salonId)
+            ->first();
+
+        if (! $provider) {
+            return response()->json(['message' => 'You are not a service provider at this salon.'], 403);
+        }
+
+        $leaves = ProviderLeave::where('provider_id', $provider->id)
+            ->orderByDesc('leave_date')
+            ->limit(100)
+            ->get();
+
+        return response()->json([
+            'auto_approve_leave' => (bool) $provider->auto_approve_leave,
+            'leaves' => $leaves,
+        ]);
     }
 
     public function updateLeaveStatus(Request $request, $salonId, $leaveId)

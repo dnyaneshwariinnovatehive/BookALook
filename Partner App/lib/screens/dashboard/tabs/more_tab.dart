@@ -4,6 +4,8 @@ import '../../phone_screen.dart';
 import 'settings/salon_timings_screen.dart';
 import '../more/subscription_billing_screen.dart';
 import '../more/wallet_screen.dart';
+import '../more/payroll_screen.dart';
+import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 
 class MoreTab extends StatelessWidget {
@@ -129,6 +131,30 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SubscriptionBillingScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  _buildOptionTile(context,
+                    icon: Icons.groups,
+                    iconColor: Colors.indigo,
+                    title: 'Staff Payroll',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => PayrollScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  _buildOptionTile(context,
+                    icon: Icons.account_balance,
+                    iconColor: Colors.blueGrey,
+                    title: 'Payouts from BookALook',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SalonPayoutsScreen(salonId: salonId)),
                       );
                     },
                   ),

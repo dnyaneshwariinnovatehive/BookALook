@@ -34,42 +34,16 @@ class AvailabilityService
      */
     public function summariseCart(Cart $cart): array
     {
-        $serviceIds = [];
-        $duration = 0;
-        $total = 0.0;
-        $advance = 0.0;
-
-        foreach ($cart->items as $item) {
-            $quantity = max(1, (int) $item->quantity);
-
-            if ($item->service) {
-                $serviceIds[] = $item->service_id;
-                $duration += $this->serviceDuration($item->service) * $quantity;
-
-                $price = (float) $item->service->price * $quantity;
-                $total += $price;
-                $advance += $price * $this->advancePercentage($item->service->advance_percentage) / 100;
-                continue;
-            }
-
-            if ($item->combo) {
-                $comboPrice = 0.0;
-                foreach ($item->combo->services as $service) {
-                    $serviceIds[] = $service->id;
-                    $duration += $this->serviceDuration($service) * $quantity;
-                    $comboPrice += (float) ($service->pivot->combo_special_price ?? $service->price) * $quantity;
-                }
-
-                $total += $comboPrice;
-                $advance += $comboPrice * $this->advancePercentage($item->combo->advance_percentage) / 100;
-            }
-        }
+        // Pricing lives in CartPricingService so the cart screen, the checkout
+        // totals and the amount actually charged can never disagree — including
+        // the combo discounts it applies automatically.
+        $priced = app(CartPricingService::class)->price($cart);
 
         return [
-            'service_ids' => array_values(array_unique($serviceIds)),
-            'duration' => max($duration, self::SLOT_MINUTES),
-            'total' => round($total, 2),
-            'advance' => round(min($advance, $total), 2),
+            'service_ids' => $priced['service_ids'],
+            'duration' => $priced['duration'],
+            'total' => $priced['total'],
+            'advance' => $priced['advance'],
         ];
     }
 
