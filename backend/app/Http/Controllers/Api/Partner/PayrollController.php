@@ -190,14 +190,24 @@ class PayrollController extends Controller
             return $denied;
         }
 
+        $salon = Salon::find($salonId);
+
         $payouts = SalonPayout::with('salon:id,name')
             ->where('salon_id', $salonId)
-            ->orderByDesc('cycle_week_start_date')
+            ->orderByDesc('cycle_start_date')
             ->limit(52)
             ->get();
 
+        $model = $salon?->billingModel() ?? \App\Support\BillingModel::SUBSCRIPTION;
+
         return response()->json([
             'success' => true,
+            'billing_model' => $model,
+            'billing_label' => \App\Support\BillingModel::label($model),
+            'commission_percentage' => $salon?->isOnCommissionModel()
+                ? (float) ($salon->commission_percentage ?? 0)
+                : null,
+            'settlement_rhythm' => \App\Support\PayoutCycle::forBillingModel($model),
             'totals' => [
                 'commission_deducted_lifetime' => round((float) $payouts->sum('commission_deducted'), 2),
                 'received_lifetime' => round(

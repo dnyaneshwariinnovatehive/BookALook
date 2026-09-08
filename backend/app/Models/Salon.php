@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BillingModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -10,6 +11,12 @@ class Salon extends Model
     use HasUuids;
 
     protected $guarded = [];
+
+    protected $casts = [
+        'commission_opt_in' => 'boolean',
+        'commission_percentage' => 'decimal:2',
+        'commission_rate_effective_from' => 'date',
+    ];
 
     public function city()
     {
@@ -44,5 +51,31 @@ class Salon extends Model
     public function currentSubscription()
     {
         return $this->hasOne(SalonSubscription::class)->where('status', 'active')->latest('start_date');
+    }
+
+    public function commissionRates()
+    {
+        return $this->hasMany(SalonCommissionRate::class)->orderByDesc('effective_from');
+    }
+
+    public function payouts()
+    {
+        return $this->hasMany(SalonPayout::class);
+    }
+
+    /**
+     * Which arrangement the salon trades under.
+     *
+     * The salon's own flag is the answer, not the subscription row — a renewal
+     * replaces that row and used to lose the arrangement with it.
+     */
+    public function billingModel(): string
+    {
+        return $this->commission_opt_in ? BillingModel::COMMISSION : BillingModel::SUBSCRIPTION;
+    }
+
+    public function isOnCommissionModel(): bool
+    {
+        return (bool) $this->commission_opt_in;
     }
 }

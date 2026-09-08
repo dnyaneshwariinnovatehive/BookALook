@@ -18,6 +18,8 @@ use App\Models\User;
 use App\Models\WalletScheme;
 use App\Models\WalletSchemeTier;
 use App\Services\AppointmentCheckInService;
+use App\Services\CommissionService;
+use App\Support\BillingModel;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -30,11 +32,11 @@ use Illuminate\Support\Str;
  *
  * Two salons, deliberately in different states:
  *
- *   9112002049 — trading, on a Commission Plan, with six weeks of completed
+ *   9112002049 — trading, on the Commission Model, with six weeks of completed
  *                work behind it. This is where payouts, payroll, the coin
  *                ladder, combos and cart suggestions have something to chew on.
- *   9168281183 — fully set up but its plan lapsed yesterday, so it is the one
- *                to look at for the expiry lockdown and the "non-serviceable"
+ *   9168281183 — fully set up but its subscription plan lapsed yesterday, so it
+ *                is the one for the expiry lockdown and the "non-serviceable"
  *                state in the customer app.
  *
  * Everything it creates is its own — seeded customers, staff and appointments
@@ -79,7 +81,7 @@ class SeedTestScenario extends Command
 
         $this->components->info("Trading salon — {$this->activeSalon->name}");
         $this->seedSalonSetup($this->activeSalon, weeklyOffDay: 3);
-        $this->putOnCommissionPlan($this->activeSalon, 12.0);
+        $this->putOnCommissionModel($this->activeSalon, 12.0);
         $this->seedHistory($this->activeSalon);
         $this->seedLive($this->activeSalon);
         $this->seedLeave($this->activeSalon);
@@ -431,28 +433,33 @@ class SeedTestScenario extends Command
 
     // --------------------------------------------------------- subscriptions
 
-    private function putOnCommissionPlan(Salon $salon, float $rate): void
+    private function putOnCommissionModel(Salon $salon, float $rate): void
     {
-        $plan = SubscriptionPlan::where('is_active', true)->orderBy('price')->first()
+        // One plan carries the benefits for every Commission Model salon, so
+        // the seeder nominates one rather than picking per salon.
+        $plan = SubscriptionPlan::commissionPlan()
+            ?? SubscriptionPlan::where('is_active', true)->orderByDesc('price')->first()
             ?? SubscriptionPlan::first();
+
+        if ($plan && ! $plan->is_commission_plan) {
+            app(CommissionService::class)->setPlan($plan);
+        }
 
         SalonSubscription::where('salon_id', $salon->id)->update(['status' => 'cancelled']);
 
-        SalonSubscription::create([
-            'salon_id' => $salon->id,
-            'plan_id' => $plan?->id,
-            'billing_type' => 'commission',
-            'commission_percentage' => $rate,
-            'plan_price_snapshot' => $plan?->price ?? 0,
-            'start_date' => Carbon::today()->subMonths(2),
-            'end_date' => Carbon::today()->addMonths(2),
-            'status' => 'active',
-            'auto_renew' => false,
-        ]);
-
         $salon->forceFill(['status' => 'active'])->save();
 
-        $this->components->twoColumnDetail('plan', "Commission Plan at {$rate}%, active for 2 more months");
+        app(CommissionService::class)->activate(
+            $salon->fresh(),
+            $rate,
+            User::where('role', 'superadmin')->first() ?? User::first(),
+            'Seeded development scenario.'
+        );
+
+        $this->components->twoColumnDetail(
+            'billing',
+            "Commission Model at {$rate}%, settled monthly on the 1st"
+        );
     }
 
     private function expirePlan(Salon $salon): void
@@ -464,7 +471,7 @@ class SeedTestScenario extends Command
         SalonSubscription::create([
             'salon_id' => $salon->id,
             'plan_id' => $plan?->id,
-            'billing_type' => 'flat',
+            'billing_type' => BillingModel::SUBSCRIPTION,
             'plan_price_snapshot' => $plan?->price ?? 0,
             'start_date' => Carbon::today()->subMonth(),
             'end_date' => Carbon::yesterday(),
@@ -477,7 +484,7 @@ class SeedTestScenario extends Command
         // the salon inactive would block it for the wrong reason.
         $salon->forceFill(['status' => 'active'])->save();
 
-        $this->components->twoColumnDetail('plan', 'Flat plan, expired ' . Carbon::yesterday()->toDateString());
+        $this->components->twoColumnDetail('billing', 'Subscription plan, expired ' . Carbon::yesterday()->toDateString());
     }
 
     // -------------------------------------------------------------- history
@@ -830,7 +837,7 @@ class SeedTestScenario extends Command
         $this->components->info('Ready to test');
         $this->components->twoColumnDetail(
             "{$this->activeSalon->name} — admin " . self::ACTIVE_SALON_ADMIN,
-            'trading · commission plan'
+            'trading · commission model'
         );
         $this->components->twoColumnDetail(
             "{$this->expiredSalon->name} — admin " . self::EXPIRED_SALON_ADMIN,

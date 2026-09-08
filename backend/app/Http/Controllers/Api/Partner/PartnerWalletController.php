@@ -36,7 +36,7 @@ class PartnerWalletController extends Controller
         $transactions = WalletTransaction::with([
                 'tier.scheme:id,name',
                 'appointment:id,appointment_date,start_time',
-                'payout:id,cycle_week_start_date,cycle_week_end_date',
+                'payout:id,cycle_type,cycle_start_date,cycle_end_date',
                 'subscription:id,plan_id,plan_price_snapshot',
             ])
             ->where('salon_id', $salonId)
@@ -97,7 +97,7 @@ class PartnerWalletController extends Controller
 
     /**
      * Settle coins against commission owed on a payout. Only open to salons on
-     * a Commission Plan.
+     * a Commission Model.
      */
     public function redeemCommission(Request $request, $salonId)
     {

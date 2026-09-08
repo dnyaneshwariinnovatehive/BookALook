@@ -3,16 +3,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import styles from './page.module.css';
 
+type CycleType = 'weekly' | 'monthly';
+
 interface Payout {
   id: string;
   salon_id: string;
   salon_name: string | null;
-  cycle_week_start_date: string;
-  cycle_week_end_date: string;
+  cycle_type: CycleType;
+  cycle_label: string;
+  cycle_start_date: string;
+  cycle_end_date: string;
   appointments_count: number;
   appointment_revenue: number;
   gross_amount: number;
   billing_type: string;
+  billing_label: string;
   commission_percentage: number;
   commission_deducted: number;
   refund_adjustment: number;
@@ -32,13 +37,29 @@ interface Totals {
   distributed: number;
 }
 
+/* Built from local parts: toISOString() shifts to UTC and can land a Monday
+   on the Sunday before it. */
+const toKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /** Monday of the week containing `date`, as YYYY-MM-DD. */
 const mondayOf = (date: Date) => {
   const d = new Date(date);
   const day = (d.getDay() + 6) % 7; // Monday = 0
   d.setDate(d.getDate() - day);
-  return d.toISOString().split('T')[0];
+  return toKey(d);
 };
+
+/** First of the month containing `date`, as YYYY-MM-DD. */
+const firstOf = (date: Date) => {
+  const d = new Date(date);
+  d.setDate(1);
+  return toKey(d);
+};
+
+/** Where the cycle each arrangement settles on begins. */
+const startOfCycle = (cycle: CycleType, date: Date) =>
+  cycle === 'monthly' ? firstOf(date) : mondayOf(date);
 
 const money = (value: number) =>
   `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -47,11 +68,13 @@ export default function PayoutsPage() {
   const lastWeek = new Date();
   lastWeek.setDate(lastWeek.getDate() - 7);
 
-  const [weekStart, setWeekStart] = useState(mondayOf(lastWeek));
+  const [cycleType, setCycleType] = useState<CycleType>('weekly');
+  const [cycleStart, setCycleStart] = useState(mondayOf(lastWeek));
   const [statusFilter, setStatusFilter] = useState('');
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
-  const [weekEnd, setWeekEnd] = useState('');
+  const [cycleEnd, setCycleEnd] = useState('');
+  const [cycleLabel, setCycleLabel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -68,7 +91,7 @@ export default function PayoutsPage() {
     setIsLoading(true);
     setError('');
     try {
-      const query = new URLSearchParams({ week_start: weekStart });
+      const query = new URLSearchParams({ cycle_type: cycleType, cycle_start: cycleStart });
       if (statusFilter) query.append('status', statusFilter);
 
       const res = await fetch(`/api/proxy/superadmin/payouts?${query}`, { headers: authHeaders() });
@@ -78,19 +101,20 @@ export default function PayoutsPage() {
 
       setPayouts(data.payouts);
       setTotals(data.totals);
-      setWeekEnd(data.week_end);
+      setCycleEnd(data.cycle_end);
+      setCycleLabel(data.cycle_label);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setIsLoading(false);
     }
-  }, [weekStart, statusFilter]);
+  }, [cycleType, cycleStart, statusFilter]);
 
   useEffect(() => {
     fetchPayouts();
   }, [fetchPayouts]);
 
-  /* Recalculates the cycle from the week's completed appointments. */
+  /* Recalculates the cycle from its completed appointments. */
   const generate = async () => {
     setBusyId('generate');
     setError('');
@@ -98,7 +122,7 @@ export default function PayoutsPage() {
       const res = await fetch('/api/proxy/superadmin/payouts/generate', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ week_start: weekStart }),
+        body: JSON.stringify({ cycle_type: cycleType, cycle_start: cycleStart }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not calculate the cycle.');
@@ -115,6 +139,9 @@ export default function PayoutsPage() {
       const confirmed = confirm(
         `Distribute ${money(payout.net_amount)} to ${payout.salon_name}?\n\n` +
           `${money(payout.commission_deducted)} commission is deducted in this cycle. ` +
+          (payout.cycle_type === 'monthly'
+            ? 'Settling also extends their access into the next month. '
+            : '') +
           `This cannot be undone.`
       );
       if (!confirmed) return;
@@ -158,19 +185,46 @@ export default function PayoutsPage() {
     <div className={styles.container}>
       <h1 className={styles.title}>Payouts &amp; distribution</h1>
       <p style={{ color: '#6B7280', fontSize: 14, marginTop: -8 }}>
-        Weekly settlement. The platform hands over the advances it collected, less
-        commission for salons on the Commission Plan — deducted in this cycle,
-        before the payout is marked distributed.
+        {cycleType === 'monthly'
+          ? 'Monthly settlement for salons on the Commission Model, run on the 1st for the month just finished. Commission comes off inside this cycle, and settling extends the salon\u2019s access into the next month.'
+          : 'Weekly settlement for salons on a Subscription Plan. They have already paid for access, so this only hands back the advances the platform collected on their behalf.'}
       </p>
 
       <div className={styles.toolbar}>
         <div className={styles.field}>
-          <label htmlFor="week">Week starting (Monday)</label>
+          <label htmlFor="cycle">Settlement run</label>
+          <select
+            id="cycle"
+            value={cycleType}
+            onChange={(e) => {
+              const next = e.target.value as CycleType;
+              setCycleType(next);
+              // The same date sits in a different cycle depending on the
+              // rhythm, so the anchor moves with it.
+              setCycleStart(startOfCycle(next, new Date(cycleStart)));
+            }}
+          >
+            <option value="weekly">Weekly &middot; Subscription Plan</option>
+            <option value="monthly">Monthly &middot; Commission Model</option>
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="cycle-start">
+            {cycleType === 'monthly' ? 'Month' : 'Week starting (Monday)'}
+          </label>
           <input
-            id="week"
-            type="date"
-            value={weekStart}
-            onChange={(e) => setWeekStart(mondayOf(new Date(e.target.value)))}
+            id="cycle-start"
+            type={cycleType === 'monthly' ? 'month' : 'date'}
+            value={cycleType === 'monthly' ? cycleStart.slice(0, 7) : cycleStart}
+            onChange={(e) =>
+              setCycleStart(
+                startOfCycle(
+                  cycleType,
+                  new Date(cycleType === 'monthly' ? `${e.target.value}-01` : e.target.value)
+                )
+              )
+            }
           />
         </div>
 
@@ -185,13 +239,17 @@ export default function PayoutsPage() {
         </div>
 
         <button className={styles.button} onClick={generate} disabled={busyId === 'generate'}>
-          {busyId === 'generate' ? 'Calculating…' : 'Calculate this week'}
+          {busyId === 'generate'
+            ? 'Calculating…'
+            : cycleType === 'monthly'
+              ? 'Calculate this month'
+              : 'Calculate this week'}
         </button>
       </div>
 
-      {weekEnd && (
+      {cycleEnd && (
         <p style={{ color: '#6B7280', fontSize: 13, marginTop: -8 }}>
-          Cycle {weekStart} → {weekEnd}
+          {cycleLabel} · {cycleStart} → {cycleEnd}
         </p>
       )}
 
@@ -234,15 +292,17 @@ export default function PayoutsPage() {
         <p>Loading…</p>
       ) : payouts.length === 0 ? (
         <div className={styles.card}>
-          No payouts for this week yet. Press <strong>Calculate this week</strong> to
-          build them from completed appointments.
+          No {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts
+          for this cycle yet. Press{' '}
+          <strong>{cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}</strong>{' '}
+          to build them from completed appointments.
         </div>
       ) : (
         <table className={styles.table}>
           <thead>
             <tr>
               <th>Salon</th>
-              <th>Plan</th>
+              <th>Billing</th>
               <th>Appts</th>
               <th>Billed</th>
               <th>Advances held</th>
@@ -268,10 +328,10 @@ export default function PayoutsPage() {
                 <td>
                   <span
                     className={`${styles.pill} ${
-                      p.billing_type === 'commission' ? styles.pillCommission : styles.pillFlat
+                      p.billing_type === 'commission' ? styles.pillCommission : styles.pillSubscription
                     }`}
                   >
-                    {p.billing_type}
+                    {p.billing_label}
                   </span>
                 </td>
                 <td>{p.appointments_count}</td>

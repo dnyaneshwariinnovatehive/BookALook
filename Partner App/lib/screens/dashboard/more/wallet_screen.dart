@@ -309,8 +309,8 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                   )),
               subtitle: Text(
                 _canRedeemAgainstCommission
-                    ? 'Settle against a weekly payout’s commission'
-                    : 'Only available on a Commission Plan',
+                    ? 'Settle against a monthly payout’s commission'
+                    : 'Only available on the Commission Model',
                 style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
               ),
             ),

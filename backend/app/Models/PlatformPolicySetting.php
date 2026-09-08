@@ -34,6 +34,10 @@ class PlatformPolicySetting extends Model
         // Local hour (0-23) for the daily renewal reminder. Mid-morning: the
         // owner is at the salon and not yet in the day's rush.
         'subscription_reminder_hour' => 11,
+        // Days after a month closes before an unsettled Commission Model salon
+        // loses access. The month's payout lands on the 1st and someone has to
+        // work through the queue; a salon should not be shut for that.
+        'commission_settlement_grace_days' => 7,
     ];
 
     /**

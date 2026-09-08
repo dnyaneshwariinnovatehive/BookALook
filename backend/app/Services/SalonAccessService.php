@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Salon;
 use App\Models\SalonSubscription;
+use App\Support\BillingModel;
 use Carbon\Carbon;
 
 /**
@@ -25,8 +26,15 @@ class SalonAccessService
     public const REASON_SUBSCRIPTION_EXPIRED = 'subscription_expired';
 
     /**
+     * A Commission Model salon has not failed to renew — it has an unsettled
+     * month. Telling its owner to "renew the plan" would send them looking for
+     * a buy button that does not apply to them.
+     */
+    public const REASON_COMMISSION_UNSETTLED = 'commission_unsettled';
+
+    /**
      * @return array{
-     *   is_active: bool, reason: ?string, message: ?string,
+     *   is_active: bool, reason: ?string, message: ?string, billing_model: string,
      *   subscription: ?SalonSubscription, expired_on: ?string, days_remaining: ?int
      * }
      */
@@ -34,12 +42,14 @@ class SalonAccessService
     {
         $this->expireStale($salon->id);
 
+        $model = $salon->billingModel();
+
         if ($salon->status === 'suspended') {
-            return $this->blocked(self::REASON_SUSPENDED, 'This salon is temporarily unavailable.');
+            return $this->blocked(self::REASON_SUSPENDED, 'This salon is temporarily unavailable.', model: $model);
         }
 
         if ($salon->status !== 'active') {
-            return $this->blocked(self::REASON_NOT_APPROVED, 'This salon is not accepting online bookings yet.');
+            return $this->blocked(self::REASON_NOT_APPROVED, 'This salon is not accepting online bookings yet.', model: $model);
         }
 
         $subscription = SalonSubscription::with('plan')
@@ -49,15 +59,22 @@ class SalonAccessService
             ->first();
 
         if (! $subscription) {
-            // Either never subscribed, or the last plan lapsed.
+            // Either never signed up, or the arrangement lapsed.
             $lapsed = SalonSubscription::where('salon_id', $salon->id)
                 ->orderByDesc('end_date')
                 ->first();
 
+            $reason = match (true) {
+                BillingModel::isCommission($model) && (bool) $lapsed => self::REASON_COMMISSION_UNSETTLED,
+                (bool) $lapsed => self::REASON_SUBSCRIPTION_EXPIRED,
+                default => self::REASON_NO_SUBSCRIPTION,
+            };
+
             return $this->blocked(
-                $lapsed ? self::REASON_SUBSCRIPTION_EXPIRED : self::REASON_NO_SUBSCRIPTION,
+                $reason,
                 'This salon is not taking online bookings at the moment.',
                 expiredOn: $lapsed ? Carbon::parse($lapsed->end_date)->toDateString() : null,
+                model: $model,
             );
         }
 
@@ -65,6 +82,7 @@ class SalonAccessService
             'is_active' => true,
             'reason' => null,
             'message' => null,
+            'billing_model' => $model,
             'subscription' => $subscription,
             'expired_on' => null,
             'days_remaining' => (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false),
@@ -103,9 +121,15 @@ class SalonAccessService
             'reason' => $status['reason'],
             'expired_on' => $status['expired_on'],
             'days_remaining' => $status['days_remaining'],
+            'billing_model' => $status['billing_model'],
+            'billing_label' => BillingModel::label($status['billing_model']),
+            'commission_percentage' => $salon->isOnCommissionModel()
+                ? (float) ($salon->commission_percentage ?? 0)
+                : null,
             'subscription' => $subscription ? [
                 'plan_name' => $subscription->plan->name ?? 'Plan',
-                'billing_type' => $subscription->billing_type,
+                'billing_type' => BillingModel::normalise($subscription->billing_type),
+                'billing_label' => BillingModel::label($subscription->billing_type),
                 'end_date' => Carbon::parse($subscription->end_date)->toDateString(),
             ] : null,
             // A staff member cannot renew — they can only ask the owner to,
@@ -129,12 +153,17 @@ class SalonAccessService
             ->update(['status' => 'expired']);
     }
 
-    private function blocked(string $reason, string $message, ?string $expiredOn = null): array
-    {
+    private function blocked(
+        string $reason,
+        string $message,
+        ?string $expiredOn = null,
+        string $model = BillingModel::SUBSCRIPTION
+    ): array {
         return [
             'is_active' => false,
             'reason' => $reason,
             'message' => $message,
+            'billing_model' => $model,
             'subscription' => null,
             'expired_on' => $expiredOn,
             'days_remaining' => null,

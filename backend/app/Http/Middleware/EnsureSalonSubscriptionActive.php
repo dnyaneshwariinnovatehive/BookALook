@@ -40,12 +40,18 @@ class EnsureSalonSubscriptionActive
 
         // 402: the work is understood and permitted, but not paid for.
         return response()->json([
-            'message' => $status['reason'] === SalonAccessService::REASON_SUBSCRIPTION_EXPIRED
-                || $status['reason'] === SalonAccessService::REASON_NO_SUBSCRIPTION
-                ? 'This salon\'s subscription has lapsed. Renew the plan to use the app again.'
-                : $status['message'],
+            'message' => match ($status['reason']) {
+                // Postpaid: nothing has been bought, so there is nothing to renew.
+                SalonAccessService::REASON_COMMISSION_UNSETTLED
+                    => 'This salon has an unsettled commission month. It will go back online once the payout is settled.',
+                SalonAccessService::REASON_SUBSCRIPTION_EXPIRED,
+                SalonAccessService::REASON_NO_SUBSCRIPTION
+                    => 'This salon\'s subscription plan has lapsed. Renew the plan to use the app again.',
+                default => $status['message'],
+            },
             'subscription_required' => true,
             'reason' => $status['reason'],
+            'billing_model' => $status['billing_model'],
             'expired_on' => $status['expired_on'],
         ], 402);
     }

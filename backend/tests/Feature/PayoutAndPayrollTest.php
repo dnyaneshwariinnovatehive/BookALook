@@ -18,10 +18,13 @@ use App\Services\PayoutService;
 use App\Services\PayrollService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use App\Models\SalonCommissionRate;
+use App\Support\BillingModel;
+use App\Support\PayoutCycle;
 use Tests\TestCase;
 
 /**
- * Weekly settlement with the salon, and monthly pay for its staff.
+ * Settlement with the salon, and monthly pay for its staff.
  *
  * Runs in a transaction so it can use the development database without
  * leaving anything behind.
@@ -35,15 +38,16 @@ class PayoutAndPayrollTest extends TestCase
     public function test_commission_comes_off_the_advances_the_platform_holds(): void
     {
         [$salon, $superAdmin, $provider] = $this->fixture();
-        $this->givenSubscription($salon, 'commission', 10.0);
+        $this->givenSubscription($salon, BillingModel::COMMISSION, 10.0);
 
-        [$weekStart, $weekEnd] = $this->thisWeek();
+        // The Commission Model settles a month at a time, on the 1st.
+        [$start, $end] = $this->thisMonth();
 
         // Two completed appointments: ₹5,000 billed, ₹1,500 taken as advance.
-        $this->givenCompleted($salon, $provider, total: 2000, advance: 600, on: $weekStart);
-        $this->givenCompleted($salon, $provider, total: 3000, advance: 900, on: $weekStart);
+        $this->givenCompleted($salon, $provider, total: 2000, advance: 600, on: $start);
+        $this->givenCompleted($salon, $provider, total: 3000, advance: 900, on: $start);
 
-        $payout = app(PayoutService::class)->calculate($salon->id, $weekStart, $weekEnd);
+        $payout = app(PayoutService::class)->calculate($salon->id, $start, $end);
 
         // Commission is charged on everything billed...
         $this->assertEquals(5000.0, (float) $payout->appointment_revenue);
@@ -51,14 +55,15 @@ class PayoutAndPayrollTest extends TestCase
         // ...but only the advances are the platform's to hand over.
         $this->assertEquals(1500.0, (float) $payout->gross_amount);
         $this->assertEquals(1000.0, (float) $payout->net_amount);
-        $this->assertSame('commission', $payout->billing_type);
+        $this->assertSame(BillingModel::COMMISSION, $payout->billing_type);
+        $this->assertSame(PayoutCycle::MONTHLY, $payout->cycle_type);
         $this->assertSame(2, (int) $payout->appointments_count);
     }
 
-    public function test_a_flat_plan_salon_has_nothing_deducted(): void
+    public function test_a_subscription_plan_salon_has_nothing_deducted(): void
     {
         [$salon, , $provider] = $this->fixture();
-        $this->givenSubscription($salon, 'flat');
+        $this->givenSubscription($salon, BillingModel::SUBSCRIPTION);
 
         [$weekStart, $weekEnd] = $this->thisWeek();
         $this->givenCompleted($salon, $provider, total: 4000, advance: 1000, on: $weekStart);
@@ -72,15 +77,15 @@ class PayoutAndPayrollTest extends TestCase
     public function test_superadmin_approves_then_distributes_and_the_record_is_frozen(): void
     {
         [$salon, $superAdmin, $provider] = $this->fixture();
-        $this->givenSubscription($salon, 'commission', 20.0);
+        $this->givenSubscription($salon, BillingModel::COMMISSION, 20.0);
 
-        [$weekStart, $weekEnd] = $this->thisWeek();
-        $this->givenCompleted($salon, $provider, total: 1000, advance: 400, on: $weekStart);
+        [$start, $end] = $this->thisMonth();
+        $this->givenCompleted($salon, $provider, total: 1000, advance: 400, on: $start);
 
-        app(PayoutService::class)->calculate($salon->id, $weekStart, $weekEnd);
+        app(PayoutService::class)->calculate($salon->id, $start, $end);
 
         $listed = $this->actingAs($superAdmin, 'sanctum')
-            ->getJson('/api/superadmin/payouts?week_start=' . $weekStart->toDateString())
+            ->getJson('/api/superadmin/payouts?cycle_type=monthly&cycle_start=' . $start->toDateString())
             ->assertStatus(200)
             ->json();
 
@@ -108,8 +113,8 @@ class PayoutAndPayrollTest extends TestCase
             ->assertStatus(422);
 
         // A late recalculation must not rewrite money that has already moved.
-        $this->givenCompleted($salon, $provider, total: 9999, advance: 5000, on: $weekStart);
-        $again = app(PayoutService::class)->calculate($salon->id, $weekStart, $weekEnd);
+        $this->givenCompleted($salon, $provider, total: 9999, advance: 5000, on: $start);
+        $again = app(PayoutService::class)->calculate($salon->id, $start, $end);
         $this->assertEquals(200.0, (float) $again->net_amount);
     }
 
@@ -117,18 +122,18 @@ class PayoutAndPayrollTest extends TestCase
     {
         [$salon, , $provider] = $this->fixture();
         $admin = User::find($salon->admin_id);
-        $this->givenSubscription($salon, 'commission', 15.0);
+        $this->givenSubscription($salon, BillingModel::COMMISSION, 15.0);
 
-        [$weekStart, $weekEnd] = $this->thisWeek();
-        $this->givenCompleted($salon, $provider, total: 2000, advance: 800, on: $weekStart);
-        app(PayoutService::class)->calculate($salon->id, $weekStart, $weekEnd);
+        [$start, $end] = $this->thisMonth();
+        $this->givenCompleted($salon, $provider, total: 2000, advance: 800, on: $start);
+        app(PayoutService::class)->calculate($salon->id, $start, $end);
 
         $body = $this->actingAs($admin, 'sanctum')
             ->getJson("/api/partner/salons/{$salon->id}/payouts")
             ->assertStatus(200)
             ->json();
 
-        $row = collect($body['payouts'])->firstWhere('cycle_week_start_date', $weekStart->toDateString());
+        $row = collect($body['payouts'])->firstWhere('cycle_start_date', $start->toDateString());
         $this->assertNotNull($row);
         $this->assertEquals(300.0, $row['commission_deducted']);
         $this->assertEquals(15.0, $row['commission_percentage']);
@@ -379,7 +384,7 @@ class PayoutAndPayrollTest extends TestCase
 
         // Payroll sits behind the subscription gate, so the salon has to be
         // trading for these tests to reach it.
-        $this->givenSubscription($salon, 'flat');
+        $this->givenSubscription($salon, BillingModel::SUBSCRIPTION);
 
         $provider = $this->givenProvider($salon, "Staff A {$unique}");
         $other = $needsSecondProvider ? $this->givenProvider($salon, "Staff B {$unique}") : null;
@@ -435,6 +440,21 @@ class PayoutAndPayrollTest extends TestCase
         return [$start, $start->copy()->endOfWeek()];
     }
 
+    /** The cycle a Commission Model salon settles on. @return array{0: Carbon, 1: Carbon} */
+    private function thisMonth(): array
+    {
+        $start = Carbon::today()->startOfMonth();
+
+        return [$start, $start->copy()->endOfMonth()];
+    }
+
+    /**
+     * Put the salon on one of the two arrangements.
+     *
+     * The salon row is the source of truth for which model it is on and what
+     * it is charged — the subscription row is replaced on every renewal, which
+     * is exactly why the rate no longer lives there.
+     */
     private function givenSubscription(Salon $salon, string $billingType, ?float $rate = null): void
     {
         SalonSubscription::where('salon_id', $salon->id)->update(['status' => 'cancelled']);
@@ -443,6 +463,23 @@ class PayoutAndPayrollTest extends TestCase
 
         if (! $plan) {
             $this->markTestSkipped('needs a subscription plan');
+        }
+
+        $isCommission = BillingModel::isCommission($billingType);
+
+        $salon->forceFill([
+            'commission_opt_in' => $isCommission,
+            'commission_percentage' => $isCommission ? $rate : null,
+            'commission_rate_effective_from' => $isCommission ? Carbon::today()->subDay() : null,
+        ])->save();
+
+        if ($isCommission) {
+            SalonCommissionRate::where('salon_id', $salon->id)->update(['effective_to' => Carbon::yesterday()]);
+            SalonCommissionRate::create([
+                'salon_id' => $salon->id,
+                'percentage' => $rate ?? 0,
+                'effective_from' => Carbon::today()->subDay(),
+            ]);
         }
 
         SalonSubscription::create([

@@ -94,8 +94,11 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       request.headers['Authorization'] = 'Bearer $token';
       request.headers['Accept'] = 'application/json';
       
+      // This screen only ever buys a plan. Moving to the Commission Model is a
+      // request SuperAdmin approves, not a purchase — it lives on the billing
+      // screen, and sending a billing type from here used to overwrite a
+      // commission salon's arrangement.
       request.fields['plan_id'] = _selectedPlanId!;
-      request.fields['billing_type'] = 'flat';
 
       if (_screenshot != null) {
         final bytes = await _screenshot!.readAsBytes();

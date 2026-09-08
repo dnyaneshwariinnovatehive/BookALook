@@ -73,12 +73,17 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       _buildTotals(),
+                      const SizedBox(height: 12),
+                      _buildBillingBanner(),
                       const SizedBox(height: 16),
                       if (_data!.payouts.isEmpty)
                         _card(
                           child: Text(
-                            'No payouts yet. A cycle appears once BookALook settles a '
-                            'week of completed appointments.',
+                            _data!.onCommissionModel
+                                ? 'No settlements yet. A month appears here once '
+                                    'BookALook settles it, on the 1st.'
+                                : 'No payouts yet. A cycle appears once BookALook settles '
+                                    'a week of completed appointments.',
                             style: GoogleFonts.outfit(color: Colors.grey.shade700),
                           ),
                         )
@@ -150,6 +155,50 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
         ),
       );
 
+  /// Which arrangement the salon is on, and what that means for its money.
+  ///
+  /// Without this the two rhythms look like a bug: a commission salon sees one
+  /// row a month where its neighbour sees four.
+  Widget _buildBillingBanner() {
+    final commission = _data!.onCommissionModel;
+    final rate = _data!.commissionPercentage;
+
+    return _card(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            commission ? Icons.percent_rounded : Icons.verified_rounded,
+            size: 20,
+            color: commission ? AppTheme.lightWarning : Colors.green.shade700,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _data!.billingLabel,
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  commission
+                      ? 'You pay ${rate == null ? '' : '${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2)}% of '}'
+                          'everything you bill. Settled on the 1st of each month for the '
+                          'month just finished.'
+                      : 'Your plan is already paid for, so nothing is deducted. Each week '
+                          'BookALook returns the advances it collected for you.',
+                  style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCycle(SalonPayoutRecord p) {
     final distributed = p.status == 'distributed';
 
@@ -163,7 +212,9 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    '${_formatDate(p.weekStart)} – ${_formatDate(p.weekEnd)}',
+                    p.cycleLabel.isNotEmpty
+                        ? p.cycleLabel
+                        : '${_formatDate(p.cycleStart)} – ${_formatDate(p.cycleEnd)}',
                     style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -220,9 +271,10 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
                   style: GoogleFonts.outfit(fontSize: 11.5, color: Colors.grey.shade600)),
             ],
 
-            if (p.billingType != 'commission' && p.commissionDeducted == 0) ...[
+            if (p.billingType != 'commission') ...[
               const SizedBox(height: 6),
-              Text('Flat plan — no commission is deducted.',
+              // Nothing is deducted because access was already paid for.
+              Text('Subscription Plan — no commission is deducted.',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: Colors.grey.shade600)),
             ],
           ],

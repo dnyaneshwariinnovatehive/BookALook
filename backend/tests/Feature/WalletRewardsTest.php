@@ -118,8 +118,8 @@ class WalletRewardsTest extends TestCase
 
         $payout = SalonPayout::create([
             'salon_id' => $salon->id,
-            'cycle_week_start_date' => Carbon::today()->subDays(7),
-            'cycle_week_end_date' => Carbon::today(),
+            'cycle_start_date' => Carbon::today()->subDays(7),
+            'cycle_end_date' => Carbon::today(),
             'gross_amount' => 5000,
             'commission_deducted' => 400,
             'net_amount' => 4600,
@@ -127,7 +127,7 @@ class WalletRewardsTest extends TestCase
         ]);
 
         // Flat plan: there is no commission relationship to settle.
-        $this->givenSubscription($salon, 'flat');
+        $this->givenSubscription($salon, \App\Support\BillingModel::SUBSCRIPTION);
 
         $this->actingAs($admin, 'sanctum')
             ->postJson("/api/partner/salons/{$salon->id}/wallet/redeem-commission", [
@@ -135,9 +135,9 @@ class WalletRewardsTest extends TestCase
                 'coins_to_redeem' => 10,
             ])
             ->assertStatus(422)
-            ->assertJsonPath('message', 'Coins can only be settled against commission on a Commission Plan.');
+            ->assertJsonPath('message', 'Coins can only be settled against commission on a Commission Model.');
 
-        $this->givenSubscription($salon, 'commission');
+        $this->givenSubscription($salon, \App\Support\BillingModel::COMMISSION);
 
         $this->actingAs($admin, 'sanctum')
             ->postJson("/api/partner/salons/{$salon->id}/wallet/redeem-commission", [
@@ -170,12 +170,12 @@ class WalletRewardsTest extends TestCase
         [$salon, , $admin] = $this->fixture();
         $this->setCoinValue(10.0);
         $this->giveCoins($salon, 500);
-        $this->givenSubscription($salon, 'commission');
+        $this->givenSubscription($salon, \App\Support\BillingModel::COMMISSION);
 
         $payout = SalonPayout::create([
             'salon_id' => $salon->id,
-            'cycle_week_start_date' => Carbon::today()->subDays(7),
-            'cycle_week_end_date' => Carbon::today(),
+            'cycle_start_date' => Carbon::today()->subDays(7),
+            'cycle_end_date' => Carbon::today(),
             'gross_amount' => 1000,
             'commission_deducted' => 50, // only 5 coins' worth
             'net_amount' => 950,
@@ -435,6 +435,12 @@ class WalletRewardsTest extends TestCase
         if (! $plan) {
             $this->markTestSkipped('needs a subscription plan');
         }
+
+        // Which arrangement a salon is on is the salon's own flag; coins may
+        // only be settled against commission when there is commission to owe.
+        $salon->forceFill([
+            'commission_opt_in' => \App\Support\BillingModel::isCommission($billingType),
+        ])->save();
 
         SalonSubscription::create([
             'salon_id' => $salon->id,

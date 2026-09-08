@@ -93,7 +93,13 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'store']);
         Route::put('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'update']);
         Route::delete('/subscriptions/plans/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'destroy']);
+        // The one plan whose benefits every Commission Model salon enjoys.
+        Route::post('/subscriptions/commission-plan', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'setCommissionPlan']);
         Route::post('/salons/{id}/subscription', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'assignToSalon']);
+        // Refused while the salon still has an open payout, so the boundary
+        // between the old rate and the new one stays honest.
+        Route::put('/salons/{id}/commission-rate', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'setCommissionRate']);
+        Route::get('/salons/{id}/commission-history', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'commissionHistory']);
         Route::get('/subscription-requests', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'getSubscriptionRequests']);
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);
@@ -101,7 +107,8 @@ Route::prefix('superadmin')->group(function () {
         
         Route::apiResource('wallet-schemes', \App\Http\Controllers\Api\SuperAdmin\WalletSchemeController::class);
 
-        // Weekly payout & distribution
+        // Payout runs: weekly for Subscription Plan salons, monthly for the
+        // Commission Model.
         Route::get('/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'index']);
         Route::post('/payouts/generate', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'generate']);
         Route::get('/payouts/{id}', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'show']);
@@ -148,6 +155,8 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
         Route::post('/salons/{salon_id}/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
         Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
+        // Postpaid: no money changes hands here, so there is nothing to upload.
+        Route::post('/salons/{salon_id}/subscription/commission-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'commissionRequest']);
         Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
         Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
         Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);

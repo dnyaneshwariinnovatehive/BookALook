@@ -180,3 +180,276 @@
   margin: 0;
   cursor: pointer;
 }
+
+/* ------------------------------------------- billing models & commission */
+
+.pageIntro {
+  color: var(--text-body);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 76ch;
+  margin: -12px 0 28px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.sectionHint {
+  color: var(--text-body);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  max-width: 76ch;
+  margin: 6px 0 16px;
+}
+
+.bannerOk,
+.bannerError {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.bannerOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.bannerError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.bannerOk button,
+.bannerError button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.warningPanel,
+.inlineWarning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.inlineWarning {
+  margin-top: 8px;
+}
+
+.inlineHint {
+  color: var(--text-body);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+}
+
+/* Requests are the only thing on this page that is actually blocking work. */
+.pendingPanel {
+  background: var(--surface);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-lg, 16px);
+  padding: 20px 24px 24px;
+  box-shadow: var(--card-shadow);
+}
+
+.pendingTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-heading);
+}
+
+.countChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-warning);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.commissionSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--card-shadow);
+  padding: 20px 24px;
+}
+
+.summaryLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+
+.summaryValue {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cardTop h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-heading);
+}
+
+/* The plan carrying the Commission Model is the one to find at a glance. */
+.cardHighlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--card-shadow);
+}
+
+.specList {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+}
+
+.specList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.specList > div:last-child {
+  border-bottom: none;
+}
+
+.specList dt {
+  color: var(--text-body);
+}
+
+.specList dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-align: right;
+}
+
+.cardActions,
+.rowActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.cardActions {
+  justify-content: flex-start;
+}
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pillSubscription { background: #E0E7FF; color: #4338CA; }
+.pillCommission { background: #F3E8FF; color: #9333EA; }
+.pillMuted { background: var(--background); color: var(--text-body); border: 1px solid var(--border); }
+
+.smallButton,
+.dangerButton {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.smallButton:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-hover);
+  color: var(--accent);
+}
+
+.smallButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.approveButton {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.dangerButton:hover {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.mutedNote {
+  color: var(--text-light);
+  font-size: 0.78rem;
+}
+
+.blockedNote {
+  color: var(--color-warning);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.blockingList {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: var(--text-body);
+  line-height: 1.7;
+}

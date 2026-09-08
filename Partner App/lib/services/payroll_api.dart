@@ -257,13 +257,21 @@ class MyPayroll {
       );
 }
 
+/// One settled cycle.
+///
+/// A Subscription Plan salon settles weekly and only gets its held advances
+/// back; a Commission Model salon settles monthly and has commission taken off
+/// inside the cycle. [cycleLabel] is what the salon should actually read.
 class SalonPayoutRecord {
-  final String weekStart;
-  final String weekEnd;
+  final String cycleType;
+  final String cycleLabel;
+  final String cycleStart;
+  final String cycleEnd;
   final int appointments;
   final double revenue;
   final double advancesHeld;
   final String billingType;
+  final String billingLabel;
   final double commissionPercentage;
   final double commissionDeducted;
   final double walletRedeemed;
@@ -272,12 +280,15 @@ class SalonPayoutRecord {
   final String? reference;
 
   SalonPayoutRecord({
-    required this.weekStart,
-    required this.weekEnd,
+    required this.cycleType,
+    required this.cycleLabel,
+    required this.cycleStart,
+    required this.cycleEnd,
     required this.appointments,
     required this.revenue,
     required this.advancesHeld,
     required this.billingType,
+    required this.billingLabel,
     required this.commissionPercentage,
     required this.commissionDeducted,
     required this.walletRedeemed,
@@ -287,12 +298,15 @@ class SalonPayoutRecord {
   });
 
   factory SalonPayoutRecord.fromJson(Map<String, dynamic> json) => SalonPayoutRecord(
-        weekStart: json['cycle_week_start_date'] ?? '',
-        weekEnd: json['cycle_week_end_date'] ?? '',
+        cycleType: json['cycle_type'] ?? 'weekly',
+        cycleLabel: json['cycle_label'] ?? '',
+        cycleStart: json['cycle_start_date'] ?? '',
+        cycleEnd: json['cycle_end_date'] ?? '',
         appointments: json['appointments_count'] ?? 0,
         revenue: _num(json['appointment_revenue']),
         advancesHeld: _num(json['gross_amount']),
-        billingType: json['billing_type'] ?? 'flat',
+        billingType: json['billing_type'] ?? 'subscription',
+        billingLabel: json['billing_label'] ?? 'Subscription Plan',
         commissionPercentage: _num(json['commission_percentage']),
         commissionDeducted: _num(json['commission_deducted']),
         walletRedeemed: _num(json['wallet_redeemed_amount']),
@@ -305,11 +319,21 @@ class SalonPayoutRecord {
 class SalonPayouts {
   final double commissionLifetime;
   final double receivedLifetime;
+  final String billingModel;
+  final String billingLabel;
+  final double? commissionPercentage;
+  final String settlementRhythm;
   final List<SalonPayoutRecord> payouts;
+
+  bool get onCommissionModel => billingModel == 'commission';
 
   SalonPayouts({
     required this.commissionLifetime,
     required this.receivedLifetime,
+    required this.billingModel,
+    required this.billingLabel,
+    required this.commissionPercentage,
+    required this.settlementRhythm,
     required this.payouts,
   });
 
@@ -319,6 +343,11 @@ class SalonPayouts {
     return SalonPayouts(
       commissionLifetime: _num(totals['commission_deducted_lifetime']),
       receivedLifetime: _num(totals['received_lifetime']),
+      billingModel: json['billing_model'] ?? 'subscription',
+      billingLabel: json['billing_label'] ?? 'Subscription Plan',
+      commissionPercentage:
+          json['commission_percentage'] == null ? null : _num(json['commission_percentage']),
+      settlementRhythm: json['settlement_rhythm'] ?? 'weekly',
       payouts: ((json['payouts'] as List?) ?? [])
           .map((e) => SalonPayoutRecord.fromJson(e as Map<String, dynamic>))
           .toList(),

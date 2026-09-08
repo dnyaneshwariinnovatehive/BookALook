@@ -109,7 +109,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
     // Parse Services
     final List services = appointment['services'] ?? [];
-    String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(', ');
+    String serviceNames = services.map((s) => s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service').join(', ');
     if (serviceNames.isEmpty) serviceNames = 'No specific service';
 
     final num totalAmount = appointment['total_amount'] ?? 0;
@@ -220,7 +220,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               children: [
                 _buildInfoRow('Date', appointment['appointment_date'] ?? ''),
                 _buildInfoRow('Time', '${appointment['start_time']} - ${appointment['end_time']}'),
-                _buildInfoRow('Assigned Provider', appointment['appointed_provider']?['name'] ?? 'Any Staff'),
+                _buildInfoRow('Assigned Provider', appointment['appointed_provider']?['user']?['name'] ?? appointment['appointed_provider']?['name'] ?? 'Any Staff'),
                 const Divider(height: 24),
                 Text('Booked Services', style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey)),
                 const SizedBox(height: 4),

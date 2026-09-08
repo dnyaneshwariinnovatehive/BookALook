@@ -232,7 +232,7 @@
 .pillPending { background: #FEF3C7; color: #B45309; }
 .pillApproved { background: #E0F2FE; color: #0369A1; }
 .pillDistributed { background: #DCFCE7; color: #15803D; }
-.pillFlat { background: #F3F4F6; color: #374151; }
+.pillSubscription { background: #E0E7FF; color: #4338CA; }
 .pillCommission { background: #F3E8FF; color: #9333EA; }
 
 .rowActions {

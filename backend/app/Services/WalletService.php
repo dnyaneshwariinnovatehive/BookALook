@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Salons earn coins for completed online appointments against a ladder
  * SuperAdmin publishes, and can spend them in exactly two places: their next
- * subscription purchase, or the commission they owe on a Commission Plan.
+ * subscription purchase, or the commission they owe on a Commission Model.
  * Coins are never cash and are never paid out — that is the separate payout
  * system's job.
  *
@@ -169,7 +169,7 @@ class WalletService
 
     /**
      * Settle coins against commission owed. Only open to salons on a
-     * Commission Plan — there is no commission to offset otherwise.
+     * Commission Model — there is no commission to offset otherwise.
      *
      * @return array{coins: int, value: float, new_balance: int}
      */
@@ -181,7 +181,7 @@ class WalletService
     ): array {
         if (! $this->isOnCommissionPlan($salonId)) {
             throw new \RuntimeException(
-                'Coins can only be settled against commission on a Commission Plan.'
+                'Coins can only be settled against commission on a Commission Model.'
             );
         }
 
@@ -204,11 +204,14 @@ class WalletService
         );
     }
 
+    /**
+     * The salon's own flag is the answer, not its subscription row — that row
+     * is replaced whenever the arrangement is renewed.
+     */
     public function isOnCommissionPlan(string $salonId): bool
     {
-        return SalonSubscription::where('salon_id', $salonId)
-            ->where('status', 'active')
-            ->where('billing_type', 'commission')
+        return \App\Models\Salon::where('id', $salonId)
+            ->where('commission_opt_in', true)
             ->exists();
     }
 

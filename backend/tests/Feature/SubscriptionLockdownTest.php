@@ -271,7 +271,7 @@ class SubscriptionLockdownTest extends TestCase
         return SalonSubscription::create([
             'salon_id' => $salon->id,
             'plan_id' => $plan->id,
-            'billing_type' => 'flat',
+            'billing_type' => \App\Support\BillingModel::SUBSCRIPTION,
             'plan_price_snapshot' => $plan->price,
             'start_date' => (clone $end)->subDays(30),
             'end_date' => $end,

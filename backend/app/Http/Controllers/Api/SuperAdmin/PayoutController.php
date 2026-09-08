@@ -5,17 +5,24 @@ namespace App\Http\Controllers\Api\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\SalonPayout;
 use App\Services\PayoutService;
+use App\Support\BillingModel;
+use App\Support\PayoutCycle;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * The weekly payout run.
+ * The payout run.
  *
- * Generate the cycle, check the figures, then distribute. Commission comes off
- * inside the same cycle, before the record is closed, so a salon on the
- * Commission Plan receives the net and the deduction is on the record for both
- * sides to point at afterwards.
+ * Generate the cycle, check the figures, then distribute. Two rhythms share
+ * this screen because they settle the same way:
+ *
+ *  - Weekly, for salons on a Subscription Plan. They have already paid for
+ *    access, so the run only hands back the advances the platform is holding.
+ *  - Monthly on the 1st, for salons on the Commission Model. Commission is
+ *    deducted inside the cycle, before the record is closed, so the salon
+ *    receives the net and the deduction stays on the record for both sides to
+ *    point at afterwards. Settling a month also buys the salon the next one.
  */
 class PayoutController extends Controller
 {
@@ -24,31 +31,33 @@ class PayoutController extends Controller
     }
 
     /**
-     * A week's payouts, with the totals SuperAdmin needs to sign the run off.
+     * One cycle's payouts, with the totals SuperAdmin needs to sign the run off.
      */
     public function index(Request $request)
     {
-        $weekStart = $request->filled('week_start')
-            ? Carbon::parse($request->week_start)->startOfWeek()
-            : Carbon::today()->startOfWeek();
+        $cycleType = $this->cycleType($request);
+        [$start, $end] = PayoutCycle::bounds($cycleType, $this->anchor($request));
 
         $query = SalonPayout::with('salon:id,name')
-            ->whereDate('cycle_week_start_date', $weekStart->toDateString());
+            ->where('cycle_type', $cycleType)
+            ->whereDate('cycle_start_date', $start->toDateString());
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
         if ($request->filled('billing_type')) {
-            $query->where('billing_type', $request->billing_type);
+            $query->where('billing_type', BillingModel::normalise($request->billing_type));
         }
 
         $payouts = $query->orderBy('created_at')->get();
 
         return response()->json([
             'success' => true,
-            'week_start' => $weekStart->toDateString(),
-            'week_end' => $weekStart->copy()->endOfWeek()->toDateString(),
+            'cycle_type' => $cycleType,
+            'cycle_label' => PayoutCycle::label($cycleType, $start, $end),
+            'cycle_start' => $start->toDateString(),
+            'cycle_end' => $end->toDateString(),
             'totals' => [
                 'salons' => $payouts->count(),
                 'appointment_revenue' => round((float) $payouts->sum('appointment_revenue'), 2),
@@ -68,11 +77,17 @@ class PayoutController extends Controller
     }
 
     /**
-     * Build (or refresh) every salon's payout for a week.
+     * Build (or refresh) every salon's payout for a cycle.
+     *
+     * With no cycle named, both legs run for whatever has just closed — which
+     * is what the scheduled job does.
      */
     public function generate(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'cycle_type' => 'nullable|in:' . implode(',', PayoutCycle::ALL),
+            'cycle_start' => 'nullable|date',
+            // Kept so an older client calling with week_start still works.
             'week_start' => 'nullable|date',
         ]);
 
@@ -80,15 +95,38 @@ class PayoutController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $weekStart = $request->filled('week_start')
-            ? Carbon::parse($request->week_start)
-            : Carbon::today()->subWeek();
+        if (! $request->filled('cycle_type')) {
+            $result = $this->payouts->generateDue(force: true);
 
-        $result = $this->payouts->generateForWeek($weekStart);
+            return response()->json([
+                'success' => true,
+                'message' => sprintf(
+                    '%d weekly payout(s) for %s and %d monthly payout(s) for %s.',
+                    $result['weekly']['payouts'],
+                    $result['weekly']['start'],
+                    $result['monthly']['payouts'] ?? 0,
+                    $result['monthly']['start'] ?? '—'
+                ),
+                'weekly' => $result['weekly'],
+                'monthly' => $result['monthly'],
+            ]);
+        }
+
+        $cycleType = $request->cycle_type;
+        $anchor = $this->anchor($request, defaultToPrevious: true);
+
+        $result = $cycleType === PayoutCycle::MONTHLY
+            ? $this->payouts->generateMonthly($anchor)
+            : $this->payouts->generateWeekly($anchor);
 
         return response()->json([
             'success' => true,
-            'message' => "{$result['payouts']} salon payout(s) calculated for the week of {$result['week_start']}.",
+            'message' => sprintf(
+                '%d salon payout(s) calculated for the %s cycle starting %s.',
+                $result['payouts'],
+                $cycleType,
+                $result['start']
+            ),
         ] + $result);
     }
 
@@ -146,15 +184,54 @@ class PayoutController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        $isCommission = BillingModel::isCommission($payout->billing_type);
+
         return response()->json([
             'success' => true,
-            'message' => sprintf(
-                'Distributed %s to %s after deducting %s commission.',
-                number_format((float) $payout->net_amount, 2),
-                $payout->salon->name ?? 'the salon',
-                number_format((float) $payout->commission_deducted, 2)
-            ),
+            'message' => $isCommission
+                ? sprintf(
+                    'Distributed %s to %s after deducting %s commission. Their access now runs to %s.',
+                    number_format((float) $payout->net_amount, 2),
+                    $payout->salon->name ?? 'the salon',
+                    number_format((float) $payout->commission_deducted, 2),
+                    optional($payout->salon?->currentSubscription)->end_date?->format('j M Y') ?? 'the next cycle'
+                )
+                : sprintf(
+                    'Distributed %s in held advances to %s.',
+                    number_format((float) $payout->net_amount, 2),
+                    $payout->salon->name ?? 'the salon'
+                ),
             'payout' => $this->payouts->present($payout->load('salon:id,name')),
         ]);
+    }
+
+    // ------------------------------------------------------------- internals
+
+    private function cycleType(Request $request): string
+    {
+        $requested = $request->input('cycle_type');
+
+        return in_array($requested, PayoutCycle::ALL, true) ? $requested : PayoutCycle::WEEKLY;
+    }
+
+    /**
+     * The date the caller is asking about. `week_start` is still honoured so an
+     * older client keeps working.
+     */
+    private function anchor(Request $request, bool $defaultToPrevious = false): Carbon
+    {
+        $given = $request->input('cycle_start') ?? $request->input('week_start');
+
+        if ($given) {
+            return Carbon::parse($given);
+        }
+
+        if (! $defaultToPrevious) {
+            return Carbon::today();
+        }
+
+        return $this->cycleType($request) === PayoutCycle::MONTHLY
+            ? Carbon::today()->subMonthNoOverflow()
+            : Carbon::today()->subWeek();
     }
 }
