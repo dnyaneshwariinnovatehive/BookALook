@@ -61,4 +61,12 @@ return [
         'deeplink_base' => env('CUSTOMER_APP_DEEPLINK_BASE', 'bookalook://customer'),
     ],
 
+    'razorpay' => [
+        'driver' => env('PAYMENT_DRIVER', 'demo'), // fallback to demo if no keys
+        'key_id' => env('RAZORPAY_KEY_ID'),
+        'key_secret' => env('RAZORPAY_KEY_SECRET'),
+        'demo_secret' => env('DEMO_PAYMENT_SECRET', 'test-secret'),
+        'display_name' => env('PAYMENT_DISPLAY_NAME', 'BookALook'),
+    ],
+
 ];

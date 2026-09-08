@@ -19,9 +19,7 @@ Route::prefix('customer')->group(function () {
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
-        Route::get('/profile', function (Request $request) {
-            return $request->user();
-        });
+        Route::get('/profile', [CustomerAuthController::class, 'profile']);
         
         // Cart Routes
         Route::get('/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getGlobalCart']);

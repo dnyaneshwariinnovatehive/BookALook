@@ -533,6 +533,18 @@ class AppointmentController extends Controller
         // Upcoming reads best soonest-first; history reads best newest-first.
         $upcoming = array_reverse($upcoming);
 
+        // Sort so that items needing reschedule appear at the top
+        usort($upcoming, function ($a, $b) {
+            $aNeeds = $a['needs_reschedule'] ?? false;
+            $bNeeds = $b['needs_reschedule'] ?? false;
+            
+            if ($aNeeds && !$bNeeds) return -1;
+            if (!$aNeeds && $bNeeds) return 1;
+            
+            // If both need it or neither need it, keep chronological order
+            return strcmp($a['appointment_date'] . ' ' . $a['start_time'], $b['appointment_date'] . ' ' . $b['start_time']);
+        });
+
         // Bookings the salon released. Surfaced separately so the home tab can
         // raise an alert without downloading and filtering the whole list.
         $actionRequired = array_values(array_filter(

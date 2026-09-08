@@ -372,6 +372,22 @@ class SalonController extends Controller
             $query->where('city_id', $request->city_id);
         }
 
+        if ($request->filled('gender')) {
+            $gender = strtolower($request->gender);
+            if ($gender === 'men') {
+                $query->whereIn('gender_focus', ['Unisex', 'Men Only']);
+            } elseif ($gender === 'women') {
+                $query->whereIn('gender_focus', ['Unisex', 'Women Only']);
+            }
+        }
+
+        if ($request->filled('category_id')) {
+            $categoryId = $request->category_id;
+            $query->whereHas('services.template', function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
+
         $salons = $query->orderBy('name')->get();
 
         $rows = $salons->map(function (Salon $salon) use ($access) {

@@ -154,4 +154,23 @@ class CustomerAuthController extends Controller
             'message' => 'Logged out successfully.'
         ]);
     }
+
+    /**
+     * Get customer profile and stats.
+     */
+    public function profile(Request $request)
+    {
+        $user = $request->user();
+
+        // Count of all non-cancelled appointments booked by this customer
+        $appointmentsCount = \App\Models\Appointment::where('customer_id', $user->id)
+            ->where('status', '!=', 'cancelled')
+            ->count();
+
+        return response()->json([
+            'user' => $user,
+            'appointments_count' => $appointmentsCount,
+            'fav_salons_count' => 0, // Hardcoded for now as per plan
+        ]);
+    }
 }

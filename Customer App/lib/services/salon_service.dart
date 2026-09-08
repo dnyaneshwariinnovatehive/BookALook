@@ -11,9 +11,14 @@ class SalonService {
   /// subscriptions — a salon whose plan had lapsed still looked open. Each row
   /// now carries `is_serviceable`, decided by the same rule the detail page
   /// uses.
-  Future<List<dynamic>> fetchSalons({String? search}) async {
+  Future<List<dynamic>> fetchSalons({String? search, String? gender, String? categoryId}) async {
+    final Map<String, dynamic> queryParams = {};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    if (gender != null && gender.isNotEmpty && gender != 'All') queryParams['gender'] = gender;
+    if (categoryId != null && categoryId.isNotEmpty) queryParams['category_id'] = categoryId;
+    
     final uri = Uri.parse('$baseUrl/customer/salons').replace(
-      queryParameters: (search != null && search.isNotEmpty) ? {'search': search} : null,
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
     );
 
     final response = await http.get(uri, headers: {'Accept': 'application/json'});
