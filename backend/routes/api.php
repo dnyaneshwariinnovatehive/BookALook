@@ -19,9 +19,11 @@ Route::prefix('customer')->group(function () {
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
-        Route::get('/profile', function (Request $request) {
-            return $request->user();
-        });
+        Route::get('/profile', [CustomerAuthController::class, 'profile']);
+        
+        // Favourites
+        Route::get('/favorites', [\App\Http\Controllers\Api\Customer\FavouriteController::class, 'index']);
+        Route::post('/salons/{salon_id}/favorite', [\App\Http\Controllers\Api\Customer\FavouriteController::class, 'toggle']);
         
         // Cart Routes
         Route::get('/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getGlobalCart']);

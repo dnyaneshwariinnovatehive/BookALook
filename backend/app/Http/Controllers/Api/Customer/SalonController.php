@@ -32,6 +32,11 @@ class SalonController extends Controller
         $availability = $this->availabilityToday($salon);
         $bookable = $this->bookability($salon, $services);
 
+        $isFavourited = false;
+        if ($request->user()) {
+            $isFavourited = $request->user()->favouriteSalons()->where('salon_id', $salon->id)->exists();
+        }
+
         return response()->json([
             'salon' => [
                 'id' => $salon->id,
@@ -56,6 +61,8 @@ class SalonController extends Controller
                 'advance_required' => (bool) $salon->advance_required,
                 'advance_refundable' => (bool) $salon->advance_refundable,
                 'advance_percentage_default' => (float) $salon->advance_percentage_default,
+
+                'is_favourited' => $isFavourited,
 
                 'is_bookable' => $bookable['is_bookable'],
                 'unavailable_reason' => $bookable['reason'],
@@ -372,6 +379,22 @@ class SalonController extends Controller
             $query->where('city_id', $request->city_id);
         }
 
+        if ($request->filled('gender')) {
+            $gender = strtolower($request->gender);
+            if ($gender === 'men') {
+                $query->whereIn('gender_focus', ['Unisex', 'Men Only']);
+            } elseif ($gender === 'women') {
+                $query->whereIn('gender_focus', ['Unisex', 'Women Only']);
+            }
+        }
+
+        if ($request->filled('category_id')) {
+            $categoryId = $request->category_id;
+            $query->whereHas('services.template', function ($q) use ($categoryId) {
+                $q->where('category_id', $categoryId);
+            });
+        }
+
         $salons = $query->orderBy('name')->get();
 
         $rows = $salons->map(function (Salon $salon) use ($access) {
@@ -387,9 +410,33 @@ class SalonController extends Controller
             ];
         });
 
+        $suggestedRows = collect();
+
+        // If search returned empty, we try to suggest nearby/top active salons
+        if ($rows->isEmpty() && $request->filled('search')) {
+            $suggestedSalons = Salon::with(['currentSubscription'])
+                ->where('status', 'active')
+                ->inRandomOrder() // Fallback since we don't have user lat/lng yet
+                ->limit(5)
+                ->get();
+
+            $suggestedRows = $suggestedSalons->map(function (Salon $salon) use ($access) {
+                $status = $access->status($salon);
+                return [
+                    'id' => $salon->id,
+                    'name' => $salon->name,
+                    'address' => $salon->address,
+                    'cover_photo_url' => $salon->cover_photo_url,
+                    'is_serviceable' => $status['is_active'],
+                    'unavailable_reason' => $status['message'],
+                ];
+            });
+        }
+
         // Salons that can be booked come first; the rest stay findable below.
         return response()->json([
             'salons' => $rows->sortByDesc('is_serviceable')->values(),
+            'suggested_salons' => $suggestedRows->sortByDesc('is_serviceable')->values(),
         ]);
     }
 

@@ -66,4 +66,12 @@ class User extends Authenticatable
     {
         return 'password_hash';
     }
+
+    /**
+     * Get the customer's favourite salons.
+     */
+    public function favouriteSalons()
+    {
+        return $this->belongsToMany(Salon::class, 'favourite_salons', 'customer_id', 'salon_id')->withTimestamps();
+    }
 }

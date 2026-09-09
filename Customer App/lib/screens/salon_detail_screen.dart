@@ -23,6 +23,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Map<String, dynamic>? _cart;
   bool _isLoading = true;
   String _error = '';
+  bool _isFavourited = false;
+  bool _isTogglingFavourite = false;
 
   /// null = the "All Services" tab.
   String? _selectedCategoryId;
@@ -49,6 +51,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       if (!mounted) return;
       setState(() {
         _salon = data;
+        _isFavourited = data['is_favourited'] == true;
         _isLoading = false;
       });
     } catch (e) {
@@ -68,6 +71,27 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       setState(() => _cart = cart);
     } catch (_) {
       // A failed cart read should never block the salon page.
+    }
+  }
+
+  Future<void> _toggleFavourite() async {
+    if (_isTogglingFavourite) return;
+    setState(() => _isTogglingFavourite = true);
+    
+    try {
+      final isFavourited = await _salonService.toggleFavourite(widget.salonId);
+      if (!mounted) return;
+      setState(() {
+        _isFavourited = isFavourited;
+      });
+      _showMessage(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _isTogglingFavourite = false);
+      }
     }
   }
 
@@ -322,6 +346,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       title: Text(_salon!['name'] ?? 'Salon',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
       actions: [
+        IconButton(
+          icon: Icon(_isFavourited ? Icons.favorite : Icons.favorite_border),
+          color: _isFavourited ? Colors.redAccent : Colors.white,
+          onPressed: _toggleFavourite,
+        ),
         IconButton(icon: Icon(Icons.shopping_bag_outlined), onPressed: _openCart),
       ],
       flexibleSpace: FlexibleSpaceBar(
