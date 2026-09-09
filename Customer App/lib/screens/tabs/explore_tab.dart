@@ -28,7 +28,8 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Future<void> _loadSalons() async {
     try {
-      final salons = await _salonService.fetchSalons();
+      final response = await _salonService.fetchSalons();
+      final salons = response['salons'] ?? [];
       final globalCart = await _cartService.getGlobalCart();
       setState(() {
         _salons = salons;

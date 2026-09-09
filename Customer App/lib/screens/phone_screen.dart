@@ -16,9 +16,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
 
   void _sendOtp() async {
     final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
+    if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid phone number')),
+        SnackBar(content: Text('Please enter a valid phone number (min 10 digits)')),
       );
       return;
     }

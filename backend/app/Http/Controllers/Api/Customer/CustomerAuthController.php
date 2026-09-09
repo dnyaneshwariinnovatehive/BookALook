@@ -170,7 +170,7 @@ class CustomerAuthController extends Controller
         return response()->json([
             'user' => $user,
             'appointments_count' => $appointmentsCount,
-            'fav_salons_count' => 0, // Hardcoded for now as per plan
+            'fav_salons_count' => $user->favouriteSalons()->count(),
         ]);
     }
 }
