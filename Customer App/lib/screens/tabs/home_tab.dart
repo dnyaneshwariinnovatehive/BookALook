@@ -379,13 +379,6 @@ class _HomeTabState extends State<HomeTab> {
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(50),
                           border: Border.all(color: Theme.of(context).dividerColor),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context).shadowColor,
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
