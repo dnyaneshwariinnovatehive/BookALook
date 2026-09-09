@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './page.module.css';
 
 type CycleType = 'weekly' | 'monthly';
@@ -134,11 +134,25 @@ export default function PayoutsPage() {
     }
   };
 
+  // Recalculate automatically whenever the cycle (type or start date) changes,
+  // so the table stays in sync without having to press "Calculate" each time.
+  // Skipped on first render — only reacts to an actual filter change.
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    generate();
+    // generate intentionally left out — it is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycleType, cycleStart]);
+
   const act = async (payout: Payout, action: 'approve' | 'distribute') => {
     if (action === 'distribute') {
       const confirmed = confirm(
         `Distribute ${money(payout.net_amount)} to ${payout.salon_name}?\n\n` +
-          `${money(payout.commission_deducted)} commission is deducted in this cycle. ` +
+          `${money(payout.commission_deducted)} commission is earned in this cycle. ` +
           (payout.cycle_type === 'monthly'
             ? 'Settling also extends their access into the next month. '
             : '') +
@@ -270,8 +284,8 @@ export default function PayoutsPage() {
             <div className={styles.summaryValue}>{money(totals.advances_held)}</div>
           </div>
           <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Commission deducted</div>
-            <div className={styles.summaryValue} style={{ color: '#DC2626' }}>
+            <div className={styles.summaryLabel}>Commission earned</div>
+            <div className={styles.summaryValue} style={{ color: '#15803D' }}>
               {money(totals.commission_deducted)}
             </div>
           </div>
@@ -293,9 +307,8 @@ export default function PayoutsPage() {
       ) : payouts.length === 0 ? (
         <div className={styles.card}>
           No {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts
-          for this cycle yet. Press{' '}
-          <strong>{cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}</strong>{' '}
-          to build them from completed appointments.
+          for this cycle yet — built from completed appointments as soon as the
+          cycle has data.
         </div>
       ) : (
         <table className={styles.table}>
@@ -306,7 +319,7 @@ export default function PayoutsPage() {
               <th>Appts</th>
               <th>Billed</th>
               <th>Advances held</th>
-              <th>Commission</th>
+              <th>Commission earned</th>
               <th>Adjustments</th>
               <th>Net payable</th>
               <th>Status</th>
@@ -337,8 +350,8 @@ export default function PayoutsPage() {
                 <td>{p.appointments_count}</td>
                 <td>{money(p.appointment_revenue)}</td>
                 <td>{money(p.gross_amount)}</td>
-                <td className={p.commission_deducted > 0 ? styles.deduction : undefined}>
-                  {p.commission_deducted > 0 ? `− ${money(p.commission_deducted)}` : '—'}
+                <td className={p.commission_deducted > 0 ? styles.earned : undefined}>
+                  {p.commission_deducted > 0 ? `+ ${money(p.commission_deducted)}` : '—'}
                   {p.commission_percentage > 0 && (
                     <>
                       <br />

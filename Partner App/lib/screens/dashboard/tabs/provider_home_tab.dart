@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart';
 import '../../provider_appointment_details_screen.dart';
+import '../../qr_scanner_screen.dart';
+import 'package:partner_app/theme/app_theme.dart';
 
 class ProviderHomeTab extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -17,10 +19,13 @@ class ProviderHomeTab extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ProviderHomeTab> createState() => _ProviderHomeTabState();
+  State<ProviderHomeTab> createState() => ProviderHomeTabState();
 }
 
-class _ProviderHomeTabState extends State<ProviderHomeTab> {
+/// Exposed so the dashboard shell can reload this tab when the user switches
+/// back to it (the tab stays alive inside the IndexedStack, so its own state
+/// never triggers a second load by itself).
+class ProviderHomeTabState extends State<ProviderHomeTab> {
   final PartnerAppointmentService _service = PartnerAppointmentService();
   List<dynamic> _appointments = [];
   bool _isLoading = true;
@@ -31,6 +36,8 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
     super.initState();
     _loadAppointments();
   }
+
+  Future<void> loadAppointments() => _loadAppointments();
 
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
@@ -87,7 +94,9 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
   Widget build(BuildContext context) {
     String name = widget.user['name'] ?? 'Provider';
     String salonName = widget.salon['name'] ?? 'Salon';
-    String location = widget.salon['city'] ?? 'Location';
+    String location = (widget.salon['city'] is Map)
+        ? (widget.salon['city']?['name'] ?? 'Location')
+        : (widget.salon['city'] ?? 'Location');
     String initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     // Calculate Stats
@@ -101,8 +110,23 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
       orElse: () => null
     );
 
-    return SafeArea(
-      child: RefreshIndicator(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => QrScannerScreen(salonId: widget.salon['id'].toString()),
+            ),
+          );
+        },
+        backgroundColor: AppTheme.accentColor,
+        foregroundColor: Colors.white,
+        tooltip: 'Scan customer QR',
+        child: const Icon(Icons.qr_code_scanner, size: 28),
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
         onRefresh: _loadAppointments,
         color: const Color(0xFF9C54F2),
         child: SingleChildScrollView(
@@ -213,6 +237,7 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -320,7 +345,9 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
     String customerName = isWalkIn ? (apt['walk_in_customer_name'] ?? 'Walk-In') : (apt['customer']?['name'] ?? 'Unknown');
     List services = apt['services'] ?? [];
     String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
-    
+
+    final statusColor = _statusColors(apt);
+
     String time = _formatTime(apt['start_time']);
     String timeNumber = time.isNotEmpty ? time.split(' ')[0] : '';
     String timeMeridiem = time.length > 2 ? time.substring(time.length - 2) : '';
@@ -338,7 +365,7 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: const Border(left: BorderSide(color: Color(0xFF9C54F2), width: 4)), // Accent left border
+          border: Border(left: BorderSide(color: statusColor.color, width: 4)), // Accent left border colored by status
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 4))],
         ),
         child: Padding(
@@ -348,12 +375,12 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
               Container(
                 width: 56,
                 height: 56,
-                decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: statusColor.softBg, borderRadius: BorderRadius.circular(12)),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(timeNumber, style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(timeMeridiem, style: GoogleFonts.outfit(color: const Color(0xFFDC2626), fontSize: 12, fontWeight: FontWeight.bold)), // Red meridiem
+                    Text(timeMeridiem, style: GoogleFonts.outfit(color: statusColor.color, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -362,7 +389,22 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(customerName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF1F2937))),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(customerName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF1F2937)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.softBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(statusColor.label, style: GoogleFonts.outfit(color: statusColor.color, fontSize: 10.5, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
                     Text(serviceNames, style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF9CA3AF)), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
@@ -376,4 +418,30 @@ class _ProviderHomeTabState extends State<ProviderHomeTab> {
       ),
     );
   }
+
+  _StatusTheme _statusColors(Map<String, dynamic> apt) {
+    final status = (apt['status'] ?? 'scheduled').toString();
+    switch (status) {
+      case 'completed':
+        return const _StatusTheme(Color(0xFF16A34A), Color(0xFFDCFCE7), 'Completed');
+      case 'in_progress':
+        return const _StatusTheme(Color(0xFFD97706), Color(0xFFFEF3C7), 'In Progress');
+      case 'cancelled':
+        return const _StatusTheme(Color(0xFFDC2626), Color(0xFFFEE2E2), 'Cancelled');
+      case 'no_show':
+        return const _StatusTheme(Color(0xFFDC2626), Color(0xFFFEE2E2), 'No Show');
+      case 'scheduled':
+      default:
+        return const _StatusTheme(Color(0xFF3B82F6), Color(0xFFEFF6FF), 'Scheduled');
+    }
+  }
+}
+
+/// Colour/theme bundle for an appointment's status badge.
+class _StatusTheme {
+  final Color color;
+  final Color softBg;
+  final String label;
+
+  const _StatusTheme(this.color, this.softBg, this.label);
 }

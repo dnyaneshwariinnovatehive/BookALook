@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart'; // Ensure correct path
+import '../../../../utils/time_fmt.dart';
 import '../../appointment_details_screen.dart'; // Fixed relative path
 import '../../walk_in_screen.dart';
 import '../close_day_sheet.dart';
@@ -527,6 +528,9 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     if (status == 'COMPLETED') {
       statusColor = const Color(0xFFDCFCE7);
       statusTextColor = const Color(0xFF15803D);
+    } else if (status == 'IN_PROGRESS') {
+      statusColor = const Color(0xFFFEF3C7);
+      statusTextColor = const Color(0xFFD97706);
     } else if (status == 'CANCELLED' || status == 'NO_SHOW') {
       statusColor = const Color(0xFFFEE2E2);
       statusTextColor = const Color(0xFFDC2626);
@@ -535,6 +539,16 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
       statusColor = const Color(0xFFFEF3C7);
       statusTextColor = const Color(0xFFB45309);
     }
+
+    // Human-readable badge label, e.g. "In Progress" instead of "IN_PROGRESS".
+    final String statusLabel = switch ((apt['status'] ?? '').toString()) {
+      'completed' => 'Completed',
+      'in_progress' => 'In Progress',
+      'cancelled' => 'Cancelled',
+      'no_show' => 'No Show',
+      'awaiting_reschedule' => 'Awaiting Reschedule',
+      _ => 'Scheduled',
+    };
 
     // Determine icon based on source
     IconData sourceIcon = Icons.wifi;
@@ -603,7 +617,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(16)),
-                  child: Text(status, style: GoogleFonts.outfit(color: statusTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text(statusLabel, style: GoogleFonts.outfit(color: statusTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -614,7 +628,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                 Text(provider, style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 13)),
                 const Spacer(),
                 Text('Time: ', style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 13)),
-                Text('${apt['start_time']} - ${apt['end_time']}', style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(TimeFmt.slot(apt['start_time'], apt['end_time']), style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 13)),
               ],
             ),
             const SizedBox(height: 6),

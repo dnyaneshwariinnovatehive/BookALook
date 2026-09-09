@@ -17,10 +17,15 @@ class WalkInScreen extends StatefulWidget {
   /// Embedded as a dashboard tab rather than pushed as its own page.
   final bool embedded;
 
+  /// Called after a walk-in has been successfully created. Lets an embedded
+  /// tab (provider walk-in) tell the home tab to refresh its appointments.
+  final VoidCallback? onCreated;
+
   const WalkInScreen({
     Key? key,
     required this.salonId,
     this.embedded = false,
+    this.onCreated,
   }) : super(key: key);
 
   @override
@@ -219,6 +224,10 @@ class _WalkInScreenState extends State<WalkInScreen> {
       _startLater = null;
       _searchController.clear();
     });
+
+    // Let an embedded host (provider walk-in tab) know a new appointment is
+    // live so the home tab can refresh straight away.
+    widget.onCreated?.call();
 
     if (!startedNow) {
       _showMessage(result.message);

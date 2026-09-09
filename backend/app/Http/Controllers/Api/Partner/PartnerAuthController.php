@@ -55,7 +55,9 @@ class PartnerAuthController extends Controller
         $token = $user->createToken('partner-auth-token')->plainTextToken;
 
         if ($user->role === 'admin') {
-            $salons = Salon::where('admin_id', $user->id)->get(['id', 'name', 'cover_photo_url', 'city', 'status']);
+            $salons = Salon::with('city:id,name')
+                ->where('admin_id', $user->id)
+                ->get(['id', 'name', 'cover_photo_url', 'city_id', 'status']);
             
             return response()->json([
                 'success' => true,
@@ -66,7 +68,7 @@ class PartnerAuthController extends Controller
                 'user' => $user,
             ]);
         } elseif ($user->role === 'service_provider') {
-            $serviceProvider = ServiceProvider::with(['services', 'workingHours'])->where('user_id', $user->id)->first();
+            $serviceProvider = ServiceProvider::with(['services.template', 'workingHours'])->where('user_id', $user->id)->first();
             
             if (!$serviceProvider) {
                  return response()->json([
@@ -75,7 +77,7 @@ class PartnerAuthController extends Controller
                 ], 404);
             }
 
-            $salon = Salon::where('id', $serviceProvider->salon_id)->first(['id', 'name', 'cover_photo_url', 'city', 'status']);
+            $salon = Salon::with('city:id,name')->where('id', $serviceProvider->salon_id)->first(['id', 'name', 'cover_photo_url', 'city_id', 'status']);
 
             return response()->json([
                 'success' => true,

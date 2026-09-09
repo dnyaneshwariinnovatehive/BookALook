@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
+import '../utils/time_fmt.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'qr_scanner_screen.dart';
@@ -115,7 +116,6 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
     final num balanceDue = apt['balance_amount'] ?? totalAmount;
 
     final List services = apt['services'] ?? [];
-    int totalDuration = services.fold(0, (sum, s) => sum + (s['duration_minutes_at_booking'] as int? ?? 0));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
@@ -237,7 +237,7 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
                   child: Column(
                     children: [
-                      _buildInfoRow('Time Slot', '${apt['start_time']} ($totalDuration mins)'),
+                      _buildInfoRow('Time Slot', TimeFmt.slot(apt['start_time'], apt['end_time'])),
                       _buildInfoRow('Payment Method', apt['payment_option'] == 'full_at_venue' ? 'Pay at Venue' : 'Prepaid'),
                       _buildInfoRow('Total Amount', '₹$totalAmount'),
                       _buildInfoRow('Advance Paid', '₹$advancePaid', valueColor: const Color(0xFF16A34A)),

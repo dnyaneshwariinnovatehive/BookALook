@@ -453,3 +453,100 @@
   color: var(--text-body);
   line-height: 1.7;
 }
+
+/* -------------------------------------------------------- salon info popup */
+.infoButton {
+  margin-left: 8px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--accent, #3b82f6);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  vertical-align: middle;
+}
+.infoButton:hover {
+  opacity: 0.75;
+}
+
+.infoModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.infoClose {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-light);
+}
+.infoClose:hover {
+  color: var(--text-body);
+}
+
+.infoBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.infoLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-light);
+}
+
+.infoValue {
+  font-size: 0.92rem;
+  color: var(--text-body);
+  word-break: break-word;
+}
+
+.infoSectionTitle {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.infoStats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.infoStat {
+  flex: 1;
+  background: var(--surface-subtle, #f8f9fa);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.infoStatValue {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-body);
+}
+
+.infoStatLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-light);
+  margin-top: 2px;
+}

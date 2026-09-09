@@ -19,6 +19,10 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
   bool _isLoading = true;
   List<Map<String, dynamic>> _groupedServices = [];
   String? _error;
+
+  /// Which category sections are expanded. Starts empty; tapping a category
+  /// header toggles it — same browsing pattern as the master catalog page.
+  final Set<String> _expandedCategories = {};
   
   List<dynamic> _combos = [];
   bool _isLoadingCombos = true;
@@ -262,90 +266,168 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
       return const Center(child: Text('No services added yet.\nTap "Add" to get started.', textAlign: TextAlign.center));
     }
 
-    // Flatten grouped services to a single list
-    List<Map<String, dynamic>> flatServices = [];
-    for (var group in _groupedServices) {
-      final category = ServiceCategory.fromJson(group['category']);
-      final servicesList = group['services'] as List;
-      for (var s in servicesList) {
-        flatServices.add({
-          'category': category,
-          'service': SalonService.fromJson(s),
-        });
-      }
-    }
-
     return RefreshIndicator(
       onRefresh: _fetchServices,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: flatServices.length,
+        itemCount: _groupedServices.length,
         itemBuilder: (context, index) {
-          final category = flatServices[index]['category'] as ServiceCategory;
-          final service = flatServices[index]['service'] as SalonService;
+          final group = _groupedServices[index];
+          final category = ServiceCategory.fromJson(group['category']);
+          final servicesList = group['services'] as List;
+          final services = servicesList.map((s) => SalonService.fromJson(s)).toList();
 
-          return GestureDetector(
-            onTap: () async {
-              final result = await showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (context) => EditServiceSheet(
-                  salonId: widget.salonId,
-                  service: service,
-                ),
-              );
-              if (result == true) {
-                _fetchServices();
-              }
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
-                boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(service.template?.name ?? 'Unknown Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
-                        child: Text('Active', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), fontSize: 12, fontWeight: FontWeight.bold)),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFFF3E5F5), borderRadius: BorderRadius.circular(8)),
-                        child: Text(category.name, style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(width: 12),
-                      Text('\u20B9${service.price.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
-                      const SizedBox(width: 12),
-                      Text('${service.template?.estimatedDurationMinutes ?? 0} min', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
-                      const SizedBox(width: 12),
-                      Text('Adv: 20%', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text('Providers: All Staff', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 12)),
-                ],
+          return _buildCategorySection(category, services);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategorySection(ServiceCategory category, List<SalonService> services) {
+    final isExpanded = _expandedCategories.contains(category.id);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        // Category header — tap to expand/collapse, like the master catalog.
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => setState(() {
+            if (isExpanded) {
+              _expandedCategories.remove(category.id);
+            } else {
+              _expandedCategories.add(category.id);
+            }
+          }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isExpanded
+                    ? AppTheme.accentColor.withValues(alpha: 0.6)
+                    : theme.dividerColor,
               ),
             ),
-          );
-        },
+            child: Row(
+              children: [
+                if (services.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      services.length.toString(),
+                      style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    category.name,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    size: 26,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Services under this category — only when expanded.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: isExpanded
+              ? Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    ...services.map((service) => _buildServiceCard(category, service)),
+                    const SizedBox(height: 4),
+                  ],
+                )
+              : const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildServiceCard(ServiceCategory category, SalonService service) {
+    return GestureDetector(
+      onTap: () async {
+        final result = await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) => EditServiceSheet(
+            salonId: widget.salonId,
+            service: service,
+          ),
+        );
+        if (result == true) {
+          _fetchServices();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor),
+          boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.02), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(service.template?.name ?? 'Unknown Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
+                  child: Text('Active', style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), fontSize: 12, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFFF3E5F5), borderRadius: BorderRadius.circular(8)),
+                  child: Text(category.name, style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 12),
+                Text('\u20B9${service.price.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                const SizedBox(width: 12),
+                Text('${service.template?.estimatedDurationMinutes ?? 0} min', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+                const SizedBox(width: 12),
+                Text('Adv: 20%', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Providers: All Staff', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 12)),
+          ],
+        ),
       ),
     );
   }

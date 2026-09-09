@@ -11,10 +11,14 @@ class ProviderWalkInTab extends StatelessWidget {
   final Map<String, dynamic> salon;
   final Map<String, dynamic> provider;
 
+  /// Called after a walk-in is created, so the home tab can refresh.
+  final VoidCallback? onCreated;
+
   const ProviderWalkInTab({
     Key? key,
     required this.salon,
     required this.provider,
+    this.onCreated,
   }) : super(key: key);
 
   @override
@@ -22,6 +26,7 @@ class ProviderWalkInTab extends StatelessWidget {
     return WalkInScreen(
       salonId: salon['id'].toString(),
       embedded: true,
+      onCreated: onCreated,
     );
   }
 }

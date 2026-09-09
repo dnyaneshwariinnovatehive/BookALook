@@ -1,12 +1,11 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import '../../phone_screen.dart';
 import '../more/my_salary_screen.dart';
 
-class ProviderProfileTab extends StatelessWidget {
+class ProviderProfileTab extends StatefulWidget {
   final Map<String, dynamic> salon;
   final Map<String, dynamic> provider;
   final Map<String, dynamic> user;
@@ -17,6 +16,15 @@ class ProviderProfileTab extends StatelessWidget {
     required this.provider,
     required this.user,
   });
+
+  @override
+  State<ProviderProfileTab> createState() => _ProviderProfileTabState();
+}
+
+class _ProviderProfileTabState extends State<ProviderProfileTab> {
+  bool _showAllServices = false;
+  bool _showWorkingHours = false;
+  static const int _maxVisibleServices = 2;
 
   Future<void> _logout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -46,12 +54,23 @@ class ProviderProfileTab extends StatelessWidget {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
-    if (!context.mounted) return;
-    // Has to replace the whole shell, not just this tab's stack.
+    if (!mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const PhoneScreen()),
       (route) => false,
     );
+  }
+
+  String _getServiceName(dynamic service) {
+    if (service is Map) {
+      if (service['template'] != null && service['template']['name'] != null) {
+        return service['template']['name'];
+      }
+      if (service['name'] != null) {
+        return service['name'];
+      }
+    }
+    return 'Service';
   }
 
   String _formatTime(String? timeStr) {
@@ -70,13 +89,17 @@ class ProviderProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<dynamic> services = provider['services'] ?? [];
-    final List<dynamic> workingHours = provider['working_hours'] ?? [];
+    final List<dynamic> services = widget.provider['services'] ?? [];
+    final List<dynamic> workingHours = widget.provider['working_hours'] ?? [];
     
-    // Sort working hours by day of week (0 = Sunday, 1 = Monday...)
     workingHours.sort((a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int));
 
     final List<String> daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    final bool hasMoreServices = services.length > _maxVisibleServices;
+    final List<dynamic> visibleServices = _showAllServices 
+        ? services 
+        : (services.length > _maxVisibleServices ? services.sublist(0, _maxVisibleServices) : services);
 
     return Scaffold(
       backgroundColor: AppTheme.lightBg,
@@ -103,7 +126,7 @@ class ProviderProfileTab extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: AppTheme.accentColor, width: 2),
                         image: const DecorationImage(
-                          image: NetworkImage('https://i.pravatar.cc/150?img=11'), // Generic avatar
+                          image: NetworkImage('https://i.pravatar.cc/150?img=11'),
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -114,7 +137,7 @@ class ProviderProfileTab extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            user['name'] ?? 'Unknown',
+                            widget.user['name'] ?? 'Unknown',
                             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                           ),
                           const SizedBox(height: 4),
@@ -131,7 +154,7 @@ class ProviderProfileTab extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            salon['name'] ?? 'Luxe Studio Salon',
+                            widget.salon['name'] ?? 'Luxe Studio Salon',
                             style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
                           ),
                         ],
@@ -146,8 +169,35 @@ class ProviderProfileTab extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: services.map((s) => _buildServiceChip(s['name'] ?? 'Service')).toList(),
+                    children: [
+                      ...visibleServices.map((s) => _buildServiceChip(_getServiceName(s))),
+                      if (hasMoreServices && !_showAllServices)
+                        GestureDetector(
+                          onTap: () => setState(() => _showAllServices = true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '+${services.length - _maxVisibleServices} more',
+                              style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                  if (_showAllServices && hasMoreServices) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _showAllServices = false),
+                      child: Text(
+                        'Show less',
+                        style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Text(
                     'Set by salon admin',
@@ -163,62 +213,101 @@ class ProviderProfileTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 
-                _buildInfoRow(context, 'FULL NAME', user['name'] ?? '', actionIcon: Icons.lock_outline),
+                _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
                 Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
-                _buildInfoRow(context, 'PHONE NUMBER', user['phone'] ?? '', actionText: 'Edit'),
+                _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
                 Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
-                _buildInfoRow(context, 'EMAIL ADDRESS', user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
+                _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
                 Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                 
                 _buildPhotoUploadRow(context),
                 
                 const SizedBox(height: 40),
 
-                // Working Hours Section
-                Text(
-                  'Working Hours',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                // Working Hours Section - Collapsible
+                GestureDetector(
+                  onTap: () => setState(() => _showWorkingHours = !_showWorkingHours),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Working Hours',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                      AnimatedRotation(
+                        turns: _showWorkingHours ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.keyboard_arrow_down,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          size: 28,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 
-                if (workingHours.isEmpty)
-                  Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
-                else
-                  ...workingHours.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final hour = entry.value;
-                    final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
-                    
-                    final workTime = isOff 
-                      ? 'Closed' 
-                      : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
-                      
-                    final breakTime = hour['break_start'] != null 
-                      ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
-                      : 'No break';
-
-                    return Column(
+                AnimatedCrossFade(
+                  firstChild: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
-                        if (index < workingHours.length - 1)
-                          Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                        Icon(Icons.schedule, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                        const SizedBox(width: 8),
+                        Text(
+                          workingHours.isEmpty ? 'No working hours assigned' : 'Tap to view working hours',
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 14),
+                        ),
                       ],
-                    );
-                  }),
+                    ),
+                  ),
+                  secondChild: workingHours.isEmpty
+                      ? Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
+                      : Column(
+                          children: workingHours.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final hour = entry.value;
+                            final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
+                            
+                            final workTime = isOff 
+                              ? 'Closed' 
+                              : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
+                              
+                            final breakTime = hour['break_start'] != null 
+                              ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
+                              : 'No break';
+
+                            return Column(
+                              children: [
+                                _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
+                                if (index < workingHours.length - 1)
+                                  Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                  crossFadeState: _showWorkingHours ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 200),
+                ),
 
                 const SizedBox(height: 32),
 
-                // A staff member should be able to check their own pay without
-                // having to ask the admin for it.
+                // Salary button
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => MySalaryScreen(salonId: salon['id'].toString()),
+                        builder: (_) => MySalaryScreen(salonId: widget.salon['id'].toString()),
                       ),
                     ),
                     icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),

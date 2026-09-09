@@ -143,59 +143,85 @@ class _PayslipSheetState extends State<PayslipSheet> {
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
         Text(p.monthLabel, style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade600)),
 
+        const SizedBox(height: 16),
+
+        // Summary card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.accentColor, AppTheme.accentGradientEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('Total payable',
+                      style: GoogleFonts.outfit(
+                          color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(p.isPaid ? 'PAID ✓' : 'NOT PAID',
+                        style: GoogleFonts.outfit(
+                            color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('₹${p.totalPayable.toStringAsFixed(2)}',
+                  style: GoogleFonts.outfit(
+                      fontSize: 30, fontWeight: FontWeight.w900, color: Colors.white)),
+            ],
+          ),
+        ),
+
         const SizedBox(height: 20),
 
-        _section('Salary'),
-        _row('Base salary', p.baseSalary),
+        _section('Earnings'),
+        _row('Base salary', p.baseSalary, positive: true),
         _note('${p.workingDays} working days this month · '
             '₹${p.dailyRate.toStringAsFixed(2)} a day'),
-
-        const SizedBox(height: 16),
-        _section('Leave'),
-        if (p.paidLeaveDays > 0)
-          _note('${_days(p.paidLeaveDays)} paid leave — no deduction'),
-        if (p.unpaidLeaveDays > 0)
-          _row('Unpaid leave (${_days(p.unpaidLeaveDays)})', -p.unpaidLeaveDeduction,
-              color: AppTheme.lightDanger)
-        else
-          _note('No unpaid leave.'),
+        if (p.paidLeaveDays > 0) _note('${_days(p.paidLeaveDays)} paid leave — no deduction'),
 
         const SizedBox(height: 16),
         _section('Commission'),
         _row('Earned at ${p.commissionPercentage.toStringAsFixed(0)}%', p.commissionEarned,
-            color: Colors.green.shade700),
-
+            positive: true),
         if (p.commissionLines.isEmpty)
           _note('No commission-earning services this month.')
         else
           ...p.commissionLines.map(_buildCommissionLine),
 
-        if (p.otherAdjustments != 0) ...[
+        if (p.unpaidLeaveDeduction > 0 || p.otherAdjustments < 0) ...[
+          const SizedBox(height: 16),
+          _section('Deductions'),
+          if (p.unpaidLeaveDeduction > 0)
+            _row('Unpaid leave (${_days(p.unpaidLeaveDays)})', p.unpaidLeaveDeduction,
+                positive: false)
+          else
+            _note('No unpaid leave.'),
+          if (p.otherAdjustments < 0)
+            _row('Other adjustments', p.otherAdjustments.abs(), positive: false),
+        ],
+
+        if (p.otherAdjustments > 0) ...[
           const SizedBox(height: 16),
           _section('Adjustments'),
-          _row('Other adjustments', p.otherAdjustments),
+          _row('Other adjustments', p.otherAdjustments, positive: true),
         ],
 
         const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.accentColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Total payable',
-                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
-              Text('₹${p.totalPayable.toStringAsFixed(2)}',
-                  style: GoogleFonts.outfit(
-                      fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.accentColor)),
-            ],
-          ),
-        ),
 
-        const SizedBox(height: 12),
         Row(
           children: [
             Icon(
@@ -243,7 +269,11 @@ class _PayslipSheetState extends State<PayslipSheet> {
               ),
             ),
             Text('₹${line.commission.toStringAsFixed(2)}',
-                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green.shade700,
+                )),
           ],
         ),
       );
@@ -266,15 +296,19 @@ class _PayslipSheetState extends State<PayslipSheet> {
                 color: Colors.grey.shade500)),
       );
 
-  Widget _row(String label, double amount, {Color? color}) => Padding(
+  Widget _row(String label, double amount, {required bool positive}) => Padding(
         padding: const EdgeInsets.only(bottom: 2),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 14))),
             Text(
-              '${amount < 0 ? '− ' : ''}₹${amount.abs().toStringAsFixed(2)}',
-              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: color),
+              '${positive ? '+' : '−'} ₹${amount.abs().toStringAsFixed(2)}',
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: positive ? Colors.green.shade700 : AppTheme.lightDanger,
+              ),
             ),
           ],
         ),

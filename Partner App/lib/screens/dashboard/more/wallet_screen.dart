@@ -34,7 +34,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
   double _balanceValue = 0;
   bool _canRedeemAgainstCommission = false;
   Map<String, dynamic> _progress = const {};
-  List<dynamic> _earned = const [];
+  List<dynamic> _earnedByScheme = const [];
   List<dynamic> _redeemed = const [];
 
   @override
@@ -80,7 +80,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         _balanceValue = double.tryParse('${data['balance_value_inr'] ?? 0}') ?? 0;
         _canRedeemAgainstCommission = data['can_redeem_against_commission'] == true;
         _progress = (data['progress'] as Map<String, dynamic>?) ?? const {};
-        _earned = data['earned'] ?? const [];
+        _earnedByScheme = data['earned_by_scheme'] ?? const [];
         _redeemed = data['redeemed'] ?? const [];
         _isLoading = false;
       });
@@ -158,12 +158,29 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('COIN BALANCE',
-                style: GoogleFonts.outfit(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('COIN BALANCE',
+                      style: GoogleFonts.outfit(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1)),
+                ),
+                GestureDetector(
+                  onTap: _showCoinsInfo,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                    child: const Icon(Icons.info_outline, size: 16, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -182,21 +199,70 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
               'Worth ₹${_balanceValue.toStringAsFixed(2)} at ₹$_coinValue per coin',
               style: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Coins are not cash. They can only be used on your next plan '
-                'purchase or against commission owed.',
-                style: GoogleFonts.outfit(color: Colors.white, fontSize: 11.5, height: 1.4),
-              ),
-            ),
           ],
         ),
+      );
+
+  /// Explains what coins are (and are not) without a permanent disclaimer box
+  /// cluttering the balance card. Tapped from the small info button on it.
+  void _showCoinsInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.monetization_on_outlined, color: AppTheme.accentColor),
+            const SizedBox(width: 8),
+            const Text('About your coins'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Coins are not cash. They can only be used on your next plan '
+                'purchase or against commission you owe.',
+                style: GoogleFonts.outfit(fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              _infoRow(Icons.shopping_bag_outlined,
+                  'You earn coins on every completed online booking, based on '
+                  'the reward scheme that is active for your salon.'),
+              const SizedBox(height: 12),
+              _infoRow(Icons.percent_outlined,
+                  'Coins are never paid out to you — that is the separate payout '
+                  'system. Their value is only applied as a discount.'),
+              const SizedBox(height: 12),
+              _infoRow(Icons.schedule_outlined,
+                  'A scheme runs for the start/end dates SuperAdmin sets. Once a '
+                  'month is over, its earnings still show here for you to review.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(color: AppTheme.accentColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppTheme.accentColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text,
+                style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade800, height: 1.45)),
+          ),
+        ],
       );
 
   Widget _buildProgressCard() {
@@ -329,16 +395,16 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
               indicatorColor: AppTheme.accentColor,
               labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
               tabs: [
-                Tab(text: 'Earned (${_earned.length})'),
+                Tab(text: 'Earned (${_earnedByScheme.length})'),
                 Tab(text: 'Redeemed (${_redeemed.length})'),
               ],
             ),
             SizedBox(
-              height: 340,
+              height: 360,
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildList(_earned, emptyLabel: 'No coins earned yet.'),
+                  _buildEarnedByScheme(),
                   _buildList(_redeemed, emptyLabel: 'No coins spent yet.'),
                 ],
               ),
@@ -346,6 +412,96 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
           ],
         ),
       );
+
+  /// Earned coins shown the way a salon owner actually reads them: grouped by
+  /// the reward scheme that produced them, with a month-by-month split, instead
+  /// of a long list of "+1 appointment" rows.
+  Widget _buildEarnedByScheme() {
+    if (_earnedByScheme.isEmpty) {
+      return Center(
+        child: Text('No coins earned yet.',
+            style: GoogleFonts.outfit(color: Colors.grey.shade600)),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _earnedByScheme.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final group = _earnedByScheme[index] as Map<String, dynamic>;
+        final schemeName = group['scheme_name'] ?? 'Reward scheme';
+        final totalCoins = (group['total_coins'] ?? 0) as int;
+        final totalValue = group['total_value_inr'];
+        final months = (group['months'] ?? const []) as List<dynamic>;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(schemeName,
+                        style: GoogleFonts.outfit(
+                            fontSize: 13.5, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('+$totalCoins coins',
+                          style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade700)),
+                      if (totalValue != null)
+                        Text('₹${totalValue.toStringAsFixed(2)}',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ...months.map((m) {
+                final month = m as Map<String, dynamic>;
+                final coins = (month['coins'] ?? 0) as int;
+                final value = month['value_inr'];
+                final label = month['month_label'] ?? (month['month'] ?? '');
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_month_outlined,
+                          size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(label,
+                            style: GoogleFonts.outfit(
+                                fontSize: 12.5, color: Colors.grey.shade700)),
+                      ),
+                      Text('+$coins',
+                          style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green.shade700)),
+                      if (value != null) ...[
+                        const SizedBox(width: 8),
+                        Text('₹${value.toStringAsFixed(2)}',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11, color: Colors.grey.shade500)),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildList(List<dynamic> entries, {required String emptyLabel}) {
     if (entries.isEmpty) {

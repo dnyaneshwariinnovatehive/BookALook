@@ -26,6 +26,10 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
   List<ProviderLeave> _leaves = [];
   String? _leaveError;
 
+  /// Which leave status is shown in the Leave Requests view. Defaults to the
+  /// most actionable bucket — the ones still waiting for a decision.
+  String _leaveFilter = 'pending';
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +100,20 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update leave: $e')));
       }
     }
+  }
+
+  /// Leaves the current filter shows, sorted with the newest leave date first.
+  List<ProviderLeave> get _filteredLeaves {
+    final matching = _leaveFilter == 'all'
+        ? List<ProviderLeave>.of(_leaves)
+        : _leaves.where((l) => l.status == _leaveFilter).toList();
+
+    matching.sort((a, b) {
+      final aDate = DateTime.tryParse(a.leaveDate) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = DateTime.tryParse(b.leaveDate) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    return matching;
   }
 
   String _formatLeaveTime(ProviderLeave leave) {
@@ -231,16 +249,62 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     );
   }
 
+  Widget _buildLeaveFilterChip(String value, String label) {
+    final selected = _leaveFilter == value;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => setState(() => _leaveFilter = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.accentColor : theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppTheme.accentColor : theme.dividerColor,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : (isDark ? theme.colorScheme.onSurface : const Color(0xFF6B7280)),
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLeaveCard(ProviderLeave leave) {
     Color statusColor;
-    String statusText = leave.status.capitalize();
-    
-    if (leave.status == 'approved') {
-      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess);
-    } else if (leave.status == 'rejected') {
-      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger);
-    } else {
-      statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning);
+    Color statusBg;
+    String statusText;
+    IconData statusIcon;
+
+    switch (leave.status) {
+      case 'approved':
+        statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess);
+        statusBg = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccessBg : AppTheme.lightSuccessBg);
+        statusText = 'Approved';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'rejected':
+        statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger);
+        statusBg = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg);
+        statusText = 'Rejected';
+        statusIcon = Icons.cancel;
+        break;
+      default:
+        statusColor = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning);
+        statusBg = (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg);
+        statusText = 'Pending';
+        statusIcon = Icons.schedule;
     }
 
     return Container(
@@ -256,8 +320,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning).withValues(alpha: 0.05),
-            child: Icon(Icons.person_outline, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning)),
+            backgroundColor: statusBg,
+            child: Icon(statusIcon, color: statusColor),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -273,40 +337,57 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                   _formatLeaveTime(leave),
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  leave.reason ?? 'No reason provided',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                ),
+                if (leave.reason != null && leave.reason!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    leave.reason!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                statusText,
-                style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
               ),
               if (leave.status == 'pending') ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     InkWell(
                       onTap: () => _updateLeaveStatus(leave.id, 'approved'),
                       child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                        child: Icon(Icons.check, color: Theme.of(context).colorScheme.surface, size: 16),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.check, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess), size: 18),
                       ),
                     ),
                     const SizedBox(width: 8),
                     InkWell(
                       onTap: () => _updateLeaveStatus(leave.id, 'rejected'),
                       child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                        child: Icon(Icons.close, color: Theme.of(context).colorScheme.surface, size: 16),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.close, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger), size: 18),
                       ),
                     ),
                   ],
@@ -410,31 +491,37 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                child: Text(
-                                  'Leave Calendar — Sep 2026',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                              ),
-                              // Static Weekday Header
+                              // Status filters — default to the pending bucket.
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                  children: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-                                      .map((day) => Text(day, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12)))
-                                      .toList(),
+                                  children: [
+                                    _buildLeaveFilterChip('pending', 'Pending'),
+                                    const SizedBox(width: 8),
+                                    _buildLeaveFilterChip('approved', 'Approved'),
+                                    const SizedBox(width: 8),
+                                    _buildLeaveFilterChip('rejected', 'Rejected'),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
                               Expanded(
-                                child: _leaves.isEmpty
-                                    ? const Center(child: Text('No leave requests found.'))
+                                child: _filteredLeaves.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          _leaves.isEmpty
+                                              ? 'No leave requests found.'
+                                              : 'No ${_leaveFilter} leave requests.',
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      )
                                     : ListView.builder(
                                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        itemCount: _leaves.length,
-                                        itemBuilder: (context, index) => _buildLeaveCard(_leaves[index]),
+                                        itemCount: _filteredLeaves.length,
+                                        itemBuilder: (context, index) =>
+                                            _buildLeaveCard(_filteredLeaves[index]),
                                       ),
                               ),
                             ],

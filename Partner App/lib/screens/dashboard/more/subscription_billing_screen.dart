@@ -1,5 +1,6 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,7 +20,6 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   bool _hasSubscription = false;
   Map<String, dynamic>? _subscription;
   int _daysRemaining = 0;
-  int _warningThresholdDays = 3;
   Map<String, dynamic>? _pendingRequest;
   List<dynamic> _history = [];
 
@@ -62,7 +62,6 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
           if (_hasSubscription) {
             _subscription = data['subscription'];
             _daysRemaining = data['days_remaining'];
-            _warningThresholdDays = data['warning_threshold_days'] ?? 3;
           } else {
             _subscription = null;
           }
@@ -201,64 +200,6 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_hasSubscription &&
-                !_onCommissionModel &&
-                _daysRemaining <= _warningThresholdDays &&
-                _daysRemaining >= 0)
-              Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  border: Border.all(color: colorScheme.error),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: colorScheme.onErrorContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Your subscription plan expires in $_daysRemaining days. Renew now to avoid service interruption.',
-                        style: TextStyle(color: colorScheme.onErrorContainer, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // A postpaid salon has not failed to renew — it has an unsettled
-            // month, and telling it to renew would send it looking for a button
-            // that does not apply.
-            if (_hasSubscription && _onCommissionModel && _daysRemaining <= 7)
-              Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  border: Border.all(color: colorScheme.error),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: colorScheme.onErrorContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _daysRemaining < 0
-                            ? 'Your last month\u2019s commission is still unsettled, so online '
-                                'booking is paused. It resumes as soon as BookALook settles it.'
-                            : 'Your commission for last month is due. Online booking pauses '
-                                'in $_daysRemaining day${_daysRemaining == 1 ? '' : 's'} if it '
-                                'stays unsettled.',
-                        style: TextStyle(
-                            color: colorScheme.onErrorContainer, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
             if (_hasSubscription && !_onCommissionModel && _daysRemaining < 0)
               Container(
                 margin: const EdgeInsets.only(bottom: 24),
@@ -328,16 +269,18 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                         const SizedBox(height: 12),
                         _buildDetailRow(
                           'Next settlement',
-                          _nextSettlementDate ?? 'The 1st of next month',
+                          _nextSettlementDate == null
+                              ? 'The 1st of next month'
+                              : _formatDate(_nextSettlementDate),
                           colorScheme,
                         ),
                       ],
                       const SizedBox(height: 12),
-                      _buildDetailRow('Start Date', _subscription!['start_date'], colorScheme),
+                      _buildDetailRow('Start Date', _formatDate(_subscription!['start_date']), colorScheme),
                       const SizedBox(height: 12),
                       _buildDetailRow(
                         _onCommissionModel ? 'Access until' : 'Expiry Date',
-                        _subscription!['end_date'],
+                        _formatDate(_subscription!['end_date'], relative: true),
                         colorScheme,
                       ),
                     ],
@@ -498,6 +441,41 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
     );
   }
 
+  /// Formats a raw date string from the API into a readable form.
+  ///
+  /// - When a time component is present it is shown as `HH:mm dd/MM/yy`.
+  /// - When only a date is present it is shown as `dd/MM/yy`.
+  /// - When [relative] is true and the date falls today or tomorrow, a human
+  ///   friendly "Today" / "Tomorrow" label is used instead.
+  String _formatDate(Object? raw, {bool relative = false}) {
+    final String text = raw?.toString() ?? '';
+    if (text.isEmpty) return '—';
+
+    final DateTime? dt = DateTime.tryParse(text);
+    if (dt == null) return text;
+
+    final bool hasTime = dt.hour != 0 || dt.minute != 0 || dt.second != 0;
+
+    if (relative) {
+      final DateTime now = DateTime.now();
+      final DateTime today = DateTime(now.year, now.month, now.day);
+      final DateTime target = DateTime(dt.year, dt.month, dt.day);
+      final int diff = target.difference(today).inDays;
+
+      if (diff == 1) {
+        return hasTime ? 'Tomorrow at ${DateFormat('HH:mm').format(dt)}' : 'Tomorrow';
+      }
+      if (diff == 0) {
+        return hasTime ? 'Today at ${DateFormat('HH:mm').format(dt)}' : 'Today';
+      }
+    }
+
+    if (hasTime) {
+      return DateFormat('HH:mm dd/MM/yy').format(dt);
+    }
+    return DateFormat('dd/MM/yy').format(dt);
+  }
+
   Widget _buildDetailRow(String label, String value, ColorScheme colorScheme) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -511,8 +489,8 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   Widget _buildHistoryCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {
     final String status = item['status'] ?? 'unknown';
     final String planName = item['plan'] != null ? item['plan']['name'] : 'Unknown';
-    final String startDate = item['start_date'] ?? 'N/A';
-    final String endDate = item['end_date'] ?? 'N/A';
+    final String startDate = _formatDate(item['start_date']);
+    final String endDate = _formatDate(item['end_date']);
 
     Color statusColor;
     if (status == 'active') {

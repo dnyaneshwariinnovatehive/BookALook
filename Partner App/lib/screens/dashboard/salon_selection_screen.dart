@@ -40,6 +40,18 @@ class SalonSelectionScreen extends StatelessWidget {
     );
   }
 
+  /// Safely reads a salon's city, handling both the current nested `city`
+  /// relation object (`{"id": ..., "name": "Mumbai"}`) and a legacy flat string.
+  String _cityName(dynamic salon) {
+    final city = salon['city'];
+    if (city is Map) {
+      final name = city['name'];
+      if (name != null && name.toString().isNotEmpty) return name.toString();
+    }
+    final flat = city?.toString() ?? '';
+    return flat.isNotEmpty ? flat : 'Unknown location';
+  }
+
   void _addNewSalon(BuildContext context) {
     Navigator.push(
       context,
@@ -131,7 +143,10 @@ class SalonSelectionScreen extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
-                                      Text(salon['city'] ?? 'Unknown location', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+                                      Text(
+                                        _cityName(salon),
+                                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                                      ),
                                       if (isPending) ...[
                                         const SizedBox(width: 8),
                                         Container(

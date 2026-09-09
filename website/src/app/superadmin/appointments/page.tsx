@@ -522,7 +522,7 @@ export default function GlobalAppointmentsDashboard() {
                     >
                       Details
                     </button>
-                    {apt.status === 'in_progress' && (
+                    {false && apt.status === 'in_progress' && (
                         <button
                             className={styles.secondaryButton}
                             style={{ padding: '6px 12px', fontSize: '13px', marginLeft: '8px' }}

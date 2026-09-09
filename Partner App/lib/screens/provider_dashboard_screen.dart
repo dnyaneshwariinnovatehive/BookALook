@@ -11,10 +11,13 @@ class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({Key? key, required this.salonId}) : super(key: key);
 
   @override
-  State<ProviderDashboardScreen> createState() => _ProviderDashboardScreenState();
+  State<ProviderDashboardScreen> createState() => ProviderDashboardScreenState();
 }
 
-class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
+/// Exposed so the dashboard shell can reload this tab when the user switches
+/// back to it (the tab stays alive inside the IndexedStack, so its own state
+/// never triggers a second load by itself).
+class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
   final PartnerAppointmentService _service = PartnerAppointmentService();
   DateTime _selectedDate = DateTime.now();
   List<dynamic> _appointments = [];
@@ -27,6 +30,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     super.initState();
     _loadAppointments();
   }
+
+  Future<void> loadAppointments() => _loadAppointments();
 
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
@@ -217,18 +222,32 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
 
             // Queue List
             Expanded(
-              child: _isLoading 
+              child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
-                : filtered.isEmpty
-                    ? Center(child: Text('No appointments found', style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16)))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: filtered.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          return _buildQueueCard(filtered[index]);
-                        },
-                      ),
+                : RefreshIndicator(
+                    color: const Color(0xFF9C54F2),
+                    onRefresh: _loadAppointments,
+                    child: filtered.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 120),
+                              Center(
+                                child: Text('No appointments found',
+                                    style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16)),
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(20),
+                            itemCount: filtered.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 16),
+                            itemBuilder: (context, index) {
+                              return _buildQueueCard(filtered[index]);
+                            },
+                          ),
+                  ),
             ),
           ],
         ),

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
-import '../qr_scanner_screen.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
 import 'tabs/provider_profile_tab.dart';
@@ -34,6 +33,14 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   /// that tab and the bottom navigation bar remains visible.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(4, (_) => GlobalKey<NavigatorState>());
+
+  /// Keep the tab's own State reachable from the shell. The tabs live inside
+  /// the IndexedStack, so they stay alive across tab switches — the shell has
+  /// to ask them to reload when the user comes back, and when a walk-in is
+  /// created in another tab.
+  final GlobalKey<ProviderHomeTabState> _homeKey = GlobalKey<ProviderHomeTabState>();
+  final GlobalKey<ProviderDashboardScreenState> _scheduleKey =
+      GlobalKey<ProviderDashboardScreenState>();
 
   /// The salon's plan gates the whole shell, so it is checked before the tabs
   /// are drawn rather than letting each screen fail on its own.
@@ -68,11 +75,28 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
 
   void _onItemTapped(int index) {
     if (index == _currentIndex) {
-      // Tapping the tab you are already on goes back to its first page.
+      // Tapping the tab you are already on goes back to its first page, and so
+      // the content on that tab reloads.
+      _refreshTab(index);
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
       return;
     }
     setState(() => _currentIndex = index);
+    _refreshTab(index);
+  }
+
+  /// Reload the appointment tab that was just opened. Home and Schedule both
+  /// read from the live appointments endpoint, so data created in another tab
+  /// (a walk-in, for instance) shows up without a manual refresh.
+  void _refreshTab(int index) {
+    switch (index) {
+      case 0:
+        _homeKey.currentState?.loadAppointments();
+        break;
+      case 1:
+        _scheduleKey.currentState?.loadAppointments();
+        break;
+    }
   }
 
   /// Back unwinds the active tab first, then falls back to Home and only then
@@ -94,13 +118,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
     SystemNavigator.pop();
   }
 
-  Future<void> _openScanner() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => QrScannerScreen(salonId: widget.salon['id'].toString()),
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -124,9 +142,13 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
 
   Widget _buildShell(BuildContext context) {
     final List<Widget> pages = [
-      ProviderHomeTab(salon: widget.salon, provider: widget.provider, user: widget.user),
-      ProviderDashboardScreen(salonId: widget.salon['id'].toString()),
-      ProviderWalkInTab(salon: widget.salon, provider: widget.provider),
+      ProviderHomeTab(key: _homeKey, salon: widget.salon, provider: widget.provider, user: widget.user),
+      ProviderDashboardScreen(key: _scheduleKey, salonId: widget.salon['id'].toString()),
+      ProviderWalkInTab(
+        salon: widget.salon,
+        provider: widget.provider,
+        onCreated: () => _homeKey.currentState?.loadAppointments(),
+      ),
       ProviderProfileTab(
         salon: widget.salon,
         provider: widget.provider,
@@ -142,15 +164,6 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
           for (var i = 0; i < pages.length; i++)
             TabNavigator(navigatorKey: _navigatorKeys[i], root: pages[i]),
         ],
-      ),
-      // Scanning is the provider's most common action, so it sits on the shell
-      // and is reachable from every tab and every page inside them.
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openScanner,
-        backgroundColor: AppTheme.accentColor,
-        foregroundColor: Colors.white,
-        tooltip: 'Scan customer QR',
-        child: const Icon(Icons.qr_code_scanner, size: 28),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

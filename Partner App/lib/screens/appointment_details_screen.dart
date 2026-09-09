@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
+import '../utils/time_fmt.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'qr_scanner_screen.dart';
@@ -219,7 +220,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               title: 'Appointment Details',
               children: [
                 _buildInfoRow('Date', appointment['appointment_date'] ?? ''),
-                _buildInfoRow('Time', '${appointment['start_time']} - ${appointment['end_time']}'),
+                _buildInfoRow('Time Slot', TimeFmt.slot(appointment['start_time'], appointment['end_time'])),
                 _buildInfoRow('Assigned Provider', appointment['appointed_provider']?['user']?['name'] ?? appointment['appointed_provider']?['name'] ?? 'Any Staff'),
                 const Divider(height: 24),
                 Text('Booked Services', style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey)),

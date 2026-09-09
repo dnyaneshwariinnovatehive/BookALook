@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
-import '../qr_scanner_screen.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
 import 'tabs/home_tab.dart';
@@ -61,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _checkAccess();
     _tabs = [
-      const HomeTab(),
+      HomeTab(salonId: widget.salonData['id'].toString()),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
       StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),
@@ -119,15 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// The scanner lives on the shell, so it is one tap away from every tab and
-  /// every page inside them.
-  Future<void> _openScanner() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => QrScannerScreen(salonId: widget.salonData['id'].toString()),
-      ),
-    );
-  }
+
 
   Widget _buildShell(BuildContext context) {
     return Scaffold(
@@ -137,13 +128,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           for (var i = 0; i < _tabs.length; i++)
             TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openScanner,
-        backgroundColor: AppTheme.accentColor,
-        foregroundColor: Colors.white,
-        tooltip: 'Scan customer QR',
-        child: const Icon(Icons.qr_code_scanner, size: 28),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

@@ -55,6 +55,11 @@ class PartnerWalletController extends Controller
             // separately without filtering client-side.
             'earned' => $transactions->where('type', WalletTransaction::TYPE_EARNED)
                 ->map(fn ($t) => $this->present($t))->values(),
+            // The salon-facing summary: what each reward scheme earned them, and
+            // when (grouped by month), instead of one row per appointment.
+            'earned_by_scheme' => $this->earnedByScheme(
+                $transactions->where('type', WalletTransaction::TYPE_EARNED)
+            ),
             'redeemed' => $transactions->where('type', WalletTransaction::TYPE_REDEEMED)
                 ->map(fn ($t) => $this->present($t))->values(),
             'transactions' => $transactions->map(fn ($t) => $this->present($t))->values(),
@@ -149,6 +154,86 @@ class PartnerWalletController extends Controller
             'discount_applied' => $result['value'],
             'new_balance' => $result['new_balance'],
         ]);
+    }
+
+    /**
+     * How the salon's coins were earned, grouped by reward scheme and then by
+     * the month each batch of coins landed. This is what the partner reads on
+     * the wallet screen instead of a long line of per-appointment +1/+2 rows.
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\WalletTransaction>  $earned
+     * @return array<int, array{
+     *   scheme_id: ?string,
+     *   scheme_name: ?string,
+     *   total_coins: int,
+     *   total_value_inr: float,
+     *   months: array<int, array{month: ?string, month_label: ?string, coins: int, value_inr: float}>
+     * }>
+     */
+    private function earnedByScheme($earned): array
+    {
+        $byScheme = [];
+
+        foreach ($earned as $transaction) {
+            $scheme = $transaction->tier?->scheme;
+            $key = $scheme?->id ?? 'other';
+
+            if (! isset($byScheme[$key])) {
+                $byScheme[$key] = [
+                    'scheme_id' => $scheme?->id,
+                    'scheme_name' => $scheme?->name ?? 'Other',
+                    'total_coins' => 0,
+                    'total_value_inr' => 0.0,
+                    'months' => [],
+                ];
+            }
+
+            $coins = (int) $transaction->coins;
+            $value = $transaction->coin_value_snapshot !== null
+                ? round($coins * (float) $transaction->coin_value_snapshot, 2)
+                : 0.0;
+
+            $byScheme[$key]['total_coins'] += $coins;
+            $byScheme[$key]['total_value_inr'] = round(
+                (float) $byScheme[$key]['total_value_inr'] + $value,
+                2
+            );
+
+            $month = $transaction->created_at?->format('Y-m');
+            $monthLabel = $transaction->created_at?->format('M Y');
+            $monthKey = $month ?? 'unknown';
+
+            if (! isset($byScheme[$key]['months'][$monthKey])) {
+                $byScheme[$key]['months'][$monthKey] = [
+                    'month' => $month,
+                    'month_label' => $monthLabel,
+                    'coins' => 0,
+                    'value_inr' => 0.0,
+                ];
+            }
+
+            $byScheme[$key]['months'][$monthKey]['coins'] += $coins;
+            $byScheme[$key]['months'][$monthKey]['value_inr'] = round(
+                (float) $byScheme[$key]['months'][$monthKey]['value_inr'] + $value,
+                2
+            );
+        }
+
+        $result = array_values($byScheme);
+
+        // Newest month first within each scheme; highest-earning scheme first.
+        foreach ($result as &$group) {
+            $group['months'] = array_values($group['months']);
+            usort(
+                $group['months'],
+                fn ($a, $b) => strcmp((string) ($b['month'] ?? ''), (string) ($a['month'] ?? ''))
+            );
+        }
+        unset($group);
+
+        uasort($result, fn ($a, $b) => $b['total_coins'] <=> $a['total_coins']);
+
+        return array_values($result);
     }
 
     private function present(WalletTransaction $transaction): array

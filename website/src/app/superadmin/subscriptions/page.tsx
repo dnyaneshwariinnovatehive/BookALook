@@ -66,6 +66,10 @@ export default function SubscriptionsPage() {
   const [blockingPayouts, setBlockingPayouts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Salon detail popup — the ⓘ button runs this off the full salon endpoint.
+  const [infoSalon, setInfoSalon] = useState<any>(null);
+  const [infoLoading, setInfoLoading] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -103,6 +107,27 @@ export default function SubscriptionsPage() {
       console.error(e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Fetch the full salon record and pop the details dialog. The list row only
+  // carries subscription-scoped fields, so we go back to the salon endpoint for
+  // address, contact, city, staff and service counts.
+  const openSalonInfo = async (salon: any) => {
+    setInfoSalon({ ...salon, detail: null });
+    setInfoLoading(true);
+    try {
+      const res = await fetch(`/api/proxy/superadmin/salons/${salon.id}`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInfoSalon((prev: any) => (prev ? { ...prev, detail: data.data } : prev));
+      }
+    } catch (e) {
+      console.error('Failed to load salon details:', e);
+    } finally {
+      setInfoLoading(false);
     }
   };
 
@@ -713,6 +738,13 @@ export default function SubscriptionsPage() {
                 <tr key={salon.id}>
                   <td>
                     <strong>{salon.name}</strong>
+                    <button
+                      className={styles.infoButton}
+                      onClick={() => openSalonInfo(salon)}
+                      title="View salon details"
+                    >
+                      &#9432;
+                    </button>
                   </td>
                   <td>{salon.owner}</td>
                   <td>
@@ -918,6 +950,95 @@ export default function SubscriptionsPage() {
           </div>
         </div>
       )}
+
+      {/* -------------------------------------------------- salon details */}
+      {infoSalon && (
+        <div className={styles.modalOverlay} onClick={() => setInfoSalon(null)}>
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div className={styles.infoModalHeader}>
+              <h3 style={{ margin: 0 }}>{infoSalon.name}</h3>
+              <button className={styles.infoClose} onClick={() => setInfoSalon(null)} aria-label="Close">
+                &times;
+              </button>
+            </div>
+
+            {infoLoading && infoSalon.detail == null ? (
+              <p className={styles.inlineHint}>Loading details…</p>
+            ) : infoSalon.detail ? (
+              <div className={styles.infoBody}>
+                <div className={styles.infoGrid}>
+                  <InfoField label="Status" value={infoSalon.detail.status} />
+                  <InfoField label="City" value={infoSalon.detail.city?.name} />
+                  <InfoField label="Address" value={infoSalon.detail.address} />
+                  <InfoField label="Pincode" value={infoSalon.detail.pincode} />
+                  <InfoField label="Gender focus" value={infoSalon.detail.gender_focus} />
+                  <InfoField label="Description" value={infoSalon.detail.description} />
+                </div>
+
+                <h4 className={styles.infoSectionTitle}>Owner / Admin</h4>
+                <div className={styles.infoGrid}>
+                  <InfoField label="Name" value={infoSalon.detail.admin?.name} />
+                  <InfoField label="Phone" value={infoSalon.detail.admin?.phone} />
+                  <InfoField label="Email" value={infoSalon.detail.admin?.email} />
+                </div>
+
+                <h4 className={styles.infoSectionTitle}>Billing (as of now)</h4>
+                <div className={styles.infoGrid}>
+                  <InfoField label="Owner display" value={infoSalon.owner} />
+                  <InfoField
+                    label="Billing model"
+                    value={infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)}
+                  />
+                  <InfoField label="Plan" value={infoSalon.current_plan} />
+                  {infoSalon.billing_model === COMMISSION && (
+                    <InfoField
+                      label="Commission"
+                      value={infoSalon.commission_percentage != null ? `${infoSalon.commission_percentage}%` : '—'}
+                    />
+                  )}
+                  <InfoField label="Access until" value={infoSalon.expiry || 'N/A'} />
+                  <InfoField label="Registered" value={infoSalon.detail.created_at} />
+                </div>
+
+                <div className={styles.infoStats}>
+                  <InfoStat label="Staff" value={infoSalon.detail.providers?.length} />
+                  <InfoStat label="Services" value={infoSalon.detail.services?.length} />
+                  <InfoStat label="Combos" value={infoSalon.detail.combos?.length} />
+                </div>
+              </div>
+            ) : (
+              <p className={styles.inlineHint}>Could not load salon details.</p>
+            )}
+
+            <div
+              className={styles.formActions}
+              style={{ marginTop: 20, justifyContent: 'flex-end' }}
+            >
+              <button className={styles.primaryButton} onClick={() => setInfoSalon(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const InfoField = ({ label, value }: { label: string; value: any }) => (
+  <div>
+    <div className={styles.infoLabel}>{label}</div>
+    <div className={styles.infoValue}>{value ?? '—'}</div>
+  </div>
+);
+
+const InfoStat = ({ label, value }: { label: string; value: any }) => (
+  <div className={styles.infoStat}>
+    <div className={styles.infoStatValue}>{value ?? '—'}</div>
+    <div className={styles.infoStatLabel}>{label}</div>
+  </div>
+);

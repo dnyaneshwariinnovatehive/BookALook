@@ -134,6 +134,12 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/appointments', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'index']);
         Route::post('/appointments/verify-qr', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'verifyQrAndStartSession']);
         Route::post('/appointments/{id}/add-service', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'addServiceMidAppointment']);
+
+        // Platform Reporting
+        Route::get('/reports/overview', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'overview']);
+        Route::get('/reports/salons', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'salons']);
+        Route::get('/reports/cities', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'cities']);
+        Route::get('/reports/services', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'services']);
     });
 });
 
