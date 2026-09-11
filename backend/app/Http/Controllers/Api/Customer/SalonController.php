@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\City;
 use App\Models\Combo;
 use App\Models\Salon;
 use App\Models\SalonWorkingHour;
@@ -358,6 +359,12 @@ class SalonController extends Controller
      * business. Serviceability is decided here by the same rule the detail page
      * uses, and unserviceable salons are marked rather than hidden so a
      * returning customer can still find one they know.
+     *
+     * Results are scoped to one city. A customer in Pune scrolling past salons
+     * in Bangalore is browsing a database, not a marketplace — nothing in that
+     * list is bookable by them. The city is resolved here rather than demanded
+     * from the caller, so an older client that sends nothing still gets a
+     * sensible list instead of an error.
      */
     public function index(Request $request)
     {
@@ -365,6 +372,8 @@ class SalonController extends Controller
 
         // One sweep, rather than once per salon.
         $access->expireStale();
+
+        $city = $this->resolveCity($request);
 
         $query = Salon::with(['currentSubscription'])
             ->where('status', 'active');
@@ -375,8 +384,8 @@ class SalonController extends Controller
                 ->orWhere('address', 'like', "%{$search}%"));
         }
 
-        if ($request->filled('city_id')) {
-            $query->where('city_id', $request->city_id);
+        if ($city) {
+            $query->where('city_id', $city->id);
         }
 
         if ($request->filled('gender')) {
@@ -395,9 +404,138 @@ class SalonController extends Controller
             });
         }
 
-        $salons = $query->orderBy('name')->get();
+        // Distance decides the order when the app knows where the customer is.
+        // Within one city that is the only ordering that means anything — a
+        // salon three streets away and one an hour across town are not
+        // equivalent just because they share a postcode.
+        $geo = app(\App\Services\GeoService::class);
+        $hasPosition = $geo->isValid($request->lat, $request->lng);
 
-        $rows = $salons->map(function (Salon $salon) use ($access) {
+        if ($hasPosition) {
+            $geo->orderByDistance($query, (float) $request->lat, (float) $request->lng);
+        } else {
+            $query->orderByDesc('avg_rating')->orderBy('name');
+        }
+
+        $salons = $query->get();
+
+        $rows = $this->present($salons, $access);
+
+        $suggestedRows = collect();
+        $alternativeCity = null;
+
+        // An empty list is a dead end, so it never ships on its own. A failed
+        // search falls back to what else is in this city; a city with nothing
+        // in it at all falls back to the nearest market that does.
+        if ($rows->isEmpty()) {
+            if ($request->filled('search') || $request->filled('category_id')) {
+                $suggestedRows = $this->present(
+                    Salon::with(['currentSubscription'])
+                        ->where('status', 'active')
+                        ->when($city, fn ($q) => $q->where('city_id', $city->id))
+                        ->orderByDesc('avg_rating')
+                        ->limit(5)
+                        ->get(),
+                    $access
+                );
+            }
+
+            // Still nothing — this city has no salons worth showing. Point at
+            // the busiest one that does, so the screen has somewhere to go.
+            if ($suggestedRows->isEmpty()) {
+                $alternativeCity = City::where('is_active', true)
+                    ->when($city, fn ($q) => $q->where('id', '!=', $city->id))
+                    ->serviceable()
+                    ->withOpenSalonCount()
+                    ->orderByDesc('salon_count')
+                    ->first();
+
+                if ($alternativeCity) {
+                    $suggestedRows = $this->present(
+                        Salon::with(['currentSubscription'])
+                            ->where('status', 'active')
+                            ->where('city_id', $alternativeCity->id)
+                            ->orderByDesc('avg_rating')
+                            ->limit(5)
+                            ->get(),
+                        $access
+                    );
+                }
+            }
+        }
+
+        // Salons that can be booked come first; the rest stay findable below.
+        return response()->json([
+            'salons' => $rows->sortByDesc('is_serviceable')->values(),
+            'suggested_salons' => $suggestedRows->sortByDesc('is_serviceable')->values(),
+            // The app shows which market it is displaying, because a customer
+            // seeing no salons must be able to tell "none here" from "broken".
+            'sorted_by' => $hasPosition ? 'distance' : 'rating',
+            'city' => $city ? [
+                'id' => $city->id,
+                'name' => $city->name,
+                'state' => $city->state,
+            ] : null,
+            'suggested_city' => $alternativeCity ? [
+                'id' => $alternativeCity->id,
+                'name' => $alternativeCity->name,
+                'state' => $alternativeCity->state,
+                'salon_count' => (int) $alternativeCity->salon_count,
+            ] : null,
+        ]);
+    }
+
+    /**
+     * Which city's salons to show.
+     *
+     * In order of how much the platform should trust it: what the app asked
+     * for, then the customer's saved city, then the busiest market so a first
+     * launch has something in it. Null only when the platform serves nowhere,
+     * in which case the unfiltered list is still better than an error.
+     */
+    private function resolveCity(Request $request): ?City
+    {
+        if ($request->filled('city_id')) {
+            $chosen = City::find($request->city_id);
+
+            if ($chosen) {
+                return $chosen;
+            }
+        }
+
+        // The directory is a public route, so the request has no resolved user
+        // even when a signed-in customer sends their token. Ask the guard
+        // directly, otherwise a returning customer silently loses their city.
+        $saved = auth('sanctum')->user()?->city;
+
+        if ($saved) {
+            return $saved;
+        }
+
+        // Nothing chosen and nothing saved, but the app told us where they are.
+        // Using it beats the blind default: a customer standing in Mumbai
+        // should not be shown the busiest market instead of their own.
+        $geo = app(\App\Services\GeoService::class);
+
+        if ($geo->isValid($request->lat, $request->lng)) {
+            $market = $geo->marketFor((float) $request->lat, (float) $request->lng);
+
+            if ($market['city']) {
+                return $market['city'];
+            }
+        }
+
+        return City::where('is_active', true)
+            ->serviceable()
+            ->withOpenSalonCount()
+            ->orderByDesc('salon_count')
+            ->first();
+    }
+
+    /** The row shape the directory returns, used for results and suggestions. */
+    private function present($salons, $access)
+    {
+        return $salons->map(function (Salon $salon) use ($access) {
             $status = $access->status($salon);
 
             return [
@@ -405,39 +543,21 @@ class SalonController extends Controller
                 'name' => $salon->name,
                 'address' => $salon->address,
                 'cover_photo_url' => $salon->cover_photo_url,
+                'avg_rating' => (float) $salon->avg_rating,
+                'review_count' => (int) $salon->review_count,
                 'is_serviceable' => $status['is_active'],
                 'unavailable_reason' => $status['message'],
+                // Null when the customer shared no position, or the salon has
+                // not been placed on the map yet.
+                'distance_km' => isset($salon->distance_km)
+                    ? round((float) $salon->distance_km, 1)
+                    : null,
+                // A salon sitting at its city centre has not pinned itself, so
+                // the distance is indicative. The app says "about" for these
+                // rather than presenting a guess as a measurement.
+                'distance_is_approximate' => $salon->location_source === 'city_centre',
             ];
         });
-
-        $suggestedRows = collect();
-
-        // If search returned empty, we try to suggest nearby/top active salons
-        if ($rows->isEmpty() && $request->filled('search')) {
-            $suggestedSalons = Salon::with(['currentSubscription'])
-                ->where('status', 'active')
-                ->inRandomOrder() // Fallback since we don't have user lat/lng yet
-                ->limit(5)
-                ->get();
-
-            $suggestedRows = $suggestedSalons->map(function (Salon $salon) use ($access) {
-                $status = $access->status($salon);
-                return [
-                    'id' => $salon->id,
-                    'name' => $salon->name,
-                    'address' => $salon->address,
-                    'cover_photo_url' => $salon->cover_photo_url,
-                    'is_serviceable' => $status['is_active'],
-                    'unavailable_reason' => $status['message'],
-                ];
-            });
-        }
-
-        // Salons that can be booked come first; the rest stay findable below.
-        return response()->json([
-            'salons' => $rows->sortByDesc('is_serviceable')->values(),
-            'suggested_salons' => $suggestedRows->sortByDesc('is_serviceable')->values(),
-        ]);
     }
 
     /**

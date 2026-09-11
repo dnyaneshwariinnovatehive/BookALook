@@ -28,6 +28,10 @@ class SalonRegistrationController extends Controller
             'street_address' => 'required|string',
             'city_id' => 'required|exists:cities,id',
             'pincode' => 'required|string|max:10',
+            // Optional: an owner registering from a laptop at home should not
+            // be blocked, and they can drop the pin later from the app.
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'gender_focus' => 'nullable|string', // Appended to description
         ]);
 
@@ -62,6 +66,12 @@ class SalonRegistrationController extends Controller
                 'city_id' => $request->city_id,
                 'address' => $fullAddress,
                 'pincode' => $request->pincode,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                // Only the owner standing in their own salon can claim 'owner'.
+                'location_source' => $request->filled(['latitude', 'longitude'])
+                    ? 'owner'
+                    : null,
                 'status' => 'pending_approval',
                 'submitted_by' => $adminUser->id,
                 'advance_required' => true,

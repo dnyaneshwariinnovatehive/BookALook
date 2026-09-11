@@ -1,5 +1,6 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import '../../../services/salon_location_api.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/api_service.dart';
 
@@ -21,6 +22,11 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _pincodeController = TextEditingController();
+
+  /// Where the salon is. Optional at sign-up, and null until the owner taps.
+  double? _latitude;
+  double? _longitude;
+  bool _locating = false;
   
   String _genderFocus = 'Unisex';
   
@@ -71,6 +77,30 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
     });
   }
 
+  /// Read the owner's position, if they are standing in the salon.
+  ///
+  /// Never blocks registration: plenty of owners sign up from home, and a
+  /// missing pin is a thing to fix later rather than a reason to stop.
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+
+    final position = await SalonLocationApi.devicePosition();
+
+    if (!mounted) return;
+
+    setState(() {
+      _locating = false;
+      _latitude = position?.latitude;
+      _longitude = position?.longitude;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(position == null
+          ? 'Could not read your location. You can add it later from More > Salon Location.'
+          : 'Location captured. Nearby customers will see you at the right distance.'),
+    ));
+  }
+
   void _submit() {
     if (_formKey.currentState!.validate()) {
       // Append state to address to respect the schema
@@ -88,6 +118,11 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         if (!_useDropdowns) 'city_name': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'gender_focus': _genderFocus,
+        // Optional. Customers browse nearest-first, so a salon that pins itself
+        // at sign-up is placed correctly from its first day. Skipping it is
+        // fine — the owner can pin later from More > Salon Location.
+        if (_latitude != null) 'latitude': _latitude,
+        if (_longitude != null) 'longitude': _longitude,
       });
     }
   }
@@ -111,6 +146,9 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
               style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
             ),
             const SizedBox(height: 24),
+
+            _buildLocationCard(),
+            const SizedBox(height: 20),
 
             _buildLabel('Salon Name *'),
             _buildTextField(
@@ -352,6 +390,82 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
+      ),
+    );
+  }
+
+  /// Offer to pin the salon while the owner is likely standing in it.
+  Widget _buildLocationCard() {
+    final captured = _latitude != null && _longitude != null;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: captured
+            ? AppTheme.lightSuccessBg
+            : AppTheme.accentColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: captured
+              ? AppTheme.lightSuccess.withValues(alpha: 0.4)
+              : AppTheme.accentColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(captured ? Icons.check_circle : Icons.place_outlined,
+              size: 20,
+              color: captured ? AppTheme.lightSuccess : AppTheme.accentColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  captured ? 'Location captured' : 'Pin your salon (optional)',
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  captured
+                      ? '${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}'
+                      : 'Customers see the nearest salons first. Tap while you are '
+                          'at the salon — you can also do this later.',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: AppTheme.lightTextBody),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _locating ? null : _useCurrentLocation,
+                  icon: _locating
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location, size: 16),
+                  label: Text(
+                    _locating
+                        ? 'Finding you…'
+                        : captured
+                            ? 'Update'
+                            : 'Use my current location',
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.accentColor,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

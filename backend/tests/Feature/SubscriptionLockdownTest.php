@@ -36,7 +36,9 @@ class SubscriptionLockdownTest extends TestCase
 
         // ...and so does the directory, which used to read a SuperAdmin
         // endpoint that knew nothing about subscriptions.
-        $listed = $this->getJson('/api/customer/salons')->assertStatus(200)->json('salons');
+        $listed = $this->getJson("/api/customer/salons?city_id={$salon->city_id}")
+            ->assertStatus(200)
+            ->json('salons');
         $row = collect($listed)->firstWhere('id', $salon->id);
 
         $this->assertNotNull($row);
@@ -49,9 +51,12 @@ class SubscriptionLockdownTest extends TestCase
         [$salon] = $this->fixture();
         $this->givenSubscription($salon, endsInDays: 20);
 
-        $listed = $this->getJson('/api/customer/salons')->assertStatus(200)->json('salons');
+        $listed = $this->getJson("/api/customer/salons?city_id={$salon->city_id}")
+            ->assertStatus(200)
+            ->json('salons');
         $row = collect($listed)->firstWhere('id', $salon->id);
 
+        $this->assertNotNull($row);
         $this->assertTrue($row['is_serviceable']);
     }
 
@@ -228,6 +233,10 @@ class SubscriptionLockdownTest extends TestCase
             'name' => "Lock Salon {$unique}",
             'slug' => "lock-salon-{$unique}",
             'address' => 'Test address',
+            // Salon registration requires a city, and the customer directory is
+            // scoped to one, so a salon without a city is not a state the
+            // platform can actually be in.
+            'city_id' => \App\Models\City::where('is_active', true)->value('id'),
             'submitted_by' => $admin->id,
             'status' => 'active',
         ]);

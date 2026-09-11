@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'location_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthService {
@@ -67,6 +68,11 @@ class AuthService {
       };
       if (dob != null && dob.isNotEmpty) body['date_of_birth'] = dob;
       if (address != null && address.isNotEmpty) body['address'] = address;
+
+      // Carry over the city they were already browsing, so signing up does not
+      // throw away a choice they made as a guest.
+      final city = LocationService.instance.city?.id;
+      if (city != null && city.isNotEmpty) body['city_id'] = city;
 
       final response = await http.post(
         Uri.parse('$baseUrl/complete-profile'),

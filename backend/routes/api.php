@@ -20,6 +20,8 @@ Route::prefix('customer')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
+        // Switching market happens from the home screen, not the profile form.
+        Route::put('/profile/city', [CustomerAuthController::class, 'updateCity']);
         
         // Favourites
         Route::get('/favorites', [\App\Http\Controllers\Api\Customer\FavouriteController::class, 'index']);
@@ -59,8 +61,8 @@ Route::prefix('customer')->group(function () {
 
 // Public global routes
 Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']);
+Route::get('/cities/nearest', [\App\Http\Controllers\Api\CityController::class, 'nearest']);
 Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
-Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']);
 
 Route::prefix('superadmin')->group(function () {
     Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
@@ -195,6 +197,10 @@ Route::prefix('partner')->group(function () {
         // Salon Settings (Working Hours, etc.)
         Route::get('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getWorkingHours']);
         Route::put('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateWorkingHours']);
+        // Where the salon is. Customers see the nearest first, so an unpinned
+        // salon sorts last however good it is.
+        Route::get('/salons/{salon_id}/location', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getLocation']);
+        Route::put('/salons/{salon_id}/location', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateLocation']);
 
         // Emergency day closure + mass reschedule
         Route::get('/salons/{salon_id}/closures', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'index']);

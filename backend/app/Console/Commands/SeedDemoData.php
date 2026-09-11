@@ -572,7 +572,7 @@ class SeedDemoData extends Command
     {
         return [
             [
-                'name' => 'Glow Up Studio', 'city' => 'Pune', 'phone' => '9112002049',
+                'name' => 'Glow Up Studio', 'lat' => 18.5362, 'lng' => 73.8939, 'city' => 'Pune', 'phone' => '9112002049',
                 'owner' => 'Sanjay Deshmukh', 'status' => 'active',
                 'billing' => 'growth', 'staff' => 4, 'busyness' => 5,
                 'rating' => 4.7, 'gender' => 'Unisex',
@@ -580,7 +580,7 @@ class SeedDemoData extends Command
                 'about' => 'Full-service unisex salon in Koregaon Park. Known for colour and bridal work.',
             ],
             [
-                'name' => 'Elite Cuts', 'city' => 'Mumbai', 'phone' => '9168281183',
+                'name' => 'Elite Cuts', 'lat' => 19.0544, 'lng' => 72.8266, 'city' => 'Mumbai', 'phone' => '9168281183',
                 'owner' => 'Farhan Qureshi', 'status' => 'active',
                 'billing' => 'commission', 'rate' => 12.0, 'staff' => 3, 'busyness' => 4,
                 'rating' => 4.4, 'gender' => 'Men Only',
@@ -588,7 +588,7 @@ class SeedDemoData extends Command
                 'about' => 'Men\'s grooming bar. Walk in for a fade, stay for the beard work.',
             ],
             [
-                'name' => 'Serenity Spa & Salon', 'city' => 'Bangalore', 'phone' => '9112002047',
+                'name' => 'Serenity Spa & Salon', 'lat' => 12.9784, 'lng' => 77.6408, 'city' => 'Bangalore', 'phone' => '9112002047',
                 'owner' => 'Lakshmi Menon', 'status' => 'active',
                 'billing' => 'commission', 'rate' => 15.0, 'staff' => 4, 'busyness' => 4,
                 'rating' => 4.8, 'gender' => 'Women Only',
@@ -596,7 +596,7 @@ class SeedDemoData extends Command
                 'about' => 'Quiet spa-first studio. Massages, facials and long appointments.',
             ],
             [
-                'name' => 'The Style Loft', 'city' => 'Pune', 'phone' => '9112002046',
+                'name' => 'The Style Loft', 'lat' => 18.559, 'lng' => 73.7868, 'city' => 'Pune', 'phone' => '9112002046',
                 'owner' => 'Neha Kulkarni', 'status' => 'active',
                 'billing' => 'starter', 'staff' => 3, 'busyness' => 3,
                 'rating' => 4.2, 'gender' => 'Unisex',
@@ -604,7 +604,7 @@ class SeedDemoData extends Command
                 'about' => 'Neighbourhood salon with a loyal regular crowd.',
             ],
             [
-                'name' => 'Urban Trim', 'city' => 'Nashik', 'phone' => '9811000005',
+                'name' => 'Urban Trim', 'lat' => 20.0059, 'lng' => 73.7749, 'city' => 'Nashik', 'phone' => '9811000005',
                 'owner' => 'Amol Pawar', 'status' => 'active',
                 'billing' => 'starter', 'staff' => 2, 'busyness' => 2,
                 'rating' => 3.9, 'gender' => 'Men Only',
@@ -613,7 +613,7 @@ class SeedDemoData extends Command
             ],
             // Lapsed: the lockdown story. Trades, then stops being bookable.
             [
-                'name' => 'Bliss Beauty Bar', 'city' => 'Mumbai', 'phone' => '9811000006',
+                'name' => 'Bliss Beauty Bar', 'lat' => 19.1364, 'lng' => 72.8296, 'city' => 'Mumbai', 'phone' => '9811000006',
                 'owner' => 'Reshma Shaikh', 'status' => 'active',
                 'billing' => 'lapsed', 'staff' => 2, 'busyness' => 2,
                 'rating' => 4.1, 'gender' => 'Women Only',
@@ -622,7 +622,7 @@ class SeedDemoData extends Command
             ],
             // Waiting on SuperAdmin: the approval queue.
             [
-                'name' => 'Scissors & Co.', 'city' => 'Pune', 'phone' => '9811000007',
+                'name' => 'Scissors & Co.', 'lat' => 18.559, 'lng' => 73.8078, 'city' => 'Pune', 'phone' => '9811000007',
                 'owner' => 'Vaibhav Jadhav', 'status' => 'pending_approval',
                 'billing' => 'none', 'staff' => 0, 'busyness' => 0,
                 'rating' => 0.0, 'gender' => 'Unisex',
@@ -630,7 +630,7 @@ class SeedDemoData extends Command
                 'about' => 'New unisex salon applying to join the marketplace.',
             ],
             [
-                'name' => 'Velvet Touch Salon', 'city' => 'Bangalore', 'phone' => '9811000008',
+                'name' => 'Velvet Touch Salon', 'lat' => 12.9116, 'lng' => 77.6474, 'city' => 'Bangalore', 'phone' => '9811000008',
                 'owner' => 'Divya Krishnan', 'status' => 'pending_approval',
                 'billing' => 'none', 'staff' => 0, 'busyness' => 0,
                 'rating' => 0.0, 'gender' => 'Women Only',
@@ -676,6 +676,11 @@ class SeedDemoData extends Command
                 'advance_percentage_default' => 30,
                 'avg_rating' => $blueprint['rating'],
                 'review_count' => 0,
+                // Real neighbourhood positions, so "nearest first" orders these
+                // the way a customer standing in the city would expect.
+                'latitude' => $blueprint['lat'],
+                'longitude' => $blueprint['lng'],
+                'location_source' => 'owner',
                 'cover_photo_url' => 'https://placehold.co/1200x600/1C1726/F3EBFE/png?text='
                     . urlencode($blueprint['name']),
             ]

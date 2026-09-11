@@ -103,6 +103,9 @@ class CustomerAuthController extends Controller
             'date_of_birth' => 'nullable|date',
             'address' => 'nullable|string',
             'pincode' => 'nullable|string|max:10',
+            // The market they browse in. Optional here because the app lets
+            // them pick one before signing up and sends it along.
+            'city_id' => 'nullable|exists:cities,id',
         ]);
 
         if ($validator->fails()) {
@@ -127,6 +130,7 @@ class CustomerAuthController extends Controller
             'date_of_birth' => $request->date_of_birth,
             'address' => $request->address,
             'pincode' => $request->pincode,
+            'city_id' => $request->city_id,
             'is_active' => true,
             'last_login_at' => now(),
         ]);
@@ -158,9 +162,30 @@ class CustomerAuthController extends Controller
     /**
      * Get customer profile and stats.
      */
+    /**
+     * Change the city this customer browses in.
+     *
+     * Separate from the rest of the profile because it is changed far more
+     * often — a customer switches market from the home screen, not by editing
+     * their details.
+     */
+    public function updateCity(Request $request)
+    {
+        $request->validate(['city_id' => 'required|exists:cities,id']);
+
+        $user = $request->user();
+        $user->forceFill(['city_id' => $request->city_id])->save();
+
+        return response()->json([
+            'success' => true,
+            'city' => $user->fresh()->city,
+        ]);
+    }
+
     public function profile(Request $request)
     {
         $user = $request->user();
+        $user->loadMissing('city');
 
         // Count of all non-cancelled appointments booked by this customer
         $appointmentsCount = \App\Models\Appointment::where('customer_id', $user->id)

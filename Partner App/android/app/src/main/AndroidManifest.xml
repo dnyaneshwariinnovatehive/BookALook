@@ -3,6 +3,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Used once, when the owner pins their salon on the map. Customers are
+         shown the nearest salons first, so an unpinned salon sorts last. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <application
         android:label="partner_app"
         android:name="${applicationName}"

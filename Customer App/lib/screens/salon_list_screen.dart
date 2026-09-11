@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../services/location_service.dart';
+import '../widgets/city_picker_sheet.dart';
 import '../services/salon_service.dart';
 import 'salon_detail_screen.dart';
 
@@ -85,7 +87,9 @@ class _SalonListScreenState extends State<SalonListScreen> {
           Padding(
             padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 8),
             child: Text(
-              'No exact match found.',
+              LocationService.instance.hasCity
+                  ? 'No match in ${LocationService.instance.city!.name}.'
+                  : 'No exact match found.',
               style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
@@ -108,7 +112,47 @@ class _SalonListScreenState extends State<SalonListScreen> {
       );
     }
 
-    return Center(child: Text('No salons found.', style: GoogleFonts.outfit(color: AppTheme.lightTextBody)));
+    // Naming the city matters here: searching is city-scoped, so "nothing
+    // found" without it reads as "this salon does not exist" rather than
+    // "not in the city you are looking at".
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              LocationService.instance.hasCity
+                  ? 'No salons found in ${LocationService.instance.city!.name}.'
+                  : 'No salons found.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                  color: AppTheme.lightTextHeading, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Try a different search, or change your city.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () async {
+                final changed = await showCityPicker(context);
+                if (changed && mounted) {
+                  setState(() => _isLoading = true);
+                  _loadSalons();
+                }
+              },
+              icon: const Icon(Icons.location_on, size: 18),
+              label: const Text('Change city'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildSalonItem(dynamic salon) {

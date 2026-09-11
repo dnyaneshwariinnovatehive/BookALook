@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
+import '../../services/location_service.dart';
+import '../../widgets/city_picker_sheet.dart';
 import '../../models/banner.dart';
 import '../../services/banner_service.dart';
 import '../../widgets/banner_carousel.dart';
@@ -42,9 +44,43 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _fetchBanners();
+    _bootstrap();
     _fetchCategories();
     _fetchAlerts();
+    // Another screen can change the city; the header has to follow it.
+    LocationService.instance.addListener(_onCityChanged);
+  }
+
+  @override
+  void dispose() {
+    LocationService.instance.removeListener(_onCityChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// The stored city has to be read before anything city-scoped is fetched,
+  /// otherwise the first load asks for the wrong market and corrects itself a
+  /// moment later in front of the customer.
+  Future<void> _bootstrap() async {
+    await LocationService.instance.restore();
+    if (!mounted) return;
+    setState(() {});
+    _fetchBanners();
+  }
+
+  void _onCityChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  /// Let the customer change market, and reload what that changes.
+  Future<void> _pickCity() async {
+    final changed = await showCityPicker(context);
+
+    if (changed && mounted) {
+      setState(() => _isLoadingBanners = true);
+      _fetchBanners();
+    }
   }
 
   /// Guests have no bookings or inbox, so this is a no-op for them.
@@ -88,10 +124,10 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _fetchBanners() async {
-    final bannerService = BannerService();
-    // Assuming we want to fetch banners for the user's current city if known.
-    // For now, we fetch platform-wide banners (and city banners if city is passed).
-    final banners = await bannerService.fetchBanners();
+    // Scoped to the chosen city by BannerService, so a campaign aimed at one
+    // city reaches it and nobody else.
+    final banners = await BannerService().fetchBanners();
+    if (!mounted) return;
     setState(() {
       _banners = banners;
       _isLoadingBanners = false;
@@ -231,18 +267,33 @@ class _HomeTabState extends State<HomeTab> {
                           fontSize: 14,
                         ),
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            'Select Location',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                      InkWell(
+                        onTap: _pickCity,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.location_on,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.primary),
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 180),
+                              child: Text(
+                                LocationService.instance.label,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
-                          ),
-                          Icon(Icons.keyboard_arrow_down, size: 20, color: Theme.of(context).colorScheme.primary),
-                        ],
+                            Icon(Icons.keyboard_arrow_down,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.primary),
+                          ],
+                        ),
                       ),
                     ],
                   ),

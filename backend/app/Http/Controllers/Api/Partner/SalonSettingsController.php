@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Salon;
 use App\Models\SalonWorkingHour;
+use App\Services\GeoService;
 use Illuminate\Support\Facades\Validator;
 
 class SalonSettingsController extends Controller
@@ -63,5 +65,64 @@ class SalonSettingsController extends Controller
         }
 
         return response()->json(['message' => 'Working hours updated successfully']);
+    }
+
+    /**
+     * Where the salon actually is.
+     *
+     * Customers are shown salons nearest to them first, so a salon without a
+     * pin sorts last however good it is. This is how an owner fixes that —
+     * standing in their own doorway, tapping once.
+     *
+     * Marked `owner` because it came from the person who runs the place, which
+     * outranks the city-centre guess the platform makes on their behalf.
+     */
+    public function updateLocation(Request $request, $salon_id)
+    {
+        $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+        ]);
+
+        $salon = Salon::where('id', $salon_id)
+            ->where('admin_id', $request->user()->id)
+            ->firstOrFail();
+
+        if (! app(GeoService::class)->isValid($request->latitude, $request->longitude)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That does not look like a real location.',
+            ], 422);
+        }
+
+        $salon->forceFill([
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'location_source' => 'owner',
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Location saved. Customers nearby will now see you first.',
+            'latitude' => (float) $salon->latitude,
+            'longitude' => (float) $salon->longitude,
+            'location_source' => $salon->location_source,
+        ]);
+    }
+
+    /** What the app needs to draw the pin, and whether it is the owner's own. */
+    public function getLocation(Request $request, $salon_id)
+    {
+        $salon = Salon::where('id', $salon_id)
+            ->where('admin_id', $request->user()->id)
+            ->firstOrFail();
+
+        return response()->json([
+            'success' => true,
+            'latitude' => $salon->latitude === null ? null : (float) $salon->latitude,
+            'longitude' => $salon->longitude === null ? null : (float) $salon->longitude,
+            'location_source' => $salon->location_source,
+            'city' => $salon->city?->only(['id', 'name', 'state']),
+        ]);
     }
 }

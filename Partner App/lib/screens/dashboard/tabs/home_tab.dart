@@ -97,7 +97,7 @@ class _HomeTabState extends State<HomeTab> {
         final status = appt['status'];
         if (status != 'cancelled' && status != 'no_show') {
           apptsCount++;
-          final pId = appt['serving_provider_id']?.toString() ?? appt['provider_id']?.toString();
+          final pId = appt['appointed_provider_id']?.toString() ?? appt['serving_provider_id']?.toString();
           if (pId != null) {
             providerLoads[pId] = (providerLoads[pId] ?? 0) + 1;
           }

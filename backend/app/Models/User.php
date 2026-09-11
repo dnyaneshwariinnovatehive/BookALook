@@ -28,6 +28,7 @@ class User extends Authenticatable
         'date_of_birth',
         'address',
         'pincode',
+        'city_id',
         'is_active',
         'last_login_at',
     ];
@@ -73,5 +74,11 @@ class User extends Authenticatable
     public function favouriteSalons()
     {
         return $this->belongsToMany(Salon::class, 'favourite_salons', 'customer_id', 'salon_id')->withTimestamps();
+    }
+
+    /** The market this customer browses in. Null until they have chosen one. */
+    public function city()
+    {
+        return $this->belongsTo(City::class);
     }
 }

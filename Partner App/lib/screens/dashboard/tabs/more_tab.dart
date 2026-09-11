@@ -4,6 +4,7 @@ import '../../phone_screen.dart';
 import 'settings/salon_timings_screen.dart';
 import '../more/subscription_billing_screen.dart';
 import '../more/wallet_screen.dart';
+import '../more/salon_location_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
@@ -119,6 +120,20 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // Customers browse nearest-first, so an unpinned salon sorts
+                  // below every salon on the same street that has pinned itself.
+                  _buildOptionTile(context,
+                    icon: Icons.place_outlined,
+                    iconColor: AppTheme.accentColor,
+                    title: 'Salon Location',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonId)),
                       );
                     },
                   ),

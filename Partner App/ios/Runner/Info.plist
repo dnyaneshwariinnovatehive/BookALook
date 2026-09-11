@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>BookALook uses your location once, to pin your salon on the map so nearby customers can find you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera is used to scan a customer's booking QR code to start their appointment.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
