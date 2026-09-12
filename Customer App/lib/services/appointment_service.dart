@@ -210,7 +210,7 @@ class AppointmentService {
     final token = prefs.getString('auth_token');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/customer/appointments/$id/demo-pay'),
+      Uri.parse('$baseUrl/customer/appointments/$id/payment/demo-pay'),
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
@@ -230,7 +230,7 @@ class AppointmentService {
     final token = prefs.getString('auth_token');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/customer/appointments/$id/confirm-payment'),
+      Uri.parse('$baseUrl/customer/appointments/$id/payment/confirm'),
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
@@ -255,7 +255,7 @@ class AppointmentService {
     final token = prefs.getString('auth_token');
 
     final response = await http.post(
-      Uri.parse('$baseUrl/customer/appointments/$id/abandon-payment'),
+      Uri.parse('$baseUrl/customer/appointments/$id/payment/abandon'),
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',

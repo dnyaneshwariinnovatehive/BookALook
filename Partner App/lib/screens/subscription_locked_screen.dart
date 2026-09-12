@@ -8,12 +8,17 @@ import '../theme/app_theme.dart';
 import 'dashboard/more/upgrade_plan_screen.dart';
 import 'phone_screen.dart';
 
-/// Shown in place of the whole app when the salon's plan has lapsed.
+/// Shown in place of the whole app when the salon has no usable plan.
 ///
 /// The two roles need different things from this screen. The owner needs the
 /// shortest possible path to paying. A staff member cannot pay and should not
 /// be nagged as if they could — they need to know why nothing works and be able
 /// to ring the owner in one tap.
+///
+/// It also has to tell apart a lapsed plan from a salon that has just been
+/// approved and never had one. Greeting a brand new owner with "your plan has
+/// ended" reads as a failure on their first ever sign-in, when in fact the only
+/// thing left to do is pick a plan.
 class SubscriptionLockedScreen extends StatelessWidget {
   final SalonAccess access;
 
@@ -77,22 +82,26 @@ class SubscriptionLockedScreen extends StatelessWidget {
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    color: AppTheme.lightWarning.withValues(alpha: 0.12),
+                    color: _accent.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.lock_outline, size: 44, color: AppTheme.lightWarning),
+                  child: Icon(
+                    _isWelcome ? Icons.celebration_outlined : Icons.lock_outline,
+                    size: 44,
+                    color: _accent,
+                  ),
                 ),
                 const SizedBox(height: 24),
 
                 Text(
-                  access.canRenew ? 'Your plan has ended' : 'This salon is offline',
+                  _title,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
 
                 Text(
-                  access.canRenew ? _ownerMessage() : _staffMessage(),
+                  _message,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                       fontSize: 14.5, height: 1.5, color: Colors.grey.shade700),
@@ -118,7 +127,28 @@ class SubscriptionLockedScreen extends StatelessWidget {
     );
   }
 
+  /// The salon has just been approved and is picking its very first plan, so
+  /// the screen greets rather than warns.
+  bool get _isWelcome => access.hasNeverSubscribed;
+
+  Color get _accent =>
+      _isWelcome ? AppTheme.accentColor : AppTheme.lightWarning;
+
+  String get _title {
+    if (!access.canRenew) return 'This salon is offline';
+
+    return _isWelcome ? 'Choose your plan' : 'Your plan has ended';
+  }
+
+  String get _message => access.canRenew ? _ownerMessage() : _staffMessage();
+
   String _ownerMessage() {
+    if (_isWelcome) {
+      return '${access.salonName} is approved and ready to go. Pick a plan to '
+          'put it in front of customers, open bookings and unlock the app for '
+          'your team.';
+    }
+
     final when = _expiredLabel.isEmpty ? '' : ' on $_expiredLabel';
 
     return 'Your subscription for ${access.salonName} ended$when. '
@@ -128,6 +158,11 @@ class SubscriptionLockedScreen extends StatelessWidget {
 
   String _staffMessage() {
     final owner = access.adminName ?? 'the salon owner';
+
+    if (_isWelcome) {
+      return '${access.salonName} has not started a plan yet, so the app is '
+          'locked for everyone here. Only $owner can choose one.';
+    }
 
     return '${access.salonName}\'s subscription has ended, so the app is locked '
         'for everyone here. Only $owner can renew it.';
@@ -140,15 +175,27 @@ class SubscriptionLockedScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
-          children: [
-            _impactRow(Icons.visibility_off_outlined,
-                'Customers cannot find or book this salon'),
-            const SizedBox(height: 10),
-            _impactRow(Icons.block, 'Check-ins, walk-ins and billing are closed'),
-            const SizedBox(height: 10),
-            _impactRow(Icons.history_toggle_off,
-                'Nothing is lost — your data is waiting when you renew'),
-          ],
+          children: _isWelcome
+              ? [
+                  _impactRow(Icons.storefront_outlined,
+                      'The salon goes live for customers to find and book'),
+                  const SizedBox(height: 10),
+                  _impactRow(Icons.groups_outlined,
+                      'The whole team gets into the app'),
+                  const SizedBox(height: 10),
+                  _impactRow(Icons.point_of_sale_outlined,
+                      'Check-ins, walk-ins and billing all open up'),
+                ]
+              : [
+                  _impactRow(Icons.visibility_off_outlined,
+                      'Customers cannot find or book this salon'),
+                  const SizedBox(height: 10),
+                  _impactRow(
+                      Icons.block, 'Check-ins, walk-ins and billing are closed'),
+                  const SizedBox(height: 10),
+                  _impactRow(Icons.history_toggle_off,
+                      'Nothing is lost — your data is waiting when you renew'),
+                ],
         ),
       );
 
@@ -174,13 +221,16 @@ class SubscriptionLockedScreen extends StatelessWidget {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => UpgradePlanScreen(salonId: _salonIdFrom(context)),
+                  builder: (_) => UpgradePlanScreen(
+                    salonId: _salonIdFrom(context),
+                    isFirstPlan: _isWelcome,
+                  ),
                 ),
               );
               await onRecheck();
             },
-            icon: const Icon(Icons.autorenew),
-            label: Text('Renew now',
+            icon: Icon(_isWelcome ? Icons.workspace_premium_outlined : Icons.autorenew),
+            label: Text(_isWelcome ? 'Choose a plan' : 'Renew now',
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor,
@@ -195,7 +245,9 @@ class SubscriptionLockedScreen extends StatelessWidget {
           child: OutlinedButton(
             onPressed: onRecheck,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-            child: const Text('I have renewed — check again'),
+            child: Text(_isWelcome
+                ? 'I have paid — check again'
+                : 'I have renewed — check again'),
           ),
         ),
       ];

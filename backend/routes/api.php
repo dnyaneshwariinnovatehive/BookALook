@@ -81,6 +81,9 @@ Route::prefix('superadmin')->group(function () {
     // Salon Directory API (Unprotected for now)
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+    // The directory is the only surface that holds partner-app salons, which
+    // never passed through an enquiry to be assigned a collaborator.
+    Route::post('/salons/{id}/assign-collaborator', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'assignCollaborator']);
 
 
     // Public Enquiries API (Unprotected for now to ease frontend testing)
@@ -176,8 +179,25 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
         Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
 
-        // Collaborators work across salons, not inside one.
+        // Collaborators work across salons, not inside one — so none of this
+        // can sit behind the salon.active gate.
         Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
+        Route::get('/collaborator/onboarded-salons', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'onboardedSalons']);
+        // Existing salons SuperAdmin assigned from the directory. Not onboarding
+        // work — these already exist and just needed somebody looking after them.
+        Route::get('/collaborator/assigned-salons', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'assignedSalons']);
+        Route::get('/collaborator/me', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'profile']);
+        Route::put('/collaborator/me', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'updateProfile']);
+        // Plans running out on salons this collaborator onboarded. They cannot
+        // renew one — they can ring the owner, which is the point.
+        Route::get('/collaborator/alerts', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'alerts']);
+        Route::get('/collaborator/master-catalog', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'masterCatalog']);
+        // What a rejected salon already holds, so a correction is an edit and
+        // not a retype.
+        Route::get('/collaborator/salons/{salonId}/submission', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'submittedSalon']);
+        // The assignment is the only way to onboard a salon, so the enquiry id
+        // is part of the address rather than something the body claims.
+        Route::post('/collaborator/enquiries/{enquiryId}/onboard', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'onboard']);
     });
 
     // Everything a salon actually operates with. Closed while the plan is lapsed.

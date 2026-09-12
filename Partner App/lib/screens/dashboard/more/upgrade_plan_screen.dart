@@ -8,7 +8,17 @@ import 'package:partner_app/services/api_config.dart';
 
 class UpgradePlanScreen extends StatefulWidget {
   final String salonId;
-  const UpgradePlanScreen({super.key, required this.salonId});
+
+  /// A salon buying its very first plan is not "upgrading" anything, so the
+  /// screen introduces itself differently when it is reached from the welcome
+  /// lock screen.
+  final bool isFirstPlan;
+
+  const UpgradePlanScreen({
+    super.key,
+    required this.salonId,
+    this.isFirstPlan = false,
+  });
 
   @override
   State<UpgradePlanScreen> createState() => _UpgradePlanScreenState();
@@ -142,7 +152,9 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
     final finalPrice = price - discountApplied;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Upgrade Plan')),
+      appBar: AppBar(
+        title: Text(widget.isFirstPlan ? 'Choose Your Plan' : 'Upgrade Plan'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(

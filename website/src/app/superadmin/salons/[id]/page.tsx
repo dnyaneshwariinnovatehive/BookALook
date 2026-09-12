@@ -17,6 +17,8 @@ interface Salon {
   description: string;
   city?: { name: string };
   admin?: { name: string; phone: string; email: string };
+  assigned_collaborator_id?: string | null;
+  assigned_collaborator?: { id: string; name: string; email: string } | null;
   providers?: { id: string; user?: { name: string; phone: string; email: string }; is_active: boolean }[];
   services?: { 
     id: string; 
@@ -31,24 +33,49 @@ interface Salon {
   combos?: { id: string; name: string; total_price: number; is_active: boolean }[];
 }
 
+interface Collaborator {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 export default function SalonDirectoryDetail() {
   const params = useParams();
   const { id } = params;
-  
+
   const [salon, setSalon] = useState<Salon | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Onboarding collaborator. Salons that came in through an enquiry already
+  // have one; salons registered from the partner app arrive with none, and the
+  // directory is the only place they can be given one.
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [selectedCollaborator, setSelectedCollaborator] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignNote, setAssignNote] = useState('');
+
   useEffect(() => {
     async function fetchSalon() {
       try {
-        const res = await fetch(`http://localhost:8000/api/superadmin/salons/${id}`);
-        if (!res.ok) throw new Error('Failed to fetch salon details');
-        const json = await res.json();
+        const [salonRes, collabRes] = await Promise.all([
+          fetch(`http://localhost:8000/api/superadmin/salons/${id}`),
+          fetch('http://localhost:8000/api/superadmin/collaborators'),
+        ]);
+
+        if (!salonRes.ok) throw new Error('Failed to fetch salon details');
+        const json = await salonRes.json();
         if (json.success) {
           setSalon(json.data);
+          setSelectedCollaborator(json.data.assigned_collaborator_id || '');
         } else {
           throw new Error(json.message);
+        }
+
+        // A missing collaborator list only costs the dropdown, not the page.
+        if (collabRes.ok) {
+          const collabJson = await collabRes.json();
+          setCollaborators(collabJson.data || []);
         }
       } catch (err: any) {
         setError(err.message);
@@ -58,6 +85,34 @@ export default function SalonDirectoryDetail() {
     }
     if (id) fetchSalon();
   }, [id]);
+
+  const handleAssignCollaborator = async () => {
+    setAssigning(true);
+    setAssignNote('');
+
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/superadmin/salons/${id}/assign-collaborator`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ collaborator_id: selectedCollaborator || null }),
+        }
+      );
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || 'Failed to assign collaborator');
+      }
+
+      setSalon(prev => (prev ? { ...prev, ...json.data } : prev));
+      setAssignNote(json.message);
+    } catch (err: any) {
+      setAssignNote(err.message);
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   if (loading) return <div className={styles.container}>Loading...</div>;
   if (error || !salon) return <div className={styles.container} style={{color: 'red'}}>Error: {error || 'Salon not found'}</div>;
@@ -155,6 +210,54 @@ export default function SalonDirectoryDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Onboarding Collaborator */}
+      <div className={styles.card} style={{ marginTop: '24px' }}>
+        <h2 className={styles.sectionTitle}>Onboarding Collaborator</h2>
+
+        <div className={styles.infoGroup}>
+          <span className={styles.label}>Currently Assigned</span>
+          <div className={styles.value}>
+            {salon.assigned_collaborator
+              ? `${salon.assigned_collaborator.name}${
+                  salon.assigned_collaborator.email ? ` — ${salon.assigned_collaborator.email}` : ''
+                }`
+              : 'No collaborator assigned yet.'}
+          </div>
+        </div>
+
+        <div className={styles.assignRow}>
+          <select
+            className={styles.assignSelect}
+            value={selectedCollaborator}
+            onChange={(e) => setSelectedCollaborator(e.target.value)}
+            disabled={assigning}
+          >
+            <option value="">— No collaborator —</option>
+            {collaborators.map((collaborator) => (
+              <option key={collaborator.id} value={collaborator.id}>
+                {collaborator.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className={styles.assignButton}
+            onClick={handleAssignCollaborator}
+            disabled={assigning || selectedCollaborator === (salon.assigned_collaborator_id || '')}
+          >
+            {assigning ? 'Saving…' : 'Save Assignment'}
+          </button>
+        </div>
+
+        {collaborators.length === 0 && (
+          <p className={styles.assignNote}>
+            No collaborators exist yet. Create one from the Collaborators page first.
+          </p>
+        )}
+
+        {assignNote && <p className={styles.assignNote}>{assignNote}</p>}
       </div>
 
       {/* Staff Directory */}

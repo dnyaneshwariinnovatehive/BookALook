@@ -46,7 +46,8 @@ class SalonController extends Controller
                 'description' => $salon->description,
                 'address' => $salon->address,
                 'pincode' => $salon->pincode,
-                'phone' => $salon->phone_num,
+                // phone_num is the owner's personal number. It is never sent to
+                // a customer — the description carries the salon's own story.
                 'map_url' => $salon->map_url,
                 'latitude' => $salon->latitude,
                 'longitude' => $salon->longitude,

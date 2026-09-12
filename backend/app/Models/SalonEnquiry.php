@@ -29,4 +29,13 @@ class SalonEnquiry extends Model
     {
         return $this->belongsTo(User::class, 'assigned_collaborator_id');
     }
+
+    /**
+     * The salon the assigned collaborator built from this enquiry, once they
+     * have submitted it. Absent until then.
+     */
+    public function salon()
+    {
+        return $this->hasOne(Salon::class, 'enquiry_id');
+    }
 }

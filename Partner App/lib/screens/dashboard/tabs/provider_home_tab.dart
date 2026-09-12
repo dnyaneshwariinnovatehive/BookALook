@@ -167,6 +167,9 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
               ),
               const SizedBox(height: 24),
 
+              _buildScanCard(),
+              const SizedBox(height: 24),
+
               // Availability Toggle
               Row(
                 children: [
@@ -238,6 +241,62 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
         ),
       ),
     ),
+    );
+  }
+
+  /// Starting an appointment by scanning the customer's code is the main thing a
+  /// staff member does all day, so it is on the page and not only on the
+  /// floating button.
+  Widget _buildScanCard() {
+    return InkWell(
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => QrScannerScreen(salonId: widget.salon['id'].toString()),
+          ),
+        );
+        await _loadAppointments();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Scan customer QR',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 3),
+                  Text('Check someone in and start their appointment',
+                      style: GoogleFonts.outfit(fontSize: 12, color: Colors.white70)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white70),
+          ],
+        ),
+      ),
     );
   }
 

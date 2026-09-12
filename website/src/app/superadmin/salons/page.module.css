@@ -150,6 +150,12 @@
   color: var(--text-body);
 }
 
+.unassigned {
+  color: var(--color-warning);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .emptyState {
   padding: 3rem;
   text-align: center;

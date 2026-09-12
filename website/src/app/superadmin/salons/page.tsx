@@ -11,6 +11,7 @@ interface Salon {
   created_at: string;
   city?: { name: string };
   admin?: { name: string };
+  assigned_collaborator?: { name: string } | null;
 }
 
 interface Meta {
@@ -125,6 +126,7 @@ export default function SalonDirectory() {
               <th className={styles.th}>Salon Name</th>
               <th className={styles.th}>City</th>
               <th className={styles.th}>Owner/Admin</th>
+              <th className={styles.th}>Collaborator</th>
               <th className={styles.th}>Status</th>
               <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
             </tr>
@@ -132,15 +134,15 @@ export default function SalonDirectory() {
           <tbody>
             {loading && salons.length === 0 ? (
               <tr>
-                <td colSpan={5} className={styles.emptyState}>Loading...</td>
+                <td colSpan={6} className={styles.emptyState}>Loading...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={5} className={styles.emptyState} style={{ color: 'red' }}>{error}</td>
+                <td colSpan={6} className={styles.emptyState} style={{ color: 'red' }}>{error}</td>
               </tr>
             ) : salons.length === 0 ? (
               <tr>
-                <td colSpan={5} className={styles.emptyState}>No salons found matching your criteria.</td>
+                <td colSpan={6} className={styles.emptyState}>No salons found matching your criteria.</td>
               </tr>
             ) : (
               salons.map((salon) => (
@@ -148,6 +150,11 @@ export default function SalonDirectory() {
                   <td className={`${styles.td} ${styles.salonName}`}>{salon.name}</td>
                   <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
                   <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
+                  <td className={styles.td}>
+                    {salon.assigned_collaborator?.name || (
+                      <span className={styles.unassigned}>Unassigned</span>
+                    )}
+                  </td>
                   <td className={styles.td}>
                     <span className={`${styles.badge} ${getStatusBadgeClass(salon.status)}`}>
                       {formatStatus(salon.status)}

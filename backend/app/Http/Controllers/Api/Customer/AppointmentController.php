@@ -851,7 +851,7 @@ class AppointmentController extends Controller
     private function bookingRelations(): array
     {
         return [
-            'salon:id,name,address,phone_num',
+            'salon:id,name,address',
             'services.service.template:id,name,estimated_duration_minutes',
             'services.combo:id,name,will_refund_advance_if_cancelled',
             'appointedProvider.user:id,name',
@@ -912,7 +912,7 @@ class AppointmentController extends Controller
                 'id' => $appointment->salon_id,
                 'name' => $appointment->salon->name ?? 'Salon',
                 'address' => $appointment->salon->address ?? null,
-                'phone' => $appointment->salon->phone_num ?? null,
+                // Owner's number — deliberately withheld from customers.
             ],
             'provider_name' => $appointment->appointedProvider->user->name ?? 'Any available staff',
             'appointment_date' => $date,

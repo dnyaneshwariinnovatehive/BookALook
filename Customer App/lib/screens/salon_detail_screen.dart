@@ -533,18 +533,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             ),
           ],
 
-          if (_salon!['phone'] != null) ...[
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.phone_outlined, size: 18, color: AppTheme.lightTextBody),
-                SizedBox(width: 8),
-                Text(_salon!['phone'],
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-              ],
-            ),
-          ],
-
+          // The salon's phone is the owner's personal number — never surfaced
+          // to customers. The description takes its place here.
           if ((_salon!['description'] ?? '').toString().isNotEmpty) ...[
             SizedBox(height: 14),
             Text(_salon!['description'],

@@ -70,11 +70,19 @@ class SalonApprovalController extends Controller
         ]);
 
         $salon = Salon::findOrFail($id);
-        
+
         $salon->update([
             'status' => 'rejected',
             'rejection_reason' => $request->rejection_reason
         ]);
+
+        // A salon a collaborator onboarded is not finished when it is rejected
+        // — it goes back on their list so they can fix what was wrong and send
+        // it again. Without this the enquiry would sit at 'onboarded' forever
+        // and the collaborator would have no way back to it.
+        if ($salon->enquiry_id) {
+            $salon->enquiry()->update(['status' => 'assigned']);
+        }
 
         return response()->json([
             'success' => true,

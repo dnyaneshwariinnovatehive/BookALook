@@ -61,6 +61,11 @@ class SalonAccess {
   bool get isSubscriptionProblem =>
       reason == 'subscription_expired' || reason == 'no_subscription';
 
+  /// Approved, but has never held a plan. Nothing has "ended" for this salon —
+  /// it is standing at the start line, so the lock screen has to sell the
+  /// first purchase rather than chase a renewal.
+  bool get hasNeverSubscribed => reason == 'no_subscription';
+
   factory SalonAccess.fromJson(Map<String, dynamic> json) {
     final subscription = json['subscription'] as Map<String, dynamic>?;
     final admin = json['salon_admin'] as Map<String, dynamic>?;

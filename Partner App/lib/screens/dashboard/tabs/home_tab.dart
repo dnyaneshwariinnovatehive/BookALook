@@ -213,6 +213,8 @@ class _HomeTabState extends State<HomeTab> {
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 24),
+                      _buildScanCard(),
+                      const SizedBox(height: 24),
                       _buildTopStats(),
                       const SizedBox(height: 24),
                       _buildQuickActions(),
@@ -283,6 +285,55 @@ class _HomeTabState extends State<HomeTab> {
           ),
         )
       ],
+    );
+  }
+
+  /// Checking a customer in is the thing this screen gets opened for most, so it
+  /// sits in the page itself rather than only on the floating button — a FAB is
+  /// easy to miss, and on a nested scaffold it is not always where you expect.
+  Widget _buildScanCard() {
+    return InkWell(
+      onTap: () => _openScanner(context),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.22),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Scan customer QR',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  SizedBox(height: 3),
+                  Text('Check someone in and start their appointment',
+                      style: TextStyle(fontSize: 12, color: Colors.white70)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white70),
+          ],
+        ),
+      ),
     );
   }
 
