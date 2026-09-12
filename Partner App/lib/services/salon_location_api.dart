@@ -34,6 +34,28 @@ class SalonLocation {
       );
 }
 
+/// The link a salon's printed QR code carries.
+class SalonQrCode {
+  final String url;
+  final String salonName;
+  final String salonSlug;
+  final String? city;
+
+  const SalonQrCode({
+    required this.url,
+    required this.salonName,
+    required this.salonSlug,
+    this.city,
+  });
+
+  factory SalonQrCode.fromJson(Map<String, dynamic> json) => SalonQrCode(
+        url: json['url'] ?? '',
+        salonName: json['salon_name'] ?? '',
+        salonSlug: json['salon_slug'] ?? 'salon',
+        city: json['city'] as String?,
+      );
+}
+
 /// Reading and setting the salon's position.
 ///
 /// Customers see the nearest salons first, so this is not decoration — a salon
@@ -113,5 +135,23 @@ class SalonLocationApi {
       debugPrint('Could not get a position: $e');
       return null;
     }
+  }
+
+  /// The address this salon's QR poster points at.
+  ///
+  /// Fetched rather than built on the device, so every poster printed anywhere
+  /// carries the same link and SuperAdmin can move the site without
+  /// invalidating the ones already on walls.
+  static Future<SalonQrCode> fetchQrCode(String salonId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/partner/salons/$salonId/qr-code'),
+      headers: await _headers(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Could not load the QR code');
+    }
+
+    return SalonQrCode.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 }

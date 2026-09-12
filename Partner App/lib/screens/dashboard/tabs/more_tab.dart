@@ -5,6 +5,7 @@ import 'settings/salon_timings_screen.dart';
 import '../more/subscription_billing_screen.dart';
 import '../more/wallet_screen.dart';
 import '../more/salon_location_screen.dart';
+import '../more/salon_qr_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
@@ -134,6 +135,19 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // The poster that goes in the window. Prints to a real PNG.
+                  _buildOptionTile(context,
+                    icon: Icons.qr_code_2,
+                    iconColor: AppTheme.accentColor,
+                    title: 'Your QR Code',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SalonQrScreen(salonId: salonId)),
                       );
                     },
                   ),

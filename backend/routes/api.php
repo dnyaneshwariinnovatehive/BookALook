@@ -64,6 +64,11 @@ Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']
 Route::get('/cities/nearest', [\App\Http\Controllers\Api\CityController::class, 'nearest']);
 Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
 
+// What a scanned salon QR code resolves to. Open to anyone: the person holding
+// the phone has no account yet, which is the whole point of the poster.
+Route::get('/public/salons/{slug}', [\App\Http\Controllers\Api\PublicSalonController::class, 'show']);
+Route::get('/public/app-links', [\App\Http\Controllers\Api\PublicSalonController::class, 'appLinks']);
+
 Route::prefix('superadmin')->group(function () {
     Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
 
@@ -201,6 +206,8 @@ Route::prefix('partner')->group(function () {
         // salon sorts last however good it is.
         Route::get('/salons/{salon_id}/location', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getLocation']);
         Route::put('/salons/{salon_id}/location', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateLocation']);
+        // The link the owner's printable QR poster carries.
+        Route::get('/salons/{salon_id}/qr-code', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'qrCode']);
 
         // Emergency day closure + mass reschedule
         Route::get('/salons/{salon_id}/closures', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'index']);

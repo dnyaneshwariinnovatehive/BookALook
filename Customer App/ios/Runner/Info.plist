@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Scanning a salon's printed QR opens its page in the app. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.bookalook.customerApp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bookalook</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>BookALook uses your location to show salons near you first. You can pick your city by hand instead.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>

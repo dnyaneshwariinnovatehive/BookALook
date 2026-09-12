@@ -79,6 +79,14 @@ export default function PlatformPolicyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Where a scanned salon QR lands, and where that page sends people who do
+  // not have the app. Held as settings because every poster already printed
+  // follows whatever these say.
+  const [publicWebUrl, setPublicWebUrl] = useState('');
+  const [androidAppUrl, setAndroidAppUrl] = useState('');
+  const [iosAppUrl, setIosAppUrl] = useState('');
+  const [androidApkUrl, setAndroidApkUrl] = useState('');
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -92,6 +100,10 @@ export default function PlatformPolicyPage() {
         setCancelCutoff(parseInt(data.settings.cancellation_cutoff_minutes || '90', 10));
         setRescheduleCutoff(parseInt(data.settings.reschedule_cutoff_minutes || '90', 10));
         setStartEarly(parseInt(data.settings.appointment_start_early_minutes || '30', 10));
+        setPublicWebUrl(data.settings.public_web_url || '');
+        setAndroidAppUrl(data.settings.android_app_url || '');
+        setIosAppUrl(data.settings.ios_app_url || '');
+        setAndroidApkUrl(data.settings.android_apk_url || '');
       }
     } catch (e) {
       console.error(e);
@@ -112,6 +124,12 @@ export default function PlatformPolicyPage() {
           cancellation_cutoff_minutes: cancelCutoff,
           reschedule_cutoff_minutes: rescheduleCutoff,
           appointment_start_early_minutes: startEarly,
+          public_web_url: publicWebUrl.trim(),
+          // Sent even when blank: clearing one is how SuperAdmin takes a dead
+          // store button off the landing page.
+          android_app_url: androidAppUrl.trim(),
+          ios_app_url: iosAppUrl.trim(),
+          android_apk_url: androidApkUrl.trim(),
         })
       });
       if (res.ok) {
@@ -170,6 +188,67 @@ export default function PlatformPolicyPage() {
             onChange={setStartEarly}
           />
           
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 600, margin: '32px 0 4px' }}>
+            Salon QR codes &amp; the app
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-body)', margin: '0 0 20px', lineHeight: 1.6 }}>
+            Every salon&apos;s printed QR code points at the address below. Changing
+            it redirects every poster already on a wall — which is the point, but
+            get it right before they are printed.
+          </p>
+
+          <div className={styles.formGroup}>
+            <label>Public website address</label>
+            <input
+              type="url"
+              value={publicWebUrl}
+              onChange={(e) => setPublicWebUrl(e.target.value)}
+              placeholder="https://bookalook.in"
+              required
+            />
+            <p style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-body)' }}>
+              A scanned salon QR opens <code>{publicWebUrl || 'https://…'}/s/salon-name</code>.
+            </p>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Play Store link</label>
+            <input
+              type="text"
+              value={androidAppUrl}
+              onChange={(e) => setAndroidAppUrl(e.target.value)}
+              placeholder="https://play.google.com/store/apps/details?id=…"
+            />
+            <p style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-body)' }}>
+              Leave blank until the listing is live. A blank link hides the button
+              rather than sending customers to a page that does not exist.
+            </p>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>App Store link</label>
+            <input
+              type="text"
+              value={iosAppUrl}
+              onChange={(e) => setIosAppUrl(e.target.value)}
+              placeholder="https://apps.apple.com/in/app/…"
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Direct Android build (APK)</label>
+            <input
+              type="text"
+              value={androidApkUrl}
+              onChange={(e) => setAndroidApkUrl(e.target.value)}
+              placeholder="https://bookalook.in/downloads/bookalook.apk"
+            />
+            <p style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-body)' }}>
+              Used before the Play Store listing is approved. If both are set, the
+              Play Store link wins.
+            </p>
+          </div>
+
           <button type="submit" className={styles.button} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save Settings'}
           </button>

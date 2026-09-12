@@ -30,6 +30,19 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Scanning a salon's printed QR opens its page here.
+
+                 The poster carries an https link to the website, which then
+                 hands over to this scheme. A custom scheme cannot be the thing
+                 printed: Google Lens and the camera scanner only follow http
+                 and https, and would silently do nothing with anything else. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="bookalook" android:host="salon"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

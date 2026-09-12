@@ -46,6 +46,8 @@ dependencies:
   # The city itself is resolved server-side from this fix, which keeps the
   # mapping between coordinates and markets in one place.
   geolocator: ^13.0.2
+  # Opens the app straight at a salon when someone scans its printed QR code.
+  app_links: ^6.3.2
 
 dev_dependencies:
   flutter_test:

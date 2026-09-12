@@ -45,6 +45,12 @@ dependencies:
   # Lets an owner drop their salon's pin from inside the salon. Customers are
   # shown the nearest salons first, so an unpinned salon sorts last.
   geolocator: ^13.0.2
+  # Draws the salon's QR poster on the device, so a real PNG can be printed
+  # without the server needing an image library installed.
+  qr_flutter: ^4.1.0
+  # Hands the finished PNG to WhatsApp, a printer, or the gallery.
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

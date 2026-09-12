@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Salon;
 use App\Models\SalonWorkingHour;
 use App\Services\GeoService;
+use App\Services\SalonLinkService;
 use Illuminate\Support\Facades\Validator;
 
 class SalonSettingsController extends Controller
@@ -123,6 +124,29 @@ class SalonSettingsController extends Controller
             'longitude' => $salon->longitude === null ? null : (float) $salon->longitude,
             'location_source' => $salon->location_source,
             'city' => $salon->city?->only(['id', 'name', 'state']),
+        ]);
+    }
+
+    /**
+     * The link this salon's printed QR code carries.
+     *
+     * The app draws the code itself so the owner gets a real PNG to print
+     * without the server needing an image library. All the server owns is the
+     * address — which is the part that must never differ between a poster
+     * printed today and one printed next year.
+     */
+    public function qrCode(Request $request, $salon_id, SalonLinkService $links)
+    {
+        $salon = Salon::where('id', $salon_id)
+            ->where('admin_id', $request->user()->id)
+            ->firstOrFail();
+
+        return response()->json([
+            'success' => true,
+            'url' => $links->publicUrl($salon),
+            'salon_name' => $salon->name,
+            'salon_slug' => $salon->slug,
+            'city' => $salon->city?->name,
         ]);
     }
 }

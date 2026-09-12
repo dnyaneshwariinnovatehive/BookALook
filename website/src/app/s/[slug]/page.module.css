@@ -1,0 +1,221 @@
+/*
+ * The page a printed salon QR code lands on.
+ *
+ * Built phone-first and deliberately short: whoever is reading this is standing
+ * in a doorway, one-handed, probably on a bad connection. Everything above the
+ * fold answers "am I in the right place" and "what do I tap".
+ */
+
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--background);
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 20px);
+  box-shadow: var(--shadow-medium);
+  overflow: hidden;
+}
+
+.cover {
+  position: relative;
+  height: 150px;
+  background-color: var(--accent);
+  background-image: var(--accent-gradient);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px 18px;
+}
+
+/* Legible over any photo the salon happens to have uploaded. */
+.cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+.brand {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
+.body {
+  padding: 20px;
+}
+
+.name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-heading);
+  margin: 0 0 8px;
+  line-height: 1.25;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 999px);
+}
+
+.reviewCount {
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.city {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.address,
+.description {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-body);
+  margin: 0 0 10px;
+}
+
+.description {
+  margin-bottom: 4px;
+}
+
+.notice {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 14px 0 0;
+}
+
+.actions {
+  margin-top: 20px;
+}
+
+.primary {
+  width: 100%;
+  padding: 15px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.12s ease;
+}
+
+.primary:hover {
+  background: var(--accent-hover);
+}
+
+.primary:active {
+  transform: translateY(1px);
+}
+
+.hint {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-body);
+  margin: 12px 0 0;
+}
+
+.stores {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.store {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  color: var(--text-heading);
+  text-decoration: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.store:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.storeIcon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.store small {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-body);
+}
+
+.store strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.comingSoon {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-body);
+  text-align: center;
+}
+
+.footer {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin: 0;
+}

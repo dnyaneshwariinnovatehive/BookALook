@@ -38,6 +38,27 @@ class PlatformPolicySetting extends Model
         // loses access. The month's payout lands on the 1st and someone has to
         // work through the queue; a salon should not be shut for that.
         'commission_settlement_grace_days' => 7,
+
+        // Where a scanned salon QR code lands. Held as a setting rather than an
+        // env var because the address changes when the platform moves host, and
+        // every printed QR in every salon keeps pointing at whatever this says.
+        'public_web_url' => 'http://localhost:3000',
+
+        // Where that landing page sends someone who does not have the app.
+        // Empty until the listings are live; the page hides what it has no
+        // link for rather than sending anyone to a dead store page.
+        'android_app_url' => '',
+        'ios_app_url' => '',
+        // A direct build, for handing the app out before the stores approve it.
+        'android_apk_url' => '',
+    ];
+
+    /** Settings that hold a URL rather than a number. */
+    public const URL_KEYS = [
+        'public_web_url',
+        'android_app_url',
+        'ios_app_url',
+        'android_apk_url',
     ];
 
     /**

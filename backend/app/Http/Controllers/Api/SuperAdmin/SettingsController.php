@@ -42,6 +42,16 @@ class SettingsController extends Controller
             'appointment_start_early_minutes' => 'sometimes|integer|min:0',
             'coin_value_inr' => 'sometimes|numeric|min:0',
             'subscription_reminder_hour' => 'sometimes|integer|min:0|max:23',
+            'commission_settlement_grace_days' => 'sometimes|integer|min:0|max:60',
+            // Where every printed salon QR code lands. Changing it silently
+            // redirects every poster already on a wall, which is the point —
+            // but it has to be a real address.
+            'public_web_url' => 'sometimes|string|max:255|url',
+            // Blank is meaningful: it means "not listed yet", and the landing
+            // page hides the button rather than offering a dead link.
+            'android_app_url' => 'sometimes|nullable|string|max:255',
+            'ios_app_url' => 'sometimes|nullable|string|max:255',
+            'android_apk_url' => 'sometimes|nullable|string|max:255',
         ]);
 
         $user = $request->user();
@@ -52,6 +62,7 @@ class SettingsController extends Controller
             'reschedule_cutoff_minutes' => 'Number of minutes before an appointment when rescheduling is blocked',
             'appointment_start_early_minutes' => 'Number of minutes before an appointment start time when a provider can start it',
             'subscription_reminder_hour' => 'Hour of the day (0-23) when renewal reminders are sent to salon owners',
+            'commission_settlement_grace_days' => 'Days after a month closes before an unsettled Commission Model salon is locked out',
         ];
 
         // Not an integer like the rest — a coin can be worth paise.
@@ -65,6 +76,33 @@ class SettingsController extends Controller
                     'updated_by' => $user->id,
                 ]
             );
+        }
+
+        $urlSettings = [
+            'public_web_url' => 'Where a scanned salon QR code lands. Every printed poster follows this.',
+            'android_app_url' => 'Play Store listing for the customer app. Blank hides the Android button.',
+            'ios_app_url' => 'App Store listing for the customer app. Blank hides the iPhone button.',
+            'android_apk_url' => 'Direct Android build, for handing the app out before the stores approve it.',
+        ];
+
+        foreach ($urlSettings as $key => $description) {
+            if ($request->has($key)) {
+                $value = trim((string) $request->input($key));
+
+                // A store link that is not live yet is stored empty rather than
+                // as a placeholder, so the landing page knows to hide it.
+                PlatformPolicySetting::updateOrCreate(
+                    ['setting_key' => $key],
+                    [
+                        'setting_value' => $key === 'public_web_url'
+                            ? rtrim($value, '/')
+                            : $value,
+                        'data_type' => 'string',
+                        'description' => $description,
+                        'updated_by' => $user->id,
+                    ]
+                );
+            }
         }
 
         foreach ($allowedSettings as $key => $description) {
