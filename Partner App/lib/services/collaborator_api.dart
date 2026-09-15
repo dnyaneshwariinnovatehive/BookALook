@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -129,11 +130,16 @@ class CollaboratorApi {
         jsonEncode(draft.services.map((s) => s.toPayload()).toList());
 
     for (final path in draft.photoPaths) {
-      final file = File(path);
-      // A photo the OS cleaned up must not sink the whole submission — the
-      // profile matters more than the gallery.
-      if (await file.exists()) {
-        request.files.add(await http.MultipartFile.fromPath('photos[]', path));
+      if (kIsWeb) {
+        final res = await http.get(Uri.parse(path));
+        request.files.add(http.MultipartFile.fromBytes('photos[]', res.bodyBytes, filename: 'photo.jpg'));
+      } else {
+        final file = File(path);
+        // A photo the OS cleaned up must not sink the whole submission — the
+        // profile matters more than the gallery.
+        if (await file.exists()) {
+          request.files.add(await http.MultipartFile.fromPath('photos[]', path));
+        }
       }
     }
 

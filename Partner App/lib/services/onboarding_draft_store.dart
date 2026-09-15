@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,7 +128,9 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
     // The photos were copies made for this draft, so nothing else is holding
     // them.
     for (final path in draft?.photoPaths ?? const <String>[]) {
-      unawaited(File(path).delete().catchError((_) => File(path)));
+      if (!kIsWeb) {
+        unawaited(File(path).delete().catchError((_) => File(path)));
+      }
     }
 
     await _persist();
@@ -138,6 +141,8 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
   /// cache path the OS is free to delete, which for a draft that may sit for
   /// hours is not good enough.
   Future<String> keepPhoto(String pickedPath) async {
+    if (kIsWeb) return pickedPath;
+
     final dir = await getApplicationDocumentsDirectory();
     final target = Directory('${dir.path}/onboarding_photos');
     if (!await target.exists()) await target.create(recursive: true);

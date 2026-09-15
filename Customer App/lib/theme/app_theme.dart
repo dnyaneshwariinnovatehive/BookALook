@@ -6,7 +6,7 @@ class AppTheme {
   static const Color accentColor = Color(0xFF9C54F2);
   static const Color accentGradientStart = Color(0xFF9C54F2);
   static const Color accentGradientEnd = Color(0xFF7B32EC);
-  static const Color accentGradientLightEnd = Color(0xFFB885FC);
+  static const Color accentGradientLightEnd = Color(0xFFB088FF);
 
   // Light Mode Colors
   static const Color lightBg = Color(0xFFF8F7FC);
@@ -17,6 +17,7 @@ class AppTheme {
   static const Color lightTextBody = Color(0xFF7C758D);
   static const Color lightTextLight = Color(0xFFB7B2C5);
   static const Color lightBorder = Color(0xFFECEAF2);
+  static const Color lightCardBg = Color(0xFFFFFFFF);
 
   // Dark Mode Colors
   static const Color darkBg = Color(0xFF13111A);
@@ -53,7 +54,7 @@ class AppTheme {
   // Secondary Warm Brown Palette
   static const Color brownDark = Color(0xFF2A2320);
   static const Color brownMedium = Color(0xFF4E403B);
-  static const Color brownGoldText = Color(0xFFF5DEC2);
+  static const Color brownGoldText = Color(0xFFD4A24C);
   static const Color brownMuted = Color(0xFF8A8078);
   static const Color brownLightBg = Color(0xFFE3D9CE);
   
@@ -98,36 +99,36 @@ class AppTheme {
       style: OutlinedButton.styleFrom(
         foregroundColor: accentColor,
         backgroundColor: lightAccentSoft,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
         side: BorderSide.none,
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: accentColor, // Note: We will use a custom container for gradient buttons when needed, but this acts as fallback
+        backgroundColor: accentColor,
         foregroundColor: Colors.white,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
         elevation: 0,
-        shadowColor: const Color(0x4D9C54F2), // rgba(156, 84, 242, 0.3)
+        shadowColor: const Color.fromRGBO(212, 162, 76, 0.35),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: lightBg,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: lightBorder, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: lightBorder, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: accentColor, width: 2),
       ),
       labelStyle: TextStyle(color: lightTextLight),
@@ -137,7 +138,7 @@ class AppTheme {
       color: lightSurface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: lightBorder),
       ),
     ),
@@ -186,9 +187,9 @@ class AppTheme {
       style: OutlinedButton.styleFrom(
         foregroundColor: accentColor,
         backgroundColor: darkAccentSoft,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
         side: BorderSide.none,
       ),
     ),
@@ -196,26 +197,26 @@ class AppTheme {
       style: ElevatedButton.styleFrom(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
         elevation: 0,
-        shadowColor: const Color(0x4D9C54F2),
+        shadowColor: const Color.fromRGBO(212, 162, 76, 0.35),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: darkBg,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: darkBorder, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: darkBorder, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: accentColor, width: 2),
       ),
       labelStyle: TextStyle(color: darkTextLight),
@@ -225,7 +226,7 @@ class AppTheme {
       color: darkSurface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: darkBorder),
       ),
     ),

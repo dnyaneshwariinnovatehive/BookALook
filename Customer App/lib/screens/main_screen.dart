@@ -83,6 +83,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildShell(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      extendBody: true,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -91,50 +92,70 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       bottomNavigationBar: Container(
+        height: 80,
         decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? AppTheme.darkBorder 
+                  : AppTheme.lightBorder,
+              width: 1,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
-              blurRadius: 20,
-              offset: Offset(0, -5),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 30,
+              offset: const Offset(0, -8),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
           child: BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: _onTabTapped,
             type: BottomNavigationBarType.fixed,
             backgroundColor: Theme.of(context).colorScheme.surface,
-            selectedItemColor: Theme.of(context).colorScheme.primary,
-            unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-            selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
-            items: [
+            selectedItemColor: AppTheme.accentColor,
+            unselectedItemColor: Theme.of(context).brightness == Brightness.dark 
+                ? AppTheme.darkTextBody 
+                : AppTheme.lightTextBody,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+            elevation: 0,
+            items: const [
               BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
+                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_outlined, size: 22)),
+                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_rounded, size: 22)),
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.explore_outlined),
-                activeIcon: Icon(Icons.explore),
+                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.explore_outlined, size: 22)),
+                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.explore_rounded, size: 22)),
                 label: 'Explore',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today_outlined),
-                activeIcon: Icon(Icons.calendar_month),
+                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.calendar_today_outlined, size: 22)),
+                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.calendar_month_rounded, size: 22)),
                 label: 'Bookings',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.favorite_outline),
-                activeIcon: Icon(Icons.favorite),
+                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.favorite_outline, size: 22)),
+                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.favorite_rounded, size: 22)),
                 label: 'Favourites',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
+                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_outline, size: 22)),
+                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_rounded, size: 22)),
                 label: 'Profile',
               ),
             ],

@@ -61,24 +61,27 @@ class _BannerCarouselState extends State<BannerCarousel> {
         width: double.infinity,
         padding: EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(24),
+          color: AppTheme.lightAccentSoft.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
           children: [
-            Icon(Icons.local_offer, size: 48, color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+            Icon(Icons.local_offer,
+                size: 44,
+                color: AppTheme.accentColor.withOpacity(0.35)),
             SizedBox(height: 12),
             Text(
               'No active offers right now',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+                color: AppTheme.accentColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
               ),
             ),
+            SizedBox(height: 4),
             Text(
               'Check back later for exciting spa and salon deals!',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              style: TextStyle(color: AppTheme.lightTextBody, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],
@@ -88,11 +91,11 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
     final isInfinite = widget.banners.length > 1;
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
+    return SizedBox(
+      height: 160,
+      child: Stack(
+        children: [
+          PageView.builder(
             controller: _pageController,
             onPageChanged: (int page) {
               setState(() {
@@ -113,42 +116,100 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   }
                 },
                 child: Container(
-                  margin: EdgeInsets.symmetric(horizontal: 4),
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
-                    color: Theme.of(context).dividerColor,
+                    color: AppTheme.lightAccentSoft,
                     image: DecorationImage(
                       image: NetworkImage(banner.imageUrl),
                       fit: BoxFit.cover,
                     ),
                   ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Gradient overlay as per spec
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.1),
+                              Colors.black.withOpacity(0.5),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Real backend title overlaid on the image
+                      if (banner.title.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Align(
+                            alignment: Alignment.topLeft,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  banner.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0x4D000000),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               );
             },
           ),
-        ),
-        SizedBox(height: 12),
-        if (widget.banners.length > 1)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              widget.banners.length,
-              (index) {
-                final realCurrentPage = _currentPage % widget.banners.length;
-                return AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
-                  margin: EdgeInsets.symmetric(horizontal: 4),
-                  height: 8,
-                  width: realCurrentPage == index ? 24 : 8,
-                  decoration: BoxDecoration(
-                    color: realCurrentPage == index ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                );
-              }
+          if (widget.banners.length > 1)
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  widget.banners.length,
+                  (index) {
+                    final realCurrentPage = _currentPage % widget.banners.length;
+                    final isActive = realCurrentPage == index;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.symmetric(horizontal: 3), // gap 6px total
+                      height: 6,
+                      width: isActive ? 18 : 6,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -64,6 +64,33 @@ class NotificationService
     }
 
     /**
+     * Alert a service provider that a customer rescheduled their appointment,
+     * freeing up this slot.
+     */
+    public function providerAppointmentRescheduled(Appointment $appointment): Notification
+    {
+        $provider = $appointment->appointedProvider;
+        if (! $provider || ! $provider->user_id) {
+            return new Notification();
+        }
+
+        $customerName = $appointment->customer ? $appointment->customer->name : $appointment->walk_in_customer_name;
+        $dateLabel = \Carbon\Carbon::parse($appointment->appointment_date)->format('M d, Y') . ' at ' . \Carbon\Carbon::parse($appointment->start_time)->format('h:i A');
+
+        return $this->record(
+            userId: $provider->user_id,
+            type: 'general', // Using 'general' as a fallback, or could use 'cancellation'
+            title: 'Appointment Rescheduled',
+            message: "Your appointment with {$customerName} on {$dateLabel} has been rescheduled by the customer.",
+            appointment: $appointment,
+            data: [
+                'action' => 'appointment_rescheduled',
+                'appointment_id' => $appointment->id,
+            ]
+        ) ?? new Notification();
+    }
+
+    /**
      * Write an in-app notification. Walk-in bookings have no customer account,
      * so there is nobody to notify — those are the salon's phone call to make.
      */

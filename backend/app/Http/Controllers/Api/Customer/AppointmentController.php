@@ -13,6 +13,7 @@ use App\Models\Salon;
 use App\Services\AvailabilityService;
 use App\Services\BookingPaymentService;
 use App\Services\BookingPolicyService;
+use App\Services\Notifications\NotificationService;
 use App\Services\Payments\PaymentGatewayException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class AppointmentController extends Controller
         private AvailabilityService $availability,
         private BookingPolicyService $policy,
         private BookingPaymentService $payments,
+        private NotificationService $notifications,
     ) {
     }
 
@@ -797,6 +799,8 @@ class AppointmentController extends Controller
             $appointment->status = 'rescheduled';
             $appointment->reschedule_reason = $replacement->reschedule_reason;
             $appointment->save();
+
+            $this->notifications->providerAppointmentRescheduled($appointment);
 
             DB::commit();
         } catch (\Exception $e) {

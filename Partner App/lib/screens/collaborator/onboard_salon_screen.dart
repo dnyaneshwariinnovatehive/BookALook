@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -709,7 +710,7 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
                 color: isCover ? AppTheme.accentColor : AppTheme.lightBorder,
                 width: isCover ? 2 : 1,
               ),
-              image: DecorationImage(image: FileImage(File(path)), fit: BoxFit.cover),
+              image: DecorationImage(image: kIsWeb ? NetworkImage(path) as ImageProvider : FileImage(File(path)), fit: BoxFit.cover),
             ),
           ),
           if (isCover)
@@ -801,7 +802,9 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
   Future<void> _removePhoto(int index) async {
     final draft = _draft!;
     final removed = draft.photoPaths.removeAt(index);
-    unawaited(File(removed).delete().catchError((_) => File(removed)));
+    if (!kIsWeb) {
+      unawaited(File(removed).delete().catchError((_) => File(removed)));
+    }
 
     if (draft.coverIndex >= draft.photoPaths.length) {
       draft.coverIndex = draft.photoPaths.isEmpty ? 0 : draft.photoPaths.length - 1;

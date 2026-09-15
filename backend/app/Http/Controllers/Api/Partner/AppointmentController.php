@@ -27,8 +27,8 @@ class AppointmentController extends Controller
             ->where('salon_id', $salon_id)
             // Slots held while a customer is mid-payment block the time but are
             // not bookings yet — the salon should not see a customer who may
-            // never pay.
-            ->where('status', '!=', 'pending_payment');
+            // never pay. Also exclude rescheduled/awaiting_reschedule as they don't occupy slots.
+            ->whereNotIn('status', ['pending_payment', 'rescheduled', 'awaiting_reschedule']);
 
         if ($user->role === 'service_provider') {
             $provider = \App\Models\ServiceProvider::where('user_id', $user->id)->first();
@@ -57,6 +57,12 @@ class AppointmentController extends Controller
         }
 
         $appointments = $query->orderBy('start_time', 'asc')->get();
+
+        // Add explicit is_rescheduled flag for the frontend UI tag
+        $appointments->each(function ($appointment) {
+            $appointment->is_rescheduled = !is_null($appointment->rescheduled_from_id);
+        });
+
         return response()->json(['appointments' => $appointments]);
     }
 

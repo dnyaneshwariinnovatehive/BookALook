@@ -15,6 +15,7 @@ import '../reschedule_screen.dart';
 import '../salon_list_screen.dart';
 import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
+import '../qr_code_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -123,6 +124,18 @@ class _HomeTabState extends State<HomeTab> {
     _fetchAlerts();
   }
 
+  Future<void> _openCheckInQr(Map<String, dynamic> booking) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QrCodeScreen(
+          appointmentId: booking['id'].toString(),
+        ),
+      ),
+    );
+    _fetchAlerts();
+  }
+
   Future<void> _fetchBanners() async {
     // Scoped to the chosen city by BannerService, so a campaign aimed at one
     // city reaches it and nobody else.
@@ -151,22 +164,29 @@ class _HomeTabState extends State<HomeTab> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text('Filter Salons', style: TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
+              title: Text('Filter Salons',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.lightTextHeading)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Gender', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Gender',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: AppTheme.lightTextBody)),
                   SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      color: AppTheme.lightAccentSoft.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                    padding: EdgeInsets.all(4),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: ['All', 'Men', 'Women'].map((gender) {
                         final isSelected = tempGender == gender;
                         return Expanded(
@@ -176,18 +196,26 @@ class _HomeTabState extends State<HomeTab> {
                                 tempGender = gender;
                               });
                             },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                            child: AnimatedContainer(
+                              duration: Duration(milliseconds: 200),
+                              padding: EdgeInsets.symmetric(vertical: 11),
                               decoration: BoxDecoration(
-                                color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
-                                borderRadius: BorderRadius.circular(30),
+                                color: isSelected
+                                    ? AppTheme.accentColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Center(
                                 child: Text(
                                   gender,
                                   style: TextStyle(
-                                    color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppTheme.lightTextBody,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ),
@@ -206,7 +234,8 @@ class _HomeTabState extends State<HomeTab> {
                       tempGender = 'All';
                     });
                   },
-                  child: Text('Reset', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+                  child: Text('Reset',
+                      style: TextStyle(color: AppTheme.lightTextBody)),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -216,7 +245,10 @@ class _HomeTabState extends State<HomeTab> {
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   ),
                   child: Text('Apply'),
                 ),
@@ -229,410 +261,261 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _navigateToSearch({String? categoryId}) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (context) => SalonListScreen(
-        initialSearch: _searchController.text,
-        initialGender: _selectedGender,
-        initialCategoryId: categoryId,
-        title: categoryId != null ? 'Category Salons' : 'Search Results',
-      ),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SalonListScreen(
+            initialSearch: _searchController.text,
+            initialGender: _selectedGender,
+            initialCategoryId: categoryId,
+            title: categoryId != null ? 'Category Salons' : 'Search Results',
+          ),
+        ));
   }
 
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  child: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: _pickCity,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.location_on,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 4),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 180),
-                              child: Text(
-                                LocationService.instance.label,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            Icon(Icons.keyboard_arrow_down,
-                                size: 20,
-                                color: Theme.of(context).colorScheme.primary),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildNotificationBell(context),
-              ],
-            ),
-            SizedBox(height: 24),
+            const SizedBox(height: 15),
 
-            // Anything the salon has forced on the customer comes first.
-            ..._buildRescheduleAlerts(context),
+            // 1. Header
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildHeader()),
 
-            // Search Bar
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'Search salons, services...',
-                              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5), fontSize: 16),
-                              border: InputBorder.none,
-                            ),
-                            onSubmitted: (_) => _navigateToSearch(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                InkWell(
-                  onTap: _showFilterDialog,
-                  borderRadius: BorderRadius.circular(30),
-                  child: Container(
-                    padding: EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: _selectedGender != 'All' ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Theme.of(context).colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _selectedGender != 'All' ? Theme.of(context).colorScheme.primary : Theme.of(context).dividerColor),
-                    ),
-                    child: Icon(Icons.filter_list, color: _selectedGender != 'All' ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurface),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 24),
+            // 2. Reschedule alerts
+            ..._buildRescheduleAlerts().map((w) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: w)),
 
-            // Banners Carousel
-            if (_isLoadingBanners)
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else
-              BannerCarousel(banners: _banners),
-              
-            SizedBox(height: 32),
+            const SizedBox(height: 15),
 
-            // Categories Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Categories',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                ),
-                Text(
-                  'See All',
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-            if (_isLoadingCategories)
-              Container(
-                height: 100,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_categories.isEmpty)
-              Container(
-                padding: EdgeInsets.all(24),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Theme.of(context).dividerColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).shadowColor,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    'No categories available yet.',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                  ),
-                ),
-              )
-            else
-              SizedBox(
-                height: 48,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
-                  itemBuilder: (context, index) {
-                    final category = _categories[index];
-                    return InkWell(
-                      onTap: () => _navigateToSearch(categoryId: category.id.toString()),
-                      borderRadius: BorderRadius.circular(50),
-                      child: Container(
-                        margin: EdgeInsets.only(right: 12),
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: Theme.of(context).dividerColor),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (category.iconUrl != null && category.iconUrl!.isNotEmpty)
-                              Image.network(category.iconUrl!, width: 20, height: 20, errorBuilder: (c,e,s) => Icon(Icons.category, size: 20, color: Theme.of(context).colorScheme.primary))
-                            else
-                              Icon(Icons.category, color: Theme.of(context).colorScheme.primary, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              category.name,
-                              style: TextStyle(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            SizedBox(height: 32),
+            // 3. Search bar
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildSearchBar()),
 
-            // Next Appointment Placeholder
-            _upcoming.isNotEmpty && !widget.isGuest
-                ? _buildNextAppointmentCard(context, _upcoming.first)
-                : Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(50),
-                          ),
-                          child: Text(
-                            'YOUR NEXT APPOINTMENT',
-                            style: TextStyle(color: Theme.of(context).colorScheme.surface, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 24.0),
-                            child: Text(
-                              widget.isGuest ? 'Sign in to see your appointments' : 'No upcoming appointments',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-            SizedBox(height: 32),
+            const SizedBox(height: 15),
 
-            // Book Again Placeholder
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Book Again',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                ),
-                InkWell(
-                  onTap: () {
-                    // Find MainScreen in the widget tree or pop until we can switch tab
-                    // For now, we can push to MyBookingsScreen or use a global key if available.
-                    // The simplest is to just push the screen.
-                    Navigator.push(context, MaterialPageRoute(
-                      builder: (context) => MyBookingsScreen()
-                    ));
-                  },
-                  child: Text(
-                    'See All',
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-            _past.isNotEmpty && !widget.isGuest
-                ? _buildBookAgainCard(context, _past.first)
-                : Container(
-                    padding: EdgeInsets.all(24),
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context).shadowColor,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        widget.isGuest ? 'Sign in to view your past bookings' : 'You have no previous bookings to show here.',
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-            SizedBox(height: 40), // Bottom padding
+            // 4. Banner carousel
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildBannerSection()),
+
+            const SizedBox(height: 15),
+
+            // 5. Categories
+            _buildCategoriesSection(),
+
+            const SizedBox(height: 15),
+
+            // 6. Next appointment
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildNextAppointmentSection()),
+
+            const SizedBox(height: 15),
+
+            // 7. Book again
+            _buildBookAgainSection(),
+
+            const SizedBox(height: 90), // Bottom navigation padding
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNotificationBell(BuildContext context) {
-    return InkWell(
-      onTap: widget.isGuest ? null : _openNotifications,
-      customBorder: const CircleBorder(),
-      child: Stack(
-        clipBehavior: Clip.none,
+  // ---------------------------------------------------------------------------
+  // HEADER
+  // ---------------------------------------------------------------------------
+  Widget _buildHeader() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
         children: [
+          // Avatar: 44px round, purple border
           Container(
-            padding: EdgeInsets.all(10),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
               shape: BoxShape.circle,
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            child: Icon(
-              _unreadNotifications > 0 ? Icons.notifications : Icons.notifications_none,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-          if (_unreadNotifications > 0)
-            Positioned(
-              right: -2,
-              top: -2,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                constraints: BoxConstraints(minWidth: 18),
-                decoration: BoxDecoration(
-                  color: AppTheme.lightDanger,
-                  borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
-                ),
-                child: Text(
-                  _unreadNotifications > 9 ? '9+' : '$_unreadNotifications',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
+              border: Border.all(
+                color: AppTheme.accentColor,
+                width: 2,
               ),
             ),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.lightAccentSoft,
+              child: Icon(Icons.person, color: AppTheme.accentColor, size: 24),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Greeting + Location
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
+                  style: TextStyle(
+                    color: bodyColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                InkWell(
+                  onTap: _pickCity,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 168),
+                        child: Text(
+                          LocationService.instance.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: headingColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down,
+                          size: 14, color: AppTheme.accentColor),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Notification bell
+          _buildNotificationBell(),
         ],
       ),
     );
   }
 
-  /// One card per booking the salon released. Deliberately loud and at the very
-  /// top: the customer has money tied up in it and only they can resolve it.
-  List<Widget> _buildRescheduleAlerts(BuildContext context) {
+  // ---------------------------------------------------------------------------
+  // NOTIFICATION BELL
+  // ---------------------------------------------------------------------------
+  Widget _buildNotificationBell() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+
+    return InkWell(
+      onTap: widget.isGuest ? null : _openNotifications,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: borderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accentColor.withOpacity(0.02),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(
+              child: Icon(
+                _unreadNotifications > 0
+                    ? Icons.notifications
+                    : Icons.notifications_none,
+                color: headingColor.withOpacity(0.75),
+                size: 20,
+              ),
+            ),
+            if (_unreadNotifications > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightDanger,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: surfaceColor, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RESCHEDULE ALERTS
+  // ---------------------------------------------------------------------------
+  List<Widget> _buildRescheduleAlerts() {
     if (_needsReschedule.isEmpty) return const [];
 
     return [
+      const SizedBox(height: 10),
       ..._needsReschedule.map((raw) {
         final booking = raw as Map<String, dynamic>;
         final salonName = booking['salon']?['name'] ?? 'The salon';
-        final advance = double.tryParse('${booking['advance_paid'] ?? 0}') ?? 0;
+        final advance =
+            double.tryParse('${booking['advance_paid'] ?? 0}') ?? 0;
         final reason = booking['closure_reason'];
-        final originalDate = DateTime.tryParse('${booking['appointment_date']}');
+        final originalDate =
+            DateTime.tryParse('${booking['appointment_date']}');
 
         return Container(
-          margin: EdgeInsets.only(bottom: 16),
-          padding: EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppTheme.lightWarningBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.lightWarning.withOpacity(0.4)),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: AppTheme.lightWarning.withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.event_busy, size: 18, color: AppTheme.lightWarning),
-                  SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightWarning.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.event_busy,
+                        size: 16, color: AppTheme.lightWarning),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Action needed: pick a new time',
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.lightWarning,
                       ),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 '$salonName is closed'
                 '${originalDate != null ? ' on ${DateFormat('EEE, d MMM').format(originalDate)}' : ''}'
@@ -640,11 +523,11 @@ class _HomeTabState extends State<HomeTab> {
                 'Rebook free of charge — your ₹${advance.toStringAsFixed(0)} advance carries over.',
                 style: TextStyle(
                   fontSize: 13,
-                  height: 1.4,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                  height: 1.5,
+                  color: AppTheme.lightTextBody,
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -652,10 +535,13 @@ class _HomeTabState extends State<HomeTab> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.accentColor,
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text('Reschedule free',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  child: const Text('Reschedule free',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 ),
               ),
             ],
@@ -665,155 +551,759 @@ class _HomeTabState extends State<HomeTab> {
     ];
   }
 
-  Widget _buildNextAppointmentCard(BuildContext context, Map<String, dynamic> booking) {
-    final date = DateTime.tryParse(booking['appointment_date'] ?? '');
-    final salonName = booking['salon']?['name'] ?? 'Salon';
-    final address = booking['salon']?['address'] ?? '';
-    final services = (booking['services'] as List?)?.map((s) => s['name']).join(', ') ?? 'Services';
-    
+  // ---------------------------------------------------------------------------
+  // SEARCH BAR
+  // ---------------------------------------------------------------------------
+  Widget _buildSearchBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+
+    return Row(
+      children: [
+        // Search field
+        Expanded(
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.only(left: 16, right: 16),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.accentColor.withOpacity(0.02),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search,
+                    color: bodyColor, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(
+                      color: headingColor,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search salons, services...',
+                      hintStyle: TextStyle(
+                        color: bodyColor,
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 12),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _navigateToSearch(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Filter button: circular 46x46
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: _selectedGender != 'All'
+                ? AppTheme.accentColor.withOpacity(0.1)
+                : surfaceColor,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: _selectedGender != 'All'
+                  ? AppTheme.accentColor
+                  : borderColor,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.accentColor.withOpacity(0.02),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: InkWell(
+            onTap: _showFilterDialog,
+            customBorder: const CircleBorder(),
+            child: Icon(
+              Icons.tune_rounded,
+              color: _selectedGender != 'All'
+                  ? AppTheme.accentColor
+                  : bodyColor,
+              size: 18,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BANNER SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildBannerSection() {
+    if (_isLoadingBanners) {
+      return Container(
+        height: 185,
+        decoration: BoxDecoration(
+          color: AppTheme.lightAccentSoft.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: AppTheme.accentColor.withOpacity(0.5),
+          ),
+        ),
+      );
+    }
+    return BannerCarousel(banners: _banners);
+  }
+
+  // ---------------------------------------------------------------------------
+  // CATEGORIES SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildCategoriesSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Categories',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: headingColor,
+              ),
+            ),
+            Text(
+              'See All',
+              style: TextStyle(
+                color: AppTheme.accentColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Category chips
+        if (_isLoadingCategories)
+          SizedBox(
+            height: 58,
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.accentColor.withOpacity(0.4),
+              ),
+            ),
+          )
+        else if (_categories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+              ),
+              child: Center(
+                child: Text(
+                  'No categories available yet.',
+                  style: TextStyle(color: bodyColor.withOpacity(0.7)),
+                ),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final category = _categories[index];
+                return GestureDetector(
+                  onTap: () =>
+                      _navigateToSearch(categoryId: category.id.toString()),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                          color: borderColor, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.accentColor.withOpacity(0.02),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (category.iconUrl != null &&
+                            category.iconUrl!.isNotEmpty)
+                          Image.network(category.iconUrl!,
+                              width: 15,
+                              height: 15,
+                              errorBuilder: (c, e, s) => Icon(
+                                  Icons.category_rounded,
+                                  size: 15,
+                                  color: bodyColor))
+                        else
+                          Icon(Icons.category_rounded,
+                              color: bodyColor, size: 15),
+                        const SizedBox(width: 8),
+                        Text(
+                          category.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: bodyColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // NEXT APPOINTMENT SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildNextAppointmentSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    if (_upcoming.isNotEmpty && !widget.isGuest) {
+      return _buildNextAppointmentCard(_upcoming.first);
+    }
+
+    // Empty state
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.lightSurface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.lightBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
+        color: AppTheme.lightCardBg,
+        borderRadius: BorderRadius.circular(22),
+        border:
+            Border.all(color: AppTheme.lightAccentSoft.withOpacity(0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(50),
+              color: AppTheme.accentColor,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
+            child: const Text(
               'YOUR NEXT APPOINTMENT',
-              style: TextStyle(color: Theme.of(context).colorScheme.surface, fontSize: 10, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5),
             ),
           ),
-          SizedBox(height: 16),
-          Text(
-            date != null ? DateFormat('EEE, MMM d, yyyy').format(date) : '',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary),
-          ),
-          SizedBox(height: 8),
-          Text(
-            salonName,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-          ),
-          if (address.isNotEmpty) ...[
-            SizedBox(height: 4),
-            Text(
-              address,
-              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+          const SizedBox(height: 20),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                children: [
+                  Icon(Icons.calendar_today_outlined,
+                      size: 36,
+                      color: AppTheme.accentColor.withOpacity(0.3)),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.isGuest
+                        ? 'Sign in to see your appointments'
+                        : 'No upcoming appointments',
+                    style: TextStyle(
+                        color: bodyColor,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14),
+                  ),
+                ],
+              ),
             ),
-          ],
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-              SizedBox(width: 6),
-              Text(
-                '${booking['start_time']} – ${booking['end_time']}',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.cut, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  services,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBookAgainCard(BuildContext context, Map<String, dynamic> booking) {
+  Widget _buildNextAppointmentCard(Map<String, dynamic> booking) {
+    final date = DateTime.tryParse(booking['appointment_date'] ?? '');
     final salonName = booking['salon']?['name'] ?? 'Salon';
-    final services = (booking['services'] as List?)?.map((s) => s['name']).join(', ') ?? 'Services';
-    final salonId = booking['salon_id'];
+    final address = booking['salon']?['address'] ?? '';
+    final services = (booking['services'] as List?)
+            ?.map((s) => s['name'])
+            .join(', ') ??
+        'Services';
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     return Container(
-      padding: EdgeInsets.all(16),
+      width: double.infinity,
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: AppTheme.lightSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.lightBorder),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.lightAccentSoft,
+            AppTheme.lightAccentSoftHover,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border:
+            Border.all(color: AppTheme.accentColor.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: AppTheme.accentColor.withOpacity(0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: AppTheme.lightAccentSoft,
-              borderRadius: BorderRadius.circular(12),
+          // Decorative circle in upper-right corner
+          Positioned(
+            top: -40,
+            right: -40,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.accentColor.withOpacity(0.08),
+              ),
             ),
-            child: Icon(Icons.history, color: AppTheme.accentColor, size: 30),
           ),
-          SizedBox(width: 16),
-          Expanded(
+
+          Padding(
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Status pill
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'YOUR NEXT APPOINTMENT',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Salon name
                 Text(
                   salonName,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: headingColor,
+                  ),
                 ),
-                SizedBox(height: 4),
+
+                // Address
+                if (address.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 14, color: bodyColor.withOpacity(0.6)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          address,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: bodyColor.withOpacity(0.75),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Services
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Icon(Icons.content_cut,
+                        size: 14,
+                        color: AppTheme.accentColor.withOpacity(0.75)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        services,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: bodyColor.withOpacity(0.8),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Divider
+                const SizedBox(height: 14),
+
+                // Date & time
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today_outlined,
+                        size: 15, color: AppTheme.accentColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        date != null
+                            ? DateFormat('EEE, MMM d, yyyy').format(date)
+                            : '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: headingColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.access_time,
+                        size: 15, color: AppTheme.accentColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${booking['start_time']} – ${booking['end_time']}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: headingColor,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // CTA: dark charcoal pill — check-in QR
+                if (booking['id'] != null) ...[
+                  const SizedBox(height: 14),
+                  ElevatedButton(
+                    onPressed: () => _openCheckInQr(booking),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.brownDark,
+                      foregroundColor: AppTheme.brownGoldText,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('View Details & Get Directions',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BOOK AGAIN SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildBookAgainSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Book Again',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: headingColor,
+              ),
+            ),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => MyBookingsScreen()));
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Text(
+                'See All',
+                style: TextStyle(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Book again content
+        if (_past.isNotEmpty && !widget.isGuest)
+          SizedBox(
+            height: 195,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 5, 20, 15),
+              itemCount: _past.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              itemBuilder: (context, index) => _buildBookAgainCard(_past[index]),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(24),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.history,
+                    size: 32, color: bodyColor.withOpacity(0.3)),
+                const SizedBox(height: 10),
+                Text(
+                  widget.isGuest
+                      ? 'Sign in to view your past bookings'
+                      : 'You have no previous bookings to show here.',
+                  style: TextStyle(
+                      color: bodyColor.withOpacity(0.6), fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBookAgainCard(Map<String, dynamic> booking) {
+    final salonName = booking['salon']?['name'] ?? 'Salon';
+    final services = (booking['services'] as List?)
+            ?.map((s) => s['name'])
+            .join(', ') ??
+        'Services';
+    final salonId = booking['salon_id'];
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    return GestureDetector(
+      onTap: () {
+        if (salonId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SalonDetailScreen(
+                salonId: salonId.toString(),
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        width: 250,
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withOpacity(0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image Wrapper
+          SizedBox(
+            height: 110,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18)),
+                  child: Image.network(
+                    booking['salon']?['cover_image'] ??
+                        'https://via.placeholder.com/250x110',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AppTheme.lightAccentSoft,
+                      child: Icon(Icons.image,
+                          color: AppTheme.accentColor.withOpacity(0.5)),
+                    ),
+                  ),
+                ),
+                // Distance Badge Placeholder
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xB32A2320), // rgba(42, 35, 32, 0.7)
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      '2.5 km',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Info Section
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        salonName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: headingColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Rebook',
+                        style: TextStyle(
+                          color: AppTheme.accentColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
                   services,
-                  style: TextStyle(fontSize: 13, color: AppTheme.lightTextBody),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: bodyColor,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: () {
-              if (salonId != null) {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => SalonDetailScreen(salonId: salonId.toString())
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              minimumSize: Size.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text('Book', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
         ],
       ),
-    );
+    ));
   }
 }
