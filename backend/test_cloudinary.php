@@ -3,10 +3,13 @@ require __DIR__ . '/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\File;
 
 try {
-    $url = Cloudinary::upload(__DIR__ . '/public/favicon.ico')->getSecurePath();
+    $file = new File(__DIR__ . '/public/favicon.ico');
+    $path = Storage::disk('cloudinary')->putFile('test', $file);
+    $url = Storage::disk('cloudinary')->url($path);
     echo "Success: " . $url . "\n";
 } catch (\Exception $e) {
     echo "Exception: " . $e->getMessage() . "\n";

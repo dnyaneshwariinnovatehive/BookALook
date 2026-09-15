@@ -251,8 +251,8 @@ class PartnerSubscriptionController extends Controller
             ->where('status', 'pending')
             ->update(['status' => 'rejected']);
 
-        $uploadedFileUrl = Cloudinary::upload($request->file('screenshot')->getRealPath())->getSecurePath();
-
+        $path = \Illuminate\Support\Facades\Storage::disk('cloudinary')->put('screenshots', $request->file('screenshot'));
+        $uploadedFileUrl = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($path);
         $paymentRequest = SubscriptionPaymentRequest::create([
             'salon_id' => $salonId,
             'subscription_plan_id' => $request->plan_id,
