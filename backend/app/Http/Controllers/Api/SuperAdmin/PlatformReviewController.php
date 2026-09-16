@@ -41,7 +41,7 @@ class PlatformReviewController extends Controller
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
             ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
-            ->having('reviews_count', '>', 0)
+            ->has('reviews')
             ->get()
             ->map(fn (Salon $salon) => [
                 'id' => $salon->id,
