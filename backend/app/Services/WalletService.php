@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Appointment;
 use App\Models\PlatformPolicySetting;
+use App\Models\Salon;
 use App\Models\SalonPayout;
 use App\Models\SalonSubscription;
 use App\Models\SalonWallet;
@@ -32,6 +33,9 @@ class WalletService
     /** Platform setting holding what one coin is worth, in rupees. */
     public const COIN_VALUE_KEY = 'coin_value_inr';
 
+    /** Platform setting holding the coins every approved salon is given. */
+    public const WELCOME_BONUS_KEY = 'welcome_bonus_coins';
+
     /** Only these bookings count towards the ladder. */
     public const REWARDABLE_SOURCE = 'online';
 
@@ -39,6 +43,90 @@ class WalletService
     public function coinValue(): float
     {
         return (float) PlatformPolicySetting::value(self::COIN_VALUE_KEY);
+    }
+
+    /** How many coins a salon is given on approval, as it stands today. */
+    public function welcomeBonusCoins(): int
+    {
+        return max(0, (int) PlatformPolicySetting::value(self::WELCOME_BONUS_KEY));
+    }
+
+    /**
+     * Hand a newly approved salon its free coins.
+     *
+     * The bonus exists to close the gap between "you are approved" and "now pay
+     * for a plan", which is the moment a salon is most likely to walk away. It
+     * is granted the instant SuperAdmin approves, so the owner's first sight of
+     * the plan screen already has money against it.
+     *
+     * Granted once, ever. The welcome_bonus row in wallet_transactions is the
+     * record of that, so a re-approval, a repeated click, or a backfill run
+     * twice cannot mint a second helping. The amount is read at grant time and
+     * frozen into the row — SuperAdmin raising the bonus later does not top up
+     * salons that already had theirs.
+     *
+     * @return array{granted: int, balance: int, already_granted: bool}
+     */
+    public function grantWelcomeBonus(Salon $salon): array
+    {
+        $wallet = $this->walletFor($salon->id);
+
+        // Only a trading salon gets it. A salon still pending or rejected has
+        // nothing to spend coins on, and would keep the bonus through a later
+        // rejection.
+        if ($salon->status !== 'active') {
+            return ['granted' => 0, 'balance' => (int) $wallet->coin_balance, 'already_granted' => false];
+        }
+
+        if ($this->hasHadWelcomeBonus($salon->id)) {
+            return ['granted' => 0, 'balance' => (int) $wallet->coin_balance, 'already_granted' => true];
+        }
+
+        $coins = $this->welcomeBonusCoins();
+
+        if ($coins < 1) {
+            return ['granted' => 0, 'balance' => (int) $wallet->coin_balance, 'already_granted' => false];
+        }
+
+        return DB::transaction(function () use ($salon, $coins) {
+            $wallet = SalonWallet::where('salon_id', $salon->id)->lockForUpdate()->first()
+                ?? $this->walletFor($salon->id);
+
+            // Re-checked under the lock: two approvals landing together would
+            // otherwise both pass the check above and grant twice.
+            if ($this->hasHadWelcomeBonus($salon->id)) {
+                return [
+                    'granted' => 0,
+                    'balance' => (int) $wallet->coin_balance,
+                    'already_granted' => true,
+                ];
+            }
+
+            $wallet->coin_balance = (int) $wallet->coin_balance + $coins;
+            $wallet->save();
+
+            WalletTransaction::create([
+                'salon_id' => $salon->id,
+                'type' => WalletTransaction::TYPE_WELCOME_BONUS,
+                'coins' => $coins,
+                'balance_after' => $wallet->coin_balance,
+                'coin_value_snapshot' => $this->coinValue(),
+                'note' => 'Welcome bonus on approval',
+            ]);
+
+            return [
+                'granted' => $coins,
+                'balance' => (int) $wallet->coin_balance,
+                'already_granted' => false,
+            ];
+        });
+    }
+
+    public function hasHadWelcomeBonus(string $salonId): bool
+    {
+        return WalletTransaction::where('salon_id', $salonId)
+            ->where('type', WalletTransaction::TYPE_WELCOME_BONUS)
+            ->exists();
     }
 
     public function walletFor(string $salonId): SalonWallet

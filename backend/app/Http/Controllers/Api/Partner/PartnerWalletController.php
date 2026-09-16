@@ -44,6 +44,14 @@ class PartnerWalletController extends Controller
             ->limit(200)
             ->get();
 
+        // Everything that put coins in, not just ladder earnings — the welcome
+        // bonus is most of a new salon's balance, and a balance the owner
+        // cannot see the source of reads as a bug.
+        $credits = $transactions->whereIn('type', [
+            WalletTransaction::TYPE_EARNED,
+            WalletTransaction::TYPE_WELCOME_BONUS,
+        ]);
+
         return response()->json([
             'success' => true,
             'balance' => (int) $wallet->coin_balance,
@@ -53,13 +61,10 @@ class PartnerWalletController extends Controller
             'progress' => $this->wallet->progress($salonId),
             // Split so the app can show "how I earned" and "how I spent"
             // separately without filtering client-side.
-            'earned' => $transactions->where('type', WalletTransaction::TYPE_EARNED)
-                ->map(fn ($t) => $this->present($t))->values(),
+            'earned' => $credits->map(fn ($t) => $this->present($t))->values(),
             // The salon-facing summary: what each reward scheme earned them, and
             // when (grouped by month), instead of one row per appointment.
-            'earned_by_scheme' => $this->earnedByScheme(
-                $transactions->where('type', WalletTransaction::TYPE_EARNED)
-            ),
+            'earned_by_scheme' => $this->earnedByScheme($credits),
             'redeemed' => $transactions->where('type', WalletTransaction::TYPE_REDEEMED)
                 ->map(fn ($t) => $this->present($t))->values(),
             'transactions' => $transactions->map(fn ($t) => $this->present($t))->values(),
@@ -176,12 +181,17 @@ class PartnerWalletController extends Controller
 
         foreach ($earned as $transaction) {
             $scheme = $transaction->tier?->scheme;
-            $key = $scheme?->id ?? 'other';
+            // Coins that came from no scheme are grouped by why they arrived,
+            // so the welcome bonus reads as itself rather than as "Other".
+            $key = $scheme?->id ?? $transaction->type;
 
             if (! isset($byScheme[$key])) {
                 $byScheme[$key] = [
                     'scheme_id' => $scheme?->id,
-                    'scheme_name' => $scheme?->name ?? 'Other',
+                    'scheme_name' => $scheme?->name
+                        ?? ($transaction->type === WalletTransaction::TYPE_WELCOME_BONUS
+                            ? 'Welcome bonus'
+                            : 'Other'),
                     'total_coins' => 0,
                     'total_value_inr' => 0.0,
                     'months' => [],

@@ -29,6 +29,11 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool _isProcessing = false;
   List<dynamic> _plans = [];
   double _walletBalance = 0;
+
+  /// What one coin is worth in rupees, as the server says. Read rather than
+  /// assumed, so the discount shown here matches what the server would work
+  /// out if SuperAdmin ever changes the rate.
+  double _coinValue = 1;
   bool _applyCoins = true;
   String? _selectedPlanId;
   XFile? _screenshot;
@@ -67,6 +72,8 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
         if (walletData != null && walletData['success'] == true) {
           final balance = walletData['balance'] ?? 0;
           _walletBalance = balance is num ? balance.toDouble() : (double.tryParse(balance.toString()) ?? 0.0);
+          final rate = walletData['coin_value_inr'];
+          if (rate is num && rate > 0) _coinValue = rate.toDouble();
         }
       });
     } catch (e) {
@@ -88,9 +95,38 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
     }
   }
 
+  /// Coins the owner has chosen to put towards the selected plan.
+  int get _coinsApplied => _applyCoins ? _usableCoinsFor(_selectedPlanPrice) : 0;
+
+  double get _selectedPlanPrice {
+    final plan = _plans.firstWhere(
+      (p) => p['id'].toString() == _selectedPlanId,
+      orElse: () => null,
+    );
+    if (plan == null) return 0;
+    final price = plan['price'];
+    return price is num ? price.toDouble() : (double.tryParse(price.toString()) ?? 0);
+  }
+
+  /// Mirrors the server's own quote: whole coins only, and never more than the
+  /// bill is worth, because coins spent beyond the price would just be burnt.
+  int _usableCoinsFor(double price) {
+    if (_coinValue <= 0 || price <= 0) return 0;
+    final affordable = (price / _coinValue).floor();
+    return _walletBalance < affordable ? _walletBalance.floor() : affordable;
+  }
+
+  /// True when the coins cover the whole plan, so there is nothing to transfer
+  /// and therefore no receipt to upload.
+  bool get _fullyPaidByCoins =>
+      _selectedPlanPrice > 0 && _coinsApplied * _coinValue >= _selectedPlanPrice;
+
   Future<void> _processUpgrade() async {
     if (_selectedPlanId == null) return;
-    if (_screenshot == null) {
+
+    // A plan the coins cover outright is activated on the spot, so the only
+    // time a screenshot is needed is when real money changed hands.
+    if (!_fullyPaidByCoins && _screenshot == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload a screenshot of your transaction')));
       return;
     }
@@ -109,6 +145,9 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       // screen, and sending a billing type from here used to overwrite a
       // commission salon's arrangement.
       request.fields['plan_id'] = _selectedPlanId!;
+      // The server clamps this to what the wallet actually holds, so it is a
+      // request rather than an instruction.
+      request.fields['coins_to_redeem'] = _coinsApplied.toString();
 
       if (_screenshot != null) {
         final bytes = await _screenshot!.readAsBytes();
@@ -142,14 +181,11 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final selectedPlan = _plans.firstWhere((p) => p['id'].toString() == _selectedPlanId, orElse: () => null);
-    final price = selectedPlan != null ? double.parse(selectedPlan['price'].toString()) : 0;
-    
-    // Simplification for UI calculation: assuming 1 coin = 1 INR discount for demo, 
-    // although backend handles exact calculation based on WalletScheme.
-    final maxDiscount = _walletBalance; 
-    final discountApplied = _applyCoins ? (price > maxDiscount ? maxDiscount : price) : 0;
+    final price = _selectedPlanPrice;
+    final coinsUsable = _usableCoinsFor(price);
+    final discountApplied = _applyCoins ? coinsUsable * _coinValue : 0;
     final finalPrice = price - discountApplied;
+    final coversEverything = _fullyPaidByCoins;
 
     return Scaffold(
       appBar: AppBar(
@@ -188,8 +224,11 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
             
             if (_walletBalance > 0)
               CheckboxListTile(
-                title: Text('Apply Wallet Coins ($_walletBalance available)'),
-                subtitle: Text('Assume 1 coin = ₹1 discount'),
+                title: Text('Apply wallet coins (${_walletBalance.toStringAsFixed(0)} available)'),
+                subtitle: Text(
+                  '1 coin = ₹${_coinValue.toStringAsFixed(_coinValue % 1 == 0 ? 0 : 2)}'
+                  ' · ${coinsUsable.toString()} usable here',
+                ),
                 value: _applyCoins,
                 onChanged: (val) {
                   setState(() => _applyCoins = val ?? false);
@@ -215,29 +254,74 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
             ),
             
             const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Theme.of(context).colorScheme.outline),
-                borderRadius: BorderRadius.circular(12),
+
+            // Nothing left to transfer means nothing to photograph. Showing a
+            // payment QR for ₹0 would just be confusing.
+            if (coversEverything)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.lightSuccessBg,
+                  border: Border.all(color: AppTheme.lightSuccess.withValues(alpha: 0.4)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        size: 26, color: AppTheme.lightSuccess),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Your coins cover this plan',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.lightSuccess)),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Nothing to pay and nothing to upload. '
+                            '${coinsUsable.toString()} coins will be spent and the plan '
+                            'starts straight away.',
+                            style: TextStyle(
+                                fontSize: 13,
+                                height: 1.35,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text('Scan QR to Pay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    Icon(Icons.qr_code_2, size: 120, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(height: 8),
+                    Text('Pay ₹${finalPrice.toStringAsFixed(0)}',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text('After payment, please upload a screenshot for verification.', textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _pickScreenshot,
+                      icon: Icon(Icons.upload_file),
+                      label: Text(_screenshot != null ? 'Screenshot Selected' : 'Upload Screenshot'),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  Text('Scan QR to Pay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Icon(Icons.qr_code_2, size: 120, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(height: 16),
-                  Text('After payment, please upload a screenshot for verification.', textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: _pickScreenshot,
-                    icon: Icon(Icons.upload_file),
-                    label: Text(_screenshot != null ? 'Screenshot Selected' : 'Upload Screenshot'),
-                  ),
-                ],
-              ),
-            ),
-            
+
             const SizedBox(height: 40),
             ElevatedButton(
               onPressed: _isProcessing ? null : _processUpgrade,
@@ -245,9 +329,9 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              child: _isProcessing 
-                  ? const CircularProgressIndicator() 
-                  : Text('Submit Payment Proof'),
+              child: _isProcessing
+                  ? const CircularProgressIndicator()
+                  : Text(coversEverything ? 'Activate with coins' : 'Submit Payment Proof'),
             ),
           ],
         ),

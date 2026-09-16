@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Models\PlatformPolicySetting;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +43,9 @@ class SettingsController extends Controller
             'reschedule_cutoff_minutes' => 'sometimes|integer|min:0',
             'appointment_start_early_minutes' => 'sometimes|integer|min:0',
             'coin_value_inr' => 'sometimes|numeric|min:0',
+            // Zero is allowed and means "stop giving new salons a bonus".
+            // Salons already granted one keep it either way.
+            'welcome_bonus_coins' => 'sometimes|integer|min:0|max:1000000',
             'subscription_reminder_hour' => 'sometimes|integer|min:0|max:23',
             'commission_settlement_grace_days' => 'sometimes|integer|min:0|max:60',
             // Where every printed salon QR code lands. Changing it silently
@@ -56,12 +61,20 @@ class SettingsController extends Controller
 
         $user = $request->user();
 
+        // Snapshotted before anything moves, so the entry can show what each
+        // rule used to be — the whole point of auditing a settings change.
+        $keysBeing = array_keys($request->except(['_token', '_method']));
+        $before = collect($keysBeing)
+            ->mapWithKeys(fn ($key) => [$key => PlatformPolicySetting::value($key)])
+            ->all();
+
         $allowedSettings = [
             'subscription_expiry_warning_days' => 'Number of days before subscription expiry to show a warning banner',
             'cancellation_cutoff_minutes' => 'Number of minutes before an appointment when cancellation is blocked',
             'reschedule_cutoff_minutes' => 'Number of minutes before an appointment when rescheduling is blocked',
             'appointment_start_early_minutes' => 'Number of minutes before an appointment start time when a provider can start it',
             'subscription_reminder_hour' => 'Hour of the day (0-23) when renewal reminders are sent to salon owners',
+            'welcome_bonus_coins' => 'Free coins given to a salon when SuperAdmin approves it',
             'commission_settlement_grace_days' => 'Days after a month closes before an unsettled Commission Model salon is locked out',
         ];
 
@@ -117,6 +130,21 @@ class SettingsController extends Controller
                     ]
                 );
             }
+        }
+
+        $after = collect($keysBeing)
+            ->mapWithKeys(fn ($key) => [$key => PlatformPolicySetting::value($key)])
+            ->all();
+
+        // Only worth an entry if something actually moved — saving the form
+        // unchanged is not a platform policy change.
+        if ($before != $after) {
+            AuditLogger::record(
+                action: AuditLog::POLICY_UPDATED,
+                label: 'Platform policy',
+                before: $before,
+                after: $after,
+            );
         }
 
         return response()->json([

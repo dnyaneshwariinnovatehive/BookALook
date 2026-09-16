@@ -218,12 +218,27 @@ class _SalonListScreenState extends State<SalonListScreen> {
                         ),
                       )
                     else
-                      Row(
-                        children: [
-                          Icon(Icons.star, size: 14, color: AppTheme.starRating),
-                          SizedBox(width: 4),
-                          Text('4.5 (120 reviews)', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
-                        ],
+                      Builder(
+                        builder: (_) {
+                          // Real figures rather than a placeholder that claimed
+                          // every salon was 4.5 from 120 reviews.
+                          final count = (salon['review_count'] as num?)?.toInt() ?? 0;
+                          final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+
+                          if (count == 0) {
+                            return Text('New salon',
+                                style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600));
+                          }
+
+                          return Row(
+                            children: [
+                              Icon(Icons.star, size: 14, color: AppTheme.starRating),
+                              SizedBox(width: 4),
+                              Text('${avg.toStringAsFixed(1)} ($count ${count == 1 ? 'review' : 'reviews'})',
+                                  style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          );
+                        },
                       )
                   ],
                 ),

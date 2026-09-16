@@ -241,31 +241,20 @@ class SalonController extends Controller
      */
     private function ratings(Salon $salon): array
     {
-        $reviews = DB::table('reviews')
-            ->join('users', 'users.id', '=', 'reviews.customer_id')
-            ->where('reviews.salon_id', $salon->id)
-            ->get(['reviews.id', 'reviews.rating', 'reviews.comment', 'users.name as customer_name']);
+        $service = app(\App\Services\ReviewService::class);
+        $summary = $service->summaryFor($salon->id);
 
-        $breakdown = [];
-        for ($star = 5; $star >= 1; $star--) {
-            $breakdown[$star] = $reviews->where('rating', $star)->count();
-        }
+        // The newest few with something to read, as a preview. The full list
+        // lives behind /salons/{id}/reviews — a salon page should not carry
+        // four hundred reviews to show the first three.
+        $recent = $service->listFor($salon->id, 1, 3, null, true)['reviews'];
 
-        return [
-            'average' => $reviews->isNotEmpty()
-                ? round($reviews->avg('rating'), 1)
-                : round((float) $salon->avg_rating, 1),
-            'count' => $reviews->isNotEmpty() ? $reviews->count() : (int) $salon->review_count,
-            'breakdown' => $breakdown,
-            'recent' => $reviews->filter(fn ($r) => filled($r->comment))
-                ->take(5)
-                ->map(fn ($r) => [
-                    'rating' => (int) $r->rating,
-                    'comment' => $r->comment,
-                    'customer_name' => $r->customer_name,
-                ])
-                ->values()
-                ->all(),
+        return $summary + [
+            // Kept as a flat star => count map as well, because the app's
+            // existing bars read it that way.
+            'breakdown_counts' => collect($summary['breakdown'])
+                ->map(fn ($row) => $row['count'])->all(),
+            'recent' => $recent->all(),
         ];
     }
 

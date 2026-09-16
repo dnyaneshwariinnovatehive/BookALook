@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Services\AuditLogger;
+use App\Services\WalletService;
 use Illuminate\Http\Request;
 use App\Models\Salon;
 use Illuminate\Support\Str;
@@ -41,9 +44,10 @@ class SalonApprovalController extends Controller
     /**
      * Approve the salon.
      */
-    public function approve($id)
+    public function approve($id, WalletService $wallet)
     {
         $salon = Salon::findOrFail($id);
+        $previousStatus = $salon->status;
 
         // Generate a dummy QR code URL for now (e.g. using qrserver API)
         $dummyQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=salon_' . $salon->id;
@@ -53,9 +57,31 @@ class SalonApprovalController extends Controller
             'qr_code_url' => $dummyQrCodeUrl,
         ]);
 
+        // The owner's next screen asks them to buy a plan, so the coins that
+        // help pay for it have to be in the wallet before they get there.
+        // Idempotent, so re-approving never hands out a second bonus.
+        $bonus = $wallet->grantWelcomeBonus($salon->refresh());
+
+        AuditLogger::record(
+            action: AuditLog::SALON_APPROVED,
+            entity: $salon,
+            label: $salon->name,
+            before: ['status' => $previousStatus],
+            after: ['status' => 'active'],
+            metadata: $bonus['granted'] > 0 ? ['welcome_coins_granted' => $bonus['granted']] : [],
+        );
+
+        $message = 'Salon approved successfully. QR Code generated.';
+
+        if ($bonus['granted'] > 0) {
+            $message .= " {$bonus['granted']} welcome coins added to their wallet.";
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Salon approved successfully. QR Code generated.',
+            'message' => $message,
+            'welcome_bonus_coins' => $bonus['granted'],
+            'wallet_balance' => $bonus['balance'],
             'data' => $salon
         ]);
     }
@@ -70,11 +96,21 @@ class SalonApprovalController extends Controller
         ]);
 
         $salon = Salon::findOrFail($id);
+        $previousStatus = $salon->status;
 
         $salon->update([
             'status' => 'rejected',
             'rejection_reason' => $request->rejection_reason
         ]);
+
+        AuditLogger::record(
+            action: AuditLog::SALON_REJECTED,
+            entity: $salon,
+            label: $salon->name,
+            before: ['status' => $previousStatus],
+            after: ['status' => 'rejected'],
+            metadata: ['reason' => $request->rejection_reason],
+        );
 
         // A salon a collaborator onboarded is not finished when it is rejected
         // — it goes back on their list so they can fix what was wrong and send

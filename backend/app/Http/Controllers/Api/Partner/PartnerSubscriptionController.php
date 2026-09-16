@@ -234,8 +234,12 @@ class PartnerSubscriptionController extends Controller
     public function paymentRequest(Request $request, $salon_id)
     {
         $request->validate([
-            'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            // Not required outright: a plan paid for entirely in coins has no
+            // transfer to show a receipt for. Enforced below once we know what
+            // the coins cover.
+            'screenshot' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'plan_id' => 'required|exists:subscription_plans,id',
+            'coins_to_redeem' => 'nullable|integer|min:0',
         ]);
 
         $user = $request->user();
@@ -246,10 +250,40 @@ class PartnerSubscriptionController extends Controller
         }
         $salonId = $salon->id;
 
+        $plan = SubscriptionPlan::findOrFail($request->plan_id);
+        $price = (float) $plan->price;
+
+        $wallet = app(\App\Services\WalletService::class);
+
+        // The server decides what the coins are worth, not the app. Asking for
+        // more than the wallet holds, or more than the bill, is clamped rather
+        // than refused — the owner's intent is "use my coins".
+        $usable = $wallet->quote($salonId, $price);
+        $coins = $request->filled('coins_to_redeem')
+            ? min((int) $request->coins_to_redeem, $usable['coins'])
+            : $usable['coins'];
+
+        $discount = round($coins * $wallet->coinValue(), 2);
+        $payable = round(max($price - $discount, 0), 2);
+
         // Cancel previous pending requests to avoid duplicates
         SubscriptionPaymentRequest::where('salon_id', $salonId)
             ->where('status', 'pending')
             ->update(['status' => 'rejected']);
+
+        // Nothing left to pay means nothing to verify. Sending the owner away
+        // to photograph a transfer they never made would be absurd, so the plan
+        // starts here and the coins leave the wallet with it.
+        if ($payable <= 0 && $coins > 0) {
+            return $this->activatePaidInCoins($salon, $plan, $coins, $user);
+        }
+
+        if (! $request->hasFile('screenshot')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload a screenshot of your transfer so SuperAdmin can verify it.',
+            ], 422);
+        }
 
         $path = \Illuminate\Support\Facades\Storage::disk('cloudinary')->put('screenshots', $request->file('screenshot'));
         $uploadedFileUrl = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($path);
@@ -258,13 +292,86 @@ class PartnerSubscriptionController extends Controller
             'subscription_plan_id' => $request->plan_id,
             'billing_type' => BillingModel::SUBSCRIPTION,
             'screenshot_url' => $uploadedFileUrl,
-            'status' => 'pending'
+            'status' => 'pending',
+            // Intent only. The coins stay in the wallet until SuperAdmin turns
+            // this into a subscription — a request that is rejected, or
+            // superseded by another, must not have cost anything.
+            'coins_to_redeem' => $coins,
+            'coin_discount_inr' => $discount,
+            'amount_payable_inr' => $payable,
         ]);
+
+        $note = $coins > 0
+            ? sprintf(' %d coins (₹%s) will come off when it is approved.', $coins, number_format($discount, 2))
+            : '';
 
         return response()->json([
             'success' => true,
-            'message' => 'Payment screenshot uploaded successfully. Your subscription plan will be activated once verified by SuperAdmin.',
+            'message' => 'Payment screenshot uploaded successfully. Your subscription plan will be activated once verified by SuperAdmin.' . $note,
+            'coins_to_redeem' => $coins,
+            'coin_discount' => $discount,
+            'amount_payable' => $payable,
             'data' => $paymentRequest
+        ]);
+    }
+
+    /**
+     * Start a plan the salon's coins paid for outright.
+     *
+     * No money moved, so there is no receipt and nothing for SuperAdmin to
+     * check — holding this in a queue would leave a salon that has already paid
+     * sitting offline waiting on an approval that can only rubber-stamp it.
+     * The coins are spent inside the same transaction that creates the
+     * subscription, so the plan can never exist without having been paid for.
+     */
+    private function activatePaidInCoins(Salon $salon, SubscriptionPlan $plan, int $coins, $user)
+    {
+        $wallet = app(\App\Services\WalletService::class);
+
+        try {
+            $subscription = DB::transaction(function () use ($salon, $plan, $coins, $user, $wallet) {
+                SalonSubscription::where('salon_id', $salon->id)
+                    ->where('status', 'active')
+                    ->update(['status' => 'cancelled', 'cancelled_at' => Carbon::now()]);
+
+                // Buying a plan is leaving the Commission Model, exactly as it
+                // is on the upgrade path.
+                if ($salon->isOnCommissionModel()) {
+                    $this->commission->deactivate($salon, $user);
+                }
+
+                $subscription = SalonSubscription::create([
+                    'salon_id' => $salon->id,
+                    'plan_id' => $plan->id,
+                    'plan_price_snapshot' => $plan->price,
+                    'status' => 'active',
+                    'start_date' => Carbon::today(),
+                    'end_date' => Carbon::today()->addDays($plan->validity_days),
+                    'billing_type' => BillingModel::SUBSCRIPTION,
+                ]);
+
+                $wallet->redeemForSubscription(
+                    $salon->id,
+                    $coins,
+                    (float) $plan->price,
+                    $user,
+                    $subscription,
+                    "Paid for {$plan->name} in full with coins"
+                );
+
+                return $subscription;
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'paid_with_coins' => true,
+            'message' => "Your coins covered {$plan->name} in full. The plan is active — nothing to pay.",
+            'coins_redeemed' => $coins,
+            'amount_payable' => 0,
+            'data' => $subscription->load('plan'),
         ]);
     }
 

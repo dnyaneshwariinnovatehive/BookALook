@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\SalonPayout;
+use App\Services\AuditLogger;
 use App\Services\PayoutService;
 use App\Support\BillingModel;
 use App\Support\PayoutCycle;
@@ -150,6 +152,14 @@ class PayoutController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        AuditLogger::record(
+            action: AuditLog::PAYOUT_APPROVED,
+            entity: $payout,
+            label: sprintf('%s payout', $payout->salon->name ?? 'Salon'),
+            after: ['status' => $payout->status, 'net_amount' => (float) $payout->net_amount],
+            metadata: ['payout_id' => $payout->id],
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Payout approved.',
@@ -185,6 +195,24 @@ class PayoutController extends Controller
         }
 
         $isCommission = BillingModel::isCommission($payout->billing_type);
+
+        // Money actually leaving the platform. Nothing else in the system is
+        // less reversible.
+        AuditLogger::record(
+            action: AuditLog::PAYOUT_DISTRIBUTED,
+            entity: $payout,
+            label: sprintf('%s payout', $payout->salon->name ?? 'Salon'),
+            after: [
+                'status' => $payout->status,
+                'net_amount' => (float) $payout->net_amount,
+                'commission_deducted' => (float) $payout->commission_deducted,
+            ],
+            metadata: [
+                'reason' => $request->input('notes'),
+                'payout_id' => $payout->id,
+                'distribution_reference' => $request->input('distribution_reference'),
+            ],
+        );
 
         return response()->json([
             'success' => true,

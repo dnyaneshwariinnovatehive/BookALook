@@ -4,7 +4,9 @@ import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
 import '../services/cart_service.dart';
 import 'cart_screen.dart';
+import 'salon_reviews_screen.dart';
 import '../widgets/cart_offers.dart';
+import '../widgets/rating_bars.dart';
 
 class SalonDetailScreen extends StatefulWidget {
   final String salonId;
@@ -1091,124 +1093,64 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   // ----------------------------------------------------------------- reviews
 
   Widget _buildReviews() {
-    final rating = _salon!['rating'] ?? {};
-    final count = (rating['count'] ?? 0) as int;
-    final average = _toDouble(rating['average']);
-    final recent = (rating['recent'] as List?) ?? [];
-    final breakdown = (rating['breakdown'] as Map?) ?? {};
+    final rating = Map<String, dynamic>.from((_salon!['rating'] as Map?) ?? {});
+    final count = (rating['count'] as num?)?.toInt() ?? 0;
+    final recent = (rating['recent'] as List?) ?? const [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader('Ratings & reviews', count > 0 ? '$count customer ratings' : null),
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: 16),
-          padding: EdgeInsets.all(20),
-          decoration: _cardDecoration(),
-          child: count == 0
-              ? Row(
-                  children: [
-                    Icon(Icons.rate_review_outlined, color: AppTheme.lightTextLight),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text('No reviews yet — be the first to rate this salon.',
-                          style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Column(
-                          children: [
-                            Text(average.toStringAsFixed(1),
-                                style: GoogleFonts.outfit(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.lightTextHeading)),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(
-                                5,
-                                (i) => Icon(
-                                  i < average.round() ? Icons.star_rounded : Icons.star_outline_rounded,
-                                  size: 14,
-                                  color: AppTheme.lightWarning,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            children: [5, 4, 3, 2, 1].map<Widget>((star) {
-                              final starCount = (breakdown['$star'] ?? breakdown[star] ?? 0) as int;
-                              return Padding(
-                                padding: EdgeInsets.symmetric(vertical: 1.5),
-                                child: Row(
-                                  children: [
-                                    Text('$star',
-                                        style: GoogleFonts.outfit(
-                                            fontSize: 11, color: AppTheme.lightTextLight)),
-                                    SizedBox(width: 6),
-                                    Expanded(
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(3),
-                                        child: LinearProgressIndicator(
-                                          value: count > 0 ? starCount / count : 0,
-                                          minHeight: 5,
-                                          backgroundColor: AppTheme.lightBorder,
-                                          valueColor:
-                                              AlwaysStoppedAnimation(AppTheme.lightWarning),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (recent.isNotEmpty) ...[
-                      SizedBox(height: 16),
-                      Divider(color: AppTheme.lightBorder, height: 1),
-                      SizedBox(height: 12),
-                      ...recent.map<Widget>((review) => Padding(
-                            padding: EdgeInsets.only(bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(review['customer_name'] ?? 'Customer',
-                                        style: GoogleFonts.outfit(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppTheme.lightTextHeading)),
-                                    SizedBox(width: 8),
-                                    Icon(Icons.star_rounded, size: 13, color: AppTheme.lightWarning),
-                                    Text('${review['rating']}',
-                                        style: GoogleFonts.outfit(
-                                            fontSize: 12, color: AppTheme.lightTextBody)),
-                                  ],
-                                ),
-                                SizedBox(height: 2),
-                                Text(review['comment'] ?? '',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 13, color: AppTheme.lightTextBody)),
-                              ],
-                            ),
-                          )),
-                    ],
-                  ],
-                ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: RatingSummaryCard(summary: rating),
         ),
+
+        // A preview only. The full list is its own page — a salon page should
+        // not carry four hundred reviews to show the newest three.
+        if (recent.isNotEmpty) ...[
+          SizedBox(height: 12),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (final review in recent)
+                  ReviewTile(review: Map<String, dynamic>.from(review as Map)),
+              ],
+            ),
+          ),
+        ],
+
+        if (count > 0) ...[
+          SizedBox(height: 4),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SalonReviewsScreen(
+                      salonId: widget.salonId,
+                      salonName: _salon!['name']?.toString() ?? 'Salon',
+                    ),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentColor,
+                  padding: EdgeInsets.symmetric(vertical: 13),
+                  side: BorderSide(color: AppTheme.lightBorder),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  count == 1 ? 'See the 1 review' : 'See all $count reviews',
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

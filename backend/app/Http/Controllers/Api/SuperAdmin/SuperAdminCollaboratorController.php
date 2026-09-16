@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Salon;
@@ -60,6 +62,13 @@ class SuperAdminCollaboratorController extends Controller
             'password_hash' => Hash::make(\Illuminate\Support\Str::random(12)),
             'role' => 'collaborator',
         ]);
+
+        AuditLogger::record(
+            action: AuditLog::COLLABORATOR_CREATED,
+            entity: $user,
+            label: $user->name,
+            after: ['phone' => $user->phone, 'email' => $user->email],
+        );
 
         return response()->json([
             'success' => true,

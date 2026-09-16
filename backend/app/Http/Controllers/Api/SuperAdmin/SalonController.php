@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -80,7 +82,16 @@ class SalonController extends Controller
             ? \App\Models\User::where('role', 'collaborator')->findOrFail($request->collaborator_id)
             : null;
 
+        $previous = $salon->assignedCollaborator?->name;
         $salon->update(['assigned_collaborator_id' => $collaborator?->id]);
+
+        AuditLogger::record(
+            action: AuditLog::SALON_COLLABORATOR_ASSIGNED,
+            entity: $salon,
+            label: $salon->name,
+            before: ['collaborator' => $previous],
+            after: ['collaborator' => $collaborator?->name],
+        );
 
         return response()->json([
             'success' => true,

@@ -21,6 +21,15 @@ class WalletTransaction extends Model
     public const TYPE_ADJUSTMENT = 'adjustment';
     public const TYPE_EXPIRED = 'expired';
 
+    /**
+     * The coins every salon is given on approval.
+     *
+     * Its own type rather than an adjustment, because it is the row that proves
+     * a salon has already had its one bonus — granting is idempotent on exactly
+     * this.
+     */
+    public const TYPE_WELCOME_BONUS = 'welcome_bonus';
+
     protected $fillable = [
         'salon_id',
         'type',

@@ -79,6 +79,12 @@ export default function PlatformPolicyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Coins handed to a salon the moment it is approved, so its first plan is
+  // part-paid. Read alongside the coin rate, because the number only means
+  // something once you know what a coin is worth.
+  const [welcomeBonusCoins, setWelcomeBonusCoins] = useState('2300');
+  const [coinValue, setCoinValue] = useState(1);
+
   // Where a scanned salon QR lands, and where that page sends people who do
   // not have the app. Held as settings because every poster already printed
   // follows whatever these say.
@@ -100,6 +106,8 @@ export default function PlatformPolicyPage() {
         setCancelCutoff(parseInt(data.settings.cancellation_cutoff_minutes || '90', 10));
         setRescheduleCutoff(parseInt(data.settings.reschedule_cutoff_minutes || '90', 10));
         setStartEarly(parseInt(data.settings.appointment_start_early_minutes || '30', 10));
+        setWelcomeBonusCoins((data.settings.welcome_bonus_coins ?? 2300).toString());
+        setCoinValue(Number(data.settings.coin_value_inr ?? 1));
         setPublicWebUrl(data.settings.public_web_url || '');
         setAndroidAppUrl(data.settings.android_app_url || '');
         setIosAppUrl(data.settings.ios_app_url || '');
@@ -124,6 +132,7 @@ export default function PlatformPolicyPage() {
           cancellation_cutoff_minutes: cancelCutoff,
           reschedule_cutoff_minutes: rescheduleCutoff,
           appointment_start_early_minutes: startEarly,
+          welcome_bonus_coins: parseInt(welcomeBonusCoins, 10) || 0,
           public_web_url: publicWebUrl.trim(),
           // Sent even when blank: clearing one is how SuperAdmin takes a dead
           // store button off the landing page.
@@ -188,6 +197,37 @@ export default function PlatformPolicyPage() {
             onChange={setStartEarly}
           />
           
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 600, margin: '32px 0 4px' }}>
+            Welcome bonus
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-body)', margin: '0 0 20px', lineHeight: 1.6 }}>
+            Every salon is given these coins the moment you approve it, so its
+            first subscription is already part-paid. Coins can be spent on a
+            subscription plan or against commission owed.
+          </p>
+
+          <div className={styles.formGroup}>
+            <label>Free coins on approval</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={welcomeBonusCoins}
+              onChange={(e) => setWelcomeBonusCoins(e.target.value)}
+              required
+            />
+            <p style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-body)' }}>
+              Worth{' '}
+              <strong>
+                ₹{((parseInt(welcomeBonusCoins, 10) || 0) * coinValue).toLocaleString('en-IN')}
+              </strong>{' '}
+              at the current rate of ₹{coinValue} per coin. Changing this only
+              affects salons approved from now on — a salon that already has its
+              bonus keeps the amount it was given. Set it to 0 to stop giving
+              new salons a bonus.
+            </p>
+          </div>
+
           <h2 style={{ fontSize: '1.05rem', fontWeight: 600, margin: '32px 0 4px' }}>
             Salon QR codes &amp; the app
           </h2>

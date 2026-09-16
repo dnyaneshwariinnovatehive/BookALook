@@ -15,6 +15,9 @@ Route::prefix('customer')->group(function () {
     Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
     Route::get('/salons', [\App\Http\Controllers\Api\Customer\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\Customer\SalonController::class, 'show']);
+    // Reading reviews needs no account — someone deciding where to book has
+    // usually not signed in yet.
+    Route::get('/salons/{id}/reviews', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'forSalon']);
 
     // Protected customer routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -51,6 +54,11 @@ Route::prefix('customer')->group(function () {
         Route::post('/appointments/{id}/payment/confirm', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'confirmPayment']);
         Route::post('/appointments/{id}/payment/demo-pay', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'demoPay']);
         Route::post('/appointments/{id}/payment/abandon', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'abandonPayment']);
+
+        // Rating a visit, and reporting one. The app asks for /reviews/pending
+        // on opening — anything it returns becomes the rating prompt.
+        Route::get('/reviews/pending', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'pending']);
+        Route::post('/appointments/{id}/review', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'store']);
 
         // In-app notification inbox
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
@@ -145,6 +153,25 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/appointments/verify-qr', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'verifyQrAndStartSession']);
         Route::post('/appointments/{id}/add-service', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'addServiceMidAppointment']);
 
+        // Complaints, and the two things that can be done about one.
+        Route::get('/complaints', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'index']);
+        Route::get('/complaints/{id}', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'show']);
+        Route::post('/complaints/{id}/warn', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'warn']);
+        Route::post('/complaints/{id}/suspend', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'suspend']);
+        Route::post('/complaints/{id}/dismiss', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'dismiss']);
+        // Undoing a suspension is not resolving a complaint, so it hangs off
+        // the salon rather than the complaint that caused it.
+        Route::post('/salons/{salonId}/reinstate', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'reinstate']);
+
+        // The audit trail. Read-only by design — entries are only ever written
+        // as a side effect of the action they describe, and a log with an API
+        // that can change it proves nothing.
+        Route::get('/audit-log', [\App\Http\Controllers\Api\SuperAdmin\AuditLogController::class, 'index']);
+
+        // Ratings across the platform, worst first.
+        Route::get('/reviews', [\App\Http\Controllers\Api\SuperAdmin\PlatformReviewController::class, 'index']);
+        Route::get('/salons/{salonId}/reviews', [\App\Http\Controllers\Api\SuperAdmin\PlatformReviewController::class, 'forSalon']);
+
         // Platform Reporting
         Route::get('/reports/overview', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'overview']);
         Route::get('/reports/dashboard', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'dashboard']);
@@ -179,6 +206,11 @@ Route::prefix('partner')->group(function () {
         Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
         Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
         Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);
+
+        // A salon's own ratings. Outside the salon.active gate deliberately: an
+        // owner whose plan has lapsed should still be able to read what their
+        // customers said, and it is a read-only page.
+        Route::get('/salons/{salon_id}/reviews', [\App\Http\Controllers\Api\Partner\SalonReviewController::class, 'index']);
 
         // Collaborators work across salons, not inside one — so none of this
         // can sit behind the salon.active gate.

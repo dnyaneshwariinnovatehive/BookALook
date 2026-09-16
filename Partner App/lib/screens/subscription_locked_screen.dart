@@ -107,6 +107,11 @@ class SubscriptionLockedScreen extends StatelessWidget {
                       fontSize: 14.5, height: 1.5, color: Colors.grey.shade700),
                 ),
 
+                if (access.canRenew && access.hasCoins) ...[
+                  const SizedBox(height: 20),
+                  _buildCoinsCard(),
+                ],
+
                 const SizedBox(height: 24),
                 _buildImpactCard(),
                 const SizedBox(height: 28),
@@ -167,6 +172,57 @@ class SubscriptionLockedScreen extends StatelessWidget {
     return '${access.salonName}\'s subscription has ended, so the app is locked '
         'for everyone here. Only $owner can renew it.';
   }
+
+  /// The coins the salon already has against the price it is about to be shown.
+  ///
+  /// This is the whole point of the welcome bonus: an owner who reads "₹1999"
+  /// cold is being asked to start paying, while an owner who reads "you already
+  /// have ₹2300 towards it" is being asked to finish something.
+  Widget _buildCoinsCard() => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.lightSuccessBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.lightSuccess.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppTheme.lightSuccess.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.savings_outlined,
+                  size: 21, color: AppTheme.lightSuccess),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${access.walletCoins} coins ready to spend',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.lightSuccess),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _isWelcome
+                        ? 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your first plan.'
+                        : 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your renewal.',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12.5, height: 1.35, color: AppTheme.lightTextBody),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _buildImpactCard() => Container(
         padding: const EdgeInsets.all(16),

@@ -45,6 +45,12 @@ class SalonAccess {
   final String? adminName;
   final String? adminPhone;
 
+  /// Reward coins the salon can put towards a plan, and what they are worth.
+  /// A newly approved salon arrives here with its welcome bonus already in,
+  /// which is the difference between "pay ₹1999" and "pay nothing".
+  final int walletCoins;
+  final double walletValueInr;
+
   SalonAccess({
     required this.salonName,
     required this.isLocked,
@@ -55,6 +61,8 @@ class SalonAccess {
     this.planName,
     this.adminName,
     this.adminPhone,
+    this.walletCoins = 0,
+    this.walletValueInr = 0,
   });
 
   /// A plan that ran out, as opposed to a salon that was never approved.
@@ -80,6 +88,11 @@ class SalonAccess {
       planName: subscription?['plan_name'],
       adminName: admin?['name'],
       adminPhone: admin?['phone'],
+      walletCoins: (json['wallet_coins'] as num?)?.toInt() ?? 0,
+      walletValueInr: (json['wallet_value_inr'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  /// True when there are coins worth showing off on the plan screen.
+  bool get hasCoins => walletCoins > 0 && walletValueInr > 0;
 }

@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Salon;
 use App\Models\SalonSubscription;
 use App\Models\SubscriptionPaymentRequest;
 use App\Models\SubscriptionPlan;
+use App\Services\AuditLogger;
 use App\Services\CommissionService;
+use App\Services\WalletService;
 use App\Support\BillingModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Plans, and which arrangement each salon trades under.
@@ -81,6 +85,13 @@ class SubscriptionPlanController extends Controller
 
         $plan = SubscriptionPlan::create($validated);
 
+        AuditLogger::record(
+            action: AuditLog::PLAN_CREATED,
+            entity: $plan,
+            label: $plan->name,
+            after: ['price' => (float) $plan->price, 'validity_days' => (int) $plan->validity_days],
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Plan created successfully',
@@ -104,7 +115,16 @@ class SubscriptionPlanController extends Controller
             ], 422);
         }
 
+        $before = $plan->only(array_keys($validated));
         $plan->update($validated);
+
+        AuditLogger::record(
+            action: AuditLog::PLAN_UPDATED,
+            entity: $plan,
+            label: $plan->name,
+            before: $before,
+            after: $plan->fresh()->only(array_keys($validated)),
+        );
 
         return response()->json([
             'success' => true,
@@ -130,6 +150,13 @@ class SubscriptionPlanController extends Controller
                 'message' => 'Cannot delete plan because active salons are subscribed to it.',
             ], 400);
         }
+
+        AuditLogger::record(
+            action: AuditLog::PLAN_DELETED,
+            entity: $plan,
+            label: $plan->name,
+            before: ['price' => (float) $plan->price, 'validity_days' => (int) $plan->validity_days],
+        );
 
         $plan->delete();
 
@@ -223,13 +250,86 @@ class SubscriptionPlanController extends Controller
             'status' => 'active',
         ]);
 
+        // The owner transferred the balance after coins, so the coins have to
+        // come out now that the plan exists. Done before the request is closed,
+        // while it still says how many were promised.
+        $coinsSpent = $this->redeemCoinsPromisedOn($salon, $plan, $subscription, $request->user());
+
+        AuditLogger::record(
+            action: AuditLog::SUBSCRIPTION_ASSIGNED,
+            entity: $salon,
+            label: $salon->name,
+            after: ['plan' => $plan->name, 'price' => (float) $plan->price],
+            metadata: ['coins_applied' => $coinsSpent],
+        );
+
         $this->closePendingRequests($salon->id);
 
         return response()->json([
             'success' => true,
-            'message' => "{$salon->name} is now on the {$plan->name} subscription plan.",
+            'message' => "{$salon->name} is now on the {$plan->name} subscription plan."
+                . ($coinsSpent > 0 ? " {$coinsSpent} coins were applied." : ''),
+            'coins_redeemed' => $coinsSpent,
             'subscription' => $subscription->load('plan'),
         ]);
+    }
+
+    /**
+     * Spend the coins the salon put against its pending request.
+     *
+     * The request only ever held the intent — this is where the coins actually
+     * leave the wallet. Recomputed against the balance as it stands rather than
+     * trusting the recorded figure, because a salon that spent coins elsewhere
+     * in the meantime must not be able to overdraw. A salon that no longer has
+     * them simply gets less off; it never fails the approval, because the
+     * subscription is already real and blocking it would leave a salon that has
+     * paid stuck offline.
+     */
+    private function redeemCoinsPromisedOn(
+        Salon $salon,
+        SubscriptionPlan $plan,
+        SalonSubscription $subscription,
+        $actor
+    ): int {
+        $pending = SubscriptionPaymentRequest::where('salon_id', $salon->id)
+            ->where('status', 'pending')
+            ->where('subscription_plan_id', $plan->id)
+            ->latest('created_at')
+            ->first();
+
+        $promised = (int) ($pending->coins_to_redeem ?? 0);
+
+        if ($promised < 1) {
+            return 0;
+        }
+
+        $wallet = app(WalletService::class);
+        $coins = min($promised, $wallet->quote($salon->id, (float) $plan->price)['coins']);
+
+        if ($coins < 1) {
+            return 0;
+        }
+
+        try {
+            $wallet->redeemForSubscription(
+                $salon->id,
+                $coins,
+                (float) $plan->price,
+                $actor,
+                $subscription,
+                "Applied to {$plan->name}"
+            );
+        } catch (\RuntimeException $e) {
+            Log::warning('Could not apply coins to an approved subscription', [
+                'salon_id' => $salon->id,
+                'promised' => $promised,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+
+        return $coins;
     }
 
     /**
@@ -240,6 +340,7 @@ class SubscriptionPlanController extends Controller
     public function setCommissionRate(Request $request, $salonId)
     {
         $salon = Salon::findOrFail($salonId);
+        $previousRate = $salon->commission_percentage;
 
         $request->validate([
             'commission_percentage' => 'required|numeric|min:0|max:100',
@@ -267,6 +368,20 @@ class SubscriptionPlanController extends Controller
                     ])->values(),
             ], 422);
         }
+
+        // What a salon is charged, changed by hand. If any single entry ever
+        // needs defending months later, it is this one.
+        AuditLogger::record(
+            action: AuditLog::COMMISSION_RATE_CHANGED,
+            entity: $salon,
+            label: $salon->name,
+            before: ['commission_percentage' => $previousRate === null ? null : (float) $previousRate],
+            after: ['commission_percentage' => (float) $request->commission_percentage],
+            metadata: [
+                'reason' => $request->input('reason'),
+                'effective_from' => Carbon::parse($rate->effective_from)->toDateString(),
+            ],
+        );
 
         return response()->json([
             'success' => true,

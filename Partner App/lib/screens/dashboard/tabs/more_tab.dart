@@ -6,6 +6,7 @@ import '../more/subscription_billing_screen.dart';
 import '../more/wallet_screen.dart';
 import '../more/salon_location_screen.dart';
 import '../more/salon_qr_screen.dart';
+import '../more/salon_reviews_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
@@ -135,6 +136,21 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // What customers said. High up the list on purpose — it is
+                  // the only page here that tells an owner how the business is
+                  // actually doing.
+                  _buildOptionTile(context,
+                    icon: Icons.star_outline_rounded,
+                    iconColor: const Color(0xFFF5A623),
+                    title: 'Customer Reviews',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SalonReviewsScreen(salonId: salonId)),
                       );
                     },
                   ),

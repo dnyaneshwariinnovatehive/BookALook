@@ -54,6 +54,16 @@ class Salon extends Model
         return $this->hasMany(SalonMedia::class)->orderBy('sort_order');
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function complaints()
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
     public function workingHours()
     {
         return $this->hasMany(SalonWorkingHour::class)->orderBy('day_of_week');

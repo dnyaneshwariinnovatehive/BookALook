@@ -12,6 +12,18 @@ class SubscriptionPaymentRequest extends Model
         'billing_type',
         'screenshot_url',
         'status',
+        // The coins the owner put towards this plan. Held as intent until
+        // SuperAdmin approves — a request that is never approved must not have
+        // cost the salon anything.
+        'coins_to_redeem',
+        'coin_discount_inr',
+        'amount_payable_inr',
+    ];
+
+    protected $casts = [
+        'coins_to_redeem' => 'integer',
+        'coin_discount_inr' => 'decimal:2',
+        'amount_payable_inr' => 'decimal:2',
     ];
 
     public function salon()

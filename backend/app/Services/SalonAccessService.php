@@ -114,7 +114,16 @@ class SalonAccessService
         $subscription = $status['subscription'];
         $admin = $salon->admin;
 
+        // What the salon can put towards a plan before paying anything. The
+        // lock screen is where an owner meets the price for the first time, so
+        // it is also where their free coins have to be visible — otherwise the
+        // bonus may as well not exist.
+        $wallet = app(WalletService::class);
+        $coins = (int) $wallet->walletFor($salon->id)->coin_balance;
+
         return [
+            'wallet_coins' => $coins,
+            'wallet_value_inr' => round($coins * $wallet->coinValue(), 2),
             'salon_id' => $salon->id,
             'salon_name' => $salon->name,
             'is_locked' => ! $status['is_active'],

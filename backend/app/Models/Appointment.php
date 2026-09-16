@@ -50,6 +50,16 @@ class Appointment extends Model
     }
 
     /** Set when an emergency closure released this booking. */
+    /**
+     * The customer's verdict on this visit, once they have given one. At most
+     * one — the reviews table holds a unique key on appointment_id, so a visit
+     * cannot be rated twice.
+     */
+    public function review()
+    {
+        return $this->hasOne(Review::class);
+    }
+
     public function salonClosure()
     {
         return $this->belongsTo(SalonClosure::class, 'salon_closure_id');

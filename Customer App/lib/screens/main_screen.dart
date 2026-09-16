@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/review_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/review_prompt_sheet.dart';
 import '../widgets/tab_navigator.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
@@ -28,10 +30,24 @@ class _MainScreenState extends State<MainScreen> {
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
+  /// Visits waiting to be rated, asked about one at a time.
+  ///
+  /// The prompt belongs here rather than on the home tab because it should
+  /// follow the customer into the app however they arrive — a deep link from a
+  /// QR code lands on a salon page, not on home.
+  bool _askedThisSession = false;
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+
+    // After the first frame: the shell has to exist before a sheet can sit on
+    // top of it.
+    if (!widget.isGuest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askForPendingReviews());
+    }
+
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
       ExploreTab(),
@@ -69,6 +85,29 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     SystemNavigator.pop();
+  }
+
+  /// Ask about unrated visits, one sheet at a time.
+  ///
+  /// Only ever once per launch, and it stops the moment someone dismisses one:
+  /// a customer with four unrated visits who skips the first is telling us
+  /// something, and stacking three more sheets on them would be the fastest way
+  /// to teach them to ignore the prompt forever.
+  Future<void> _askForPendingReviews() async {
+    if (_askedThisSession) return;
+    _askedThisSession = true;
+
+    final pending = await ReviewService.pending();
+    if (!mounted || pending.isEmpty) return;
+
+    for (final visit in pending) {
+      final submitted = await ReviewPromptSheet.show(
+        context,
+        Map<String, dynamic>.from(visit as Map),
+      );
+
+      if (!mounted || !submitted) break;
+    }
   }
 
   @override
