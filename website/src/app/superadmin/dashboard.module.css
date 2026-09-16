@@ -39,6 +39,12 @@
   box-shadow: var(--card-shadow);
 }
 
+.clickableCard {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
 .kpiHeader {
   display: flex;
   justify-content: space-between;
@@ -258,4 +264,309 @@
 .actionBtn:hover {
   background-color: var(--accent-soft);
   color: var(--accent-color);
+}
+
+/* --- Controls bar (date range + granularity + refresh) --- */
+
+.controlsBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+}
+
+.controlsGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.presetGroup {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.presetBtn {
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.presetBtn:hover {
+  color: var(--accent-color);
+}
+
+.presetBtnActive {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.presetBtnActive:hover {
+  color: #fff;
+}
+
+.dateInputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dateField {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dateLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-body);
+  opacity: 0.8;
+}
+
+.dateInput {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-body);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dateInput:focus {
+  border-color: var(--accent-color);
+}
+
+.dateSep {
+  color: var(--text-body);
+  opacity: 0.5;
+  font-size: 0.9rem;
+}
+
+.tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+.tr:hover {
+  background-color: var(--bg-color);
+}
+
+.granularityToggle {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.granularityBtn {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.granularityBtn:hover {
+  color: var(--accent-color);
+}
+
+.granularityBtnActive {
+  background: var(--surface-color);
+  color: var(--accent-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.refreshBtn {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refreshBtn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.refreshBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.updatedAt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--text-body);
+  opacity: 0.8;
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.35rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.updatedAt:hover {
+  background: var(--bg-color);
+  opacity: 1;
+}
+
+.updatedAt:hover .autoLabel {
+  color: var(--accent-color);
+}
+
+.autoLabel {
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.autoTime {
+  font-weight: 400;
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.liveDotActive {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* --- Trend card & chart header --- */
+
+.fullWidthCard {
+  margin-bottom: 1.5rem;
+}
+
+.chartHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.chartHeaderRow .cardTitle {
+  margin-bottom: 0;
+}
+
+.chartSubtext {
+  font-size: 0.8rem;
+  color: var(--text-body);
+  opacity: 0.7;
+  margin-top: 0.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.chartLegend {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-body);
+  padding-top: 0.25rem;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chartLoading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-body);
+  opacity: 0.7;
+}
+
+/* --- Tables extras --- */
+
+.trendSub {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-body);
+  opacity: 0.7;
+  margin-left: 0.25rem;
+}
+
+.rankBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: var(--bg-color);
+  color: var(--text-body);
 }

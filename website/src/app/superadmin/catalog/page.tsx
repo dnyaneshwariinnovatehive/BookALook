@@ -324,7 +324,12 @@ export default function CatalogPage() {
                   )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className={styles.categoryName}>{cat.name}</span>
+                  <span className={styles.categoryName}>
+                    {cat.name} 
+                    <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500, marginLeft: '8px' }}>
+                      ({cat.templates?.length || 0})
+                    </span>
+                  </span>
                   <div style={{ display: 'flex', gap: '8px', marginTop: '4px', alignItems: 'center' }}>
                     <span className={`${styles.badge} ${cat.is_custom ? styles.badgeCustom : styles.badgeStandard}`}>
                       {cat.is_custom ? 'Custom' : 'Standard'}
@@ -334,7 +339,7 @@ export default function CatalogPage() {
                     )}
                   </div>
                 </div>
-                {cat.is_custom && (
+                {!!cat.is_custom && (
                   <button className={styles.promoteBtn} onClick={(e) => handlePromoteCategory(cat.id, e)}>
                     Promote
                   </button>
@@ -374,7 +379,7 @@ export default function CatalogPage() {
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {tpl.is_custom && (
+                        {!!tpl.is_custom && (
                           <button className={styles.promoteBtn} onClick={() => handlePromoteTemplate(tpl.id)}>
                             Promote
                           </button>

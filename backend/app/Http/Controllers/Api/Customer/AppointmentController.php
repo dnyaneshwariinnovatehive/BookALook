@@ -785,7 +785,7 @@ class AppointmentController extends Controller
             ]);
 
             // Copy the snapshotted service lines onto the new appointment.
-            foreach ($appointment->services as $line) {
+            foreach ($appointment->services->where('line_status', '!=', 'cancelled') as $line) {
                 $copy = $line->replicate(['id', 'appointment_id', 'created_at', 'updated_at']);
                 $copy->appointment_id = $replacement->id;
                 $copy->serving_provider_id = null; // set again at QR scan time

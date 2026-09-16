@@ -143,10 +143,13 @@ class WalkInService
         ?Carbon $startAt,
         string $actorId
     ): Appointment {
-        $services = Service::with('template')
+        $uniqueServices = Service::with('template')
             ->where('salon_id', $salonId)
             ->whereIn('id', $serviceIds)
-            ->get();
+            ->get()
+            ->keyBy('id');
+
+        $services = collect($serviceIds)->map(fn ($id) => $uniqueServices[$id]);
 
         $summary = $this->summarise($services);
 

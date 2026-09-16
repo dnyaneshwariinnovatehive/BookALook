@@ -47,7 +47,7 @@ class PlatformReportController extends Controller
             ->mapWithKeys(fn ($r) => [(string) $r->rating => (int) $r->count])
             ->all();
 
-        $topSalons = $this->topSalons(5);
+        $topSalons = $this->topSalons(null, null, 5);
 
         $cityBreakdown = $this->cityBreakdown(null, null, 5);
 
@@ -73,6 +73,60 @@ class PlatformReportController extends Controller
             'cities' => $cityBreakdown,
             'top_services' => $topServices,
             'revenue' => $this->revenueSummary(),
+        ]);
+    }
+
+    /**
+     * Live dashboard feed.
+     *
+     * Everything the super-admin home screen needs in one response so the page
+     * renders from a single round-trip: headline KPIs (as-of today), the
+     * revenue trend bucketed to a granularity the caller chooses, and the top
+     * salons / services widgets. All of it is scoped to the same date window,
+     * so the number in the KPI card and the number under the curve always
+     * agree.
+     */
+    public function dashboard(Request $request)
+    {
+        $now = Carbon::now();
+
+        $from = $this->from($request) ?? $now->copy()->subDays(29)->startOfDay();
+        $to = $this->to($request) ?? $now->copy()->endOfDay();
+
+        $granularity = $request->input('granularity', 'daily');
+        if (!in_array($granularity, ['daily', 'weekly', 'monthly'], true)) {
+            $granularity = 'daily';
+        }
+
+        // Today vs yesterday so the KPI cards can show whether we are up or down.
+        $today = $now->copy()->startOfDay();
+        $yesterday = $now->copy()->subDay()->startOfDay();
+
+        return response()->json([
+            'success' => true,
+            'generated_at' => $now->toIso8601String(),
+            'range' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'granularity' => $granularity,
+            ],
+            'kpis' => [
+                'active_bookings' => [
+                    'today' => $this->activeBookings($today, $today),
+                    'yesterday' => $this->activeBookings($yesterday, $yesterday),
+                ],
+                'revenue' => [
+                    'today' => $this->completedRevenue($today, $today),
+                    'yesterday' => $this->completedRevenue($yesterday, $yesterday),
+                ],
+                'pending_approvals' => $this->pendingSalonsCount(),
+                'active_salons' => $this->activeSalonsCount(),
+            ],
+            'bookings' => $this->appointmentCountsScoped($from, $to),
+            'revenue_trend' => $this->revenueTrend($from, $to, $granularity),
+            'top_salons' => $this->topSalons($from, $to, 5),
+            'top_services' => $this->topServices($from, $to, 5),
+            'cities' => $this->cityBreakdown($from, $to, 5),
         ]);
     }
 
@@ -250,16 +304,23 @@ class PlatformReportController extends Controller
         return $totals;
     }
 
-    private function topSalons(int $limit): array
+    private function topSalons(?Carbon $from, ?Carbon $to, int $limit): array
     {
-        $rows = DB::table('appointments')
+        $query = DB::table('appointments')
             ->join('salons', 'salons.id', '=', 'appointments.salon_id')
-            ->where('appointments.status', 'completed')
-            ->selectRaw(
-                'salons.id, salons.name, cities.name as city, count(*) as bookings,
-                 round(sum(appointments.final_billed_amount), 2) as revenue'
-            )
             ->leftJoin('cities', 'cities.id', '=', 'salons.city_id')
+            ->where('appointments.status', 'completed');
+        if ($from) {
+            $query->whereDate('appointments.appointment_date', '>=', $from->toDateString());
+        }
+        if ($to) {
+            $query->whereDate('appointments.appointment_date', '<=', $to->toDateString());
+        }
+
+        $rows = $query->selectRaw(
+            'salons.id, salons.name, cities.name as city, count(*) as bookings,
+             round(sum(appointments.final_billed_amount), 2) as revenue'
+        )
             ->groupBy('salons.id', 'salons.name', 'cities.name')
             ->orderByDesc('revenue')
             ->limit($limit)
@@ -354,6 +415,152 @@ class PlatformReportController extends Controller
         }
 
         return $result;
+    }
+
+    private function pendingSalonsCount(): int
+    {
+        return (int) DB::table('salons')->where('status', 'pending_approval')->count();
+    }
+
+    private function activeSalonsCount(): int
+    {
+        return (int) DB::table('salons')->where('status', 'active')->count();
+    }
+
+    /**
+     * Bookings still live on the date(s) in question — not yet completed,
+     * cancelled or marked no-show. This is what "active bookings today"
+     * means on the dashboard.
+     */
+    private function activeBookings(Carbon $from, Carbon $to): int
+    {
+        return (int) DB::table('appointments')
+            ->whereDate('appointment_date', '>=', $from->toDateString())
+            ->whereDate('appointment_date', '<=', $to->toDateString())
+            ->whereNotIn('status', ['cancelled', 'no_show', 'completed'])
+            ->count();
+    }
+
+    /**
+     * Billed value recognised on the date(s) in question: completed
+     * appointments for that day. Lines up with the revenue trend curve.
+     */
+    private function completedRevenue(Carbon $from, Carbon $to): float
+    {
+        return round((float) DB::table('appointments')
+            ->where('status', 'completed')
+            ->whereDate('appointment_date', '>=', $from->toDateString())
+            ->whereDate('appointment_date', '<=', $to->toDateString())
+            ->sum('final_billed_amount'), 2);
+    }
+
+    /**
+     * Status mix inside a window so the donut and the trend always describe
+     * the same period.
+     */
+    private function appointmentCountsScoped(Carbon $from, Carbon $to): array
+    {
+        $row = DB::table('appointments')
+            ->whereDate('appointment_date', '>=', $from->toDateString())
+            ->whereDate('appointment_date', '<=', $to->toDateString())
+            ->selectRaw(
+                'count(*) as total,
+                 sum(case when status = "completed" then 1 else 0 end) as completed,
+                 sum(case when status = "cancelled" then 1 else 0 end) as cancelled,
+                 sum(case when status = "no_show" then 1 else 0 end) as no_show,
+                 sum(case when status in ("scheduled", "in_progress", "pending_payment") then 1 else 0 end) as active,
+                 sum(case when status = "scheduled" then 1 else 0 end) as scheduled,
+                 sum(case when booking_source = "online" then 1 else 0 end) as online,
+                 sum(case when booking_source = "walk_in" then 1 else 0 end) as walk_in'
+            )
+            ->first();
+
+        return [
+            'total' => (int) $row->total,
+            'completed' => (int) $row->completed,
+            'cancelled' => (int) $row->cancelled,
+            'no_show' => (int) $row->no_show,
+            'active' => (int) $row->active,
+            'scheduled' => (int) $row->scheduled,
+            'online' => (int) $row->online,
+            'walk_in' => (int) $row->walk_in,
+        ];
+    }
+
+    /**
+     * Revenue (and bookings) bucketed by the requested granularity, with every
+     * bucket in the window present even when it is empty so the line chart has
+     * no gaps.
+     */
+    private function revenueTrend(Carbon $from, Carbon $to, string $granularity): array
+    {
+        // Aggregate by day in SQL (portable across SQLite and MySQL), then
+        // rebucket into weeks or months in PHP so the chart needs no special
+        // vendor date functions.
+        $days = DB::table('appointments')
+            ->where('status', 'completed')
+            ->whereDate('appointment_date', '>=', $from->toDateString())
+            ->whereDate('appointment_date', '<=', $to->toDateString())
+            ->selectRaw(
+                'appointment_date, count(*) as bookings,
+                 round(coalesce(sum(final_billed_amount), 0), 2) as revenue'
+            )
+            ->groupBy('appointment_date')
+            ->get();
+
+        $buckets = [];
+        foreach ($days as $d) {
+            $key = match ($granularity) {
+                'weekly' => Carbon::parse($d->appointment_date)->startOfWeek()->toDateString(),
+                'monthly' => Carbon::parse($d->appointment_date)->format('Y-m-01'),
+                default => $d->appointment_date,
+            };
+            $buckets[$key]['bookings'] = ($buckets[$key]['bookings'] ?? 0) + (int) $d->bookings;
+            $buckets[$key]['revenue'] = ($buckets[$key]['revenue'] ?? 0) + (float) $d->revenue;
+        }
+
+        $trend = [];
+
+        if ($granularity === 'weekly') {
+            $cursor = $from->copy()->startOfWeek();
+            while ($cursor->lte($to)) {
+                $key = $cursor->toDateString();
+                $trend[] = [
+                    'date' => $key,
+                    'label' => $cursor->format('d M') . ' – ' . $cursor->copy()->addDays(6)->format('d M'),
+                    'bookings' => round($buckets[$key]['bookings'] ?? 0),
+                    'revenue' => round($buckets[$key]['revenue'] ?? 0, 2),
+                ];
+                $cursor->addWeek();
+            }
+        } elseif ($granularity === 'monthly') {
+            $cursor = $from->copy()->startOfMonth();
+            $end = $to->copy()->endOfMonth();
+            while ($cursor->lte($end)) {
+                $key = $cursor->format('Y-m-01');
+                $trend[] = [
+                    'date' => $key,
+                    'label' => $cursor->format('M Y'),
+                    'bookings' => round($buckets[$key]['bookings'] ?? 0),
+                    'revenue' => round($buckets[$key]['revenue'] ?? 0, 2),
+                ];
+                $cursor->addMonth();
+            }
+        } else {
+            $cursor = $from->copy()->startOfDay();
+            while ($cursor->lte($to)) {
+                $key = $cursor->toDateString();
+                $trend[] = [
+                    'date' => $key,
+                    'label' => $cursor->format('d M'),
+                    'bookings' => round($buckets[$key]['bookings'] ?? 0),
+                    'revenue' => round($buckets[$key]['revenue'] ?? 0, 2),
+                ];
+                $cursor->addDay();
+            }
+        }
+
+        return $trend;
     }
 
     private function from(Request $request): ?Carbon

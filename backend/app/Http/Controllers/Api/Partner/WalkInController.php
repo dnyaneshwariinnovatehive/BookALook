@@ -79,23 +79,36 @@ class WalkInController extends Controller
             ], 422);
         }
 
-        if (! ServiceProvider::where('id', $providerId)
+        $provider = ServiceProvider::with('services:id')
+            ->where('id', $providerId)
             ->where('salon_id', $salonId)
             ->where('is_active', true)
-            ->exists()) {
+            ->first();
+
+        if (! $provider) {
             return response()->json(['message' => 'That staff member does not work at this salon.'], 422);
         }
 
         // Every service has to belong to this salon — an id from another salon
         // would otherwise be priced onto this salon's bill.
-        $services = \App\Models\Service::with('template')
+        $uniqueServices = \App\Models\Service::with('template')
             ->where('salon_id', $salonId)
             ->whereIn('id', $request->services)
-            ->get();
+            ->get()
+            ->keyBy('id');
 
-        if ($services->count() !== count(array_unique($request->services))) {
+        if ($uniqueServices->count() !== count(array_unique($request->services))) {
             return response()->json(['message' => 'One or more services are not offered by this salon.'], 422);
         }
+
+        $providerServiceIds = $provider->services->pluck('id')->toArray();
+        $missingServices = array_diff(array_unique($request->services), $providerServiceIds);
+
+        if (!empty($missingServices)) {
+            return response()->json(['message' => 'That staff member cannot perform all the selected services.'], 422);
+        }
+
+        $services = collect($request->services)->map(fn ($id) => $uniqueServices[$id]);
 
         $startAt = $request->filled('start_time') ? Carbon::parse($request->start_time) : null;
 
@@ -162,10 +175,17 @@ class WalkInController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $services = \App\Models\Service::with('template')
+        $uniqueServices = \App\Models\Service::with('template')
             ->where('salon_id', $salonId)
             ->whereIn('id', $request->services)
-            ->get();
+            ->get()
+            ->keyBy('id');
+
+        if ($uniqueServices->count() !== count(array_unique($request->services))) {
+            return response()->json(['message' => 'One or more services are not offered by this salon.'], 422);
+        }
+
+        $services = collect($request->services)->map(fn ($id) => $uniqueServices[$id]);
 
         $summary = $this->walkIns->summarise($services);
         $start = $request->filled('start_time') ? Carbon::parse($request->start_time) : now();
