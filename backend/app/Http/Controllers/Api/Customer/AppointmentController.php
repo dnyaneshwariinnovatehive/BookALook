@@ -860,6 +860,9 @@ class AppointmentController extends Controller
             'services.combo:id,name,will_refund_advance_if_cancelled',
             'appointedProvider.user:id,name',
             'salonClosure:id,closed_date,reason',
+            // Every card asks whether it has been rated; without this the list
+            // would run one query per booking to find out.
+            'review',
             // Extras added in the chair — itemised for the customer, never
             // folded into the booked lines.
             'serviceAdditions.service.template:id,name,estimated_duration_minutes',
@@ -954,6 +957,36 @@ class AppointmentController extends Controller
             'forfeited_advance' => $refund['forfeited'],
             'can_generate_qr' => in_array($appointment->status, BookingPolicyService::ACTIVE_STATUSES, true)
                 && $date === now()->format('Y-m-d'),
+        ] + $this->reviewState($appointment);
+    }
+
+    /**
+     * Whether this visit can still be rated, and what was said if it already
+     * was.
+     *
+     * Decided here rather than in the app so the button on a booking card and
+     * the prompt that appears on opening can never disagree — both read the
+     * same rule out of ReviewService.
+     *
+     * @return array<string, mixed>
+     */
+    private function reviewState(Appointment $appointment): array
+    {
+        $reviews = app(\App\Services\ReviewService::class);
+        $existing = $appointment->review;
+        $can = $reviews->reviewability($appointment);
+
+        return [
+            'can_review' => $can['allowed'],
+            // Only worth showing when it explains a missing button — "already
+            // reviewed" has its own display, and a visit that was never
+            // eligible does not need an excuse.
+            'review_blocked_reason' => $can['allowed'] || $existing ? null : $can['reason'],
+            'review' => $existing ? [
+                'rating' => $existing->rating,
+                'comment' => $existing->comment,
+                'age_label' => $reviews->ageLabel($existing->created_at),
+            ] : null,
         ];
     }
 

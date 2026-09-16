@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../widgets/rating_bars.dart';
+import '../widgets/review_prompt_sheet.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
 
@@ -541,9 +543,111 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
               ),
             ),
           ],
+
+          // Past visits had no actions at all until now. Rating belongs here as
+          // well as on the prompt that appears at launch — someone who dismissed
+          // that prompt, or who decides a week later that they want to say
+          // something, needs somewhere to go and this is where they look.
+          if (!isUpcoming) ..._buildReviewSection(booking),
         ],
       ),
     );
+  }
+
+  /// The rate button, the rating already given, or nothing.
+  ///
+  /// The server decides which — `can_review` comes from the same rule that
+  /// drives the launch prompt, so the two can never disagree about whether a
+  /// visit is still open for rating.
+  List<Widget> _buildReviewSection(Map<String, dynamic> booking) {
+    final review = booking['review'] as Map<String, dynamic>?;
+    final canReview = booking['can_review'] == true;
+    final blockedReason = booking['review_blocked_reason']?.toString();
+
+    if (review != null) {
+      return [
+        SizedBox(height: 14),
+        Divider(color: AppTheme.lightBorder, height: 1),
+        SizedBox(height: 12),
+        _buildGivenRating(review),
+      ];
+    }
+
+    if (canReview) {
+      return [
+        SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _rateVisit(booking),
+            icon: Icon(Icons.star_rounded, size: 19),
+            label: Text('Rate your visit'),
+          ),
+        ),
+      ];
+    }
+
+    // Only when there is something worth explaining — a cancelled booking does
+    // not need to be told it cannot be rated.
+    if (blockedReason != null && booking['status'] == 'completed') {
+      return [
+        SizedBox(height: 12),
+        Text(blockedReason,
+            style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+      ];
+    }
+
+    return const [];
+  }
+
+  Widget _buildGivenRating(Map<String, dynamic> review) {
+    final rating = (review['rating'] as num?)?.toInt() ?? 0;
+    final comment = review['comment']?.toString() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('You rated this visit',
+                style: GoogleFonts.outfit(
+                    fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.lightTextBody)),
+            SizedBox(width: 8),
+            StarRow(rating: rating.toDouble(), size: 15),
+            Spacer(),
+            Text(review['age_label']?.toString() ?? '',
+                style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextLight)),
+          ],
+        ),
+        if (comment.isNotEmpty) ...[
+          SizedBox(height: 6),
+          Text('“$comment”',
+              style: GoogleFonts.outfit(
+                  fontSize: 13, height: 1.4, color: AppTheme.lightTextBody)),
+        ],
+      ],
+    );
+  }
+
+  /// Opens the same sheet the launch prompt uses, so there is one rating
+  /// experience rather than two that drift apart.
+  Future<void> _rateVisit(Map<String, dynamic> booking) async {
+    final visitedOn = DateTime.tryParse(booking['appointment_date']?.toString() ?? '');
+
+    final submitted = await ReviewPromptSheet.show(context, {
+      'appointment_id': booking['id'],
+      'salon_name': booking['salon']?['name'],
+      'provider_name': booking['provider_name'],
+      'appointment_date': booking['appointment_date'],
+      // The sheet shows this under the salon name. From here the exact date is
+      // more use than "3 weeks ago" — the customer is looking at a dated card.
+      'visited_label': visitedOn == null
+          ? ''
+          : 'On ${DateFormat('d MMM yyyy').format(visitedOn)}',
+    });
+
+    // Reload so the card swaps the button for the rating that was just given.
+    if (submitted && mounted) await _loadBookings();
   }
 
   Widget _iconLine(IconData icon, String text) => Row(

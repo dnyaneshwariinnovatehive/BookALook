@@ -138,6 +138,6 @@ class AuditLog extends Model
     /** The thing acted on, as it was named at the time. */
     public function subjectLabel(): ?string
     {
-        return $this->metadata['entity_label'] ?? null;
+        return ($this->metadata ?? [])['entity_label'] ?? null;
     }
 }

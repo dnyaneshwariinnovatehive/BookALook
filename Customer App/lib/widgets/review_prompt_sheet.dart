@@ -206,7 +206,10 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
         Text(
           [
             if (provider != null && provider.isNotEmpty) 'With $provider',
-            if (visited.isNotEmpty) visited.toLowerCase(),
+            // Left as the caller wrote it. Lowercasing turned "On 14 Sep 2026"
+            // into "on 14 sep 2026" once this sheet started being opened from a
+            // dated booking card as well as from the launch prompt.
+            if (visited.isNotEmpty) visited,
           ].join(' · '),
           textAlign: TextAlign.center,
           style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),

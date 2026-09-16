@@ -163,7 +163,7 @@ class AuditLogController extends Controller
             // The reason someone typed at the time is the single most useful
             // thing in the row; it is lifted out of metadata so the list can
             // show it without the reader opening anything.
-            'reason' => $entry->metadata['reason'] ?? null,
+            'reason' => ($entry->metadata ?? [])['reason'] ?? null,
             'metadata' => $this->readableMetadata($entry),
 
             'ip_address' => $entry->ip_address,

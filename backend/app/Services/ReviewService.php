@@ -23,12 +23,12 @@ use Illuminate\Support\Collection;
 class ReviewService
 {
     /**
-     * How long after a visit a customer can still rate it.
+     * How far back the app will *ask* about an unrated visit.
      *
-     * Long enough that someone who was busy for a fortnight can still speak,
-     * short enough that the app is not still nagging about a haircut from three
-     * months ago — and short enough that ratings describe the salon as it is
-     * now rather than as it was.
+     * This bounds the prompt, not the right to review. Being nagged on opening
+     * about a haircut from three months ago is irritating; being refused when
+     * you go looking for that same haircut to review it is worse. So the
+     * unprompted route stays open forever and only the interruption expires.
      */
     public const REVIEW_WINDOW_DAYS = 30;
 
@@ -70,9 +70,11 @@ class ReviewService
     /**
      * Visits this customer has had but not yet rated.
      *
-     * Drives the prompt the app shows on opening. Ordered oldest first so a
+     * Drives the prompt the app shows on opening, so it is bounded by
+     * REVIEW_WINDOW_DAYS — anything older is still reviewable from the Past
+     * list, it just stops interrupting people. Ordered oldest first so a
      * customer with a backlog is asked about the visit they are least likely to
-     * remember before it falls out of the window entirely.
+     * remember before it falls out of the prompt entirely.
      *
      * @return Collection<int, Appointment>
      */
@@ -103,15 +105,11 @@ class ReviewService
             return ['allowed' => false, 'reason' => 'You have already reviewed this visit.'];
         }
 
-        $closesOn = Carbon::parse($appointment->appointment_date)->addDays(self::REVIEW_WINDOW_DAYS);
-
-        if (Carbon::today()->greaterThan($closesOn)) {
-            return [
-                'allowed' => false,
-                'reason' => 'This visit is too long ago to review.',
-            ];
-        }
-
+        // Deliberately no age limit. A finished visit that has never been rated
+        // can be rated whenever the customer gets round to it — the Past list
+        // is exactly where someone goes to do that, and offering the history
+        // but refusing to let them speak about most of it is a dead end.
+        // REVIEW_WINDOW_DAYS still bounds the prompt in awaitingReview().
         return ['allowed' => true, 'reason' => null];
     }
 
