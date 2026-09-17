@@ -167,6 +167,11 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/appointments/verify-qr', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'verifyQrAndStartSession']);
         Route::post('/appointments/{id}/add-service', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'addServiceMidAppointment']);
 
+        // Customer intelligence. Read-only: the owner sees the whole base, its
+        // value and its booking behaviour without touching the records.
+        Route::get('/customers', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCustomerController::class, 'index']);
+        Route::get('/customers/{id}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCustomerController::class, 'show']);
+
         // Complaints, and the two things that can be done about one.
         Route::get('/complaints', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'index']);
         Route::get('/complaints/{id}', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'show']);

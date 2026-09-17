@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../notifications_screen.dart';
+import '../../../services/notification_service.dart';
 import '../../qr_scanner_screen.dart';
 import '../../../services/appointment_service.dart';
 import '../../../services/staff_api.dart';
@@ -44,18 +46,39 @@ class _HomeTabState extends State<HomeTab> {
   Map<String, int> _providerLoads = {};
   bool _needsWorkingHours = false;
 
+  int _unreadNotifications = 0;
+
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchHomeData();
+    _refreshUnreadCount();
     // Poll every 60 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) {
         _fetchHomeData(silent: true);
+        _refreshUnreadCount();
       }
     });
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    try {
+      final count = await PartnerNotificationService.unreadCount();
+      if (mounted && count != _unreadNotifications) {
+        setState(() => _unreadNotifications = count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
+    if (mounted) _refreshUnreadCount();
   }
 
   @override
@@ -287,11 +310,45 @@ class _HomeTabState extends State<HomeTab> {
               )
             ]
           ),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.black87),
-            onPressed: () {
-              // TODO: Implement notifications sheet/screen
-            },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _unreadNotifications > 0
+                      ? Icons.notifications_active_outlined
+                      : Icons.notifications_none,
+                  color: Colors.black87,
+                  size: 26,
+                ),
+                onPressed: _openNotifications,
+              ),
+              if (_unreadNotifications > 0)
+                Positioned(
+                  right: 4,
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDC2626),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      _unreadNotifications > 99 ? '99+' : '$_unreadNotifications',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         )
       ],

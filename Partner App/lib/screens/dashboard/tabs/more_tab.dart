@@ -10,6 +10,7 @@ import '../more/salon_reviews_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../notifications_screen.dart';
 
 class MoreTab extends StatelessWidget {
   final String salonId;
@@ -122,6 +123,20 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // SuperAdmin's warnings and suspensions are the messages an
+                  // owner most needs to see, so the inbox sits at the top.
+                  _buildOptionTile(context,
+                    icon: Icons.notifications_outlined,
+                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning),
+                    title: 'Notifications',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
                       );
                     },
                   ),
