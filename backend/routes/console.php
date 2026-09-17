@@ -21,3 +21,7 @@ Schedule::command('app:release-payment-holds')->everyMinute()->withoutOverlappin
 // decides what is due: the weekly run every day, the monthly commission run
 // only on the 1st. Nothing here moves money — it prepares the figures.
 Schedule::command('app:generate-payouts')->dailyAt('04:00')->withoutOverlapping();
+
+// Shortly after midnight, transition any untouched appointments from the previous
+// day into a no-show state.
+Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();

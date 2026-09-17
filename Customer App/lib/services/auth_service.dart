@@ -59,7 +59,15 @@ class AuthService {
   }
 
   /// Complete profile for new user
-  Future<bool> completeProfile(String phone, String name, String gender, String? dob, String? address) async {
+  Future<bool> completeProfile(
+    String phone,
+    String name,
+    String gender,
+    String? dob,
+    String? address, {
+    String? cityId,
+    String? subAreaId,
+  }) async {
     try {
       final body = {
         'phone': phone,
@@ -69,10 +77,12 @@ class AuthService {
       if (dob != null && dob.isNotEmpty) body['date_of_birth'] = dob;
       if (address != null && address.isNotEmpty) body['address'] = address;
 
-      // Carry over the city they were already browsing, so signing up does not
-      // throw away a choice they made as a guest.
-      final city = LocationService.instance.city?.id;
+      // What they picked on the form wins. Falling back to the city they were
+      // already browsing means signing up does not throw away a choice they
+      // made as a guest.
+      final city = cityId ?? LocationService.instance.city?.id;
       if (city != null && city.isNotEmpty) body['city_id'] = city;
+      if (subAreaId != null && subAreaId.isNotEmpty) body['sub_area_id'] = subAreaId;
 
       final response = await http.post(
         Uri.parse('$baseUrl/complete-profile'),

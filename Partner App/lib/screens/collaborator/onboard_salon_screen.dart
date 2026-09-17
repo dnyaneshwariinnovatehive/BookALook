@@ -11,6 +11,7 @@ import '../../services/collaborator_api.dart';
 import '../../services/onboarding_draft_store.dart';
 import '../../services/salon_location_api.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/sub_area_dropdown.dart';
 import 'service_picker_sheet.dart';
 
 /// Building a salon on behalf of an owner, on site.
@@ -526,6 +527,9 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
                   _selectedState = value;
                   _draft!.cityId = null;
                   _draft!.cityLabel = '';
+                  // The old area belonged to the old city.
+                  _draft!.subAreaId = null;
+                  _draft!.subAreaLabel = '';
                 });
                 _persist();
               },
@@ -547,11 +551,25 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
                   _draft!.cityLabel = _citiesInState
                       .firstWhere((c) => c['id'].toString() == value)['name']
                       .toString();
+                  _draft!.subAreaId = null;
+                  _draft!.subAreaLabel = '';
                 });
                 _persist();
               },
             ),
           const SizedBox(height: 14),
+          _label('Area', required: true),
+          SubAreaDropdown(
+            cityId: _draft!.cityId,
+            value: _draft!.subAreaId,
+            showError: _showErrorsOn(1) && _missingHere.contains('Area'),
+            onChanged: (value) {
+              setState(() => _draft!.subAreaId = value);
+              _persist();
+            },
+          ),
+          const SizedBox(height: 14),
+
           _label('Pincode', required: true),
           _field(_pincode, '6 digits', Icons.pin_drop_outlined,
               keyboard: TextInputType.number, requiredAs: 'Pincode'),

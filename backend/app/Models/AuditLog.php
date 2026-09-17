@@ -80,6 +80,7 @@ class AuditLog extends Model
 
     // Platform settings — rules everybody is bound by.
     public const POLICY_UPDATED = 'policy.updated';
+    public const SUB_AREAS_IMPORTED = 'sub_area.imported';
 
     // People.
     public const COLLABORATOR_CREATED = 'collaborator.created';
@@ -113,6 +114,8 @@ class AuditLog extends Model
         self::PAYOUT_DISTRIBUTED => ['label' => 'Distributed a payout', 'category' => 'Money', 'severity' => 'critical'],
 
         self::POLICY_UPDATED => ['label' => 'Changed platform policy', 'category' => 'Settings', 'severity' => 'critical'],
+        // A bulk write to the list every address on the platform points at.
+        self::SUB_AREAS_IMPORTED => ['label' => 'Imported areas from a file', 'category' => 'Settings', 'severity' => 'high'],
 
         self::COLLABORATOR_CREATED => ['label' => 'Added a collaborator', 'category' => 'People', 'severity' => 'normal'],
     ];

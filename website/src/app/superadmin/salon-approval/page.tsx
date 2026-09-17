@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 
@@ -22,11 +22,147 @@ interface Enquiry {
   created_at: string;
   assigned_collaborator_id?: string;
   assigned_collaborator?: { name: string };
+  city_id?: string | null;
+  sub_area_id?: string | null;
+  city_name?: string | null;
+  sub_area_name?: string | null;
+  location_label?: string | null;
 }
 
 interface Collaborator {
   id: string;
   name: string;
+  city_id?: string | null;
+  sub_area_id?: string | null;
+  city_name?: string | null;
+  sub_area_name?: string | null;
+  location_label?: string | null;
+  has_location?: boolean;
+}
+
+/**
+ * How close a collaborator is to an enquiry.
+ *
+ * Whoever already works in the same locality is almost always the right answer,
+ * so they are lifted to the top of the list and labelled rather than left for
+ * SuperAdmin to spot by reading twenty names.
+ */
+type Proximity = 'same-area' | 'same-city' | 'elsewhere' | 'unknown';
+
+function proximityOf(collaborator: Collaborator, enquiry: Enquiry): Proximity {
+  if (!collaborator.city_id) return 'unknown';
+  if (!enquiry.city_id) return 'unknown';
+  if (collaborator.city_id !== enquiry.city_id) return 'elsewhere';
+  if (
+    enquiry.sub_area_id &&
+    collaborator.sub_area_id &&
+    collaborator.sub_area_id === enquiry.sub_area_id
+  ) {
+    return 'same-area';
+  }
+  return 'same-city';
+}
+
+const PROXIMITY_RANK: Record<Proximity, number> = {
+  'same-area': 0,
+  'same-city': 1,
+  elsewhere: 2,
+  unknown: 3,
+};
+
+const PROXIMITY_LABEL: Record<Proximity, string> = {
+  'same-area': 'Same area',
+  'same-city': 'Same city',
+  elsewhere: '',
+  unknown: 'No area set',
+};
+
+/**
+ * Picks who goes to this enquiry, with the local people first.
+ *
+ * Grouped rather than merely sorted: a flat list still asks SuperAdmin to work
+ * out which names are nearby. Optgroup headings say it outright, and the
+ * best match is preselected so the common case is one click.
+ */
+function CollaboratorPicker({
+  enquiry,
+  collaborators,
+  value,
+  onChange,
+}: {
+  enquiry: Enquiry;
+  collaborators: Collaborator[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const ranked = useMemo(() => rankFor(enquiry, collaborators), [enquiry, collaborators]);
+
+  const groups: { key: Proximity; heading: string }[] = [
+    { key: 'same-area', heading: `In ${enquiry.sub_area_name ?? 'the same area'}` },
+    { key: 'same-city', heading: `Elsewhere in ${enquiry.city_name ?? 'this city'}` },
+    { key: 'elsewhere', heading: 'Other cities' },
+    { key: 'unknown', heading: 'No area set' },
+  ];
+
+  const best = ranked[0];
+  const hasLocalMatch = best && (best.proximity === 'same-area' || best.proximity === 'same-city');
+
+  return (
+    <div className={styles.pickerWrap}>
+      <select
+        className={`${styles.picker} ${hasLocalMatch && !value ? styles.pickerSuggested : ''}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Select collaborator</option>
+        {groups.map(({ key, heading }) => {
+          const inGroup = ranked.filter((r) => r.proximity === key);
+          if (inGroup.length === 0) return null;
+
+          return (
+            <optgroup key={key} label={heading}>
+              {inGroup.map(({ collaborator }) => (
+                <option key={collaborator.id} value={collaborator.id}>
+                  {collaborator.name}
+                  {collaborator.location_label ? ` — ${collaborator.location_label}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          );
+        })}
+      </select>
+
+      {hasLocalMatch && !value && (
+        <button
+          type="button"
+          className={styles.suggestion}
+          onClick={() => onChange(best.collaborator.id)}
+          title={`${best.collaborator.name} works in ${best.collaborator.location_label}`}
+        >
+          <span
+            className={
+              best.proximity === 'same-area' ? styles.matchStrong : styles.matchWeak
+            }
+          >
+            {PROXIMITY_LABEL[best.proximity]}
+          </span>
+          {best.collaborator.name}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Nearest first, then alphabetically inside each band. */
+function rankFor(enquiry: Enquiry, collaborators: Collaborator[]) {
+  return [...collaborators]
+    .map((c) => ({ collaborator: c, proximity: proximityOf(c, enquiry) }))
+    .sort((a, b) => {
+      const byDistance = PROXIMITY_RANK[a.proximity] - PROXIMITY_RANK[b.proximity];
+      return byDistance !== 0
+        ? byDistance
+        : a.collaborator.name.localeCompare(b.collaborator.name);
+    });
 }
 
 export default function SalonApprovalQueue() {
@@ -118,7 +254,7 @@ export default function SalonApprovalQueue() {
             <thead>
               <tr>
                 <th className={styles.th}>Salon / Owner</th>
-                <th className={styles.th}>City</th>
+                <th className={styles.th}>Area</th>
                 <th className={styles.th}>Phone</th>
                 <th className={styles.th}>Status</th>
                 <th className={styles.th}>Submitted At</th>
@@ -139,7 +275,16 @@ export default function SalonApprovalQueue() {
                       <div className={styles.salonName}>{enq.salon_name}</div>
                       <div style={{ fontSize: '0.85rem', color: '#666' }}>{enq.owner_name}</div>
                     </td>
-                    <td className={styles.td}>{enq.city || 'N/A'}</td>
+                    <td className={styles.td}>
+                      {enq.sub_area_name ? (
+                        <>
+                          <div className={styles.areaName}>{enq.sub_area_name}</div>
+                          <div className={styles.areaCity}>{enq.city_name}</div>
+                        </>
+                      ) : (
+                        <div className={styles.areaCity}>{enq.city_name || enq.city || 'N/A'}</div>
+                      )}
+                    </td>
                     <td className={styles.td}>{enq.phone}</td>
                     <td className={styles.td}>
                       <span style={{ 
@@ -156,16 +301,12 @@ export default function SalonApprovalQueue() {
                     <td className={styles.td} style={{ textAlign: 'right' }}>
                       {enq.status === 'new' ? (
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <select 
+                          <CollaboratorPicker
+                            enquiry={enq}
+                            collaborators={collaborators}
                             value={selectedCollaborator[enq.id] || ''}
-                            onChange={(e) => setSelectedCollaborator(prev => ({ ...prev, [enq.id]: e.target.value }))}
-                            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ddd' }}
-                          >
-                            <option value="">Select Collaborator</option>
-                            {collaborators.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
+                            onChange={(id) => setSelectedCollaborator(prev => ({ ...prev, [enq.id]: id }))}
+                          />
                           <button 
                             onClick={() => handleAssign(enq.id)}
                             disabled={assigningId === enq.id}

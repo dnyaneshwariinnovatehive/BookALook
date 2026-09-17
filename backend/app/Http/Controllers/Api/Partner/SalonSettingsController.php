@@ -29,10 +29,16 @@ class SalonSettingsController extends Controller
                     'close_time' => '18:00:00',
                 ];
             }
-            return response()->json(['working_hours' => $defaultHours]);
+            return response()->json([
+                'working_hours' => $defaultHours,
+                'is_default' => true
+            ]);
         }
 
-        return response()->json(['working_hours' => $hours]);
+        return response()->json([
+            'working_hours' => $hours,
+            'is_default' => false
+        ]);
     }
 
     public function updateWorkingHours(Request $request, $salon_id)

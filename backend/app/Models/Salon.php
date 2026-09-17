@@ -23,6 +23,13 @@ class Salon extends Model
         return $this->belongsTo(City::class);
     }
 
+    /** The locality the salon sits in — finer than the city, which in Pune
+     *  covers a two-hour drive. */
+    public function subArea()
+    {
+        return $this->belongsTo(SubArea::class);
+    }
+
     public function admin()
     {
         return $this->belongsTo(User::class, 'admin_id');

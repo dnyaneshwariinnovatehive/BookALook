@@ -45,6 +45,46 @@ class CityController extends Controller
     }
 
     /**
+     * The localities inside one city.
+     *
+     * Open to everyone, because every form that asks for an address needs it —
+     * the public enquiry form, customer sign-up, a salon registering itself,
+     * and a collaborator onboarding one. All of those run before there is
+     * anybody to authenticate.
+     *
+     * `?serviceable=1` narrows it to localities that actually have an open
+     * salon, which is what a customer picking where to browse should see. The
+     * full list is the default, because a salon can register in a locality that
+     * has none yet — that is the point of registering.
+     */
+    public function subAreas(Request $request, string $cityId)
+    {
+        $city = City::find($cityId);
+
+        if (! $city) {
+            return response()->json(['success' => false, 'message' => 'City not found.'], 404);
+        }
+
+        $query = $city->subAreas()->active();
+
+        if ($request->boolean('serviceable')) {
+            $query->whereExists(
+                fn ($sub) => $sub->selectRaw(1)
+                    ->from('salons')
+                    ->whereColumn('salons.sub_area_id', 'sub_areas.id')
+                    ->where('salons.status', 'active')
+                    ->whereNull('salons.deleted_at')
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'city' => ['id' => $city->id, 'name' => $city->name, 'state' => $city->state],
+            'sub_areas' => $query->get(['id', 'name']),
+        ]);
+    }
+
+    /**
      * Which market a coordinate belongs to.
      *
      * The app hands over a GPS fix and gets back the city to shop in. Resolved

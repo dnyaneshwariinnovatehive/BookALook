@@ -24,6 +24,10 @@ class OnboardingDraft {
   String address;
   String? cityId;
   String cityLabel;
+  // The locality. Customers browse by it and collaborators are matched on it,
+  // so a salon submitted without one is invisible to both.
+  String? subAreaId;
+  String subAreaLabel;
   String pincode;
   String salonPhone;
   String genderFocus;
@@ -70,6 +74,8 @@ class OnboardingDraft {
     this.address = '',
     this.cityId,
     this.cityLabel = '',
+    this.subAreaId,
+    this.subAreaLabel = '',
     this.pincode = '',
     this.salonPhone = '',
     this.genderFocus = 'Unisex',
@@ -114,6 +120,7 @@ class OnboardingDraft {
     description = salon['description']?.toString() ?? '';
     address = salon['address']?.toString() ?? '';
     cityId = salon['city_id']?.toString();
+    subAreaId = salon['sub_area_id']?.toString();
     pincode = salon['pincode']?.toString() ?? '';
     salonPhone = salon['salon_phone']?.toString() ?? '';
     genderFocus = salon['gender_focus']?.toString() ?? 'Unisex';
@@ -175,6 +182,7 @@ class OnboardingDraft {
         1 => [
             if (address.trim().isEmpty) 'Street address',
             if (cityId == null) 'City',
+            if (subAreaId == null) 'Area',
             if (!_isPincode(pincode)) 'Pincode (6 digits)',
             if (photoPaths.isEmpty && existingPhotoCount == 0) 'At least one photo',
           ],
@@ -201,6 +209,8 @@ class OnboardingDraft {
         'address': address,
         'city_id': cityId,
         'city_label': cityLabel,
+        'sub_area_id': subAreaId,
+        'sub_area_label': subAreaLabel,
         'pincode': pincode,
         'salon_phone': salonPhone,
         'gender_focus': genderFocus,
@@ -226,6 +236,8 @@ class OnboardingDraft {
         address: json['address'] ?? '',
         cityId: json['city_id'],
         cityLabel: json['city_label'] ?? '',
+        subAreaId: json['sub_area_id'],
+        subAreaLabel: json['sub_area_label'] ?? '',
         pincode: json['pincode'] ?? '',
         salonPhone: json['salon_phone'] ?? '',
         genderFocus: json['gender_focus'] ?? 'Unisex',
@@ -255,6 +267,7 @@ class OnboardingDraft {
         if (description.trim().isNotEmpty) 'description': description.trim(),
         'address': address.trim(),
         'city_id': cityId ?? '',
+        if (subAreaId != null) 'sub_area_id': subAreaId!,
         if (pincode.trim().isNotEmpty) 'pincode': pincode.trim(),
         if (salonPhone.trim().isNotEmpty) 'salon_phone': salonPhone.trim(),
         'gender_focus': genderFocus,

@@ -6,8 +6,9 @@ class Step1OwnerDetails extends StatefulWidget {
   final Function(Map<String, dynamic>) onNext;
   final VoidCallback onCancel;
   final String? phone;
+  final Map<String, dynamic>? initialData;
 
-  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel, this.phone});
+  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel, this.phone, this.initialData});
 
   @override
   State<Step1OwnerDetails> createState() => _Step1OwnerDetailsState();
@@ -26,6 +27,9 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
     super.initState();
     if (widget.phone != null) {
       _phoneController.text = widget.phone!;
+    }
+    if (widget.initialData != null) {
+      _nameController.text = widget.initialData!['owner_name'] ?? '';
     }
   }
 

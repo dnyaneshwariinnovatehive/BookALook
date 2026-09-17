@@ -27,6 +27,14 @@ class SalonRegistrationController extends Controller
             'description' => 'nullable|string',
             'street_address' => 'required|string',
             'city_id' => 'required|exists:cities,id',
+            // The locality. Customers browse by it and collaborators are
+            // matched on it, so a salon without one is invisible to both.
+            'sub_area_id' => [
+                'required', 'uuid',
+                \Illuminate\Validation\Rule::exists('sub_areas', 'id')->where(
+                    fn ($q) => $q->where('city_id', $request->city_id)
+                ),
+            ],
             'pincode' => 'required|string|max:10',
             // Optional: an owner registering from a laptop at home should not
             // be blocked, and they can drop the pin later from the app.
@@ -64,6 +72,7 @@ class SalonRegistrationController extends Controller
                 'slug' => $slug,
                 'description' => trim($fullDescription),
                 'city_id' => $request->city_id,
+                'sub_area_id' => $request->sub_area_id,
                 'address' => $fullAddress,
                 'pincode' => $request->pincode,
                 'latitude' => $request->latitude,

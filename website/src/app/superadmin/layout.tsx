@@ -12,6 +12,7 @@ const navItems = [
   { name: 'Salon Approval Queue', path: '/superadmin/salon-approval' },
   { name: 'Salon Directory', path: '/superadmin/salons' },
   { name: 'Master Catalog', path: '/superadmin/catalog' },
+  { name: 'Areas', path: '/superadmin/areas' },
   { name: 'Policy Settings', path: '/superadmin/settings/policy' },
   // { name: 'Payment Settings', path: '/superadmin/settings/payment' },
   { name: 'Banners', path: '/superadmin/banners' },

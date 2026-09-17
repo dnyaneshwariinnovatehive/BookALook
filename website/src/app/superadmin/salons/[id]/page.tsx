@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import StaffDetailsModal from './StaffDetailsModal';
 import styles from './page.module.css';
 
 interface Salon {
@@ -30,7 +31,12 @@ interface Salon {
       category?: { name: string } 
     }
   }[];
-  combos?: { id: string; name: string; total_price: number; is_active: boolean }[];
+  combos?: { 
+    id: string; 
+    name: string; 
+    is_active: boolean;
+    services?: { pivot?: { combo_special_price: number | string } }[];
+  }[];
 }
 
 interface Collaborator {
@@ -54,6 +60,9 @@ export default function SalonDirectoryDetail() {
   const [selectedCollaborator, setSelectedCollaborator] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignNote, setAssignNote] = useState('');
+
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('Overview');
 
   useEffect(() => {
     async function fetchSalon() {
@@ -148,192 +157,235 @@ export default function SalonDirectoryDetail() {
           </span>
         </div>
 
-        <div className={styles.grid}>
-          <div>
-            <h2 className={styles.sectionTitle}>Basic Information</h2>
-            
-            <div className={styles.infoGroup}>
-              <span className={styles.label}>Slug</span>
-              <div className={styles.value}>{salon.slug}</div>
-            </div>
-            
-            <div className={styles.infoGroup}>
-              <span className={styles.label}>City</span>
-              <div className={styles.value}>{salon.city?.name || 'N/A'}</div>
-            </div>
+        <div className={styles.pageTabs}>
+          {['Overview', 'Collaborator', 'Staff', 'Catalog'].map(tab => (
+            <button
+              key={tab}
+              className={`${styles.pageTab} ${activeTab === tab ? styles.pageTabActive : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
 
-            <div className={styles.infoGroup}>
-              <span className={styles.label}>Address</span>
-              <div className={styles.value}>{salon.address}</div>
-            </div>
-
-            <div className={styles.infoGroup}>
-              <span className={styles.label}>Pincode</span>
-              <div className={styles.value}>{salon.pincode}</div>
-            </div>
-
-            <div className={styles.infoGroup}>
-              <span className={styles.label}>Gender Focus</span>
-              <div className={styles.value}>{salon.gender_focus || 'N/A'}</div>
-            </div>
-
-            {salon.description && (
+        {activeTab === 'Overview' && (
+          <div className={styles.grid}>
+            <div>
+              <h2 className={styles.sectionTitle}>Basic Information</h2>
+              
               <div className={styles.infoGroup}>
-                <span className={styles.label}>Description</span>
-                <div className={styles.descValue}>{salon.description}</div>
+                <span className={styles.label}>Slug</span>
+                <div className={styles.value}>{salon.slug}</div>
               </div>
-            )}
+              
+              <div className={styles.infoGroup}>
+                <span className={styles.label}>City</span>
+                <div className={styles.value}>{salon.city?.name || 'N/A'}</div>
+              </div>
+
+              <div className={styles.infoGroup}>
+                <span className={styles.label}>Address</span>
+                <div className={styles.value}>{salon.address}</div>
+              </div>
+
+              <div className={styles.infoGroup}>
+                <span className={styles.label}>Pincode</span>
+                <div className={styles.value}>{salon.pincode}</div>
+              </div>
+
+              <div className={styles.infoGroup}>
+                <span className={styles.label}>Gender Focus</span>
+                <div className={styles.value}>{salon.gender_focus || 'N/A'}</div>
+              </div>
+
+              {salon.description && (
+                <div className={styles.infoGroup}>
+                  <span className={styles.label}>Description</span>
+                  <div className={styles.descValue}>{salon.description}</div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h2 className={styles.sectionTitle}>Owner / Admin</h2>
+              
+              {salon.admin ? (
+                <>
+                  <div className={styles.infoGroup}>
+                    <span className={styles.label}>Full Name</span>
+                    <div className={styles.value}>{salon.admin.name}</div>
+                  </div>
+                  
+                  <div className={styles.infoGroup}>
+                    <span className={styles.label}>Phone</span>
+                    <div className={styles.value}>{salon.admin.phone}</div>
+                  </div>
+
+                  <div className={styles.infoGroup}>
+                    <span className={styles.label}>Email</span>
+                    <div className={styles.value}>{salon.admin.email || 'N/A'}</div>
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: '#64748b' }}>No admin information found.</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {activeTab === 'Collaborator' && (
+        <div className={styles.card}>
+          <h2 className={styles.sectionTitle}>Onboarding Collaborator</h2>
+
+          <div className={styles.infoGroup}>
+            <span className={styles.label}>Currently Assigned</span>
+            <div className={styles.value}>
+              {salon.assigned_collaborator
+                ? `${salon.assigned_collaborator.name}${
+                    salon.assigned_collaborator.email ? ` — ${salon.assigned_collaborator.email}` : ''
+                  }`
+                : 'No collaborator assigned yet.'}
+            </div>
           </div>
 
-          <div>
-            <h2 className={styles.sectionTitle}>Owner / Admin</h2>
-            
-            {salon.admin ? (
-              <>
-                <div className={styles.infoGroup}>
-                  <span className={styles.label}>Full Name</span>
-                  <div className={styles.value}>{salon.admin.name}</div>
-                </div>
-                
-                <div className={styles.infoGroup}>
-                  <span className={styles.label}>Phone</span>
-                  <div className={styles.value}>{salon.admin.phone}</div>
-                </div>
+          <div className={styles.assignRow}>
+            <select
+              className={styles.assignSelect}
+              value={selectedCollaborator}
+              onChange={(e) => setSelectedCollaborator(e.target.value)}
+              disabled={assigning}
+            >
+              <option value="">— No collaborator —</option>
+              {collaborators.map((collaborator) => (
+                <option key={collaborator.id} value={collaborator.id}>
+                  {collaborator.name}
+                </option>
+              ))}
+            </select>
 
-                <div className={styles.infoGroup}>
-                  <span className={styles.label}>Email</span>
-                  <div className={styles.value}>{salon.admin.email || 'N/A'}</div>
+            <button
+              className={styles.assignButton}
+              onClick={handleAssignCollaborator}
+              disabled={assigning || selectedCollaborator === (salon.assigned_collaborator_id || '')}
+            >
+              {assigning ? 'Saving…' : 'Save Assignment'}
+            </button>
+          </div>
+
+          {collaborators.length === 0 && (
+            <p className={styles.assignNote}>
+              No collaborators exist yet. Create one from the Collaborators page first.
+            </p>
+          )}
+
+          {assignNote && <p className={styles.assignNote}>{assignNote}</p>}
+        </div>
+      )}
+
+      {activeTab === 'Staff' && (
+        <div className={styles.card}>
+          <h2 className={styles.sectionTitle}>Staff Directory</h2>
+          {salon.providers && salon.providers.length > 0 ? (
+            <div className={styles.staffGrid}>
+              {salon.providers.map(provider => (
+                <div 
+                  key={provider.id} 
+                  className={`${styles.staffCard} ${styles.interactiveStaffCard}`}
+                  onClick={() => setSelectedStaffId(provider.id)}
+                >
+                  <div className={styles.staffAvatar}>
+                    {provider.user?.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className={styles.staffInfo} style={{ flex: 1 }}>
+                    <h4>{provider.user?.name}</h4>
+                    <p>{provider.user?.phone}</p>
+                    <p>{provider.user?.email}</p>
+                    <span className={`${styles.badge} ${provider.is_active ? styles.badgeActive : styles.badgeInactive}`}>
+                      {provider.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div>
+                    <button className={styles.viewInfoButton}>
+                      View Info
+                    </button>
+                  </div>
                 </div>
-              </>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: '#64748b' }}>No staff members registered.</p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'Catalog' && (
+        <>
+          <div className={styles.card}>
+            <h2 className={styles.sectionTitle}>Services Offered</h2>
+            {salon.services && salon.services.length > 0 ? (
+              <div className={styles.servicesGrid}>
+                {salon.services.map(service => (
+                  <div key={service.id} className={styles.serviceItem}>
+                    <div>
+                      <div className={styles.serviceCategory}>
+                        {service.template?.category?.name || 'Uncategorized'}
+                      </div>
+                      <div className={styles.serviceName}>
+                        {service.template?.name || 'Custom Service'}
+                      </div>
+                    </div>
+                    <div className={styles.serviceMeta}>
+                      <span className={styles.serviceDuration}>
+                        {service.estimated_duration_minutes || service.template?.estimated_duration_minutes || 0} mins
+                      </span>
+                      <span className={styles.servicePrice}>
+                        ₹{service.price}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p style={{ color: '#64748b' }}>No admin information found.</p>
+              <p style={{ color: '#64748b' }}>No services configured.</p>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Onboarding Collaborator */}
-      <div className={styles.card} style={{ marginTop: '24px' }}>
-        <h2 className={styles.sectionTitle}>Onboarding Collaborator</h2>
-
-        <div className={styles.infoGroup}>
-          <span className={styles.label}>Currently Assigned</span>
-          <div className={styles.value}>
-            {salon.assigned_collaborator
-              ? `${salon.assigned_collaborator.name}${
-                  salon.assigned_collaborator.email ? ` — ${salon.assigned_collaborator.email}` : ''
-                }`
-              : 'No collaborator assigned yet.'}
-          </div>
-        </div>
-
-        <div className={styles.assignRow}>
-          <select
-            className={styles.assignSelect}
-            value={selectedCollaborator}
-            onChange={(e) => setSelectedCollaborator(e.target.value)}
-            disabled={assigning}
-          >
-            <option value="">— No collaborator —</option>
-            {collaborators.map((collaborator) => (
-              <option key={collaborator.id} value={collaborator.id}>
-                {collaborator.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            className={styles.assignButton}
-            onClick={handleAssignCollaborator}
-            disabled={assigning || selectedCollaborator === (salon.assigned_collaborator_id || '')}
-          >
-            {assigning ? 'Saving…' : 'Save Assignment'}
-          </button>
-        </div>
-
-        {collaborators.length === 0 && (
-          <p className={styles.assignNote}>
-            No collaborators exist yet. Create one from the Collaborators page first.
-          </p>
-        )}
-
-        {assignNote && <p className={styles.assignNote}>{assignNote}</p>}
-      </div>
-
-      {/* Staff Directory */}
-      <div className={styles.card} style={{ marginTop: '24px' }}>
-        <h2 className={styles.sectionTitle}>Staff Directory</h2>
-        {salon.providers && salon.providers.length > 0 ? (
-          <div className={styles.staffGrid}>
-            {salon.providers.map(provider => (
-              <div key={provider.id} className={styles.staffCard}>
-                <div className={styles.staffAvatar}>
-                  {provider.user?.name.charAt(0).toUpperCase()}
-                </div>
-                <div className={styles.staffInfo}>
-                  <h4>{provider.user?.name}</h4>
-                  <p>{provider.user?.phone}</p>
-                  <p>{provider.user?.email}</p>
-                  <span className={`${styles.badge} ${provider.is_active ? styles.badgeActive : styles.badgeInactive}`}>
-                    {provider.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
+          <div className={styles.card}>
+            <h2 className={styles.sectionTitle}>Combos</h2>
+            {salon.combos && salon.combos.length > 0 ? (
+              <div className={styles.combosGrid}>
+                {salon.combos.map(combo => {
+                  const totalPrice = combo.services?.reduce((sum, svc) => sum + Number(svc.pivot?.combo_special_price || 0), 0) || 0;
+                  return (
+                    <div key={combo.id} className={styles.comboItem}>
+                      <div className={styles.comboName}>{combo.name}</div>
+                      {combo.services && combo.services.length > 0 && (
+                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '-4px', marginBottom: '4px' }}>
+                          {combo.services.length} services included
+                        </div>
+                      )}
+                      <div className={styles.comboPrice}>₹{totalPrice}</div>
+                      {!combo.is_active && <span className={`${styles.badge} ${styles.badgeInactive}`}>Inactive</span>}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              <p style={{ color: '#64748b' }}>No combos configured.</p>
+            )}
           </div>
-        ) : (
-          <p style={{ color: '#64748b' }}>No staff members registered.</p>
-        )}
-      </div>
+        </>
+      )}
 
-      {/* Services Offered */}
-      <div className={styles.card} style={{ marginTop: '24px' }}>
-        <h2 className={styles.sectionTitle}>Services Offered</h2>
-        {salon.services && salon.services.length > 0 ? (
-          <div className={styles.servicesGrid}>
-            {salon.services.map(service => (
-              <div key={service.id} className={styles.serviceItem}>
-                <div>
-                  <div className={styles.serviceCategory}>
-                    {service.template?.category?.name || 'Uncategorized'}
-                  </div>
-                  <div className={styles.serviceName}>
-                    {service.template?.name || 'Custom Service'}
-                  </div>
-                </div>
-                <div className={styles.serviceMeta}>
-                  <span className={styles.serviceDuration}>
-                    {service.estimated_duration_minutes || service.template?.estimated_duration_minutes || 0} mins
-                  </span>
-                  <span className={styles.servicePrice}>
-                    ₹{service.price}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#64748b' }}>No services configured.</p>
-        )}
-      </div>
-
-      {/* Combos */}
-      <div className={styles.card} style={{ marginTop: '24px' }}>
-        <h2 className={styles.sectionTitle}>Combos</h2>
-        {salon.combos && salon.combos.length > 0 ? (
-          <div className={styles.combosGrid}>
-            {salon.combos.map(combo => (
-              <div key={combo.id} className={styles.comboItem}>
-                <div className={styles.comboName}>{combo.name}</div>
-                <div className={styles.comboPrice}>₹{combo.total_price}</div>
-                {!combo.is_active && <span className={`${styles.badge} ${styles.badgeInactive}`}>Inactive</span>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ color: '#64748b' }}>No combos configured.</p>
-        )}
-      </div>
+      {selectedStaffId && typeof id === 'string' && (
+        <StaffDetailsModal
+          salonId={id}
+          providerId={selectedStaffId}
+          onClose={() => setSelectedStaffId(null)}
+        />
+      )}
     </div>
   );
 }

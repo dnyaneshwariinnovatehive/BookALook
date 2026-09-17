@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import styles from './page.module.css';
 
 // The API is Laravel, so every relation arrives snake_cased.
@@ -124,6 +125,7 @@ export default function GlobalAppointmentsDashboard() {
   const [addServiceError, setAddServiceError] = useState('');
   const [infoModalData, setInfoModalData] = useState<{type: 'salon' | 'customer', data: any} | null>(null);
   const [detailsAppointment, setDetailsAppointment] = useState<Appointment | null>(null);
+  const [activeDetailsTab, setActiveDetailsTab] = useState('Overview');
 
   // We should ideally fetch services and providers based on the selected salon, 
   // but for the demo, we'll keep it simple.
@@ -518,7 +520,10 @@ export default function GlobalAppointmentsDashboard() {
                     <button
                       className={styles.secondaryButton}
                       style={{ padding: '6px 12px', fontSize: '13px' }}
-                      onClick={() => setDetailsAppointment(apt)}
+                      onClick={() => {
+                        setDetailsAppointment(apt);
+                        setActiveDetailsTab('Overview');
+                      }}
                     >
                       Details
                     </button>
@@ -628,163 +633,191 @@ export default function GlobalAppointmentsDashboard() {
 
                 return (
                   <>
-                    <h3 className={styles.detailsSectionTitle}>Booking</h3>
-                    <dl className={styles.detailsGrid}>
-                      <dt>Appointment ID</dt><dd className={styles.detailsMono}>{apt.id}</dd>
-                      <dt>Status</dt>
-                      <dd>
-                        <span className={`${styles.badge} ${getStatusBadgeClass(apt.status)}`}>
-                          {formatStatus(apt.status)}
-                        </span>
-                      </dd>
-                      <dt>Date</dt><dd>{new Date(apt.appointment_date).toLocaleDateString()}</dd>
-                      <dt>Time</dt><dd>{apt.start_time} – {apt.end_time || '—'}</dd>
-                      <dt>Source</dt><dd>{sourceLabel(apt.booking_source)}</dd>
-                      <dt>Booked on</dt><dd>{dateTime(apt.created_at)}</dd>
-                    </dl>
+                    <div className={styles.tabsContainer}>
+                      {['Overview', 'Services', 'Payment', 'Lifecycle'].map(tab => (
+                        <button 
+                          key={tab}
+                          className={`${styles.tab} ${activeDetailsTab === tab ? styles.tabActive : ''}`}
+                          onClick={() => setActiveDetailsTab(tab)}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
 
-                    <h3 className={styles.detailsSectionTitle}>Customer</h3>
-                    <dl className={styles.detailsGrid}>
-                      <dt>Name</dt><dd>{customerName(apt)}</dd>
-                      <dt>Phone</dt><dd>{customerPhone(apt) || '—'}</dd>
-                      <dt>Email</dt><dd>{apt.customer?.email || '—'}</dd>
-                      {!apt.customer && (
-                        <>
-                          <dt>Gender</dt><dd>{apt.walk_in_customer_gender || '—'}</dd>
-                        </>
-                      )}
-                    </dl>
-
-                    <h3 className={styles.detailsSectionTitle}>Salon & staff</h3>
-                    <dl className={styles.detailsGrid}>
-                      <dt>Salon</dt><dd>{apt.salon?.name || '—'}</dd>
-                      <dt>Salon phone</dt><dd>{apt.salon?.phone || '—'}</dd>
-                      <dt>Address</dt><dd>{apt.salon?.address || '—'}</dd>
-                      <dt>Booked with</dt>
-                      <dd>
-                        {apt.appointed_provider?.user?.name || 'Unassigned'}
-                        {apt.appointed_provider?.user?.phone
-                          ? ` · ${apt.appointed_provider.user.phone}` : ''}
-                      </dd>
-                      <dt>Served by</dt>
-                      <dd>
-                        {apt.serving_provider?.user?.name || 'Not started'}
-                        {apt.serving_provider?.user?.phone
-                          ? ` · ${apt.serving_provider.user.phone}` : ''}
-                      </dd>
-                    </dl>
-
-                    <h3 className={styles.detailsSectionTitle}>
-                      Services ({lines.length} booked
-                      {additions.length > 0 ? ` + ${additions.length} added mid-appointment` : ''})
-                    </h3>
-                    <table className={styles.detailsTable}>
-                      <thead>
-                        <tr>
-                          <th>Service</th>
-                          <th>Provider</th>
-                          <th>Duration</th>
-                          <th>Price</th>
-                          <th>Line status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lines.length === 0 && additions.length === 0 && (
-                          <tr><td colSpan={5} style={{ color: '#9CA3AF' }}>No service lines recorded.</td></tr>
-                        )}
-                        {lines.map((line) => (
-                          <tr key={line.id}>
-                            <td>
-                              {serviceName(line)}
-                              {line.combo_id && <small style={{ color: '#6B7280' }}> (package)</small>}
-                            </td>
-                            <td>{line.serving_provider?.user?.name || providerName(apt) || '—'}</td>
-                            <td>{line.duration_minutes_at_booking ? `${line.duration_minutes_at_booking} min` : '—'}</td>
-                            <td>
-                              {money(line.price_at_booking)}
-                              {line.original_service_price !== undefined &&
-                                Number(line.original_service_price) !== Number(line.price_at_booking) && (
-                                  <small style={{ color: '#6B7280' }}>
-                                    {' '}(list {money(line.original_service_price)})
-                                  </small>
-                                )}
-                            </td>
-                            <td>{line.line_status || '—'}</td>
-                          </tr>
-                        ))}
-                        {additions.map((add) => (
-                          <tr key={add.id}>
-                            <td>
-                              {serviceName(add)}
-                              <small style={{ color: '#6B7280' }}> (added mid-appointment)</small>
-                            </td>
-                            <td>{add.provider?.user?.name || '—'}</td>
-                            <td>{add.duration_minutes_at_addition ? `${add.duration_minutes_at_addition} min` : '—'}</td>
-                            <td>{money(add.price_at_addition)}</td>
-                            <td>
-                              {/* Reads as a line status so a settled extra
-                                  matches the booked lines beside it. */}
-                              {add.status === 'voided' ? 'removed' : (add.status || '—')}
-                              {add.added_by?.name && (
-                                <>
-                                  <br/>
-                                  <small style={{ color: '#6B7280' }}>
-                                    by {add.added_by.name}
-                                    {add.added_at ? ` · ${dateTime(add.added_at)}` : ''}
-                                  </small>
-                                </>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <h3 className={styles.detailsSectionTitle}>Payment</h3>
-                    <dl className={styles.detailsGrid}>
-                      <dt>Option</dt><dd>{apt.payment_option?.replace(/_/g, ' ') || '—'}</dd>
-                      <dt>Total</dt><dd>{money(apt.total_amount)}</dd>
-                      <dt>Advance paid</dt><dd>{money(apt.advance_amount)}</dd>
-                      <dt>Balance due</dt><dd>{money(apt.balance_amount)}</dd>
-                      <dt>Final billed</dt><dd>{money(apt.final_billed_amount)}</dd>
-                    </dl>
-
-                    <h3 className={styles.detailsSectionTitle}>Lifecycle</h3>
-                    <dl className={styles.detailsGrid}>
-                      <dt>Verification</dt><dd>{apt.verification_method || '—'}</dd>
-                      <dt>QR verified</dt><dd>{dateTime(apt.qr_verified_at)}</dd>
-                      <dt>Started</dt><dd>{dateTime(apt.started_at)}</dd>
-                      <dt>Completed</dt><dd>{dateTime(apt.completed_at)}</dd>
-                      <dt>No show</dt><dd>{dateTime(apt.no_show_at)}</dd>
-                      {apt.cancelled_at && (
-                        <>
-                          <dt>Cancelled</dt>
+                    {activeDetailsTab === 'Overview' && (
+                      <>
+                        <h3 className={styles.detailsSectionTitle}>Booking</h3>
+                        <dl className={styles.detailsGrid}>
+                          <dt>Appointment ID</dt><dd className={styles.detailsMono}>{apt.id}</dd>
+                          <dt>Status</dt>
                           <dd>
-                            {dateTime(apt.cancelled_at)}
-                            {apt.cancelled_by ? ` by ${apt.cancelled_by}` : ''}
-                            {apt.cancelled_by_user?.name ? ` (${apt.cancelled_by_user.name})` : ''}
+                            <span className={`${styles.badge} ${getStatusBadgeClass(apt.status)}`}>
+                              {formatStatus(apt.status)}
+                            </span>
                           </dd>
-                          <dt>Reason</dt><dd>{apt.cancellation_reason || '—'}</dd>
-                        </>
-                      )}
-                      {apt.rescheduled_from_id && (
-                        <>
-                          <dt>Rescheduled from</dt>
-                          <dd className={styles.detailsMono}>{apt.rescheduled_from_id}</dd>
-                          <dt>Reschedule reason</dt><dd>{apt.reschedule_reason || '—'}</dd>
-                        </>
-                      )}
-                      {apt.salon_closure_id && (
-                        <>
-                          <dt>Released by closure</dt>
+                          <dt>Date</dt><dd>{new Date(apt.appointment_date).toLocaleDateString()}</dd>
+                          <dt>Time</dt><dd>{apt.start_time} – {apt.end_time || '—'}</dd>
+                          <dt>Source</dt><dd>{sourceLabel(apt.booking_source)}</dd>
+                          <dt>Booked on</dt><dd>{dateTime(apt.created_at)}</dd>
+                        </dl>
+
+                        <h3 className={styles.detailsSectionTitle}>Customer</h3>
+                        <dl className={styles.detailsGrid}>
+                          <dt>Name</dt><dd>{customerName(apt)}</dd>
+                          <dt>Phone</dt><dd>{customerPhone(apt) || '—'}</dd>
+                          <dt>Email</dt><dd>{apt.customer?.email || '—'}</dd>
+                          {!apt.customer && (
+                            <>
+                              <dt>Gender</dt><dd>{apt.walk_in_customer_gender || '—'}</dd>
+                            </>
+                          )}
+                        </dl>
+
+                        <h3 className={styles.detailsSectionTitle}>Salon & staff</h3>
+                        <dl className={styles.detailsGrid}>
+                          <dt>Salon</dt><dd>{apt.salon?.name || '—'}</dd>
+                          <dt>Salon phone</dt><dd>{apt.salon?.phone || '—'}</dd>
+                          <dt>Address</dt><dd>{apt.salon?.address || '—'}</dd>
+                          <dt>Booked with</dt>
                           <dd>
-                            {apt.salon_closure?.closed_date || 'Emergency closure'}
-                            {apt.salon_closure?.reason ? ` — ${apt.salon_closure.reason}` : ''}
+                            {apt.appointed_provider?.user?.name || 'Unassigned'}
+                            {apt.appointed_provider?.user?.phone
+                              ? ` · ${apt.appointed_provider.user.phone}` : ''}
                           </dd>
-                          <dt>Customer notified</dt><dd>{dateTime(apt.closure_notified_at)}</dd>
-                        </>
-                      )}
-                    </dl>
+                          <dt>Served by</dt>
+                          <dd>
+                            {apt.serving_provider?.user?.name || 'Not started'}
+                            {apt.serving_provider?.user?.phone
+                              ? ` · ${apt.serving_provider.user.phone}` : ''}
+                          </dd>
+                        </dl>
+                      </>
+                    )}
+
+                    {activeDetailsTab === 'Services' && (
+                      <>
+                        <h3 className={styles.detailsSectionTitle}>
+                          Services ({lines.length} booked
+                          {additions.length > 0 ? ` + ${additions.length} added mid-appointment` : ''})
+                        </h3>
+                        <table className={styles.detailsTable}>
+                          <thead>
+                            <tr>
+                              <th>Service</th>
+                              <th>Provider</th>
+                              <th>Duration</th>
+                              <th>Price</th>
+                              <th>Line status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lines.length === 0 && additions.length === 0 && (
+                              <tr><td colSpan={5} style={{ color: '#9CA3AF' }}>No service lines recorded.</td></tr>
+                            )}
+                            {lines.map((line) => (
+                              <tr key={line.id}>
+                                <td>
+                                  {serviceName(line)}
+                                  {line.combo_id && <small style={{ color: '#6B7280' }}> (package)</small>}
+                                </td>
+                                <td>{line.serving_provider?.user?.name || providerName(apt) || '—'}</td>
+                                <td>{line.duration_minutes_at_booking ? `${line.duration_minutes_at_booking} min` : '—'}</td>
+                                <td>
+                                  {money(line.price_at_booking)}
+                                  {line.original_service_price !== undefined &&
+                                    Number(line.original_service_price) !== Number(line.price_at_booking) && (
+                                      <small style={{ color: '#6B7280' }}>
+                                        {' '}(list {money(line.original_service_price)})
+                                      </small>
+                                    )}
+                                </td>
+                                <td>{line.line_status || '—'}</td>
+                              </tr>
+                            ))}
+                            {additions.map((add) => (
+                              <tr key={add.id}>
+                                <td>
+                                  {serviceName(add)}
+                                  <small style={{ color: '#6B7280' }}> (added mid-appointment)</small>
+                                </td>
+                                <td>{add.provider?.user?.name || '—'}</td>
+                                <td>{add.duration_minutes_at_addition ? `${add.duration_minutes_at_addition} min` : '—'}</td>
+                                <td>{money(add.price_at_addition)}</td>
+                                <td>
+                                  {/* Reads as a line status so a settled extra
+                                      matches the booked lines beside it. */}
+                                  {add.status === 'voided' ? 'removed' : (add.status || '—')}
+                                  {add.added_by?.name && (
+                                    <>
+                                      <br/>
+                                      <small style={{ color: '#6B7280' }}>
+                                        by {add.added_by.name}
+                                        {add.added_at ? ` · ${dateTime(add.added_at)}` : ''}
+                                      </small>
+                                    </>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </>
+                    )}
+
+                    {activeDetailsTab === 'Payment' && (
+                      <>
+                        <h3 className={styles.detailsSectionTitle}>Payment</h3>
+                        <dl className={styles.detailsGrid}>
+                          <dt>Option</dt><dd>{apt.payment_option?.replace(/_/g, ' ') || '—'}</dd>
+                          <dt>Total</dt><dd>{money(apt.total_amount)}</dd>
+                          <dt>Advance paid</dt><dd>{money(apt.advance_amount)}</dd>
+                          <dt>Balance due</dt><dd>{money(apt.balance_amount)}</dd>
+                          <dt>Final billed</dt><dd>{money(apt.final_billed_amount)}</dd>
+                        </dl>
+                      </>
+                    )}
+
+                    {activeDetailsTab === 'Lifecycle' && (
+                      <>
+                        <h3 className={styles.detailsSectionTitle}>Lifecycle</h3>
+                        <dl className={styles.detailsGrid}>
+                          <dt>Verification</dt><dd>{apt.verification_method || '—'}</dd>
+                          <dt>QR verified</dt><dd>{dateTime(apt.qr_verified_at)}</dd>
+                          <dt>Started</dt><dd>{dateTime(apt.started_at)}</dd>
+                          <dt>Completed</dt><dd>{dateTime(apt.completed_at)}</dd>
+                          <dt>No show</dt><dd>{dateTime(apt.no_show_at)}</dd>
+                          {apt.cancelled_at && (
+                            <>
+                              <dt>Cancelled</dt>
+                              <dd>
+                                {dateTime(apt.cancelled_at)}
+                                {apt.cancelled_by ? ` by ${apt.cancelled_by}` : ''}
+                                {apt.cancelled_by_user?.name ? ` (${apt.cancelled_by_user.name})` : ''}
+                              </dd>
+                              <dt>Reason</dt><dd>{apt.cancellation_reason || '—'}</dd>
+                            </>
+                          )}
+                          {apt.rescheduled_from_id && (
+                            <>
+                              <dt>Rescheduled from</dt>
+                              <dd className={styles.detailsMono}>{apt.rescheduled_from_id}</dd>
+                              <dt>Reschedule reason</dt><dd>{apt.reschedule_reason || '—'}</dd>
+                            </>
+                          )}
+                          {apt.salon_closure_id && (
+                            <>
+                              <dt>Released by closure</dt>
+                              <dd>
+                                {apt.salon_closure?.closed_date || 'Emergency closure'}
+                                {apt.salon_closure?.reason ? ` — ${apt.salon_closure.reason}` : ''}
+                              </dd>
+                              <dt>Customer notified</dt><dd>{dateTime(apt.closure_notified_at)}</dd>
+                            </>
+                          )}
+                        </dl>
+                      </>
+                    )}
                   </>
                 );
               })()}
@@ -813,6 +846,16 @@ export default function GlobalAppointmentsDashboard() {
                 {infoModalData.data.email && <p><strong>Email:</strong> {infoModalData.data.email}</p>}
                 {infoModalData.data.address && <p><strong>Address:</strong> {infoModalData.data.address}</p>}
                 {infoModalData.data.status && <p><strong>Status:</strong> {infoModalData.data.status}</p>}
+                
+                {infoModalData.type === 'salon' && infoModalData.data.id && (
+                  <div style={{ marginTop: '8px' }}>
+                    <Link href={`/superadmin/salons/${infoModalData.data.id}`}>
+                      <span style={{ color: '#4F46E5', textDecoration: 'underline', cursor: 'pointer', fontWeight: 500 }}>
+                        View Full Salon Profile &rarr;
+                      </span>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
             <div className={styles.modalFooter}>

@@ -29,6 +29,7 @@ class User extends Authenticatable
         'address',
         'pincode',
         'city_id',
+        'sub_area_id',
         'is_active',
         'last_login_at',
     ];
@@ -80,5 +81,17 @@ class User extends Authenticatable
     public function city()
     {
         return $this->belongsTo(City::class);
+    }
+
+    /**
+     * The locality this person belongs to.
+     *
+     * For a customer it narrows what they are shown; for a collaborator it is
+     * what an incoming enquiry is matched against, so the person sent to a
+     * salon is one who already works nearby.
+     */
+    public function subArea()
+    {
+        return $this->belongsTo(SubArea::class);
     }
 }

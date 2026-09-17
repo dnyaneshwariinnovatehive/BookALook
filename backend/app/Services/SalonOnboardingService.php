@@ -159,6 +159,7 @@ class SalonOnboardingService
             'description' => $payload['description'] ?? null,
             'address' => $payload['address'],
             'city_id' => $payload['city_id'],
+            'sub_area_id' => $payload['sub_area_id'] ?? null,
             'pincode' => $payload['pincode'] ?? null,
             // The salon's own line, taken on site by the collaborator. Never
             // shown to customers.

@@ -10,7 +10,9 @@ import '../../../models/staff_models.dart';
 import '../../../models/leave_models.dart';
 import '../services/add_service_flow.dart';
 import 'staff/add_staff_screen.dart';
+import 'settings/salon_timings_screen.dart';
 import '../close_day_sheet.dart';
+import '../../../services/salon_settings_api.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -40,6 +42,7 @@ class _HomeTabState extends State<HomeTab> {
 
   List<StaffMember> _staff = [];
   Map<String, int> _providerLoads = {};
+  bool _needsWorkingHours = false;
 
   Timer? _refreshTimer;
 
@@ -79,12 +82,14 @@ class _HomeTabState extends State<HomeTab> {
         StaffApi.fetchStaff(widget.salonId),
         StaffApi.fetchLeaves(widget.salonId),
         SalonClosureApi.upcomingClosures(widget.salonId),
+        SalonSettingsApi.fetchWorkingHours(widget.salonId),
       ]);
 
       final appointments = responses[0] as List<dynamic>;
       final staff = responses[1] as List<StaffMember>;
       final leaves = responses[2] as List<ProviderLeave>;
       final closures = responses[3] as List<dynamic>;
+      final workingHoursResponse = responses[4] as Map<String, dynamic>;
 
       if (!mounted) return;
 
@@ -148,6 +153,7 @@ class _HomeTabState extends State<HomeTab> {
         _closureReason = closureReason;
         _staff = staff;
         _providerLoads = providerLoads;
+        _needsWorkingHours = workingHoursResponse['is_default'] == true;
         _isLoading = false;
       });
 
@@ -212,6 +218,10 @@ class _HomeTabState extends State<HomeTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
+                      if (_needsWorkingHours) ...[
+                        const SizedBox(height: 16),
+                        _buildWorkingHoursPrompt(),
+                      ],
                       const SizedBox(height: 24),
                       _buildScanCard(),
                       const SizedBox(height: 24),
@@ -285,6 +295,56 @@ class _HomeTabState extends State<HomeTab> {
           ),
         )
       ],
+    );
+  }
+
+  Widget _buildWorkingHoursPrompt() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED), // orange-50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFED7AA)), // orange-200
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.access_time, color: Color(0xFFEA580C)), // orange-600
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Working Hours Not Set',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF9A3412)), // orange-800
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your salon has no working hours configured. Set them now to avoid missing out on bookings.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF9A3412), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => SalonTimingsScreen(salonId: widget.salonId)))
+                    .then((_) => _fetchHomeData(silent: true));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('Set Timings'),
+            ),
+          )
+        ],
+      ),
     );
   }
 

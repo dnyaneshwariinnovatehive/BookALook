@@ -20,8 +20,38 @@ export default function CollaboratorManagement() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    city_id: '',
+    sub_area_id: ''
   });
+
+  // Where this collaborator works. Without it they can never be matched to an
+  // enquiry, which is the whole reason for assigning one.
+  const [cities, setCities] = useState<{ id: string; name: string; state: string }[]>([]);
+  const [subAreas, setSubAreas] = useState<{ id: string; name: string }[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/cities', { headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((list) => Array.isArray(list) && setCities(list))
+      .catch(() => setCities([]));
+  }, []);
+
+  useEffect(() => {
+    if (!formData.city_id) {
+      setSubAreas([]);
+      return;
+    }
+    setLoadingAreas(true);
+    fetch(`http://localhost:8000/api/cities/${formData.city_id}/sub-areas`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((d) => setSubAreas(d?.sub_areas ?? []))
+      .catch(() => setSubAreas([]))
+      .finally(() => setLoadingAreas(false));
+  }, [formData.city_id]);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submitError, setSubmitError] = useState('');
 
@@ -42,9 +72,16 @@ export default function CollaboratorManagement() {
     fetchCollaborators();
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      // An area from the old city would now be in the wrong one.
+      ...(name === 'city_id' ? { sub_area_id: '' } : {}),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,10 +101,15 @@ export default function CollaboratorManagement() {
       const json = await res.json();
       if (res.ok) {
         setSubmitStatus('success');
-        setFormData({ name: '', email: '', phone: '' });
+        setFormData({ name: '', email: '', phone: '', city_id: '', sub_area_id: '' });
         fetchCollaborators(); // Refresh the list
       } else {
-        throw new Error(json.message || 'Failed to create collaborator');
+        const firstError = json?.errors ? Object.values(json.errors)[0] : null;
+        throw new Error(
+          Array.isArray(firstError)
+            ? String(firstError[0])
+            : json.message || 'Failed to create collaborator'
+        );
       }
     } catch (err: any) {
       setSubmitStatus('error');
@@ -132,6 +174,50 @@ export default function CollaboratorManagement() {
               onChange={handleInputChange}
               style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
             />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City *</label>
+            <select
+              name="city_id"
+              required
+              value={formData.city_id}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+            >
+              <option value="">Select city</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}, {c.state}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Area *</label>
+            <select
+              name="sub_area_id"
+              required
+              disabled={!formData.city_id || loadingAreas}
+              value={formData.sub_area_id}
+              onChange={handleInputChange}
+              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+            >
+              <option value="">
+                {!formData.city_id
+                  ? 'Choose a city first'
+                  : loadingAreas
+                    ? 'Loading areas…'
+                    : subAreas.length === 0
+                      ? 'No areas listed for this city yet'
+                      : 'Select area'}
+              </option>
+              {subAreas.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <p style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#777' }}>
+              Enquiries from this area are offered to them first.
+            </p>
           </div>
 
           <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>

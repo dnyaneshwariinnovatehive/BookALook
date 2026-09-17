@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../services/salon_location_api.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/api_service.dart';
+import '../../../widgets/sub_area_dropdown.dart';
 
 class Step2SalonDetails extends StatefulWidget {
   final Function(Map<String, dynamic>) onNext;
   final VoidCallback onBack;
+  final Map<String, dynamic>? initialData;
 
-  const Step2SalonDetails({super.key, required this.onNext, required this.onBack});
+  const Step2SalonDetails({super.key, required this.onNext, required this.onBack, this.initialData});
 
   @override
   State<Step2SalonDetails> createState() => _Step2SalonDetailsState();
@@ -35,6 +37,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   List<dynamic> _filteredCities = [];
   
   String? _selectedCityId;
+  String? _selectedSubAreaId;
   String? _selectedState;
   bool _isLoadingCities = true;
 
@@ -43,6 +46,11 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialData != null) {
+      _salonNameController.text = widget.initialData!['salon_name'] ?? '';
+      _addressController.text = widget.initialData!['street_address'] ?? '';
+      _pincodeController.text = widget.initialData!['pincode'] ?? '';
+    }
     _loadCities();
   }
 
@@ -59,6 +67,16 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
             }
           }
           _states = statesSet.toList()..sort();
+
+          if (widget.initialData != null && widget.initialData!['city_id'] != null) {
+            _selectedCityId = widget.initialData!['city_id'];
+            final city = _cities.firstWhere((c) => c['id'].toString() == _selectedCityId, orElse: () => null);
+            if (city != null && city['state'] != null) {
+              _selectedState = city['state']?.toString().trim();
+              _filteredCities = _cities.where((c) => c['state']?.toString().trim() == _selectedState).toList();
+            }
+            _selectedSubAreaId = widget.initialData!['sub_area_id'];
+          }
         }
         _isLoadingCities = false;
       });
@@ -69,6 +87,8 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
     setState(() {
       _selectedState = newState;
       _selectedCityId = null;
+      // The old area belonged to the old city.
+      _selectedSubAreaId = null;
       if (newState != null) {
         _filteredCities = _cities.where((c) => c['state']?.toString().trim() == newState).toList();
       } else {
@@ -110,11 +130,21 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         fullStreet += ', ' + stateVal;
       }
 
+      if (_useDropdowns && _selectedSubAreaId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please choose the area your salon is in')),
+        );
+        return;
+      }
+
       widget.onNext({
         'salon_name': _salonNameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'street_address': fullStreet,
         'city_id': _useDropdowns ? _selectedCityId : null,
+        // Customers browse by area and collaborators are matched on it, so a
+        // salon without one is invisible to both.
+        'sub_area_id': _selectedSubAreaId,
         if (!_useDropdowns) 'city_name': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'gender_focus': _genderFocus,
@@ -261,6 +291,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                           onChanged: (val) {
                             setState(() {
                               _selectedCityId = val;
+                              _selectedSubAreaId = null;
                             });
                           },
                           validator: (v) => v == null ? 'Required' : null,
@@ -278,6 +309,16 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
               ],
             ),
             const SizedBox(height: 16),
+
+            if (_useDropdowns) ...[
+              _buildLabel('Area *'),
+              SubAreaDropdown(
+                cityId: _selectedCityId,
+                value: _selectedSubAreaId,
+                onChanged: (val) => setState(() => _selectedSubAreaId = val),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             _buildLabel('Pincode *'),
             _buildTextField(

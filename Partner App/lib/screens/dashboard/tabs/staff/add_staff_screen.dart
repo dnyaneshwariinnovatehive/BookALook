@@ -79,7 +79,8 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   Future<void> _fetchInitialData() async {
     try {
       final services = await ServiceManagementApi.getSalonServices(widget.salonId);
-      final hours = await SalonSettingsApi.fetchWorkingHours(widget.salonId);
+      final response = await SalonSettingsApi.fetchWorkingHours(widget.salonId);
+      final hours = response['hours'] as List<SalonWorkingHour>;
       setState(() {
         _salonServicesGrouped = services;
         _salonWorkingHours = hours;

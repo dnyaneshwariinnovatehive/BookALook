@@ -66,11 +66,9 @@ class AppointmentCheckInService
             return 'This QR code has expired. Ask the customer to show a fresh one.';
         }
 
-        $early = (int) PlatformPolicySetting::value('appointment_start_early_minutes');
-
-        if (now()->addMinutes($early)->lessThan($this->startsAt($appointment))) {
-            return 'It is too early to start this appointment. It begins at '
-                . substr($appointment->start_time, 0, 5) . '.';
+        if (now()->toDateString() !== Carbon::parse($appointment->appointment_date)->toDateString()) {
+            return 'This appointment is scheduled for ' . Carbon::parse($appointment->appointment_date)->format('Y-m-d')
+                . ' and can only be started on that day.';
         }
 
         return null;

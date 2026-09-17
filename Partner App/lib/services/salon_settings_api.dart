@@ -17,7 +17,7 @@ class SalonSettingsApi {
     };
   }
 
-  static Future<List<SalonWorkingHour>> fetchWorkingHours(String salonId) async {
+  static Future<Map<String, dynamic>> fetchWorkingHours(String salonId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/salons/$salonId/working-hours'),
       headers: await _getHeaders(),
@@ -26,7 +26,10 @@ class SalonSettingsApi {
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
       final List<dynamic> data = jsonResponse['working_hours'];
-      return data.map((json) => SalonWorkingHour.fromJson(json)).toList();
+      return {
+        'hours': data.map((json) => SalonWorkingHour.fromJson(json)).toList(),
+        'is_default': jsonResponse['is_default'] ?? false,
+      };
     } else {
       throw Exception('Failed to fetch working hours: ${response.body}');
     }

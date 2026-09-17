@@ -45,10 +45,16 @@ class PartnerAuthController extends Controller
             ->first();
 
         if (!$user) {
+            $enquiry = \App\Models\SalonEnquiry::where('phone', $request->phone)
+                ->where('status', 'assigned')
+                ->latest()
+                ->first();
+
             return response()->json([
                 'success' => true,
                 'status' => 'new_user',
                 'message' => 'User not found or not a partner. Redirect to registration.',
+                'enquiry' => $enquiry,
             ]);
         }
 

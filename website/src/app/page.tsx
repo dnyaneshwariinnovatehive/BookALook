@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './globals.css';
 
 export default function LandingPage() {
@@ -10,16 +10,72 @@ export default function LandingPage() {
     salon_name: '',
     owner_name: '',
     phone: '',
-    city: '',
+    state: '',
+    city_id: '',
+    sub_area_id: '',
+    street_address: '',
+    pincode: '',
     message: ''
   });
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // City and area are picked, never typed. Typed cities left this table holding
+  // "navi mumbai" and "Pimpri Chinchwad", which no collaborator could be
+  // matched against.
+  const [cities, setCities] = useState<{ id: string; name: string; state: string }[]>([]);
+  const [states, setStates] = useState<string[]>([]);
+  const [subAreas, setSubAreas] = useState<{ id: string; name: string }[]>([]);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/cities', { headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((list) => {
+        if (Array.isArray(list)) {
+          setCities(list);
+          const uniqueStates = Array.from(new Set(list.map((c: any) => c.state).filter(Boolean))) as string[];
+          uniqueStates.sort();
+          setStates(uniqueStates);
+        }
+      })
+      .catch(() => setCities([]));
+  }, []);
+
+  // Areas belong to a city, so the second dropdown refills whenever the first
+  // changes — and clears any area already chosen, which would now be in the
+  // wrong city.
+  useEffect(() => {
+    if (!formData.city_id) {
+      setSubAreas([]);
+      return;
+    }
+
+    setLoadingAreas(true);
+    fetch(`http://localhost:8000/api/cities/${formData.city_id}/sub-areas`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((d) => setSubAreas(d?.sub_areas ?? []))
+      .catch(() => setSubAreas([]))
+      .finally(() => setLoadingAreas(false));
+  }, [formData.city_id]);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'state' ? { city_id: '', sub_area_id: '' } : {}),
+      ...(name === 'city_id' ? { sub_area_id: '' } : {}),
+    }));
   };
+
+  const filteredCities = formData.state 
+    ? cities.filter(c => c.state === formData.state) 
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +94,18 @@ export default function LandingPage() {
 
       if (response.ok) {
         setStatus('success');
-        setFormData({ salon_name: '', owner_name: '', phone: '', city: '', message: '' });
+        setFormData({ salon_name: '', owner_name: '', phone: '', state: '', city_id: '', sub_area_id: '', street_address: '', pincode: '', message: '' });
       } else {
         const data = await response.json();
         setStatus('error');
-        setErrorMessage(data.message || 'Failed to submit enquiry. Please check your details.');
+        // Laravel returns a field map; its own wording is more use than a
+        // generic failure line.
+        const firstError = data?.errors ? Object.values(data.errors)[0] : null;
+        setErrorMessage(
+          Array.isArray(firstError)
+            ? String(firstError[0])
+            : data.message || 'Failed to submit enquiry. Please check your details.'
+        );
       }
     } catch (error) {
       setStatus('error');
@@ -110,11 +173,87 @@ export default function LandingPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City</label>
-                <input 
-                  type="text" 
-                  name="city" 
-                  value={formData.city} 
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>State *</label>
+                <select
+                  name="state"
+                  required
+                  value={formData.state}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                >
+                  <option value="">Select your state</option>
+                  {states.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City *</label>
+                <select
+                  name="city_id"
+                  required
+                  disabled={!formData.state}
+                  value={formData.city_id}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                >
+                  <option value="">
+                    {!formData.state ? 'Choose a state first' : 'Select your city'}
+                  </option>
+                  {filteredCities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Area *</label>
+                <select
+                  name="sub_area_id"
+                  required
+                  disabled={!formData.city_id || loadingAreas}
+                  value={formData.sub_area_id}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                >
+                  <option value="">
+                    {!formData.city_id
+                      ? 'Choose a city first'
+                      : loadingAreas
+                        ? 'Loading areas…'
+                        : subAreas.length === 0
+                          ? 'No areas listed for this city yet'
+                          : 'Select your area'}
+                  </option>
+                  {subAreas.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+                <p style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#777' }}>
+                  Helps us send someone who already works near you.
+                </p>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Street Address *</label>
+                <textarea
+                  name="street_address"
+                  required
+                  rows={2}
+                  value={formData.street_address}
+                  onChange={handleInputChange}
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Pincode *</label>
+                <input
+                  type="text"
+                  name="pincode"
+                  required
+                  value={formData.pincode}
                   onChange={handleInputChange}
                   style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
                 />

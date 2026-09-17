@@ -286,7 +286,7 @@ class _CheckInConfirmSheetState extends State<CheckInConfirmSheet> {
                               ),
                             ),
                             if (p.isBookedProvider)
-                              _tag('Booked', AppTheme.accentColor)
+                              _tag('Booked for this', AppTheme.accentColor)
                             else if (!p.canPerformAll)
                               _tag('Not trained', AppTheme.lightWarning),
                           ],

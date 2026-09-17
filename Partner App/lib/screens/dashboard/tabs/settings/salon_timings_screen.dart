@@ -30,11 +30,14 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
 
   Future<void> _fetchWorkingHours() async {
     try {
-      final hours = await SalonSettingsApi.fetchWorkingHours(widget.salonId);
-      setState(() {
-        _workingHours = hours;
-        _isLoading = false;
-      });
+      final response = await SalonSettingsApi.fetchWorkingHours(widget.salonId);
+      final hours = response['hours'] as List<SalonWorkingHour>;
+      if (mounted) {
+        setState(() {
+          _workingHours = hours;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();

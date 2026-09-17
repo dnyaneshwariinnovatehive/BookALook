@@ -221,6 +221,23 @@
   opacity: 0.8;
 }
 
+.viewInfoButton {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-body);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.viewInfoButton:hover {
+  background-color: var(--border-color);
+  color: var(--text-heading);
+}
+
 /* Services */
 .servicesGrid {
   display: grid;
@@ -299,4 +316,195 @@
   font-weight: 700;
   color: #10b981;
   font-size: 1.1rem;
+}
+
+/* Interactive Staff Card */
+.interactiveStaffCard {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.interactiveStaffCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow);
+  border-color: var(--accent-color);
+}
+
+/* Modal Styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background: var(--surface-color);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalHeader h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-heading);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-body);
+  opacity: 0.6;
+}
+
+.closeBtn:hover {
+  opacity: 1;
+}
+
+.modalTabs {
+  display: flex;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 1.5rem;
+}
+
+.modalTabs button {
+  background: none;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-body);
+  opacity: 0.7;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.modalTabs button:hover {
+  opacity: 1;
+}
+
+.modalTabs button.activeTab {
+  opacity: 1;
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+.modalBody {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tabPane {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.dataTable th, .dataTable td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  color: var(--text-body);
+}
+
+.dataTable th {
+  font-weight: 600;
+  background-color: var(--bg-color);
+  color: var(--text-heading);
+}
+
+.financialSummary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background: var(--bg-color);
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.statBox {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: 0.85rem;
+  color: var(--text-body);
+  opacity: 0.8;
+  margin-bottom: 0.5rem;
+}
+
+.statVal {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+/* Page Tabs */
+.pageTabs {
+  display: flex;
+  gap: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+}
+
+.pageTab {
+  padding: 0.75rem 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-body);
+  opacity: 0.7;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+
+.pageTab:hover {
+  opacity: 1;
+}
+
+.pageTabActive {
+  opacity: 1;
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
 }

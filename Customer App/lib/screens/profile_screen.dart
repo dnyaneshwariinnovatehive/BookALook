@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../widgets/city_area_picker.dart';
 import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -19,6 +20,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   bool _isLoading = false;
   String _selectedGender = 'unspecified';
+
+  // Where they are. Required at sign-up so the first screen they see can show
+  // what is actually near them.
+  String? _cityId;
+  String? _subAreaId;
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -51,6 +57,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    if (_cityId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please choose your city')),
+      );
+      return;
+    }
+
+    if (_subAreaId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please choose your area')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final success = await _authService.completeProfile(
@@ -59,6 +79,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _selectedGender,
       _dobController.text.trim(),
       _addressController.text.trim(),
+      cityId: _cityId,
+      subAreaId: _subAreaId,
     );
 
     setState(() => _isLoading = false);
@@ -123,6 +145,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (value != null) {
                   setState(() => _selectedGender = value);
                 }
+              },
+            ),
+            SizedBox(height: 16),
+            CityAreaPicker(
+              onChanged: (cityId, subAreaId) {
+                setState(() {
+                  _cityId = cityId;
+                  _subAreaId = subAreaId;
+                });
               },
             ),
             SizedBox(height: 16),

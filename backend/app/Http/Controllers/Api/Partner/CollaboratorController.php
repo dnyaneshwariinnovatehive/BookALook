@@ -383,6 +383,7 @@ class CollaboratorController extends Controller
                 'description' => $salon->description,
                 'address' => $salon->address,
                 'city_id' => $salon->city_id,
+                'sub_area_id' => $salon->sub_area_id,
                 'pincode' => $salon->pincode,
                 'salon_phone' => $salon->phone_num,
                 'gender_focus' => $salon->gender_focus,
@@ -517,6 +518,12 @@ class CollaboratorController extends Controller
             'description' => 'required|string',
             'address' => 'required|string',
             'city_id' => 'required|exists:cities,id',
+            'sub_area_id' => [
+                'required', 'uuid',
+                \Illuminate\Validation\Rule::exists('sub_areas', 'id')->where(
+                    fn ($q) => $q->where('city_id', $request->city_id)
+                ),
+            ],
             'pincode' => 'required|string|max:10',
             'salon_phone' => 'required|string|max:20',
             'gender_focus' => 'required|in:Unisex,Men Only,Women Only',

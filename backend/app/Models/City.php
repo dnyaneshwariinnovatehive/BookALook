@@ -25,6 +25,12 @@ class City extends Model
         return $this->hasMany(Salon::class);
     }
 
+    /** Localities inside this city, in the order a dropdown should show them. */
+    public function subAreas()
+    {
+        return $this->hasMany(SubArea::class)->orderBy('name');
+    }
+
     /**
      * Cities a customer can actually book in.
      *

@@ -103,9 +103,20 @@ class CustomerAuthController extends Controller
             'date_of_birth' => 'nullable|date',
             'address' => 'nullable|string',
             'pincode' => 'nullable|string|max:10',
-            // The market they browse in. Optional here because the app lets
-            // them pick one before signing up and sends it along.
-            'city_id' => 'nullable|exists:cities,id',
+            // Where they are. Required at sign-up so the app can show what is
+            // actually near them from the first screen — a city alone covers a
+            // two-hour drive and answers nothing useful.
+            'city_id' => 'required|exists:cities,id',
+            'sub_area_id' => [
+                'required', 'uuid',
+                \Illuminate\Validation\Rule::exists('sub_areas', 'id')->where(
+                    fn ($q) => $q->where('city_id', $request->city_id)
+                ),
+            ],
+        ], [
+            'city_id.required' => 'Please choose your city.',
+            'sub_area_id.required' => 'Please choose your area.',
+            'sub_area_id.exists' => 'That area is not in the city you picked.',
         ]);
 
         if ($validator->fails()) {
@@ -131,6 +142,7 @@ class CustomerAuthController extends Controller
             'address' => $request->address,
             'pincode' => $request->pincode,
             'city_id' => $request->city_id,
+            'sub_area_id' => $request->sub_area_id,
             'is_active' => true,
             'last_login_at' => now(),
         ]);
@@ -171,21 +183,39 @@ class CustomerAuthController extends Controller
      */
     public function updateCity(Request $request)
     {
-        $request->validate(['city_id' => 'required|exists:cities,id']);
+        $request->validate([
+            'city_id' => 'required|exists:cities,id',
+            // Optional: the app may switch city and area together, or just the
+            // city and let them pick an area afterwards.
+            'sub_area_id' => [
+                'nullable', 'uuid',
+                \Illuminate\Validation\Rule::exists('sub_areas', 'id')->where(
+                    fn ($q) => $q->where('city_id', $request->city_id)
+                ),
+            ],
+        ]);
 
         $user = $request->user();
-        $user->forceFill(['city_id' => $request->city_id])->save();
+        $movedCity = $user->city_id !== $request->city_id;
+
+        $user->forceFill([
+            'city_id' => $request->city_id,
+            // An area from the old city would now be somewhere else entirely,
+            // so changing city drops it unless a new one came with the request.
+            'sub_area_id' => $request->sub_area_id ?? ($movedCity ? null : $user->sub_area_id),
+        ])->save();
 
         return response()->json([
             'success' => true,
             'city' => $user->fresh()->city,
+            'sub_area' => $user->fresh()->subArea,
         ]);
     }
 
     public function profile(Request $request)
     {
         $user = $request->user();
-        $user->loadMissing('city');
+        $user->loadMissing(['city', 'subArea']);
 
         // Count of all non-cancelled appointments booked by this customer
         $appointmentsCount = \App\Models\Appointment::where('customer_id', $user->id)

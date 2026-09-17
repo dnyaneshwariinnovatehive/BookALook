@@ -49,6 +49,15 @@ class SuperAdminCollaboratorController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255|unique:users',
             'phone' => 'required|string|max:20|unique:users,phone',
+            // Where this collaborator works. Without it they can never be
+            // matched to an enquiry, which is the whole point of assigning one.
+            'city_id' => 'required|uuid|exists:cities,id',
+            'sub_area_id' => [
+                'required', 'uuid',
+                \Illuminate\Validation\Rule::exists('sub_areas', 'id')->where(
+                    fn ($q) => $q->where('city_id', $request->city_id)
+                ),
+            ],
         ]);
 
         if ($validator->fails()) {
@@ -59,6 +68,8 @@ class SuperAdminCollaboratorController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
+            'city_id' => $request->city_id,
+            'sub_area_id' => $request->sub_area_id,
             'password_hash' => Hash::make(\Illuminate\Support\Str::random(12)),
             'role' => 'collaborator',
         ]);

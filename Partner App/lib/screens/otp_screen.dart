@@ -39,7 +39,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (response['status'] == 'new_user') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => AdminRegistrationScreen(phone: widget.phone)),
+          MaterialPageRoute(builder: (context) => AdminRegistrationScreen(phone: widget.phone, initialData: response['enquiry'])),
         );
       } else if (response['status'] == 'existing_user') {
         final prefs = await SharedPreferences.getInstance();

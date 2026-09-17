@@ -26,6 +26,7 @@ class ReviewPromptSheet extends StatefulWidget {
     final submitted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       // Dismissable on purpose. A rating prompt that traps you is a rating
       // prompt people learn to resent.

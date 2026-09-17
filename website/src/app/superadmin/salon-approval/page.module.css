@@ -92,3 +92,78 @@
   opacity: 0.8;
   font-size: 0.95rem;
 }
+
+/* ---------------------------------------------------------- area + matching */
+
+.areaName {
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.areaCity {
+  font-size: 0.82rem;
+  color: var(--text-body);
+  opacity: 0.8;
+}
+
+.pickerWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.picker {
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-body);
+  font-size: 0.85rem;
+  font-family: inherit;
+  max-width: 17rem;
+}
+
+/* A local match is waiting to be picked — say so on the control itself. */
+.pickerSuggested {
+  border-color: var(--accent-color);
+}
+
+.suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed var(--accent-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-heading);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.suggestion:hover {
+  background: var(--accent-soft);
+}
+
+.matchStrong,
+.matchWeak {
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.matchStrong {
+  background: rgba(46, 125, 50, 0.15);
+  color: var(--color-success);
+}
+
+.matchWeak {
+  background: rgba(21, 101, 192, 0.13);
+  color: var(--color-info);
+}

@@ -70,6 +70,9 @@ Route::prefix('customer')->group(function () {
 // Public global routes
 Route::get('/cities', [\App\Http\Controllers\Api\CityController::class, 'index']);
 Route::get('/cities/nearest', [\App\Http\Controllers\Api\CityController::class, 'nearest']);
+// Localities inside a city. Public, because every form that asks for an address
+// needs it and most of them run before anybody has signed in.
+Route::get('/cities/{cityId}/sub-areas', [\App\Http\Controllers\Api\CityController::class, 'subAreas']);
 Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
 
 // What a scanned salon QR code resolves to. Open to anyone: the person holding
@@ -89,6 +92,7 @@ Route::prefix('superadmin')->group(function () {
     // Salon Directory API (Unprotected for now)
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+    Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
     // The directory is the only surface that holds partner-app salons, which
     // never passed through an enquiry to be assigned a collaborator.
     Route::post('/salons/{id}/assign-collaborator', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'assignCollaborator']);
@@ -135,6 +139,16 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/payouts/{id}/approve', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'approve']);
         Route::post('/payouts/{id}/distribute', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'distribute']);
 
+
+        // Localities. One list, kept clean here, because two spellings of the
+        // same neighbourhood would split it in half everywhere it is used.
+        Route::get('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'index']);
+        Route::post('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'store']);
+        // Bulk. Send it once to be told what it would do, again with commit to
+        // have it done.
+        Route::post('/sub-areas/import', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'import']);
+        Route::put('/sub-areas/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'update']);
+        Route::delete('/sub-areas/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'destroy']);
 
         // Catalog Management
         Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
