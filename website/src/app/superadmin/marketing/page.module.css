@@ -1,0 +1,381 @@
+.container {
+  padding: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 0.5rem;
+}
+
+.subtitle {
+  color: var(--text-body);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  max-width: 62ch;
+  margin: 0;
+}
+
+.statRow {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 0.75rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 8rem;
+}
+
+.statValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.1;
+}
+
+.statLabel {
+  font-size: 0.74rem;
+  color: var(--text-body);
+  white-space: nowrap;
+}
+
+/* ---------- Banners ---------- */
+.banner {
+  padding: 0.85rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin-bottom: 1.25rem;
+}
+
+.bannerOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.bannerBad {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.bannerWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82em;
+  background: var(--bg-color);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+}
+
+/* ---------- Overview ---------- */
+.sectionTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-body);
+  margin: 0 0 0.85rem;
+}
+
+.subTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0 0 0.6rem;
+}
+
+.overview {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 2rem;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.9rem;
+}
+
+.metric {
+  background: var(--bg-color);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* The opt-out count. Coloured because it is the number that decides whether
+   the WhatsApp Business account survives. */
+.metricAlert {
+  background: var(--color-warning-bg);
+}
+
+.metricAlert .metricValue,
+.metricAlert .metricLabel {
+  color: var(--color-warning);
+}
+
+.metricValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1;
+}
+
+.metricLabel {
+  font-size: 0.74rem;
+  color: var(--text-body);
+  line-height: 1.35;
+}
+
+.topSalons {
+  margin-top: 1.4rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-body);
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table td {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-heading);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------- Templates ---------- */
+.categorySection {
+  margin-bottom: 1.75rem;
+}
+
+.categoryHeading {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+  margin: 0 0 0.65rem;
+}
+
+.template {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Not approved by Meta, so no salon can use it yet. */
+.templateOff {
+  border-style: dashed;
+}
+
+.templateHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.templateName {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.templateDescription {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.growthTag,
+.liveTag,
+.pendingTag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.5rem;
+}
+
+.growthTag {
+  background: var(--accent-soft);
+  color: var(--accent-color);
+}
+
+.liveTag {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.pendingTag {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.body {
+  margin: 0.8rem 0 0.6rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg-color);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-heading);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  color: var(--text-body);
+}
+
+/* ---------- Editor ---------- */
+.editor {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fieldLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.fieldHelp {
+  font-size: 0.75rem;
+  color: var(--text-body);
+  line-height: 1.45;
+}
+
+.input {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-heading);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(156, 84, 242, 0.12);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  color: var(--text-heading);
+  cursor: pointer;
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.button {
+  padding: 0.55rem 1.3rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  cursor: pointer;
+}
+
+.empty {
+  padding: 2.5rem;
+  text-align: center;
+  color: var(--text-body);
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 1.25rem 1rem;
+  }
+}

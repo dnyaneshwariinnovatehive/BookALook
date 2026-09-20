@@ -25,6 +25,11 @@ Route::prefix('customer')->group(function () {
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
         // Switching market happens from the home screen, not the profile form.
         Route::put('/profile/city', [CustomerAuthController::class, 'updateCity']);
+
+        // The only place marketing consent can be switched on, and it is the
+        // customer who switches it.
+        Route::get('/marketing-preference', [\App\Http\Controllers\Api\Customer\MarketingPreferenceController::class, 'show']);
+        Route::put('/marketing-preference', [\App\Http\Controllers\Api\Customer\MarketingPreferenceController::class, 'update']);
         
         // Favourites
         Route::get('/favorites', [\App\Http\Controllers\Api\Customer\FavouriteController::class, 'index']);
@@ -74,6 +79,11 @@ Route::get('/cities/nearest', [\App\Http\Controllers\Api\CityController::class, 
 // needs it and most of them run before anybody has signed in.
 Route::get('/cities/{cityId}/sub-areas', [\App\Http\Controllers\Api\CityController::class, 'subAreas']);
 Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
+
+// Meta calls these. Unauthenticated by necessity — the verify token proves the
+// subscription and X-Hub-Signature-256 proves every payload after it.
+Route::get('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'verify']);
+Route::post('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'handle']);
 
 // What a scanned salon QR code resolves to. Open to anyone: the person holding
 // the phone has no account yet, which is the whole point of the poster.
@@ -142,6 +152,14 @@ Route::prefix('superadmin')->group(function () {
 
         // Localities. One list, kept clean here, because two spellings of the
         // same neighbourhood would split it in half everywhere it is used.
+        // The marketing catalogue. Central because Meta approves templates
+        // against the one business account the whole platform sends from.
+        Route::get('/campaign-templates', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'index']);
+        Route::post('/campaign-templates', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'store']);
+        Route::put('/campaign-templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'update']);
+        Route::delete('/campaign-templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'destroy']);
+        Route::get('/marketing/overview', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'overview']);
+
         Route::get('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'index']);
         Route::post('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'store']);
         // Bulk. Send it once to be told what it would do, again with commit to
@@ -222,6 +240,20 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
         // Postpaid: no money changes hands here, so there is nothing to upload.
         Route::post('/salons/{salon_id}/subscription/commission-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'commissionRequest']);
+        // WhatsApp marketing. Inside auth but outside the salon.active gate for
+        // the same reason renewal is: a salon whose plan lapsed should be able
+        // to see what its campaigns did, even while it cannot start new ones.
+        Route::get('/salons/{salon_id}/campaigns/options', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'options']);
+        Route::post('/salons/{salon_id}/campaigns/preview', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'preview']);
+        Route::get('/salons/{salon_id}/campaigns', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'index']);
+        Route::post('/salons/{salon_id}/campaigns', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'store']);
+        Route::get('/salons/{salon_id}/campaigns/{id}', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'show']);
+        Route::post('/salons/{salon_id}/campaigns/{id}/cancel', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'cancel']);
+
+        // What the salon's own bookings say about it. How much of the answer
+        // comes back depends on the plan.
+        Route::get('/salons/{salon_id}/insights', [\App\Http\Controllers\Api\Partner\InsightsController::class, 'show']);
+
         Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
         Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
         Route::post('/salons/{salon_id}/wallet/redeem-commission', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'redeemCommission']);

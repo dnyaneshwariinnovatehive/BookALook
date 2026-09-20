@@ -14,6 +14,7 @@ const navItems = [
   { name: 'Customers', path: '/superadmin/customers' },
   { name: 'Master Catalog', path: '/superadmin/catalog' },
   { name: 'Areas', path: '/superadmin/areas' },
+  { name: 'WhatsApp Marketing', path: '/superadmin/marketing' },
   { name: 'Policy Settings', path: '/superadmin/settings/policy' },
   // { name: 'Payment Settings', path: '/superadmin/settings/payment' },
   { name: 'Banners', path: '/superadmin/banners' },

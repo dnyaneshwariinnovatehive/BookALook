@@ -57,6 +57,19 @@ class SettingsController extends Controller
             'android_app_url' => 'sometimes|nullable|string|max:255',
             'ios_app_url' => 'sometimes|nullable|string|max:255',
             'android_apk_url' => 'sometimes|nullable|string|max:255',
+
+            // WhatsApp marketing. These bound the platform's own conduct rather
+            // than any one plan — what counts as a lapsed customer, and the
+            // hours during which nobody may be messaged at all.
+            'marketing_inactive_customer_days' => 'sometimes|integer|min:7|max:730',
+            'marketing_repeat_customer_visits' => 'sometimes|integer|min:2|max:50',
+            'marketing_high_value_min_spend' => 'sometimes|numeric|min:0',
+            'marketing_quiet_hours_start' => 'sometimes|integer|min:0|max:23',
+            'marketing_quiet_hours_end' => 'sometimes|integer|min:0|max:23',
+            // Zero removes the daily ceiling, leaving only the plan's monthly
+            // allowance in the way.
+            'marketing_daily_cap_per_salon' => 'sometimes|integer|min:0|max:100000',
+            'marketing_require_explicit_opt_in' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -76,6 +89,11 @@ class SettingsController extends Controller
             'subscription_reminder_hour' => 'Hour of the day (0-23) when renewal reminders are sent to salon owners',
             'welcome_bonus_coins' => 'Free coins given to a salon when SuperAdmin approves it',
             'commission_settlement_grace_days' => 'Days after a month closes before an unsettled Commission Model salon is locked out',
+            'marketing_inactive_customer_days' => 'Days without a visit before a customer counts as inactive and can be sent a win-back campaign',
+            'marketing_repeat_customer_visits' => 'Completed visits before a customer is treated as a regular',
+            'marketing_quiet_hours_start' => 'Hour of day (0-23) after which marketing messages are held until morning',
+            'marketing_quiet_hours_end' => 'Hour of day (0-23) before which marketing messages are held',
+            'marketing_daily_cap_per_salon' => 'Most marketing messages one salon may send in a day, whatever its plan allows for the month. 0 removes the cap',
         ];
 
         // Not an integer like the rest — a coin can be worth paise.
@@ -86,6 +104,34 @@ class SettingsController extends Controller
                     'setting_value' => (string) $request->input('coin_value_inr'),
                     'data_type' => 'decimal',
                     'description' => 'What one reward coin is worth, in rupees',
+                    'updated_by' => $user->id,
+                ]
+            );
+        }
+
+        // Rupees, so the same decimal treatment as a coin's value.
+        if ($request->has('marketing_high_value_min_spend')) {
+            PlatformPolicySetting::updateOrCreate(
+                ['setting_key' => 'marketing_high_value_min_spend'],
+                [
+                    'setting_value' => (string) $request->input('marketing_high_value_min_spend'),
+                    'data_type' => 'decimal',
+                    'description' => 'Lifetime spend, in rupees, at or above which a customer is treated as high value',
+                    'updated_by' => $user->id,
+                ]
+            );
+        }
+
+        // The switch that decides whether marketing reaches anyone at all: on,
+        // only customers who have opted in are messaged; off, a completed
+        // booking is treated as permission. An opt-out wins either way.
+        if ($request->has('marketing_require_explicit_opt_in')) {
+            PlatformPolicySetting::updateOrCreate(
+                ['setting_key' => 'marketing_require_explicit_opt_in'],
+                [
+                    'setting_value' => $request->boolean('marketing_require_explicit_opt_in') ? '1' : '0',
+                    'data_type' => 'boolean',
+                    'description' => 'Require customers to opt in before any salon may send them marketing',
                     'updated_by' => $user->id,
                 ]
             );
