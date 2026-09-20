@@ -7,9 +7,12 @@ import '../more/wallet_screen.dart';
 import '../more/salon_location_screen.dart';
 import '../more/salon_qr_screen.dart';
 import '../more/salon_reviews_screen.dart';
+import '../more/marketing_screen.dart';
+import '../more/insights_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../notifications_screen.dart';
 
 class MoreTab extends StatelessWidget {
   final String salonId;
@@ -126,6 +129,20 @@ class MoreTab extends StatelessWidget {
                     },
                   ),
                   Divider(height: 1, indent: 56),
+                  // SuperAdmin's warnings and suspensions are the messages an
+                  // owner most needs to see, so the inbox sits at the top.
+                  _buildOptionTile(context,
+                    icon: Icons.notifications_outlined,
+                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning),
+                    title: 'Notifications',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
                   // Customers browse nearest-first, so an unpinned salon sorts
                   // below every salon on the same street that has pinned itself.
                   _buildOptionTile(context,
@@ -151,6 +168,36 @@ class MoreTab extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => SalonReviewsScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // Directly above Marketing, because it is where the reason to
+                  // send a campaign comes from — who has stopped coming in,
+                  // which hours are empty, what customers already buy together.
+                  _buildOptionTile(context,
+                    icon: Icons.insights_outlined,
+                    iconColor: Colors.deepPurple,
+                    title: 'Business Insights',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => InsightsScreen(salonId: salonId)),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  // Sits next to Reviews because the two answer the same
+                  // question from opposite ends: what customers think, and what
+                  // the salon can say back to them.
+                  _buildOptionTile(context,
+                    icon: Icons.campaign_outlined,
+                    iconColor: const Color(0xFF25D366),
+                    title: 'WhatsApp Marketing',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => MarketingScreen(salonId: salonId)),
                       );
                     },
                   ),

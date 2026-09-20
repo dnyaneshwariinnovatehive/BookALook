@@ -3,6 +3,18 @@
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
 
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+);
+
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+);
+
+const PromoteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+);
+
 interface Template {
   id: string;
   category_id: string;
@@ -33,11 +45,11 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-
   // Modals state
   const [showCatModal, setShowCatModal] = useState(false);
   const [showTplModal, setShowTplModal] = useState(false);
+  
+  const [viewingCategory, setViewingCategory] = useState<Category | null>(null);
   
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -294,25 +306,35 @@ export default function CatalogPage() {
     setShowTplModal(true);
   };
 
+  // Helper function to update the viewing category automatically when it's updated behind the scenes
+  useEffect(() => {
+    if (viewingCategory) {
+      const updatedCat = categories.find(c => c.id === viewingCategory.id);
+      if (updatedCat) setViewingCategory(updatedCat);
+    }
+  }, [categories]);
+
   if (loading) return <div>Loading Catalog...</div>;
   if (error) return <div>Error: {error}</div>;
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Service Category & Master Catalog</h1>
+        <div>
+          <h1 className={styles.title}>Service Category & Master Catalog</h1>
+          <p className={styles.subtitle}>
+            Manage standard service categories and templates shared across all salons on the platform.
+          </p>
+        </div>
         <button className={styles.addButton} onClick={openAddCategory}>
           + Add Standard Category
         </button>
       </div>
 
-      <div className={styles.catalogList}>
+      <div className={styles.catalogGrid}>
         {categories.map(cat => (
-          <div key={cat.id} className={styles.categoryCard}>
-            <div 
-              className={styles.categoryHeader} 
-              onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
-            >
+          <div key={cat.id} className={styles.categoryCard} onClick={() => setViewingCategory(cat)}>
+            <div className={styles.categoryHeader}>
               <div className={styles.categoryInfo}>
                 <div className={styles.iconSquare}>
                   {cat.icon_url ? (
@@ -339,62 +361,109 @@ export default function CatalogPage() {
                     )}
                   </div>
                 </div>
+              </div>
+              <div className={styles.categoryActions}>
                 {!!cat.is_custom && (
-                  <button className={styles.promoteBtn} onClick={(e) => handlePromoteCategory(cat.id, e)}>
-                    Promote
+                  <button 
+                    className={`${styles.iconBtn} ${styles.promoteBtn}`} 
+                    title="Promote to Standard"
+                    onClick={(e) => handlePromoteCategory(cat.id, e)}
+                  >
+                    <PromoteIcon />
                   </button>
                 )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button className={styles.editBtn} onClick={(e) => openEditCategory(cat, e)}>Edit</button>
-                <button className={styles.deleteBtn} onClick={(e) => handleDeleteCategory(cat.id, e)}>Delete</button>
-                <span style={{ marginLeft: '8px', color: '#9CA3AF' }}>
-                  {expandedCategory === cat.id ? '▼' : '▶'}
-                </span>
+                <button 
+                  className={`${styles.iconBtn} ${styles.editBtn}`} 
+                  title="Edit Category"
+                  onClick={(e) => openEditCategory(cat, e)}
+                >
+                  <EditIcon />
+                </button>
+                <button 
+                  className={`${styles.iconBtn} ${styles.deleteBtn}`} 
+                  title="Delete Category"
+                  onClick={(e) => handleDeleteCategory(cat.id, e)}
+                >
+                  <TrashIcon />
+                </button>
               </div>
             </div>
+          </div>
+        ))}
+      </div>
 
-            {expandedCategory === cat.id && (
-              <div className={styles.templatesList}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-                  <button 
-                    className={styles.addButton} 
-                    style={{ fontSize: '12px', padding: '6px 12px' }}
-                    onClick={() => openAddTemplate(cat.id)}
-                  >
-                    + Add Template
-                  </button>
+      {/* Category Details Modal */}
+      {viewingCategory && (
+        <div className={styles.modalOverlay} onClick={() => setViewingCategory(null)}>
+          <div className={styles.modal} style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className={styles.modalTitle} style={{ margin: 0 }}>
+                {viewingCategory.name} Templates
+              </h2>
+              <button 
+                className={styles.addButton} 
+                style={{ fontSize: '13px', padding: '6px 12px' }}
+                onClick={() => openAddTemplate(viewingCategory.id)}
+              >
+                + Add Template
+              </button>
+            </div>
+            
+            <div className={styles.templatesList}>
+              {viewingCategory.templates.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#6B7280', padding: '24px' }}>
+                  No templates configured in this category yet.
                 </div>
-                
-                {cat.templates.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#6B7280', padding: '16px' }}>No templates yet</div>
-                ) : (
-                  cat.templates.map(tpl => (
-                    <div key={tpl.id} className={styles.templateItem}>
-                      <div className={styles.templateInfo}>
-                        <span className={styles.templateName}>{tpl.name}</span>
+              ) : (
+                viewingCategory.templates.map(tpl => (
+                  <div key={tpl.id} className={styles.templateItem}>
+                    <div className={styles.templateInfo}>
+                      <span className={styles.templateName}>{tpl.name}</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span className={styles.templateDuration}>{tpl.estimated_duration_minutes} mins</span>
                         <span className={`${styles.badge} ${tpl.is_custom ? styles.badgeCustom : styles.badgeStandard}`}>
                           {tpl.is_custom ? 'Custom' : 'Standard'}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {!!tpl.is_custom && (
-                          <button className={styles.promoteBtn} onClick={() => handlePromoteTemplate(tpl.id)}>
-                            Promote
-                          </button>
-                        )}
-                        <button className={styles.editBtn} onClick={(e) => openEditTemplate(tpl, e)}>Edit</button>
-                        <button className={styles.deleteBtn} onClick={(e) => handleDeleteTemplate(tpl.id, e)}>Delete</button>
-                      </div>
                     </div>
-                  ))
-                )}
-              </div>
-            )}
+                    <div className={styles.templateActions}>
+                      {!!tpl.is_custom && (
+                        <button 
+                          className={`${styles.iconBtn} ${styles.promoteBtn}`} 
+                          title="Promote to Standard"
+                          onClick={() => handlePromoteTemplate(tpl.id)}
+                        >
+                          <PromoteIcon />
+                        </button>
+                      )}
+                      <button 
+                        className={`${styles.iconBtn} ${styles.editBtn}`} 
+                        title="Edit Template"
+                        onClick={(e) => openEditTemplate(tpl, e)}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button 
+                        className={`${styles.iconBtn} ${styles.deleteBtn}`} 
+                        title="Delete Template"
+                        onClick={(e) => handleDeleteTemplate(tpl.id, e)}
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={() => setViewingCategory(null)}>
+                Close
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* Add/Edit Category Modal */}
       {showCatModal && (

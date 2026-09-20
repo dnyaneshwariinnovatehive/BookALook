@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\Facades\DB;
 
 use App\Services\Notifications\LogWhatsAppGateway;
+use App\Services\Notifications\MetaCloudWhatsAppGateway;
 use App\Services\Notifications\WhatsAppGateway;
 use App\Services\Payments\DemoPaymentGateway;
 use App\Services\Payments\PaymentGateway;
@@ -18,10 +19,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Until a WhatsApp Business account is connected the log driver is the
-        // only implementation; add the real one here keyed on the same config.
+        // Meta's Cloud API when it is configured, the log driver otherwise.
+        // Falling back on missing credentials rather than throwing is
+        // deliberate: a half-configured environment should queue messages for
+        // inspection, not fail every booking that tries to notify someone.
         $this->app->bind(WhatsAppGateway::class, function () {
-            return match (config('services.whatsapp.driver')) {
+            $config = config('services.whatsapp');
+
+            return match ($config['driver'] ?? 'log') {
+                'meta_cloud' => filled($config['phone_number_id']) && filled($config['access_token'])
+                    ? new MetaCloudWhatsAppGateway(
+                        $config['phone_number_id'],
+                        $config['access_token'],
+                        $config['api_version'] ?? 'v21.0',
+                    )
+                    : new LogWhatsAppGateway(),
                 default => new LogWhatsAppGateway(),
             };
         });

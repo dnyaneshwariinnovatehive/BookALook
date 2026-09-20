@@ -40,16 +40,24 @@ return [
     | WhatsApp Business
     |--------------------------------------------------------------------------
     |
-    | No provider is connected yet. The `log` driver records what would be sent
-    | and leaves the row queued in whatsapp_messages; swap `driver` once a
-    | WhatsApp Business account exists and bind the implementation in
-    | AppServiceProvider.
+    | Set WHATSAPP_DRIVER=meta_cloud once a WhatsApp Business account exists and
+    | the phone number id and access token below are filled in. Until then the
+    | `log` driver records what would be sent and leaves the row queued in
+    | whatsapp_messages, so campaigns can be built and tested end to end
+    | without a provider — and nothing is ever mistaken for delivered.
+    |
+    | The marketing side needs two more values than the notification side did:
+    | `verify_token`, which Meta echoes back when the webhook is subscribed, and
+    | `app_secret`, which signs every incoming payload.
     |
     */
     'whatsapp' => [
         'driver' => env('WHATSAPP_DRIVER', 'log'),
         'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
         'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
         'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '91'),
         'templates' => [
             'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),

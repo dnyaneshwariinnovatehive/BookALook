@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart';
+import '../../notifications_screen.dart';
 import '../../provider_appointment_details_screen.dart';
 import '../../qr_scanner_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
@@ -161,7 +162,12 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.notifications_none, color: Colors.black87),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                      );
+                    },
                   ),
                 ],
               ),

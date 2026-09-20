@@ -15,6 +15,10 @@ class SubscriptionPlan extends Model
         'price',
         'validity_days',
         'whatsapp_campaign_limit',
+        // Both allowances are editable. Either can be set to zero to take it
+        // out of use, so which one actually caps a plan stays a commercial
+        // decision rather than a schema one.
+        'whatsapp_message_limit',
         'has_customer_segmentation',
         'has_service_based_targeting',
         'has_high_value_targeting',

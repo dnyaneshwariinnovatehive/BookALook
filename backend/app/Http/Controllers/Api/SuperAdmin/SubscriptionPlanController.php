@@ -465,7 +465,11 @@ class SubscriptionPlanController extends Controller
             'name' => $must('string|max:50'),
             'price' => $must('numeric'),
             'validity_days' => $must('integer|min:1'),
-            'whatsapp_campaign_limit' => $must('integer'),
+            // Campaigns per billing cycle, and messages per billing cycle.
+            // Zero on either takes that allowance out of use, so a plan can be
+            // capped by campaigns, by messages, by both or by neither.
+            'whatsapp_campaign_limit' => $must('integer|min:0'),
+            'whatsapp_message_limit' => 'sometimes|integer|min:0',
             'has_customer_segmentation' => 'boolean',
             'has_service_based_targeting' => 'boolean',
             'has_high_value_targeting' => 'boolean',
