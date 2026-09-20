@@ -130,47 +130,35 @@ class _MainScreenState extends State<MainScreen> {
             TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
         ],
       ),
-      bottomNavigationBar: Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+          height: 75,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkBorder 
-                  : AppTheme.lightBorder,
-              width: 1,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 30,
-              offset: const Offset(0, -8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
           child: BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: _onTabTapped,
             type: BottomNavigationBarType.fixed,
             backgroundColor: Theme.of(context).colorScheme.surface,
-            selectedItemColor: AppTheme.accentColor,
-            unselectedItemColor: Theme.of(context).brightness == Brightness.dark 
-                ? AppTheme.darkTextBody 
-                : AppTheme.lightTextBody,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
-            elevation: 0,
+              selectedItemColor: AppTheme.accentColor,
+              unselectedItemColor: Theme.of(context).brightness == Brightness.dark 
+                  ? AppTheme.darkTextBody 
+                  : const Color(0xFF9E98AE), // muted gray-purple
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+              elevation: 0,
             items: const [
               BottomNavigationBarItem(
                 icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_outlined, size: 22)),
@@ -201,6 +189,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

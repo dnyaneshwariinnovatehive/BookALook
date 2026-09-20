@@ -336,21 +336,21 @@ class _HomeTabState extends State<HomeTab> {
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
         children: [
-          // Avatar: 44px round, purple border
+          // Avatar: 50px round, purple border
           Container(
-            width: 44,
-            height: 44,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
                 color: AppTheme.accentColor,
-                width: 2,
+                width: 1.5,
               ),
             ),
             child: CircleAvatar(
-              radius: 20,
+              radius: 23,
               backgroundColor: AppTheme.lightAccentSoft,
-              child: Icon(Icons.person, color: AppTheme.accentColor, size: 24),
+              child: Icon(Icons.person, color: AppTheme.accentColor, size: 28),
             ),
           ),
           const SizedBox(width: 10),
@@ -416,17 +416,17 @@ class _HomeTabState extends State<HomeTab> {
       onTap: widget.isGuest ? null : _openNotifications,
       customBorder: const CircleBorder(),
       child: Container(
-        width: 42,
-        height: 42,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           color: surfaceColor,
           shape: BoxShape.circle,
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.accentColor.withOpacity(0.02),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
+              color: AppTheme.accentColor.withOpacity(0.01),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -567,17 +567,17 @@ class _HomeTabState extends State<HomeTab> {
         // Search field
         Expanded(
           child: Container(
-            height: 50,
+            height: 52,
             padding: const EdgeInsets.only(left: 16, right: 16),
             decoration: BoxDecoration(
               color: surfaceColor,
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: [
                 BoxShadow(
                   color: AppTheme.accentColor.withOpacity(0.02),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -596,7 +596,7 @@ class _HomeTabState extends State<HomeTab> {
                     decoration: InputDecoration(
                       hintText: 'Search salons, services...',
                       hintStyle: TextStyle(
-                        color: bodyColor,
+                        color: const Color(0xFF9E98AE), // muted gray-purple
                         fontSize: 14,
                       ),
                       border: InputBorder.none,
@@ -613,11 +613,11 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        // Filter button: circular 46x46
+        const SizedBox(width: 12),
+        // Filter button: circular 52x52
         Container(
-          width: 46,
-          height: 46,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
             color: _selectedGender != 'All'
                 ? AppTheme.accentColor.withOpacity(0.1)
@@ -632,8 +632,8 @@ class _HomeTabState extends State<HomeTab> {
             boxShadow: [
               BoxShadow(
                 color: AppTheme.accentColor.withOpacity(0.02),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -690,26 +690,29 @@ class _HomeTabState extends State<HomeTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Section header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Categories',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: headingColor,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Categories',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: headingColor,
+                ),
               ),
-            ),
-            Text(
-              'See All',
-              style: TextStyle(
-                color: AppTheme.accentColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+              Text(
+                'See All',
+                style: TextStyle(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         // Category chips
@@ -744,55 +747,51 @@ class _HomeTabState extends State<HomeTab> {
           )
         else
           SizedBox(
-            height: 52,
+            height: 40,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final category = _categories[index];
                 return GestureDetector(
                   onTap: () =>
                       _navigateToSearch(categoryId: category.id.toString()),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    height: 40,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(30),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: borderColor, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.accentColor.withOpacity(0.02),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                          color: const Color(0xFFE5E0FA), width: 1), // Extremely light lavender-gray border
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         if (category.iconUrl != null &&
                             category.iconUrl!.isNotEmpty)
                           Image.network(category.iconUrl!,
-                              width: 15,
-                              height: 15,
-                              errorBuilder: (c, e, s) => Icon(
+                              width: 18,
+                              height: 18,
+                              color: const Color(0xFF9E98AE), // Purple-gray icon
+                              errorBuilder: (c, e, s) => const Icon(
                                   Icons.category_rounded,
-                                  size: 15,
-                                  color: bodyColor))
+                                  size: 18,
+                                  color: Color(0xFF9E98AE)))
                         else
-                          Icon(Icons.category_rounded,
-                              color: bodyColor, size: 15),
-                        const SizedBox(width: 8),
+                          const Icon(Icons.category_rounded,
+                              color: Color(0xFF9E98AE), size: 18),
+                        const SizedBox(width: 10),
                         Text(
                           category.name,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: bodyColor,
+                            fontSize: 15,
+                            color: Color(0xFF9E98AE), // Gray-purple text
                           ),
                         ),
                       ],
@@ -820,52 +819,86 @@ class _HomeTabState extends State<HomeTab> {
     // Empty state
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: AppTheme.lightCardBg,
-        borderRadius: BorderRadius.circular(22),
-        border:
-            Border.all(color: AppTheme.lightAccentSoft.withOpacity(0.6)),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color(0xFFF3EBFE),
+            Color(0xFFF0E5FE),
+            Color(0xFFE9D9FC),
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppTheme.lightPurpleBorder, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withOpacity(0.02),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.accentColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'YOUR NEXT APPOINTMENT',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5),
+          Positioned(
+            top: -30,
+            right: -30,
+            child: Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFE4D0FA).withOpacity(0.7),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                children: [
-                  Icon(Icons.calendar_today_outlined,
-                      size: 36,
-                      color: AppTheme.accentColor.withOpacity(0.3)),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.isGuest
-                        ? 'Sign in to see your appointments'
-                        : 'No upcoming appointments',
-                    style: TextStyle(
-                        color: bodyColor,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
-              ),
+                  child: const Text(
+                    'YOUR NEXT APPOINTMENT',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        Icon(Icons.calendar_today_outlined,
+                            size: 36,
+                            color: AppTheme.accentColor.withOpacity(0.3)),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.isGuest
+                              ? 'Sign in to see your appointments'
+                              : 'No upcoming appointments',
+                          style: TextStyle(
+                              color: bodyColor,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -892,16 +925,17 @@ class _HomeTabState extends State<HomeTab> {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
-            AppTheme.lightAccentSoft,
-            AppTheme.lightAccentSoftHover,
+            Color(0xFFF3EBFE),
+            Color(0xFFF0E5FE),
+            Color(0xFFE9D9FC),
           ],
+          stops: [0.0, 0.5, 1.0],
         ),
-        borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: AppTheme.accentColor.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppTheme.lightPurpleBorder, width: 1.0),
         boxShadow: [
           BoxShadow(
             color: AppTheme.accentColor.withOpacity(0.02),
@@ -914,14 +948,14 @@ class _HomeTabState extends State<HomeTab> {
         children: [
           // Decorative circle in upper-right corner
           Positioned(
-            top: -40,
-            right: -40,
+            top: -30,
+            right: -30,
             child: Container(
-              width: 120,
-              height: 120,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.accentColor.withOpacity(0.08),
+                color: const Color(0xFFE4D0FA).withOpacity(0.7),
               ),
             ),
           ),
@@ -943,9 +977,9 @@ class _HomeTabState extends State<HomeTab> {
                     'YOUR NEXT APPOINTMENT',
                     style: TextStyle(
                         color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1046,12 +1080,12 @@ class _HomeTabState extends State<HomeTab> {
                   ElevatedButton(
                     onPressed: () => _openCheckInQr(booking),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.brownDark,
-                      foregroundColor: AppTheme.brownGoldText,
+                      backgroundColor: AppTheme.darkButtonBg,
+                      foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
+                          borderRadius: BorderRadius.circular(22)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1086,42 +1120,45 @@ class _HomeTabState extends State<HomeTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Section header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Book Again',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: headingColor,
-              ),
-            ),
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => MyBookingsScreen()));
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Text(
-                'See All',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Book Again',
                 style: TextStyle(
-                  color: AppTheme.accentColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: headingColor,
                 ),
               ),
-            ),
-          ],
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => MyBookingsScreen()));
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Text(
+                  'See All',
+                  style: TextStyle(
+                    color: AppTheme.accentColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
         // Book again content
         if (_past.isNotEmpty && !widget.isGuest)
           SizedBox(
-            height: 195,
+            height: 200,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(20, 5, 20, 15),
@@ -1187,11 +1224,13 @@ class _HomeTabState extends State<HomeTab> {
           );
         }
       },
-      child: Container(
-        width: 250,
-      decoration: BoxDecoration(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: 250,
+          decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
@@ -1202,6 +1241,7 @@ class _HomeTabState extends State<HomeTab> {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image Wrapper
@@ -1212,8 +1252,8 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(18),
-                      topRight: Radius.circular(18)),
+                      topLeft: Radius.circular(22),
+                      topRight: Radius.circular(22)),
                   child: Image.network(
                     booking['salon']?['cover_image'] ??
                         'https://via.placeholder.com/250x110',
@@ -1250,7 +1290,7 @@ class _HomeTabState extends State<HomeTab> {
           ),
           // Info Section
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1304,6 +1344,8 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ],
       ),
-    ));
+      ),
+      ),
+    );
   }
 }

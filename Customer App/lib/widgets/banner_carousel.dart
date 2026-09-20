@@ -118,7 +118,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 1),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(26),
                     color: AppTheme.lightAccentSoft,
                     image: DecorationImage(
                       image: NetworkImage(banner.imageUrl),
@@ -142,38 +142,38 @@ class _BannerCarouselState extends State<BannerCarousel> {
                           ),
                         ),
                       ),
-                      // Real backend title overlaid on the image
-                      if (banner.title.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Align(
-                            alignment: Alignment.topLeft,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  banner.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.2,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0x4D000000),
-                                        offset: Offset(0, 2),
-                                        blurRadius: 4,
-                                      ),
-                                    ],
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Stack(
+                          children: [
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    banner.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.2,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0x4D000000),
+                                          offset: Offset(0, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -195,13 +195,13 @@ class _BannerCarouselState extends State<BannerCarousel> {
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
                       margin: const EdgeInsets.symmetric(horizontal: 3), // gap 6px total
-                      height: 6,
-                      width: isActive ? 18 : 6,
+                      height: 5,
+                      width: isActive ? 16 : 5,
                       decoration: BoxDecoration(
                         color: isActive
                             ? Colors.white
-                            : Colors.white.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(3),
+                            : Colors.white.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(2.5),
                       ),
                     );
                   },

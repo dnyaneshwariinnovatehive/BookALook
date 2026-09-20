@@ -58,6 +58,10 @@ class AppTheme {
   static const Color brownMuted = Color(0xFF8A8078);
   static const Color brownLightBg = Color(0xFFE3D9CE);
   
+  // Custom Dark Button Color
+  static const Color darkButtonBg = Color(0xFF2A2831);
+  static const Color lightPurpleBorder = Color(0xFFEFE8FC);
+
   // Misc
   static const Color starRating = Color(0xFFFFB300);
   static const Color femaleColor = Color(0xFFC2185B);
