@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/salon_service.dart';
+import '../../services/appointment_service.dart';
 import '../salon_detail_screen.dart';
 import '../../services/cart_service.dart';
 import '../../services/location_service.dart';
 import '../../widgets/city_picker_sheet.dart';
 import '../cart_screen.dart';
+import '../salon_list_screen.dart';
 
 class ExploreTab extends StatefulWidget {
   @override
@@ -15,9 +17,14 @@ class ExploreTab extends StatefulWidget {
 
 class _ExploreTabState extends State<ExploreTab> {
   final SalonService _salonService = SalonService();
+  final AppointmentService _appointmentService = AppointmentService();
   List<dynamic> _salons = [];
+  List<dynamic> _mostVisitedSalons = [];
   bool _isLoading = true;
   String _error = '';
+
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedFilter = 'All Salons';
 
   final CartService _cartService = CartService();
   Map<String, dynamic>? _globalCart;
@@ -37,6 +44,7 @@ class _ExploreTabState extends State<ExploreTab> {
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -58,9 +66,38 @@ class _ExploreTabState extends State<ExploreTab> {
       final response = await _salonService.fetchSalons();
       final salons = response['salons'] ?? [];
       final globalCart = await _cartService.getGlobalCart();
+      
+      // Fetch past bookings to determine 'Most Visited'
+      List<dynamic> mostVisited = [];
+      try {
+        final bookings = await _appointmentService.getMyBookings();
+        final past = (bookings['past'] as List?) ?? [];
+        
+        // Count salon visits
+        final Map<String, int> visitCounts = {};
+        final Map<String, dynamic> salonData = {};
+        for (var booking in past) {
+          final sId = booking['salon_id']?.toString();
+          if (sId != null && booking['salon'] != null) {
+            visitCounts[sId] = (visitCounts[sId] ?? 0) + 1;
+            salonData[sId] = booking['salon'];
+          }
+        }
+        
+        // Sort by visits and take top 5
+        final sortedKeys = visitCounts.keys.toList()
+          ..sort((a, b) => visitCounts[b]!.compareTo(visitCounts[a]!));
+        for (var key in sortedKeys.take(5)) {
+          mostVisited.add(salonData[key]);
+        }
+      } catch (_) {
+        // Ignore errors for most visited
+      }
+
       if (!mounted) return;
       setState(() {
         _salons = salons;
+        _mostVisitedSalons = mostVisited;
         _suggested = response['suggested_salons'] ?? [];
         _suggestedCity = response['suggested_city'] as Map<String, dynamic>?;
         _globalCart = globalCart;
@@ -76,6 +113,36 @@ class _ExploreTabState extends State<ExploreTab> {
     }
   }
 
+  void _navigateToSearch() {
+    if (_searchController.text.trim().isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SalonListScreen(
+          initialSearch: _searchController.text,
+          title: 'Search Results',
+        ),
+      )
+    );
+  }
+
+  List<dynamic> get _filteredSalons {
+    if (_selectedFilter == 'Open Now') {
+      return _salons.where((s) => s['is_serviceable'] != false).toList();
+    } else if (_selectedFilter == 'Top Rated (4.8+)') {
+      return _salons.where((s) {
+        final avg = (s['avg_rating'] as num?)?.toDouble() ?? 0;
+        return avg >= 4.8;
+      }).toList();
+    } else if (_selectedFilter == 'Top Rated (4.5+)') {
+      return _salons.where((s) {
+        final avg = (s['avg_rating'] as num?)?.toDouble() ?? 0;
+        return avg >= 4.5;
+      }).toList();
+    }
+    return _salons;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -85,169 +152,50 @@ class _ExploreTabState extends State<ExploreTab> {
       return Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)));
     }
 
+    final filteredSalons = _filteredSalons;
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFBF9FF), // light lavender-white
       body: SafeArea(
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text('Explore Salons', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
-                ),
-                // Changing city is the single most useful control on an empty
-                // list, so it is always within reach rather than only on Home.
-                TextButton.icon(
-                  onPressed: _pickCity,
-                  icon: Icon(Icons.location_on, size: 16, color: AppTheme.accentColor),
-                  label: Text(
-                    LocationService.instance.label,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: AppTheme.accentColor),
-                  ),
-                ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 16),
+              _buildHeader(),
+              SizedBox(height: 20),
+              _buildFilters(),
+              
+              if (_mostVisitedSalons.isNotEmpty) ...[
+                SizedBox(height: 28),
+                _buildSectionTitle('Most Visited by You', null),
+                SizedBox(height: 16),
+                _buildMostVisited(),
               ],
-            ),
+              
+              // Top Rated Combos Near You
+              ..._buildCombosSection(),
+
+              SizedBox(height: 28),
+              _buildSectionTitle('All Salons near you', '(${filteredSalons.length})'),
+              SizedBox(height: 16),
+              
+              if (filteredSalons.isEmpty) 
+                _buildEmptyCity()
+              else
+                _buildAllSalons(filteredSalons),
+                
+              SizedBox(height: 90),
+            ],
           ),
-          Expanded(
-            child: _salons.isEmpty
-                ? _buildEmptyCity()
-                : ListView.separated(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    itemCount: _salons.length,
-                    separatorBuilder: (context, index) => SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final salon = _salons[index];
-                      // A salon whose plan has lapsed stays findable — a
-                      // returning customer should not think it has vanished —
-                      // but it is plainly marked as not taking bookings.
-                      final isServiceable = salon['is_serviceable'] != false;
-
-                      return InkWell(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(
-                            builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
-                          ));
-                        },
-                        child: Opacity(
-                          opacity: isServiceable ? 1.0 : 0.6,
-                          child: Container(
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppTheme.lightSurface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppTheme.lightBorder),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))
-                            ]
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.lightAccentSoft,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40),
-                              ),
-                              SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
-                                    SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.location_on, size: 14, color: AppTheme.lightTextBody),
-                                        SizedBox(width: 4),
-                                        Expanded(child: Text(salon['address'] ?? 'No address provided', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13))),
-                                      ],
-                                    ),
-                                    if (salon['distance_km'] != null) ...[
-                                      SizedBox(height: 4),
-                                      Text(
-                                        // "about" when the salon sits on its
-                                        // city centre rather than its own pin —
-                                        // a guess should not read as a measurement.
-                                        '${salon['distance_is_approximate'] == true ? 'about ' : ''}${salon['distance_km']} km away',
-                                        style: GoogleFonts.outfit(
-                                          color: AppTheme.accentColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                    SizedBox(height: 8),
-                                    if (!isServiceable)
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.lightWarningBg,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          salon['unavailable_reason'] ?? 'Not taking bookings right now',
-                                          style: GoogleFonts.outfit(
-                                              color: AppTheme.lightWarning,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600),
-                                        ),
-                                      )
-                                    else
-                                      Builder(
-                                        builder: (_) {
-                                          // Real figures, straight off the row. This
-                                          // said "4.5 (120 reviews)" for every salon
-                                          // on the platform, which is worse than
-                                          // showing nothing at all.
-                                          final count = (salon['review_count'] as num?)?.toInt() ?? 0;
-                                          final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
-
-                                          if (count == 0) {
-                                            return Text('New salon',
-                                                style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600));
-                                          }
-
-                                          return Row(
-                                            children: [
-                                              Icon(Icons.star, size: 14, color: AppTheme.starRating),
-                                              SizedBox(width: 4),
-                                              Text('${avg.toStringAsFixed(1)} ($count ${count == 1 ? 'review' : 'reviews'})',
-                                                  style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
-                                            ],
-                                          );
-                                        },
-                                      )
-                                  ],
-                                ),
-                              )
-                            ],
-                          ),
-                        ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+        ),
       ),
       floatingActionButton: _globalCart != null && (_globalCart!['items'] as List).isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(
-                  // Pass the salonId from the global cart
                   builder: (context) => CartScreen()
-                )).then((_) {
-                  // Reload when returning from cart
-                  _loadSalons();
-                });
+                )).then((_) => _loadSalons());
               },
               backgroundColor: AppTheme.accentColor,
               icon: Icon(Icons.shopping_cart, color: Colors.white),
@@ -257,88 +205,544 @@ class _ExploreTabState extends State<ExploreTab> {
     );
   }
 
-  /// What a customer sees when their city has nothing in it.
-  ///
-  /// An empty list with no explanation reads as a broken app. This says which
-  /// city was searched, offers the nearest market that does have salons, and
-  /// keeps the city control in reach — so there is always a way forward.
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 48,
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFEBE8F6)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: Offset(0, 2))
+                ]
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: AppTheme.lightTextLight, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextHeading),
+                      decoration: InputDecoration(
+                        hintText: 'Search salons or services...',
+                        hintStyle: GoogleFonts.outfit(color: AppTheme.lightTextLight, fontSize: 14),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onSubmitted: (_) => _navigateToSearch(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          InkWell(
+            onTap: _pickCity,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              height: 48,
+              width: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFEBE8F6)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: Offset(0, 2))
+                ]
+              ),
+              child: Center(
+                child: Icon(Icons.map_outlined, color: AppTheme.lightTextBody, size: 22),
+              ),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilters() {
+    final filters = ['All Salons', 'Open Now', 'Top Rated (4.8+)', 'Top Rated (4.5+)'];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        scrollDirection: Axis.horizontal,
+        itemCount: filters.length,
+        separatorBuilder: (_, __) => SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final filter = filters[index];
+          final isSelected = _selectedFilter == filter;
+          return InkWell(
+            onTap: () => setState(() => _selectedFilter = filter),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? AppTheme.accentColor : const Color(0xFFEBE8F6),
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: Offset(0, 2))
+                ]
+              ),
+              child: Text(
+                filter,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppTheme.accentColor : AppTheme.lightTextBody,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, String? subtitle) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+          if (subtitle != null) ...[
+            SizedBox(width: 6),
+            Text(subtitle, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.lightTextBody)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMostVisited() {
+    return SizedBox(
+      height: 170,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        scrollDirection: Axis.horizontal,
+        itemCount: _mostVisitedSalons.length,
+        separatorBuilder: (_, __) => SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final salon = _mostVisitedSalons[index];
+          final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+          return InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon['id'].toString()))),
+            child: Container(
+              width: 160,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFEBE8F6)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                ]
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          salon['cover_image'] ?? salon['logo_image'] ?? '',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                        ),
+                        if (salon['distance_km'] != null)
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                              child: Text(
+                                '${salon['distance_km']} km',
+                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          )
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(salon['name'] ?? 'Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading))),
+                            Icon(Icons.star, size: 12, color: AppTheme.starRating),
+                            SizedBox(width: 2),
+                            Text(avg > 0 ? avg.toStringAsFixed(1) : 'New', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                          ],
+                        ),
+                        SizedBox(height: 2),
+                        Text(salon['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.lightTextBody)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _buildCombosSection() {
+    final List<Map<String, dynamic>> allCombos = [];
+    for (var salon in _salons) {
+      if (salon['combos'] != null && salon['combos'] is List) {
+        for (var combo in salon['combos']) {
+          final enrichedCombo = Map<String, dynamic>.from(combo);
+          enrichedCombo['salon_name'] = salon['name'];
+          enrichedCombo['salon_rating'] = salon['avg_rating'];
+          enrichedCombo['salon_id'] = salon['id'];
+          enrichedCombo['cover_image'] = salon['cover_image'] ?? salon['logo_image'];
+          allCombos.add(enrichedCombo);
+        }
+      }
+    }
+
+    if (allCombos.isEmpty) return [];
+
+    return [
+      SizedBox(height: 28),
+      Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Top Rated Combos Near You', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+            SizedBox(height: 2),
+            Text('Save more with bundled services', style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextLight)),
+          ],
+        ),
+      ),
+      SizedBox(height: 16),
+      SizedBox(
+        height: 270,
+        child: ListView.separated(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          scrollDirection: Axis.horizontal,
+          itemCount: allCombos.length,
+          separatorBuilder: (_, __) => SizedBox(width: 16),
+          itemBuilder: (context, index) {
+            final combo = allCombos[index];
+            final avg = (combo['salon_rating'] as num?)?.toDouble() ?? 0;
+            return Container(
+              width: 240,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFEBE8F6)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                ]
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          combo['cover_image'] ?? '',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                        ),
+                        if (combo['discount_percent'] != null && combo['discount_percent'] > 0)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: AppTheme.accentColor, borderRadius: BorderRadius.circular(6)),
+                              child: Text(
+                                'SAVE ${combo['discount_percent']}%',
+                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                              ),
+                            ),
+                          )
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(combo['salon_name'] ?? 'Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.accentColor, fontWeight: FontWeight.w600))),
+                            Icon(Icons.star, size: 12, color: AppTheme.starRating),
+                            SizedBox(width: 2),
+                            Text(avg > 0 ? avg.toStringAsFixed(1) : 'New', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(combo['name'] ?? 'Combo', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                        SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text('₹${combo['price'] ?? 0}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                            SizedBox(width: 10),
+                            Icon(Icons.access_time, size: 12, color: AppTheme.lightTextBody),
+                            SizedBox(width: 4),
+                            Text('${combo['duration_minutes'] ?? 60} mins', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.lightTextBody)),
+                          ],
+                        ),
+                        if (combo['description'] != null) ...[
+                          SizedBox(height: 6),
+                          Text(combo['description'], maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.lightTextLight)),
+                        ],
+                        SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: combo['salon_id'].toString()))),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.accentColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: EdgeInsets.symmetric(vertical: 10)
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Book Combo', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
+                                SizedBox(width: 6),
+                                Icon(Icons.arrow_forward, size: 16),
+                              ],
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      )
+    ];
+  }
+
+  Widget _buildAllSalons(List<dynamic> salons) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: salons.map((salon) {
+          final isServiceable = salon['is_serviceable'] != false;
+          final count = (salon['review_count'] as num?)?.toInt() ?? 0;
+          final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: InkWell(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
+                ));
+              },
+              child: Opacity(
+                opacity: isServiceable ? 1.0 : 0.6,
+                child: Container(
+                  height: 130,
+                  clipBehavior: Clip.hardEdge,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFEBE8F6)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                    ]
+                  ),
+                  child: Row(
+                    children: [
+                      // Image on the left
+                      SizedBox(
+                        width: 110,
+                        height: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              salon['cover_image'] ?? salon['logo_image'] ?? '',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                            ),
+                            if (salon['distance_km'] != null)
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                                  child: Text(
+                                    '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
+                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              )
+                          ],
+                        ),
+                      ),
+                      // Details on the right
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      salon['name'] ?? 'Unnamed Salon',
+                                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (count > 0) ...[
+                                    Icon(Icons.star, size: 14, color: AppTheme.starRating),
+                                    SizedBox(width: 4),
+                                    Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: AppTheme.lightTextHeading, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  ] else
+                                    Text('New', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on, size: 13, color: AppTheme.lightTextBody),
+                                  SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      salon['address'] ?? 'No address',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12)
+                                    )
+                                  ),
+                                ],
+                              ),
+                              Spacer(),
+                              if (!isServiceable)
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.lightWarningBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    salon['unavailable_reason'] ?? 'Not taking bookings',
+                                    style: GoogleFonts.outfit(color: AppTheme.lightWarning, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                )
+                              else
+                                Text(
+                                  'Tap to view services \u2192',
+                                  style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                            ],
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildEmptyCity() {
     final cityName = LocationService.instance.city?.name;
     final suggestedName = _suggestedCity?['name'];
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 40, 20, 24),
+    return Column(
       children: [
+        SizedBox(height: 40),
         Icon(Icons.storefront_outlined, size: 56, color: Colors.grey.shade400),
         const SizedBox(height: 16),
         Text(
-          cityName == null
-              ? 'No salons found'
-              : 'No salons in $cityName yet',
+          cityName == null ? 'No salons found' : 'No salons in $cityName yet',
           textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.lightTextHeading),
+          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
         ),
         const SizedBox(height: 6),
-        Text(
-          'We are adding salons all the time. Try another city in the meantime.',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 40),
+          child: Text(
+            'We are adding salons all the time. Try another city in the meantime.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13),
+          ),
         ),
         const SizedBox(height: 20),
-        Center(
-          child: FilledButton.icon(
-            onPressed: _pickCity,
-            icon: const Icon(Icons.location_on, size: 18),
-            label: const Text('Change city'),
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor),
-          ),
+        FilledButton.icon(
+          onPressed: _pickCity,
+          icon: const Icon(Icons.location_on, size: 18),
+          label: const Text('Change city'),
+          style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor),
         ),
-
+        
         if (_suggested.isNotEmpty) ...[
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
           Text(
-            suggestedName == null
-                ? 'You might like these'
-                : 'Popular in $suggestedName',
-            style: GoogleFonts.outfit(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.lightTextHeading),
+            suggestedName == null ? 'You might like these' : 'Popular in $suggestedName',
+            style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
           ),
           const SizedBox(height: 12),
-          ..._suggested.map((salon) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          SalonDetailScreen(salonId: salon['id'].toString()),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: _suggested.map((salon) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SalonDetailScreen(salonId: salon['id'].toString()))),
+                      tileColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: const Color(0xFFEBE8F6)),
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.lightAccentSoft,
+                        child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 20),
+                      ),
+                      title: Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                      subtitle: Text(salon['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 12)),
                     ),
-                  ),
-                  tileColor: AppTheme.lightSurface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppTheme.lightBorder),
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.lightAccentSoft,
-                    child: Icon(Icons.storefront,
-                        color: AppTheme.accentColor, size: 20),
-                  ),
-                  title: Text(salon['name'] ?? 'Unnamed Salon',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                    salon['address'] ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontSize: 12),
-                  ),
-                ),
-              )),
+                  )).toList(),
+            ),
+          )
         ],
       ],
     );

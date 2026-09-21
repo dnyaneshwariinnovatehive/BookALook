@@ -47,6 +47,34 @@ class _FavouritesTabState extends State<FavouritesTab> {
     }
   }
 
+  Future<void> _removeFavourite(String salonId) async {
+    // Optimistic UI update
+    final int index = _favourites.indexWhere((s) => s['id'].toString() == salonId);
+    if (index == -1) return;
+    
+    final removedItem = _favourites[index];
+    setState(() {
+      _favourites.removeAt(index);
+    });
+    
+    try {
+      await _salonService.toggleFavourite(salonId);
+    } catch (e) {
+      // Revert if failed
+      if (mounted) {
+        setState(() {
+          _favourites.insert(index, removedItem);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove favourite: $e', style: GoogleFonts.outfit()),
+            backgroundColor: AppTheme.lightDanger,
+          )
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.isGuest) {
@@ -66,13 +94,13 @@ class _FavouritesTabState extends State<FavouritesTab> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFBF9FF), // light lavender-white
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
               child: Text('My Favourites', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
             ),
             Expanded(
@@ -83,23 +111,34 @@ class _FavouritesTabState extends State<FavouritesTab> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.favorite_border, size: 80, color: Theme.of(context).dividerColor),
+                            Container(
+                              padding: EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFEBE8F6)),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 12, offset: Offset(0, 4))
+                                ]
+                              ),
+                              child: Icon(Icons.favorite_border, size: 64, color: AppTheme.lightTextLight),
+                            ),
                             SizedBox(height: 24),
                             Text(
                               'No Favourites Yet',
-                              style: TextStyle(
-                                fontSize: 24,
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onSurface,
+                                color: AppTheme.lightTextHeading,
                               ),
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: 12),
                             Text(
                               'Tap the heart icon on salons you love to save them here.',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                color: AppTheme.lightTextBody,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -110,10 +149,15 @@ class _FavouritesTabState extends State<FavouritesTab> {
                   : RefreshIndicator(
                       color: AppTheme.accentColor,
                       onRefresh: _loadFavourites,
-                      child: ListView.separated(
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      child: GridView.builder(
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, 90),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.8, // adjust as needed for image+text
+                        ),
                         itemCount: _favourites.length,
-                        separatorBuilder: (context, index) => SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final salon = _favourites[index];
                           final isServiceable = salon['is_serviceable'] != false;
@@ -128,77 +172,90 @@ class _FavouritesTabState extends State<FavouritesTab> {
                             onTap: () {
                               Navigator.push(context, MaterialPageRoute(
                                 builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
-                              )).then((_) {
-                                // Refresh favorites when returning from detail screen
-                                _loadFavourites();
-                              });
+                              )).then((_) => _loadFavourites());
                             },
                             child: Opacity(
                               opacity: isServiceable ? 1.0 : 0.6,
                               child: Container(
-                                padding: EdgeInsets.all(16),
+                                clipBehavior: Clip.hardEdge,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.lightSurface,
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: AppTheme.lightBorder),
+                                  border: Border.all(color: const Color(0xFFEBE8F6)),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))
+                                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
                                   ]
                                 ),
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 80,
-                                      height: 80,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.lightAccentSoft,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40),
-                                    ),
-                                    SizedBox(width: 16),
                                     Expanded(
+                                      child: Stack(
+                                        fit: StackFit.expand,
+                                        children: [
+                                          Image.network(
+                                            salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                                          ),
+                                          if (salon['distance_km'] != null)
+                                            Positioned(
+                                              bottom: 8,
+                                              left: 8,
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                                                child: Text(
+                                                  '${salon['distance_km']} km',
+                                                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                                ),
+                                              ),
+                                            ),
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: InkWell(
+                                              onTap: () => _removeFavourite(salon['id'].toString()),
+                                              child: Container(
+                                                padding: EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: Offset(0, 2))
+                                                  ]
+                                                ),
+                                                child: Icon(Icons.favorite, size: 16, color: AppTheme.lightDanger),
+                                              ),
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.all(10),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                                          Row(
+                                            children: [
+                                              Expanded(child: Text(salon['name'] ?? 'Unnamed Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading))),
+                                            ],
+                                          ),
                                           SizedBox(height: 4),
                                           Row(
                                             children: [
-                                              Icon(Icons.location_on, size: 14, color: AppTheme.lightTextBody),
-                                              SizedBox(width: 4),
-                                              Expanded(child: Text(salon['address'] ?? 'No address provided', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13))),
+                                              if (ratingCount > 0) ...[
+                                                Icon(Icons.star, size: 12, color: AppTheme.starRating),
+                                                SizedBox(width: 4),
+                                                Text(avgVal.toStringAsFixed(1), style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                                              ] else
+                                                Text('New Salon', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
                                             ],
                                           ),
-                                          SizedBox(height: 8),
-                                          if (!isServiceable)
-                                            Container(
-                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.lightWarningBg,
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                salon['unavailable_reason'] ?? 'Not taking bookings right now',
-                                                style: GoogleFonts.outfit(
-                                                    color: AppTheme.lightWarning,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600),
-                                              ),
-                                            )
-                                          else if (ratingCount > 0)
-                                            Row(
-                                              children: [
-                                                Icon(Icons.star, size: 14, color: AppTheme.starRating),
-                                                SizedBox(width: 4),
-                                                Text('${avgVal.toStringAsFixed(1)} ($ratingCount reviews)', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
-                                              ],
-                                            )
-                                          else
-                                            Text('New Salon', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600))
                                         ],
                                       ),
-                                    )
+                                    ),
                                   ],
                                 ),
                               ),

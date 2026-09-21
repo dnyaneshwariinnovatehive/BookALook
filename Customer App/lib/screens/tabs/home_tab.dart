@@ -1039,6 +1039,8 @@ class _HomeTabState extends State<HomeTab> {
 
                 // Divider
                 const SizedBox(height: 14),
+                _DashedDivider(),
+                const SizedBox(height: 14),
 
                 // Date & time
                 Row(
@@ -1346,6 +1348,33 @@ class _HomeTabState extends State<HomeTab> {
       ),
       ),
       ),
+    );
+  }
+}
+
+class _DashedDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final boxWidth = constraints.constrainWidth();
+        const dashWidth = 4.0;
+        const dashHeight = 1.0;
+        final dashCount = (boxWidth / (2 * dashWidth)).floor();
+        return Flex(
+          children: List.generate(dashCount, (_) {
+            return SizedBox(
+              width: dashWidth,
+              height: dashHeight,
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: Color(0xFFBDBDBD)),
+              ),
+            );
+          }),
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          direction: Axis.horizontal,
+        );
+      },
     );
   }
 }
