@@ -108,30 +108,41 @@ class _ProfileTabState extends State<ProfileTab> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dangerColor = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
-    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final bgColor = isDark ? AppTheme.darkBg : const Color(0xFFFBF9FF);
 
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      );
     }
 
     if (_error.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(_error, style: TextStyle(color: dangerColor)),
-            SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _isLoading = true;
-                  _error = '';
-                });
-                _loadProfileData();
-              },
-              child: Text('Retry'),
-            ),
-          ],
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(_error, style: TextStyle(color: dangerColor)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _error = '';
+                  });
+                  _loadProfileData();
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
+                child: const Text('Retry', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -139,193 +150,209 @@ class _ProfileTabState extends State<ProfileTab> {
     final userName = _userProfile?['name'] ?? 'Guest';
     final joinDate = _formatJoinDate(_userProfile?['created_at']);
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Profile Header
-            Text(
-              'My Profile',
-              style: GoogleFonts.outfit(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.onSurface,
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Profile Header
+              Text(
+                'My Profile',
+                style: GoogleFonts.outfit(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: headingColor,
+                ),
               ),
-            ),
-            SizedBox(height: 24),
-            Row(
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [AppTheme.accentColor, Colors.purpleAccent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(3.0),
-                    child: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.surface,
-                      child: Icon(Icons.person, size: 40, color: Theme.of(context).colorScheme.primary),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        userName,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        joinDate,
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: AppTheme.lightTextLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 32),
-            
-            // Stats Grid
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    _appointmentsCount.toString(),
-                    'Appointments',
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    _favSalonsCount.toString(),
-                    'Fav Salons',
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 40),
-            
-            // Settings Header
-            Text(
-              'ACCOUNT SETTINGS',
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: AppTheme.lightTextLight,
-              ),
-            ),
-            SizedBox(height: 16),
-
-            // Settings Card
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
+              const SizedBox(height: 24),
+              Row(
                 children: [
-                  _buildToggleRow(
-                    context,
-                    icon: Icons.dark_mode_outlined,
-                    label: 'Dark Mode',
-                    value: isDark,
-                    onChanged: (val) {
-                      themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-                    },
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [AppTheme.accentColor, Colors.purpleAccent],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(3.0),
+                      child: CircleAvatar(
+                        backgroundColor: surfaceColor,
+                        child: Icon(Icons.person, size: 40, color: AppTheme.accentColor),
+                      ),
+                    ),
                   ),
-                  Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.5)),
-                  _buildToggleRow(
-                    context,
-                    icon: Icons.notifications_outlined,
-                    label: 'Push Notifications',
-                    value: _pushNotifications,
-                    onChanged: (val) {
-                      setState(() => _pushNotifications = val);
-                      _toggleSetting('push_notifications', val);
-                    },
-                  ),
-                  Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.5)),
-                  _buildToggleRow(
-                    context,
-                    icon: Icons.location_on_outlined,
-                    label: 'Location Access',
-                    value: _locationAccess,
-                    onChanged: (val) {
-                      setState(() => _locationAccess = val);
-                      _toggleSetting('location_access', val);
-                    },
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: headingColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          joinDate,
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-            
-            SizedBox(height: 40),
-            
-            // Logout Button
-            Center(
-              child: TextButton.icon(
-                onPressed: () => _logout(context),
-                icon: Icon(Icons.logout, color: dangerColor, size: 20),
-                label: Text(
-                  'Log Out',
-                  style: GoogleFonts.outfit(
-                    color: dangerColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+              const SizedBox(height: 32),
+              
+              // Stats Grid
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      _appointmentsCount.toString(),
+                      'Appointments',
+                      surfaceColor,
+                      borderColor,
+                      headingColor,
+                    ),
                   ),
-                ),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      _favSalonsCount.toString(),
+                      'Fav Salons',
+                      surfaceColor,
+                      borderColor,
+                      headingColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 40),
+              
+              // Settings Header
+              Text(
+                'ACCOUNT SETTINGS',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
                 ),
               ),
-            ),
-            SizedBox(height: 20),
-          ],
+              const SizedBox(height: 16),
+
+              // Settings Card
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildToggleRow(
+                      context,
+                      icon: Icons.dark_mode_outlined,
+                      label: 'Dark Mode',
+                      value: isDark,
+                      onChanged: (val) {
+                        themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                      },
+                      headingColor: headingColor,
+                    ),
+                    Divider(height: 1, color: borderColor),
+                    _buildToggleRow(
+                      context,
+                      icon: Icons.notifications_outlined,
+                      label: 'Push Notifications',
+                      value: _pushNotifications,
+                      onChanged: (val) {
+                        setState(() => _pushNotifications = val);
+                        _toggleSetting('push_notifications', val);
+                      },
+                      headingColor: headingColor,
+                    ),
+                    Divider(height: 1, color: borderColor),
+                    _buildToggleRow(
+                      context,
+                      icon: Icons.location_on_outlined,
+                      label: 'Location Access',
+                      value: _locationAccess,
+                      onChanged: (val) {
+                        setState(() => _locationAccess = val);
+                        _toggleSetting('location_access', val);
+                      },
+                      headingColor: headingColor,
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // Logout Button
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => _logout(context),
+                  icon: Icon(Icons.logout, color: dangerColor, size: 20),
+                  label: Text(
+                    'Log Out',
+                    style: GoogleFonts.outfit(
+                      color: dangerColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    backgroundColor: isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String count, String label) {
+  Widget _buildStatCard(BuildContext context, String count, String label, Color surfaceColor, Color borderColor, Color headingColor) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -336,15 +363,15 @@ class _ProfileTabState extends State<ProfileTab> {
             style: GoogleFonts.outfit(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: headingColor,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             label,
             style: GoogleFonts.outfit(
               fontSize: 12,
-              color: AppTheme.lightTextLight,
+              color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
             ),
           ),
         ],
@@ -358,20 +385,21 @@ class _ProfileTabState extends State<ProfileTab> {
     required String label,
     required bool value,
     required ValueChanged<bool> onChanged,
+    required Color headingColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-          SizedBox(width: 16),
+          Icon(icon, size: 22, color: headingColor.withOpacity(0.7)),
+          const SizedBox(width: 16),
           Expanded(
             child: Text(
               label,
               style: GoogleFonts.outfit(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: headingColor,
               ),
             ),
           ),

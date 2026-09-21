@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
+import 'appointment_details_screen.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
 
@@ -172,12 +173,15 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FC),
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF9F9FC),
+        backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
         elevation: 0,
-        title: Text('My Bookings', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+        title: Text('My Bookings', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: headingColor)),
         centerTitle: false,
       ),
       body: _isLoading
@@ -189,13 +193,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
                     Container(
                       margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF3F0FF),
+                        color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: TabBar(
                         controller: _tabController,
                         indicator: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? AppTheme.darkSurface : Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
@@ -203,7 +207,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
                         ),
                         indicatorSize: TabBarIndicatorSize.tab,
                         dividerColor: Colors.transparent,
-                        labelColor: AppTheme.accentColor,
+                        labelColor: isDark ? AppTheme.accentColor : AppTheme.accentColor,
                         unselectedLabelColor: AppTheme.accentColor.withOpacity(0.6),
                         labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
                         tabs: const [
@@ -324,399 +328,270 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     }
     final formattedDate = '$datePrefix${DateFormat('d MMM').format(date)}';
 
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            Color(0xFFF3EBFE),
-            Color(0xFFF0E5FE),
-            Color(0xFFE9D9FC),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightPurpleBorder;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final bgGradient = isDark ? null : const LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        Color(0xFFF3EBFE),
+        Color(0xFFF0E5FE),
+        Color(0xFFE9D9FC),
+      ],
+      stops: [0.0, 0.5, 1.0],
+    );
+
+    return InkWell(
+      onTap: () async {
+        final changed = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AppointmentDetailsScreen(
+              booking: booking,
+              isUpcoming: isUpcoming,
+            ),
+          ),
+        );
+        if (changed == true) {
+          _loadBookings();
+        }
+      },
+      borderRadius: BorderRadius.circular(26),
+      child: Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          gradient: bgGradient,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: needsReschedule ? AppTheme.lightWarning : borderColor,
+            width: needsReschedule ? 2 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accentColor.withOpacity(0.02),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
           ],
-          stops: [0.0, 0.5, 1.0],
         ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: needsReschedule ? AppTheme.lightWarning : AppTheme.lightPurpleBorder,
-          width: needsReschedule ? 2 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Decorative circle in upper-right corner
-          Positioned(
-            top: -30,
-            right: -30,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE4D0FA).withOpacity(0.7),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  booking['salon']?['cover_image'] ?? booking['salon']?['logo_image'] ?? '',
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 48,
-                    height: 48,
-                    color: const Color(0xFFF3F0FF),
-                    child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 24),
+        child: Stack(
+          children: [
+            // Decorative circle in upper-right corner
+            if (!isDark)
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE4D0FA).withOpacity(0.7),
                   ),
                 ),
               ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      booking['salon']?['name'] ?? 'Salon',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      serviceNames,
-                      style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              _statusChip(booking['status'].toString()),
-            ],
-          ),
-          
-          SizedBox(height: 16),
-          _DashedDivider(),
-          SizedBox(height: 16),
-
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Date & Time', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                    SizedBox(height: 4),
-                    Text(
-                      '$formattedDate · ${booking['start_time']}',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
-                    ),
-                  ],
-                ),
-              ),
-              if (isUpcoming)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Preferred Stylist', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                      SizedBox(height: 4),
-                      Text(
-                        booking['provider_name'] ?? 'Staff',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Total Payment', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                      SizedBox(height: 4),
-                      Text(
-                        '₹${total.toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-
-          if (isUpcoming && booking['salon']['address'] != null) ...[
-            SizedBox(height: 12),
-            Text('Address', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-            SizedBox(height: 4),
-            Text(booking['salon']['address'], style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextHeading)),
-          ],
-
-          if (isUpcoming && (services.isNotEmpty || addedServices.isNotEmpty)) ...[
-            SizedBox(height: 8),
-            Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                collapsedIconColor: AppTheme.lightTextBody,
-                iconColor: AppTheme.accentColor,
-                title: Text('View Details', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
-                children: [
-                  if (addedServices.isNotEmpty) ...[
-                    Text('Booked', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: AppTheme.lightTextBody)),
-                    SizedBox(height: 8),
-                  ],
-                  if (services.isNotEmpty)
-                    ...services.map((service) => Padding(
-                          padding: EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  service['combo_name'] != null ? '${service['name']}  ·  ${service['combo_name']}' : service['name'],
-                                  style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextHeading),
-                                ),
-                              ),
-                              Text('₹${_toDouble(service['price']).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.lightTextHeading)),
-                            ],
-                          ),
-                        )),
-                  if (addedServices.isNotEmpty) ...[
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Icon(Icons.add_circle_outline, size: 13, color: AppTheme.accentColor),
-                        SizedBox(width: 5),
-                        Text('ADDED AT THE SALON', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: AppTheme.accentColor)),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    ...addedServices.map((service) => Padding(
-                          padding: EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(service['name'] ?? 'Service', style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextHeading)),
-                                    if (service['provider_name'] != null) Text('by ${service['provider_name']}', style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.lightTextBody)),
-                                  ],
-                                ),
-                              ),
-                              Text('₹${_toDouble(service['price']).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.accentColor)),
-                            ],
-                          ),
-                        )),
-                    SizedBox(height: 8),
-                    _moneyRow('Booked services', _toDouble(booking['booked_total']), AppTheme.lightTextHeading),
-                    SizedBox(height: 4),
-                    _moneyRow('Added at the salon', _toDouble(booking['added_total']), AppTheme.accentColor),
-                  ],
-                  SizedBox(height: 8),
-                  _moneyRow('Total', total, AppTheme.lightTextHeading),
-                ],
-              ),
-            ),
-          ],
-
-          if (isUpcoming) ...[
-            Container(
-              margin: EdgeInsets.only(top: services.isEmpty && addedServices.isEmpty ? 16 : 0, bottom: 12),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9F9FC),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text('Advance Paid: ', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                      Text('₹${advance.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Text('Pay at Salon: ', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-                      Text('₹${balance.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          if (booking['payment_option'] == 'full_upfront') ...[
-            SizedBox(height: 4),
-            Text('Paid in full upfront.', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-            SizedBox(height: 8),
-          ],
-          
-          if (booking['cancellation_reason'] != null) ...[
-            Text('Reason: ${booking['cancellation_reason']}', style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody)),
-            SizedBox(height: 10),
-          ],
-
-          if (isUpcoming && (freeReschedule || needsReschedule)) ...[
-            Container(
-              margin: EdgeInsets.only(bottom: 12),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.lightWarningBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.event_busy, size: 18, color: AppTheme.lightWarning),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          needsReschedule ? 'This booking has been released — pick a new time' : 'The salon is closed on this date',
-                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.lightWarning),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          booking['salon']?['cover_image'] ?? booking['salon']?['cover_photo_url'] ?? booking['salon']?['logo_image'] ?? '',
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 48,
+                            height: 48,
+                            color: const Color(0xFFF3F0FF),
+                            child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 24),
+                          ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          booking['closure_reason'] != null
-                              ? '${booking['closure_reason']}. Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.'
-                              : 'Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.',
-                          style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightWarning),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              booking['salon']?['name'] ?? 'Salon',
+                              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              serviceNames,
+                              style: GoogleFonts.outfit(fontSize: 12, color: bodyColor),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      _statusChip(booking['status'].toString(), isDark),
+                    ],
+                  ),
+                  
+                  SizedBox(height: 16),
+                  _DashedDivider(),
+                  SizedBox(height: 16),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Date & Time', style: GoogleFonts.outfit(fontSize: 12, color: bodyColor)),
+                            SizedBox(height: 4),
+                            Text(
+                              '$formattedDate · ${booking['start_time']}',
+                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: headingColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isUpcoming)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Preferred Stylist', style: GoogleFonts.outfit(fontSize: 12, color: bodyColor)),
+                              SizedBox(height: 4),
+                              Text(
+                                booking['provider_name'] ?? 'Staff',
+                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: headingColor),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total Payment', style: GoogleFonts.outfit(fontSize: 12, color: bodyColor)),
+                              SizedBox(height: 4),
+                              Text(
+                                '₹${total.toStringAsFixed(0)}',
+                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: headingColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  if (isUpcoming) ...[
+                    SizedBox(height: 12),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text('Advance Paid: ', style: GoogleFonts.outfit(fontSize: 11, color: bodyColor)),
+                              Text('₹${advance.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: headingColor)),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text('Pay at Salon: ', style: GoogleFonts.outfit(fontSize: 11, color: bodyColor)),
+                              Text('₹${balance.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: headingColor)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (isUpcoming && needsReschedule) ...[
+                    SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: canReschedule ? () => _openReschedule(booking) : null,
+                        style: TextButton.styleFrom(
+                          backgroundColor: canReschedule ? (isDark ? AppTheme.darkButtonBg : AppTheme.accentColor) : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                          foregroundColor: canReschedule ? Colors.white : (isDark ? Colors.grey.shade500 : Colors.grey),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Pick a new time — free', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: canCancel ? () => _confirmCancel(booking) : null,
+                        style: TextButton.styleFrom(
+                          backgroundColor: canCancel ? (isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA)) : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
+                          foregroundColor: canCancel ? AppTheme.lightDanger : (isDark ? Colors.grey.shade500 : Colors.grey),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Cancel and refund ₹${_toDouble(booking['refundable_advance']).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ] else if (isUpcoming) ...[
+                    SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: canCancel ? () => _confirmCancel(booking) : null,
+                            style: TextButton.styleFrom(
+                              backgroundColor: canCancel ? (isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA)) : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
+                              foregroundColor: canCancel ? AppTheme.lightDanger : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text('Cancel', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: TextButton(
+                            onPressed: canReschedule ? () => _openReschedule(booking) : null,
+                            style: TextButton.styleFrom(
+                              backgroundColor: canReschedule ? (isDark ? AppTheme.darkButtonBg : AppTheme.accentColor) : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                              foregroundColor: canReschedule ? Colors.white : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              padding: EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text(freeReschedule ? 'Reschedule Free' : 'Reschedule', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
+
+                  if (!isUpcoming) ..._buildReviewSection(booking, isDark, headingColor, bodyColor),
                 ],
               ),
             ),
           ],
-
-          if (isUpcoming && !canCancel && cancelBlockedReason != null) ...[
-            Text('Cannot cancel: $cancelBlockedReason', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-            SizedBox(height: 6),
-          ],
-
-          if (isUpcoming && !canReschedule && rescheduleBlockedReason != null) ...[
-            Text('Cannot reschedule: $rescheduleBlockedReason', style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
-            SizedBox(height: 12),
-          ],
-
-          if (isUpcoming && needsReschedule) ...[
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: canReschedule ? () => _openReschedule(booking) : null,
-                style: TextButton.styleFrom(
-                  backgroundColor: canReschedule ? AppTheme.accentColor : Colors.grey.shade200,
-                  foregroundColor: canReschedule ? Colors.white : Colors.grey,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text('Pick a new time — free', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-              ),
-            ),
-            SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: canCancel ? () => _confirmCancel(booking) : null,
-                style: TextButton.styleFrom(
-                  backgroundColor: canCancel ? const Color(0xFFFEE8EA) : Colors.grey.shade100,
-                  foregroundColor: canCancel ? const Color(0xFFE55D68) : Colors.grey,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: Text('Cancel and refund ₹${_toDouble(booking['refundable_advance']).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ] else if (isUpcoming) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: canCancel ? () => _confirmCancel(booking) : null,
-                    style: TextButton.styleFrom(
-                      backgroundColor: canCancel ? const Color(0xFFFEE8EA) : Colors.grey.shade100,
-                      foregroundColor: canCancel ? const Color(0xFFE55D68) : Colors.grey,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text('Cancel', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: TextButton(
-                    onPressed: canReschedule ? () => _openReschedule(booking) : null,
-                    style: TextButton.styleFrom(
-                      backgroundColor: canReschedule ? AppTheme.accentColor : Colors.grey.shade200,
-                      foregroundColor: canReschedule ? Colors.white : Colors.grey,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text(freeReschedule ? 'Reschedule Free' : 'Reschedule', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-            if (canGenerateQr) ...[
-              SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => QrCodeScreen(appointmentId: booking['id'].toString()),
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppTheme.accentColor,
-                    side: const BorderSide(color: AppTheme.accentColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text('Show QR at salon', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ],
-
-          if (!isUpcoming) ..._buildReviewSection(booking),
-        ],
+        ),
       ),
-    ),
-  ],
-),
     );
   }
 
-  List<Widget> _buildReviewSection(Map<String, dynamic> booking) {
+  List<Widget> _buildReviewSection(Map<String, dynamic> booking, bool isDark, Color headingColor, Color bodyColor) {
     final review = booking['review'] as Map<String, dynamic>?;
     final canReview = booking['can_review'] == true;
     final blockedReason = booking['review_blocked_reason']?.toString();
@@ -724,9 +599,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     if (review != null) {
       return [
         SizedBox(height: 14),
-        Divider(color: AppTheme.lightBorder, height: 1),
+        Divider(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder, height: 1),
         SizedBox(height: 12),
-        _buildGivenRating(review),
+        _buildGivenRating(review, bodyColor, isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
       ];
     }
 
@@ -739,6 +614,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
             onPressed: () => _rateVisit(booking),
             icon: Icon(Icons.star_rounded, size: 19),
             label: Text('Rate your visit'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? AppTheme.darkButtonBg : AppTheme.accentColor,
+              foregroundColor: Colors.white,
+            ),
           ),
         ),
       ];
@@ -748,14 +627,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
       return [
         SizedBox(height: 12),
         Text(blockedReason,
-            style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+            style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight)),
       ];
     }
 
     return const [];
   }
 
-  Widget _buildGivenRating(Map<String, dynamic> review) {
+  Widget _buildGivenRating(Map<String, dynamic> review, Color bodyColor, Color lightColor) {
     final rating = (review['rating'] as num?)?.toInt() ?? 0;
     final comment = review['comment']?.toString() ?? '';
 
@@ -766,19 +645,19 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
           children: [
             Text('You rated this visit',
                 style: GoogleFonts.outfit(
-                    fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.lightTextBody)),
+                    fontSize: 12.5, fontWeight: FontWeight.w600, color: bodyColor)),
             SizedBox(width: 8),
             StarRow(rating: rating.toDouble(), size: 15),
             Spacer(),
             Text(review['age_label']?.toString() ?? '',
-                style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextLight)),
+                style: GoogleFonts.outfit(fontSize: 11.5, color: lightColor)),
           ],
         ),
         if (comment.isNotEmpty) ...[
           SizedBox(height: 6),
           Text('“$comment”',
               style: GoogleFonts.outfit(
-                  fontSize: 13, height: 1.4, color: AppTheme.lightTextBody)),
+                  fontSize: 13, height: 1.4, color: bodyColor)),
         ],
       ],
     );
@@ -809,7 +688,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
         ],
       );
 
-  Widget _statusChip(String status) {
+  Widget _statusChip(String status, bool isDark) {
     final color = _getStatusColor(status);
     final text = status.replaceAll('_', ' ').toUpperCase();
     final displayText = text.isNotEmpty ? text[0] + text.substring(1).toLowerCase() : '';
@@ -817,7 +696,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -859,11 +738,11 @@ class _DashedDivider extends StatelessWidget {
         final dashCount = (boxWidth / (2 * dashWidth)).floor();
         return Flex(
           children: List.generate(dashCount, (_) {
-            return const SizedBox(
+            return SizedBox(
               width: dashWidth,
               height: dashHeight,
               child: DecoratedBox(
-                decoration: BoxDecoration(color: Color(0xFFBDBDBD)),
+                decoration: BoxDecoration(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade700 : const Color(0xFFBDBDBD)),
               ),
             );
           }),

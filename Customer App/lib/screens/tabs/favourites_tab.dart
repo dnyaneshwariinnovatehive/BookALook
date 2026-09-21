@@ -93,15 +93,21 @@ class _FavouritesTabState extends State<FavouritesTab> {
       return Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)));
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBF9FF), // light lavender-white
+      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFFBF9FF),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(20, 20, 20, 16),
-              child: Text('My Favourites', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+              child: Text('My Favourites', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: headingColor)),
             ),
             Expanded(
               child: _favourites.isEmpty
@@ -114,14 +120,14 @@ class _FavouritesTabState extends State<FavouritesTab> {
                             Container(
                               padding: EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: surfaceColor,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFFEBE8F6)),
+                                border: Border.all(color: borderColor),
                                 boxShadow: [
                                   BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 12, offset: Offset(0, 4))
                                 ]
                               ),
-                              child: Icon(Icons.favorite_border, size: 64, color: AppTheme.lightTextLight),
+                              child: Icon(Icons.favorite_border, size: 64, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
                             ),
                             SizedBox(height: 24),
                             Text(
@@ -129,7 +135,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
                               style: GoogleFonts.outfit(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.lightTextHeading,
+                                color: headingColor,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -138,7 +144,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
                               'Tap the heart icon on salons you love to save them here.',
                               style: GoogleFonts.outfit(
                                 fontSize: 14,
-                                color: AppTheme.lightTextBody,
+                                color: bodyColor,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -179,9 +185,9 @@ class _FavouritesTabState extends State<FavouritesTab> {
                               child: Container(
                                 clipBehavior: Clip.hardEdge,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: surfaceColor,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFEBE8F6)),
+                                  border: Border.all(color: borderColor),
                                   boxShadow: [
                                     BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
                                   ]
@@ -196,7 +202,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
                                           Image.network(
                                             salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => Container(color: const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                                            errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
                                           ),
                                           if (salon['distance_km'] != null)
                                             Positioned(
@@ -219,7 +225,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
                                               child: Container(
                                                 padding: EdgeInsets.all(6),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.white,
+                                                  color: isDark ? AppTheme.darkSurface : Colors.white,
                                                   shape: BoxShape.circle,
                                                   boxShadow: [
                                                     BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: Offset(0, 2))
@@ -239,7 +245,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
                                         children: [
                                           Row(
                                             children: [
-                                              Expanded(child: Text(salon['name'] ?? 'Unnamed Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading))),
+                                              Expanded(child: Text(salon['name'] ?? 'Unnamed Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: headingColor))),
                                             ],
                                           ),
                                           SizedBox(height: 4),
@@ -248,9 +254,9 @@ class _FavouritesTabState extends State<FavouritesTab> {
                                               if (ratingCount > 0) ...[
                                                 Icon(Icons.star, size: 12, color: AppTheme.starRating),
                                                 SizedBox(width: 4),
-                                                Text(avgVal.toStringAsFixed(1), style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                                                Text(avgVal.toStringAsFixed(1), style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: headingColor)),
                                               ] else
-                                                Text('New Salon', style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
+                                                Text('New Salon', style: GoogleFonts.outfit(color: bodyColor, fontSize: 12, fontWeight: FontWeight.w600)),
                                             ],
                                           ),
                                         ],

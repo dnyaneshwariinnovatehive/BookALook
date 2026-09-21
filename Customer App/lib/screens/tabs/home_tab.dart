@@ -763,10 +763,10 @@ class _HomeTabState extends State<HomeTab> {
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: surfaceColor,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: const Color(0xFFE5E0FA), width: 1), // Extremely light lavender-gray border
+                          color: borderColor, width: 1), 
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -777,21 +777,21 @@ class _HomeTabState extends State<HomeTab> {
                           Image.network(category.iconUrl!,
                               width: 18,
                               height: 18,
-                              color: const Color(0xFF9E98AE), // Purple-gray icon
-                              errorBuilder: (c, e, s) => const Icon(
+                              color: bodyColor, 
+                              errorBuilder: (c, e, s) => Icon(
                                   Icons.category_rounded,
                                   size: 18,
-                                  color: Color(0xFF9E98AE)))
+                                  color: bodyColor))
                         else
-                          const Icon(Icons.category_rounded,
-                              color: Color(0xFF9E98AE), size: 18),
+                          Icon(Icons.category_rounded,
+                              color: bodyColor, size: 18),
                         const SizedBox(width: 10),
                         Text(
                           category.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            color: Color(0xFF9E98AE), // Gray-purple text
+                            color: headingColor.withOpacity(0.8),
                           ),
                         ),
                       ],
@@ -915,10 +915,8 @@ class _HomeTabState extends State<HomeTab> {
             .join(', ') ??
         'Services';
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final headingColor = AppTheme.lightTextHeading;
+    final bodyColor = AppTheme.lightTextBody;
 
     return Container(
       width: double.infinity,
@@ -1258,6 +1256,7 @@ class _HomeTabState extends State<HomeTab> {
                       topRight: Radius.circular(22)),
                   child: Image.network(
                     booking['salon']?['cover_image'] ??
+                        booking['salon']?['cover_photo_url'] ??
                         'https://via.placeholder.com/250x110',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(

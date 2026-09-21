@@ -6,6 +6,7 @@ import '../../../../utils/time_fmt.dart';
 import '../../appointment_details_screen.dart'; // Fixed relative path
 import '../../walk_in_screen.dart';
 import '../close_day_sheet.dart';
+import '../../../../theme/app_theme.dart';
 
 const String _kAllDates = 'All Dates';
 const String _kAllProviders = 'All Providers';
@@ -253,26 +254,27 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
   @override
   Widget build(BuildContext context) {
     final visible = _isLoading ? const <dynamic>[] : _filteredAppointments;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE), // Light background
+      backgroundColor: Theme.of(context).colorScheme.surface, // Dynamic background
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            _buildFilters(),
+            _buildHeader(isDark),
+            _buildFilters(isDark),
             Expanded(
               child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
+                ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
                 : visible.isEmpty
-                  ? _buildEmptyState()
+                  ? _buildEmptyState(isDark)
                   : ListView.separated(
                       padding: const EdgeInsets.all(16.0),
                       itemCount: visible.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 16),
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final apt = visible[index];
-                        return _buildDynamicAppointmentCard(apt);
+                        return _buildDynamicAppointmentCard(apt, isDark);
                       },
                     ),
             ),
@@ -282,8 +284,11 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     final filtered = _appointments.isNotEmpty && _hasActiveFilter;
+    final primaryColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1F2937);
+    final secondaryColor = isDark ? AppTheme.darkTextBody : Colors.grey;
+    final iconBgColor = isDark ? const Color(0xFF2E2248) : const Color(0xFFF3E8FF);
 
     return Center(
       child: Padding(
@@ -291,21 +296,40 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.event_busy, size: 48, color: AppTheme.accentColor),
+            ),
+            const SizedBox(height: 24),
             Text(
               filtered
                   ? 'No appointments match these filters'
                   : 'No appointments found',
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: Colors.grey),
+              style: GoogleFonts.outfit(
+                color: primaryColor,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+            const SizedBox(height: 8),
             if (filtered) ...[
-              const SizedBox(height: 12),
+              Text(
+                'Try adjusting your filters.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(color: secondaryColor, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
               TextButton(
                 onPressed: _clearFilters,
                 child: Text(
                   'Clear filters',
                   style: GoogleFonts.outfit(
-                    color: const Color(0xFF9C54F2),
+                    color: AppTheme.accentColor,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -317,7 +341,17 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark) {
+    final headingColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1F2937);
+    
+    // Walk-in button uses light purple
+    final wBg = isDark ? const Color(0xFF2E2248) : const Color(0xFFF3E8FF);
+    final wColor = isDark ? const Color(0xFFA78BFA) : const Color(0xFF9333EA);
+
+    // Close day uses light red/pink
+    final cBg = isDark ? const Color(0xFF4C1D2F) : const Color(0xFFFEE2E2);
+    final cColor = isDark ? const Color(0xFFFDA4AF) : const Color(0xFFDC2626);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -328,7 +362,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             style: GoogleFonts.outfit(
               fontSize: 28,
               fontWeight: FontWeight.w900,
-              color: const Color(0xFF1F2937),
+              color: headingColor,
             ),
           ),
           Row(
@@ -336,22 +370,22 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             children: [
               InkWell(
                 onTap: _openWalkIn,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3E8FF),
-                    borderRadius: BorderRadius.circular(8),
+                    color: wBg,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.person_add_alt_1, size: 15, color: Color(0xFF9333EA)),
+                      Icon(Icons.person_add_alt_1, size: 16, color: wColor),
                       const SizedBox(width: 6),
                       Text(
                         'Walk-in',
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFF9333EA),
+                          color: wColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -363,22 +397,22 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               const SizedBox(width: 8),
               InkWell(
                 onTap: _openCloseDay,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: cBg,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.event_busy, size: 15, color: Color(0xFFDC2626)),
+                      Icon(Icons.event_busy, size: 16, color: cColor),
                       const SizedBox(width: 6),
                       Text(
                         'Close day',
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFFDC2626),
+                          color: cColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -394,7 +428,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
@@ -402,11 +436,12 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
           Row(
             children: [
               Expanded(
+                flex: 2,
                 child: _buildDropdown(
                   const [_kAllDates, 'Today', 'Yesterday', 'Tomorrow', _kCustomDate],
                   _selectedDate,
                   _onDateFilterChanged,
-                  // Show the day the admin picked rather than the generic label.
+                  isDark: isDark,
                   labelFor: (item) => item == _kCustomDate && _customDate != null
                       ? DateFormat('d MMM').format(_customDate!)
                       : item,
@@ -414,26 +449,32 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               ),
               const SizedBox(width: 8),
               Expanded(
+                flex: 3,
                 child: _buildDropdown(
                   _providerOptions,
                   _selectedProvider,
                   (v) => setState(() => _selectedProvider = v!),
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
+                flex: 3,
                 child: _buildDropdown(
                   _serviceOptions,
                   _selectedService,
                   (v) => setState(() => _selectedService = v!),
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
+                flex: 3,
                 child: _buildDropdown(
                   const [_kAllStatus, ..._kStatusLabels],
                   _selectedStatus,
                   (v) => setState(() => _selectedStatus = v!),
+                  isDark: isDark,
                 ),
               ),
             ],
@@ -446,6 +487,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                   const [_kAllSources, ..._kSourceLabels],
                   _selectedSource,
                   (v) => setState(() => _selectedSource = v!),
+                  isDark: isDark,
                 ),
               ),
               if (_hasActiveFilter) ...[
@@ -453,13 +495,13 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                 TextButton(
                   onPressed: _clearFilters,
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 40),
+                    minimumSize: const Size(0, 36),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   child: Text(
                     'Clear',
                     style: GoogleFonts.outfit(
-                      color: const Color(0xFF9C54F2),
+                      color: AppTheme.accentColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -477,26 +519,31 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     List<String> items,
     String value,
     ValueChanged<String?> onChanged, {
-    bool isFullWidth = false,
+    required bool isDark,
     String Function(String)? labelFor,
   }) {
     if (!items.contains(value)) value = items.first;
+    
+    final bgColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? Colors.white24 : Colors.grey.shade300;
+    final textColor = isDark ? Colors.white : const Color(0xFF1F2937);
+    final iconColor = isDark ? Colors.white70 : Colors.black87;
 
     return Container(
-      width: isFullWidth ? double.infinity : null,
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
+        color: bgColor,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(20), // Pill shaped filters
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black87),
-          style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontSize: 12, fontWeight: FontWeight.w500),
+          dropdownColor: bgColor,
+          icon: Icon(Icons.keyboard_arrow_down, size: 16, color: iconColor),
+          style: GoogleFonts.outfit(color: textColor, fontSize: 11, fontWeight: FontWeight.w500),
           items: items.map((String item) {
             return DropdownMenuItem<String>(
               value: item,
@@ -509,7 +556,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     );
   }
 
-  Widget _buildDynamicAppointmentCard(Map<String, dynamic> apt) {
+  Widget _buildDynamicAppointmentCard(Map<String, dynamic> apt, bool isDark) {
     bool isWalkIn = apt['booking_source'] == 'walk_in';
     String customerName = isWalkIn 
         ? (apt['walk_in_customer_name'] ?? 'Walk-In Customer') 
@@ -522,25 +569,24 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
     String initials = customerName.isNotEmpty ? customerName[0].toUpperCase() : '?';
     String status = (apt['status'] ?? '').toString().toUpperCase();
     
-    // Determine colors based on status
-    Color statusColor = const Color(0xFFE0F2FE);
-    Color statusTextColor = const Color(0xFF0369A1);
+    // Determine colors based on status (adapted for dark mode if needed)
+    Color statusColor = isDark ? const Color(0xFF1E3A8A) : const Color(0xFFE0F2FE);
+    Color statusTextColor = isDark ? const Color(0xFF93C5FD) : const Color(0xFF0369A1);
+    
     if (status == 'COMPLETED') {
-      statusColor = const Color(0xFFDCFCE7);
-      statusTextColor = const Color(0xFF15803D);
+      statusColor = isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7);
+      statusTextColor = isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D);
     } else if (status == 'IN_PROGRESS') {
-      statusColor = const Color(0xFFFEF3C7);
-      statusTextColor = const Color(0xFFD97706);
+      statusColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7);
+      statusTextColor = isDark ? const Color(0xFFFDE68A) : const Color(0xFFD97706);
     } else if (status == 'CANCELLED' || status == 'NO_SHOW') {
-      statusColor = const Color(0xFFFEE2E2);
-      statusTextColor = const Color(0xFFDC2626);
+      statusColor = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEE2E2);
+      statusTextColor = isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
     } else if (status == 'AWAITING_RESCHEDULE') {
-      // Released by a day closure — waiting on the customer to pick a new slot.
-      statusColor = const Color(0xFFFEF3C7);
-      statusTextColor = const Color(0xFFB45309);
+      statusColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7);
+      statusTextColor = isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309);
     }
 
-    // Human-readable badge label, e.g. "In Progress" instead of "IN_PROGRESS".
     final String statusLabel = switch ((apt['status'] ?? '').toString()) {
       'completed' => 'Completed',
       'in_progress' => 'In Progress',
@@ -550,7 +596,6 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
       _ => 'Scheduled',
     };
 
-    // Determine icon based on source
     IconData sourceIcon = Icons.wifi;
     String sourceName = 'App';
     if (isWalkIn) {
@@ -563,9 +608,15 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
 
     String provider = _providerName(apt) ?? 'Any Staff';
 
-    // Parse services
     String serviceNames = _serviceNames(apt).join(', ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
+
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? Colors.white10 : Colors.grey.shade200;
+    final primaryTextColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1F2937);
+    final secondaryTextColor = isDark ? AppTheme.darkTextBody : const Color(0xFF9CA3AF);
+    final avatarBg = isDark ? const Color(0xFF2E2248) : const Color(0xFFF3E8FF);
+    final avatarText = isDark ? const Color(0xFFA78BFA) : const Color(0xFF9333EA);
 
     return GestureDetector(
       onTap: () {
@@ -574,16 +625,17 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             appointment: apt,
             salonId: widget.salonId,
           )
-        )).then((_) => _loadAppointments()); // Reload on return
+        )).then((_) => _loadAppointments());
       },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardBg,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -596,11 +648,11 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFFF3E8FF),
+                  backgroundColor: avatarBg,
                   radius: 20,
                   child: Text(
                     initials,
-                    style: GoogleFonts.outfit(color: const Color(0xFF9333EA), fontWeight: FontWeight.bold, fontSize: 16),
+                    style: GoogleFonts.outfit(color: avatarText, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -608,54 +660,77 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(customerName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF1F2937))),
+                      Text(customerName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTextColor)),
                       if (customerPhone.isNotEmpty)
-                        Text(customerPhone, style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF9CA3AF), fontWeight: FontWeight.w500)),
+                        Text(customerPhone, style: GoogleFonts.outfit(fontSize: 12, color: secondaryTextColor, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(16)),
-                  child: Text(statusLabel, style: GoogleFonts.outfit(color: statusTextColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text(statusLabel, style: GoogleFonts.outfit(color: statusTextColor, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Provider: ', style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 13)),
-                Text(provider, style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                Text('Time: ', style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 13)),
-                Text(TimeFmt.slot(apt['start_time'], apt['end_time']), style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontWeight: FontWeight.bold, fontSize: 13)),
+                Expanded(
+                  flex: 5,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Provider: ', style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13)),
+                      Expanded(
+                        child: Text(provider, style: GoogleFonts.outfit(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text('Time: ', style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13)),
+                      Text(TimeFmt.slot(apt['start_time'], apt['end_time']), style: GoogleFonts.outfit(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Service: ', style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 13)),
+                Text('Service: ', style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13)),
                 Expanded(
                   child: Text(
                     serviceNames, 
-                    style: GoogleFonts.outfit(color: const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 13),
+                    style: GoogleFonts.outfit(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            const Divider(color: Color(0xFFF3F4F6), height: 1, thickness: 1),
+            const SizedBox(height: 16),
+            // Dashed or subtle divider
+            Container(
+              height: 1,
+              width: double.infinity,
+              color: isDark ? Colors.white10 : const Color(0xFFF3F4F6),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(sourceIcon, size: 16, color: const Color(0xFF9CA3AF)),
+                Icon(sourceIcon, size: 16, color: secondaryTextColor),
                 const SizedBox(width: 4),
-                Text(sourceName, style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(sourceName, style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13, fontWeight: FontWeight.w500)),
                 const Spacer(),
-                Text('₹${apt['total_amount']}', style: GoogleFonts.outfit(color: const Color(0xFF9333EA), fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('₹${apt['total_amount']}', style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
           ],

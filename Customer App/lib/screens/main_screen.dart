@@ -137,6 +137,9 @@ class _MainScreenState extends State<MainScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(30),
+            border: Theme.of(context).brightness == Brightness.dark
+                ? Border.all(color: AppTheme.darkBorder, width: 1)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),

@@ -218,8 +218,10 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => _fetchHomeData(silent: false),
@@ -238,40 +240,38 @@ class _HomeTabState extends State<HomeTab> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      if (_needsWorkingHours) ...[
-                        const SizedBox(height: 16),
-                        _buildWorkingHoursPrompt(),
-                      ],
-                      const SizedBox(height: 24),
-                      _buildScanCard(),
-                      const SizedBox(height: 24),
-                      _buildTopStats(),
-                      const SizedBox(height: 24),
-                      _buildQuickActions(),
-                      const SizedBox(height: 24),
-                      _buildPendingLeavesOrClosure(),
-                      const SizedBox(height: 24),
-                      _buildProviderLoad(),
-                      const SizedBox(height: 80), // Padding for FAB
-                    ],
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       _buildHeader(isDark),
+                       if (_needsWorkingHours) ...[
+                         const SizedBox(height: 16),
+                         _buildWorkingHoursPrompt(),
+                       ],
+                       const SizedBox(height: 24),
+                       _buildScanCard(),
+                       const SizedBox(height: 24),
+                       _buildTopStats(isDark),
+                       const SizedBox(height: 24),
+                       _buildQuickActions(isDark),
+                       const SizedBox(height: 24),
+                       _buildPendingLeavesOrClosure(isDark),
+                       const SizedBox(height: 24),
+                       _buildProviderLoad(isDark),
+                       const SizedBox(height: 80), // Padding for bottom nav
+                     ],
                   ),
                 ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openScanner(context),
-        backgroundColor: AppTheme.accentColor,
-        foregroundColor: Colors.white,
-        tooltip: 'Scan customer QR',
-        child: const Icon(Icons.qr_code_scanner, size: 28),
-      ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark) {
+    final headingColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
+    final subColor = isDark ? AppTheme.darkTextBody : Colors.grey;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final iconColor = isDark ? AppTheme.darkTextHeading : Colors.black87;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -286,13 +286,13 @@ class _HomeTabState extends State<HomeTab> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Hi Admin 👋',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: headingColor),
                 ),
                 Text(
                   widget.salonName,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  style: TextStyle(fontSize: 14, color: subColor),
                 ),
               ],
             ),
@@ -300,7 +300,7 @@ class _HomeTabState extends State<HomeTab> {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: surfaceColor,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -318,7 +318,7 @@ class _HomeTabState extends State<HomeTab> {
                   _unreadNotifications > 0
                       ? Icons.notifications_active_outlined
                       : Icons.notifications_none,
-                  color: Colors.black87,
+                  color: iconColor,
                   size: 26,
                 ),
                 onPressed: _openNotifications,
@@ -405,9 +405,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// Checking a customer in is the thing this screen gets opened for most, so it
-  /// sits in the page itself rather than only on the floating button — a FAB is
-  /// easy to miss, and on a nested scaffold it is not always where you expect.
   Widget _buildScanCard() {
     return InkWell(
       onTap: () => _openScanner(context),
@@ -415,25 +412,28 @@ class _HomeTabState extends State<HomeTab> {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
+          color: AppTheme.accentColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accentColor.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            )
+          ]
         ),
         child: Row(
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.22),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 26),
+              child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,9 +441,9 @@ class _HomeTabState extends State<HomeTab> {
                   Text('Scan customer QR',
                       style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                  SizedBox(height: 3),
+                  SizedBox(height: 4),
                   Text('Check someone in and start their appointment',
-                      style: TextStyle(fontSize: 12, color: Colors.white70)),
+                      style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.3)),
                 ],
               ),
             ),
@@ -454,59 +454,82 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildTopStats() {
+  Widget _buildTopStats(bool isDark) {
+    // Pastel colors adapted for dark mode
+    final apptsBg = isDark ? const Color(0xFF3B285E) : const Color(0xFFF3E8FF);
+    final apptsText = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF7C3AED);
+
+    final staffBg = isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE0F2FE);
+    final staffText = isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7);
+
+    final leaveBg = isDark ? const Color(0xFF4C1D2F) : const Color(0xFFFFE4E6);
+    final leaveText = isDark ? const Color(0xFFFDA4AF) : const Color(0xFFE11D48);
+
     return Row(
       children: [
-        Expanded(child: _buildStatCard("Today's Appts", _todaysAppts.toString(), const Color(0xFFF3E8FF), const Color(0xFF8B5CF6))),
+        Expanded(child: _buildStatCard("Today's Appts", _todaysAppts.toString(), apptsBg, apptsText, isDark)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard("Staff on Duty", _staffOnDuty.toString(), const Color(0xFFE0F2FE), const Color(0xFF0284C7))),
+        Expanded(child: _buildStatCard("Staff on Duty", _staffOnDuty.toString(), staffBg, staffText, isDark)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard("On Leave Today", _onLeaveToday.toString(), const Color(0xFFFFE4E6), const Color(0xFFE11D48))),
+        Expanded(child: _buildStatCard("On Leave Today", _onLeaveToday.toString(), leaveBg, leaveText, isDark)),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, Color bgColor, Color textColor) {
+  Widget _buildStatCard(String title, String value, Color bgColor, Color textColor, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54)),
+          Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : Colors.black54)),
           const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
+          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textColor)),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(bool isDark) {
+    final titleColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    // Add provider uses light purple in demo
+    final pBg = isDark ? const Color(0xFF2E2248) : const Color(0xFFF5F3FF);
+    final pColor = isDark ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6);
+    
+    // Add service uses lighter purple/pink or blue in demo (we use similar to provider)
+    final sBg = isDark ? const Color(0xFF2E2248) : const Color(0xFFF5F3FF);
+    final sColor = isDark ? const Color(0xFFA78BFA) : const Color(0xFF8B5CF6);
+
+    // Mark closed uses orange
+    final cBg = isDark ? const Color(0xFF422E1A) : const Color(0xFFFFFBEB);
+    final cColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
+        Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
-              child: _buildActionBtn("Add Provider", Icons.person_add_alt_1, const Color(0xFFF5F3FF), const Color(0xFF8B5CF6), () {
+              child: _buildActionBtn("Add Provider", Icons.person_add_alt_1, pBg, pColor, () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => AddStaffScreen(salonId: widget.salonId))).then((_) => _fetchHomeData(silent: true));
               }),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildActionBtn("Add Service", Icons.add_circle_outline, const Color(0xFFF5F3FF), const Color(0xFF8B5CF6), () {
+              child: _buildActionBtn("Add Service", Icons.add_circle_outline, sBg, sColor, () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => AddServiceFlow(salonId: widget.salonId)));
               }),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildActionBtn("Mark Closed", Icons.calendar_today, const Color(0xFFFFFBEB), const Color(0xFFD97706), () async {
+              child: _buildActionBtn("Mark Closed", Icons.calendar_today, cBg, cColor, () async {
                 final now = DateTime.now();
-                final todayStr = DateFormat('yyyy-MM-dd').format(now);
                 final closed = await CloseDaySheet.show(context, salonId: widget.salonId, initialDate: now);
                 if (closed == true) _fetchHomeData(silent: true);
               }),
@@ -522,7 +545,7 @@ class _HomeTabState extends State<HomeTab> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(16),
@@ -530,39 +553,41 @@ class _HomeTabState extends State<HomeTab> {
         child: Column(
           children: [
             Icon(icon, color: iconColor, size: 28),
-            const SizedBox(height: 8),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: iconColor)),
+            const SizedBox(height: 12),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: iconColor)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPendingLeavesOrClosure() {
+  Widget _buildPendingLeavesOrClosure(bool isDark) {
+    final titleColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
+
     if (_isClosedToday) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Today\'s Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
+          Text('Today\'s Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: isDark ? const Color(0xFF4C1D2F) : const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFECACA)),
+              border: Border.all(color: isDark ? const Color(0xFF9F1239) : const Color(0xFFFECACA)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: Color(0xFFDC2626)),
+                Icon(Icons.info_outline, color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFFDC2626)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Salon is Marked Closed Today', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF991B1B))),
+                      Text('Salon is Marked Closed Today', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFF991B1B))),
                       if (_closureReason != null && _closureReason!.isNotEmpty)
-                        Text('Reason: $_closureReason', style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B))),
+                        Text('Reason: $_closureReason', style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFECDD3) : const Color(0xFF991B1B))),
                     ],
                   ),
                 )
@@ -581,8 +606,8 @@ class _HomeTabState extends State<HomeTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Pending Leave Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
-            Text('${_pendingLeaves.length}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6))),
+            Text('Pending Leave Requests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+            Text('${_pendingLeaves.length}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
           ],
         ),
         const SizedBox(height: 16),
@@ -599,8 +624,15 @@ class _HomeTabState extends State<HomeTab> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: isDark ? AppTheme.darkSurface : Colors.white,
               borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ]
             ),
             child: Row(
               children: [
@@ -608,52 +640,56 @@ class _HomeTabState extends State<HomeTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(providerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(providerName, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: titleColor)),
                       const SizedBox(height: 4),
-                      Text(timeFmt, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                      Text(timeFmt, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
                       if (leave.reason != null && leave.reason!.isNotEmpty)
-                        Text(leave.reason!, style: const TextStyle(fontSize: 12, color: Colors.black38)),
+                        Text(leave.reason!, style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black38)),
                     ],
                   ),
                 ),
                 ElevatedButton(
                   onPressed: () => _updateLeaveStatus(leave, 'approved'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
+                    backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    elevation: 0,
                   ),
-                  child: const Text('Approve'),
+                  child: const Text('Approve', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () => _updateLeaveStatus(leave, 'rejected'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDC2626),
+                    backgroundColor: const Color(0xFFEF4444),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: Size.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    elevation: 0,
                   ),
-                  child: const Text('Reject'),
+                  child: const Text('Reject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
 
-  Widget _buildProviderLoad() {
+  Widget _buildProviderLoad(bool isDark) {
     if (_staff.isEmpty) return const SizedBox.shrink();
+    
+    final titleColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Today's Provider Load", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
+        Text("Today's Provider Load", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
         const SizedBox(height: 16),
         GridView.builder(
           shrinkWrap: true,
@@ -662,23 +698,23 @@ class _HomeTabState extends State<HomeTab> {
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 2.2,
+            childAspectRatio: 2.3,
           ),
           itemCount: _staff.where((s) => s.isActive).length,
           itemBuilder: (context, index) {
             final activeStaff = _staff.where((s) => s.isActive).toList();
             final member = activeStaff[index];
             final load = _providerLoads[member.id] ?? 0;
-            final String avatarUrl = member.user?['avatar_url'] ?? 'https://i.pravatar.cc/150?u=${member.id}'; // Fallback
+            final String avatarUrl = member.user?['avatar_url'] ?? 'https://i.pravatar.cc/150?u=${member.id}';
 
             return Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? AppTheme.darkSurface : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   )
@@ -688,7 +724,7 @@ class _HomeTabState extends State<HomeTab> {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: Colors.grey[200],
+                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
                     backgroundImage: NetworkImage(avatarUrl),
                   ),
                   const SizedBox(width: 8),
@@ -697,17 +733,17 @@ class _HomeTabState extends State<HomeTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(member.user?['name'] ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(member.user?['name'] ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: titleColor)),
                         if (member.specialization != null)
-                          Text(member.specialization!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.black45)),
+                          Text(member.specialization!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: isDark ? Colors.white60 : Colors.black45)),
                       ],
                     ),
                   ),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('$load', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6))),
-                      const Text('appts', style: TextStyle(fontSize: 10, color: Colors.black45)),
+                      Text('$load', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.accentColor)),
+                      Text('appts', style: TextStyle(fontSize: 9, color: isDark ? Colors.white54 : Colors.black45, fontWeight: FontWeight.w600)),
                     ],
                   )
                 ],

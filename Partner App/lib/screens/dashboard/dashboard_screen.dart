@@ -130,55 +130,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       bottomNavigationBar: Container(
+        margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20, top: 0),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6).withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+              color: Colors.black.withOpacity(0.08),
+              spreadRadius: 0,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          selectedItemColor: AppTheme.accentColor,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          showUnselectedLabels: true,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Appointments',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'Staff',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.content_cut_outlined),
-              activeIcon: Icon(Icons.content_cut),
-              label: 'Services',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: 'More',
-            ),
-          ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: _onItemTapped,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            selectedItemColor: AppTheme.accentColor,
+            unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            showUnselectedLabels: true,
+            selectedFontSize: 11,
+            unselectedFontSize: 11,
+            elevation: 0,
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, height: 1.5),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, height: 1.5),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_today_outlined),
+                activeIcon: Icon(Icons.calendar_today),
+                label: 'Appointments',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.people_outline),
+                activeIcon: Icon(Icons.people),
+                label: 'Staff',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.content_cut_outlined),
+                activeIcon: Icon(Icons.content_cut),
+                label: 'Services',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings_outlined),
+                activeIcon: Icon(Icons.settings),
+                label: 'More',
+              ),
+            ],
+          ),
         ),
       ),
     );
