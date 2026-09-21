@@ -46,18 +46,32 @@ class InsightsController extends Controller
             // Always available to a paying salon.
             'overview' => $this->insights->overview($salon),
             'services' => $this->insights->services($salon),
-            'campaigns' => $this->insights->campaignPerformance($salon),
         ];
+
+        // Null when marketing is not deployed here. Omitted rather than sent as
+        // zeroes, so the app hides the card instead of claiming the salon ran
+        // campaigns that sent nothing.
+        $campaigns = $this->insights->campaignPerformance($salon);
+
+        if ($campaigns !== null) {
+            $payload['campaigns'] = $campaigns;
+        }
 
         // Basic cross-sell is the top few pairs and nothing more; advanced adds
         // the revenue behind each one and the combos worth building from them.
         if ($crossSellLevel !== 'none') {
+            // Advanced adds the revenue behind each pair and shows more of
+            // them. The service ids and whether a combo already exists are
+            // kept at both levels — they are not analysis, they are what the
+            // "create this combo" button needs to work at all.
             $payload['cross_sell'] = $crossSellLevel === 'advanced'
                 ? $this->insights->pairs($salon)
                 : collect($this->insights->pairs($salon, 3))
                     ->map(fn (array $pair) => [
                         'services' => $pair['services'],
+                        'service_ids' => $pair['service_ids'],
                         'booked_together' => $pair['booked_together'],
+                        'already_a_combo' => $pair['already_a_combo'],
                     ])->all();
         }
 

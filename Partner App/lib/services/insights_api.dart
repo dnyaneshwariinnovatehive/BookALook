@@ -32,8 +32,35 @@ class InsightsApi {
       return SalonInsights.fromJson(jsonDecode(response.body));
     }
 
-    throw Exception('Could not load your insights.');
+    // Carry the server's own words up to the screen. A flat "could not load"
+    // sends whoever is debugging this to the logs to find out something the
+    // response already said.
+    throw InsightsUnavailable(_reasonFrom(response.statusCode, response.body));
   }
+
+  static String _reasonFrom(int status, String body) {
+    if (status == 401) return 'Your session has expired. Sign in again.';
+    if (status == 403) return 'This account cannot see insights for that salon.';
+    if (status == 404) return 'That salon could not be found.';
+
+    try {
+      final message = (jsonDecode(body) as Map)['message'];
+      if (message is String && message.isNotEmpty) return message;
+    } catch (_) {
+      // Not JSON — a proxy error page or a crash dump. Fall through.
+    }
+
+    return 'The server could not build your insights (error $status).';
+  }
+}
+
+class InsightsUnavailable implements Exception {
+  final String message;
+
+  InsightsUnavailable(this.message);
+
+  @override
+  String toString() => message;
 }
 
 class SalonInsights {
@@ -47,7 +74,7 @@ class SalonInsights {
   final RepeatCustomers? repeatCustomers;
   final PeakHours? peakHours;
   final List<AreaStat> areas;
-  final List<String> recommendedCombos;
+  final List<ComboSuggestion> recommendedCombos;
   final List<UpsellTip> upsell;
   final List<PairStat> crossSell;
 
@@ -84,7 +111,7 @@ class SalonInsights {
           .map((r) => AreaStat.fromJson(r))
           .toList(),
       recommendedCombos: ((d['recommended_combos'] ?? []) as List)
-          .map((r) => (r['suggestion'] ?? '').toString())
+          .map((r) => ComboSuggestion.fromJson(r))
           .toList(),
       upsell: ((d['upsell'] ?? []) as List).map((r) => UpsellTip.fromJson(r)).toList(),
       crossSell: ((d['cross_sell'] ?? []) as List).map((r) => PairStat.fromJson(r)).toList(),
@@ -205,12 +232,17 @@ class PeakHours {
   final String? quietest;
   final String? quietestDay;
 
+  /// Days with no bookings at all — almost always closing days rather than
+  /// slow ones, and shown as such instead of as an empty bar.
+  final List<String> closedDays;
+
   PeakHours({
     required this.byHour,
     required this.byDay,
     this.busiest,
     this.quietest,
     this.quietestDay,
+    this.closedDays = const [],
   });
 
   factory PeakHours.fromJson(Map<String, dynamic> json) => PeakHours(
@@ -228,6 +260,8 @@ class PeakHours {
         busiest: json['busiest_hour'],
         quietest: json['quietest_hour'],
         quietestDay: json['quietest_day'],
+        closedDays:
+            ((json['closed_days'] ?? []) as List).map((d) => d.toString()).toList(),
       );
 }
 
@@ -263,16 +297,57 @@ class UpsellTip {
 
 class PairStat {
   final List<String> services;
+
+  /// The salon's own service rows, so a pair can be turned into a combo
+  /// without the owner having to find them again in a list.
+  final List<String> serviceIds;
   final int bookedTogether;
   final bool alreadyACombo;
 
-  PairStat({required this.services, required this.bookedTogether, this.alreadyACombo = false});
+  PairStat({
+    required this.services,
+    required this.bookedTogether,
+    this.serviceIds = const [],
+    this.alreadyACombo = false,
+  });
 
   factory PairStat.fromJson(Map<String, dynamic> json) => PairStat(
         services: ((json['services'] ?? []) as List).map((s) => s.toString()).toList(),
+        serviceIds:
+            ((json['service_ids'] ?? []) as List).map((s) => s.toString()).toList(),
         bookedTogether: json['booked_together'] ?? 0,
         alreadyACombo: json['already_a_combo'] == true,
       );
+
+  /// Only offerable when the pair is not already packaged and both services
+  /// came back identified.
+  bool get canBecomeCombo => !alreadyACombo && serviceIds.length >= 2;
+
+  String get comboName => services.join(' + ');
+}
+
+/// A pair worth packaging, with the words to explain why.
+class ComboSuggestion {
+  final List<String> services;
+  final List<String> serviceIds;
+  final String suggestion;
+
+  ComboSuggestion({
+    required this.services,
+    required this.serviceIds,
+    required this.suggestion,
+  });
+
+  factory ComboSuggestion.fromJson(Map<String, dynamic> json) => ComboSuggestion(
+        services: ((json['services'] ?? []) as List).map((s) => s.toString()).toList(),
+        serviceIds:
+            ((json['service_ids'] ?? []) as List).map((s) => s.toString()).toList(),
+        suggestion: (json['suggestion'] ?? '').toString(),
+      );
+
+  bool get isActionable => serviceIds.length >= 2;
+
+  String get comboName => services.join(' + ');
 }
 
 class LockedSection {

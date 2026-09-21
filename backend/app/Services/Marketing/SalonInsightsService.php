@@ -5,6 +5,7 @@ namespace App\Services\Marketing;
 use App\Models\Salon;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * What a salon's own bookings say about it.
@@ -170,7 +171,14 @@ class SalonInsightsService
             'by_day' => $days,
             'busiest_hour' => $busiest['label'] ?? null,
             'quietest_hour' => $quietest['label'] ?? null,
-            'quietest_day' => collect($days)->sortBy('bookings')->first()['day'] ?? null,
+            // Among days the salon actually trades. A day with no bookings at
+            // all is almost always a closing day, not a slow one, and calling
+            // it "quietest" leads straight to advising an offer for a day the
+            // shop is shut. The quietest hour above already works this way.
+            'quietest_day' => collect($days)->filter(fn ($day) => $day['bookings'] > 0)
+                ->sortBy('bookings')->first()['day'] ?? null,
+            'closed_days' => collect($days)->filter(fn ($day) => $day['bookings'] === 0)
+                ->pluck('day')->values(),
         ];
     }
 
@@ -363,8 +371,16 @@ class SalonInsightsService
      * message that never arrived says nothing about whether the offer was any
      * good.
      */
-    public function campaignPerformance(Salon $salon, int $days = 90): array
+    public function campaignPerformance(Salon $salon, int $days = 90): ?array
     {
+        // Insights and marketing are separate features that happen to share a
+        // screen. Where marketing has not been deployed the booking insights
+        // are still perfectly computable, and losing the whole page to a table
+        // that does not exist yet is a far worse answer than omitting one card.
+        if (! Schema::hasTable('campaigns')) {
+            return null;
+        }
+
         $since = now()->subDays($days);
 
         $campaigns = DB::table('campaigns')

@@ -6,7 +6,20 @@ import '../../../../models/service_models.dart';
 class AddComboScreen extends StatefulWidget {
   final String salonId;
   final Map<String, dynamic>? existingCombo;
-  const AddComboScreen({super.key, required this.salonId, this.existingCombo});
+
+  /// Services to tick on arrival, for when the owner got here from a
+  /// suggestion rather than from a blank form. Both of these default to null,
+  /// so opening this screen the ordinary way behaves exactly as before.
+  final List<String>? preselectedServiceIds;
+  final String? suggestedName;
+
+  const AddComboScreen({
+    super.key,
+    required this.salonId,
+    this.existingCombo,
+    this.preselectedServiceIds,
+    this.suggestedName,
+  });
 
   @override
   State<AddComboScreen> createState() => _AddComboScreenState();
@@ -45,8 +58,35 @@ class _AddComboScreenState extends State<AddComboScreen> {
           });
         }
       }
+    } else if (widget.suggestedName != null) {
+      // Arrived from a suggestion. The name is filled in as a starting point;
+      // the services need the price list, so they are ticked once it loads.
+      _nameController.text = widget.suggestedName!;
     }
     _fetchServices();
+  }
+
+  /// Tick the services a suggestion arrived with.
+  ///
+  /// Runs after the price list loads because a selected service carries its
+  /// price as the starting special price, exactly as picking it by hand does.
+  /// Anything that no longer exists is skipped rather than added as a blank.
+  void _applyPreselection() {
+    final ids = widget.preselectedServiceIds;
+
+    if (ids == null || ids.isEmpty || widget.existingCombo != null) return;
+
+    for (final id in ids) {
+      final match = _availableServices.where((s) => s.id == id).firstOrNull;
+
+      if (match == null) continue;
+      if (_selectedServices.any((s) => s['service_id'] == match.id)) continue;
+
+      _selectedServices.add({
+        'service_id': match.id,
+        'special_price': match.price,
+      });
+    }
   }
 
   Future<void> _fetchServices() async {
@@ -59,6 +99,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
       }
       setState(() {
         _availableServices = allServices;
+        _applyPreselection();
         _isLoading = false;
       });
     } catch (e) {
