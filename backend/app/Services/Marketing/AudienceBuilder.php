@@ -246,9 +246,11 @@ class AudienceBuilder
         $to = now()->addDays(max(0, $days))->format('m-d');
 
         $driver = DB::connection()->getDriverName();
-        $monthDay = $driver === 'sqlite'
-            ? "strftime('%m-%d', u.date_of_birth)"
-            : "DATE_FORMAT(u.date_of_birth, '%m-%d')";
+        $monthDay = match ($driver) {
+            'sqlite' => "strftime('%m-%d', u.date_of_birth)",
+            'pgsql' => "TO_CHAR(u.date_of_birth, 'MM-DD')",
+            default => "DATE_FORMAT(u.date_of_birth, '%m-%d')",
+        };
 
         if ($from <= $to) {
             $query->whereRaw("{$monthDay} BETWEEN ? AND ?", [$from, $to]);

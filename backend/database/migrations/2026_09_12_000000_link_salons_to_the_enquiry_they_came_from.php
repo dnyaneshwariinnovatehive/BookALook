@@ -26,13 +26,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('salons', function (Blueprint $table) {
-            $table->uuid('enquiry_id')->nullable()->index();
+            $table->foreignUuid('enquiry_id')
+                ->nullable()
+                ->constrained('salon_enquiries')
+                ->nullOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('salons', function (Blueprint $table) {
+            $table->dropForeign(['enquiry_id']);
             $table->dropIndex(['enquiry_id']);
             $table->dropColumn('enquiry_id');
         });
