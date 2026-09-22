@@ -5,6 +5,11 @@ import 'otp_screen.dart';
 import '../theme/app_theme.dart';
 
 class PhoneScreen extends StatefulWidget {
+  final bool isModal;
+  final int returnIndex;
+
+  const PhoneScreen({Key? key, this.isModal = false, this.returnIndex = 0}) : super(key: key);
+
   @override
   _PhoneScreenState createState() => _PhoneScreenState();
 }
@@ -30,10 +35,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
     if (mounted) setState(() => _isLoading = false);
 
     if (result == 'success') {
-      Navigator.push(
+      final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (context) => OtpScreen(phone: phone)),
+        MaterialPageRoute(builder: (context) => OtpScreen(phone: phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
       );
+      if (loggedIn == true && widget.isModal) {
+        if (mounted) Navigator.pop(context, true);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: $result')),
@@ -214,10 +222,15 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 Center(
                   child: TextButton.icon(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MainScreen(isGuest: true)),
-                      );
+                      if (widget.isModal) {
+                        Navigator.pop(context, false);
+                      } else {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => MainScreen(isGuest: true, initialIndex: widget.returnIndex)),
+                          (route) => false,
+                        );
+                      }
                     },
                     icon: Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary, size: 20),
                     label: Text(

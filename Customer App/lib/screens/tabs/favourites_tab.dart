@@ -81,6 +81,7 @@ class _FavouritesTabState extends State<FavouritesTab> {
       return GuestRestrictedView(
         title: 'Sign In Required',
         message: 'Please sign in to view your favorite salons.',
+        tabIndex: 3,
         icon: Icons.favorite_border,
       );
     }

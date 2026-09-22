@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/cart_service.dart';
+import '../services/auth_service.dart';
+import 'phone_screen.dart';
 import '../widgets/cart_offers.dart';
 import 'checkout_screen.dart';
 import 'main_screen.dart';
@@ -100,13 +102,34 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppTheme.darkBg : AppTheme.lightBg;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
+        backgroundColor: bgColor,
+        elevation: 0,
+        centerTitle: true,
         title: Text(
           _cart != null && _cart!['salon'] != null ? 'Cart - ${_cart!['salon']['name']}' : 'Your Cart',
-          style: AppTheme.lightTheme.appBarTheme.titleTextStyle
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: textHeading),
         ),
-        centerTitle: true,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(Icons.arrow_back, color: textHeading, size: 20),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
       ),
       body: _buildBody(),
       bottomNavigationBar: _buildCheckoutBar(),
@@ -120,14 +143,18 @@ class _CartScreenState extends State<CartScreen> {
     if (_error.isNotEmpty) {
       return Center(child: Text(_error, style: TextStyle(color: AppTheme.lightDanger)));
     }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+
     if (_cart == null || (_cart!['items'] as List).isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shopping_bag_outlined, size: 80, color: AppTheme.lightTextLight),
+            Icon(Icons.shopping_bag_outlined, size: 80, color: textLight),
             SizedBox(height: 16),
-            Text('Your cart is empty', style: GoogleFonts.outfit(fontSize: 18, color: AppTheme.lightTextHeading, fontWeight: FontWeight.w500)),
+            Text('Your cart is empty', style: GoogleFonts.outfit(fontSize: 18, color: textHeading, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -196,24 +223,32 @@ class _CartScreenState extends State<CartScreen> {
             ? '${(combo['services'] as List?)?.length ?? 0} services in this package'
             : null;
 
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: 14),
+          padding: EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppTheme.lightSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.lightBorder),
+            color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  color: AppTheme.lightAccentSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(isCombo ? Icons.card_giftcard : Icons.spa, color: AppTheme.accentColor),
+                child: Icon(isCombo ? Icons.card_giftcard : Icons.spa_outlined, color: AppTheme.accentColor, size: 28),
               ),
               SizedBox(width: 16),
               Expanded(
@@ -222,22 +257,22 @@ class _CartScreenState extends State<CartScreen> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading),
+                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
                     ),
                     if (subtitle != null) ...[
-                      SizedBox(height: 2),
-                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight)),
+                      SizedBox(height: 4),
+                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 13, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
                     ],
-                    SizedBox(height: 4),
+                    SizedBox(height: 8),
                     Text(
                       '₹${_lineTotal(item).toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.accentColor),
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline, color: AppTheme.lightDanger),
+                icon: Icon(Icons.delete_outline, color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger),
                 onPressed: () => _removeItem(item['id'].toString()),
               )
             ],
@@ -286,18 +321,26 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+
     return Container(
       padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.lightSurface,
+        color: surfaceColor,
+        border: isDark ? Border(top: BorderSide(color: AppTheme.darkBorder)) : null,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: Offset(0, -4),
-            blurRadius: 16,
-          )
+          if (!isDark)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              offset: Offset(0, -6),
+              blurRadius: 24,
+            )
         ],
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: SafeArea(
         child: Row(
@@ -307,25 +350,23 @@ class _CartScreenState extends State<CartScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: textBody)),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('₹${total.toStringAsFixed(2)}',
+                    Text('₹${total.toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
-                            fontSize: 22,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.lightTextHeading)),
-                    // The struck-through list price is what makes the package
-                    // discount legible rather than just a smaller number.
+                            color: textHeading)),
                     if (saving > 0) ...[
                       SizedBox(width: 8),
                       Padding(
-                        padding: EdgeInsets.only(bottom: 3),
+                        padding: EdgeInsets.only(bottom: 4),
                         child: Text('₹${listTotal.toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              color: AppTheme.lightTextLight,
+                              fontSize: 15,
+                              color: textLight,
                               decoration: TextDecoration.lineThrough,
                             )),
                       ),
@@ -335,20 +376,26 @@ class _CartScreenState extends State<CartScreen> {
                 if (saving > 0)
                   Text('You save ₹${saving.toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.lightSuccess)),
               ],
             ),
             ElevatedButton(
               onPressed: () async {
+                final token = await AuthService.getToken();
+                if (token == null || token.isEmpty) {
+                  final loggedIn = await Navigator.of(context, rootNavigator: true).push<bool>(
+                    MaterialPageRoute(builder: (context) => PhoneScreen(isModal: true))
+                  );
+                  if (loggedIn != true) return;
+                }
+
+                if (!mounted) return;
                 final booked = await Navigator.push<bool>(context, MaterialPageRoute(
                   builder: (context) => CheckoutScreen(salonId: _cart!['salon_id'].toString())
                 ));
-                // The booking consumed the cart server-side — reflect that here.
                 if (booked == true) {
-                  // Rebuild the shell on the Bookings tab. This has to go
-                  // through the root navigator — the cart lives inside a tab.
                   Navigator.of(context, rootNavigator: true)
                       .pushAndRemoveUntil(
                     MaterialPageRoute(
@@ -358,8 +405,12 @@ class _CartScreenState extends State<CartScreen> {
                   );
                 }
               },
-              style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
-                padding: MaterialStateProperty.all(EdgeInsets.symmetric(horizontal: 32, vertical: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
               ),
               child: Text('Checkout', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
             )

@@ -5,8 +5,10 @@ import 'profile_screen.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
+  final bool isModal;
+  final int returnIndex;
 
-  const OtpScreen({Key? key, required this.phone}) : super(key: key);
+  const OtpScreen({Key? key, required this.phone, this.isModal = false, this.returnIndex = 0}) : super(key: key);
 
   @override
   _OtpScreenState createState() => _OtpScreenState();
@@ -32,16 +34,23 @@ class _OtpScreenState extends State<OtpScreen> {
       final result = await _authService.verifyOtp(widget.phone, otp);
 
       if (result == true) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => MainScreen()),
-          (route) => false, // Clears the navigation stack
-        );
+        if (widget.isModal) {
+          Navigator.pop(context, true);
+        } else {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => MainScreen(initialIndex: widget.returnIndex)),
+            (route) => false,
+          );
+        }
       } else if (result == 'requires_registration') {
-        Navigator.pushReplacement(
+        final loggedIn = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(builder: (context) => ProfileScreen(phone: widget.phone)),
+          MaterialPageRoute(builder: (context) => ProfileScreen(phone: widget.phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
         );
+        if (loggedIn == true && widget.isModal) {
+          if (mounted) Navigator.pop(context, true);
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Invalid OTP. Please try again.')),

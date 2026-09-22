@@ -102,6 +102,7 @@ class _ProfileTabState extends State<ProfileTab> {
       return GuestRestrictedView(
         title: 'Sign In Required',
         message: 'Please sign in to access your profile settings and history.',
+        tabIndex: 4,
         icon: Icons.person_outline,
       );
     }

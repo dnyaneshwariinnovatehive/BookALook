@@ -6,12 +6,14 @@ class GuestRestrictedView extends StatelessWidget {
   final String title;
   final String message;
   final IconData icon;
+  final int tabIndex;
 
   const GuestRestrictedView({
     Key? key,
     required this.title,
     required this.message,
     required this.icon,
+    this.tabIndex = 0,
   }) : super(key: key);
 
   @override
@@ -45,10 +47,8 @@ class GuestRestrictedView extends StatelessWidget {
             SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                // Signing in has to replace the whole shell, not just the
-                // stack of the tab this view is embedded in.
                 Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => PhoneScreen()),
+                  MaterialPageRoute(builder: (context) => PhoneScreen(returnIndex: tabIndex)),
                   (route) => false,
                 );
               },

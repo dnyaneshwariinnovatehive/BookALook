@@ -5,8 +5,10 @@ import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String phone;
+  final bool isModal;
+  final int returnIndex;
 
-  const ProfileScreen({Key? key, required this.phone}) : super(key: key);
+  const ProfileScreen({Key? key, required this.phone, this.isModal = false, this.returnIndex = 0}) : super(key: key);
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -86,11 +88,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => MainScreen()),
-        (route) => false,
-      );
+      if (widget.isModal) {
+        Navigator.pop(context, true);
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => MainScreen(initialIndex: widget.returnIndex)),
+          (route) => false,
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to complete profile. Please try again.')),

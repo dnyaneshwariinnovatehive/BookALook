@@ -26,13 +26,14 @@ class AppliedComboBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (appliedCombos.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.lightSuccessBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.lightSuccess.withOpacity(0.35)),
+        color: isDark ? AppTheme.darkSuccessBg : AppTheme.lightSuccessBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppTheme.darkSuccess.withOpacity(0.3) : AppTheme.lightSuccess.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,21 +69,21 @@ class AppliedComboBanner extends StatelessWidget {
                   Text(
                     combo['name'] ?? 'Package',
                     style: GoogleFonts.outfit(
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.lightTextHeading),
+                        color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
                   ),
                   Text(
                     names,
-                    style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody),
+                    style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                   ),
                   Row(
                     children: [
                       Text(
                         '₹${_toDouble(combo['list_total']).toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          color: AppTheme.lightTextLight,
+                          fontSize: 13,
+                          color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
@@ -90,9 +91,9 @@ class AppliedComboBanner extends StatelessWidget {
                       Text(
                         '₹${_toDouble(combo['combo_total']).toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.lightSuccess),
+                            color: isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                       ),
                     ],
                   ),
@@ -130,12 +131,13 @@ class ComboOfferCard extends StatelessWidget {
     final extra = _toDouble(offer['extra_to_pay']);
     final missingIds = missing.map<String>((s) => s['id'].toString()).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.lightAccentSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+        color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.accentColor.withOpacity(isDark ? 0.4 : 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +152,7 @@ class ComboOfferCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                       fontSize: 14.5,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.lightTextHeading),
+                      color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
                 ),
               ),
             ],
@@ -159,7 +161,7 @@ class ComboOfferCard extends StatelessWidget {
           Text(
             'You already have ${(offer['services_in_cart'] as List?)?.join(', ') ?? ''}. '
             'Adding the rest costs ₹${extra.toStringAsFixed(0)} more.',
-            style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody, height: 1.4),
+            style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody, height: 1.4),
           ),
           const SizedBox(height: 10),
 
@@ -185,7 +187,7 @@ class ComboOfferCard extends StatelessWidget {
                               Text('₹${listPrice.toStringAsFixed(0)}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 11.5,
-                                    color: AppTheme.lightTextLight,
+                                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
                                     decoration: TextDecoration.lineThrough,
                                   )),
                               const SizedBox(width: 5),
@@ -250,6 +252,13 @@ class SuggestionStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+
     // The wording has to be honest about where the suggestion came from.
     final fromHistory = suggestions.any((s) => s['reason'] == 'bought_together');
 
@@ -259,26 +268,33 @@ class SuggestionStrip extends StatelessWidget {
         Text(
           fromHistory ? 'Often booked together here' : 'You might also like',
           style: GoogleFonts.outfit(
-              fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+              fontSize: 16, fontWeight: FontWeight.bold, color: textHeading),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 128,
+          height: 140,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: suggestions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final service = suggestions[index] as Map<String, dynamic>;
               final percent = service['together_percent'] ?? 0;
 
               return Container(
-                width: 168,
-                padding: const EdgeInsets.all(12),
+                width: 180,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.lightSurface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppTheme.lightBorder),
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: borderColor, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,37 +304,43 @@ class SuggestionStrip extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.lightTextHeading),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: textHeading),
                     ),
                     const SizedBox(height: 2),
                     if (service['reason'] == 'bought_together' && percent > 0)
                       Text('with $percent% of these bookings',
                           style: GoogleFonts.outfit(
-                              fontSize: 10.5, color: AppTheme.lightTextLight)),
+                              fontSize: 11, color: textLight)),
                     const Spacer(),
-                    Text('₹${_toDouble(service['price']).toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.lightTextHeading)),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 30,
-                      child: OutlinedButton(
-                        onPressed:
-                            onAdd == null ? null : () => onAdd!(service['id'].toString()),
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          foregroundColor: AppTheme.accentColor,
-                          side: BorderSide(color: AppTheme.accentColor.withOpacity(0.5)),
-                        ),
-                        child: Text('Add',
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text('₹${_toDouble(service['price']).toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(
-                                fontSize: 12.5, fontWeight: FontWeight.bold)),
-                      ),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accentColor)),
+                        SizedBox(
+                          height: 32,
+                          child: OutlinedButton(
+                            onPressed:
+                                onAdd == null ? null : () => onAdd!(service['id'].toString()),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              foregroundColor: AppTheme.accentColor,
+                              backgroundColor: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                              side: BorderSide.none,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text('ADD',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

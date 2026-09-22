@@ -311,10 +311,11 @@ class _HomeTabState extends State<HomeTab> {
             // 6. Next appointment
             Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildNextAppointmentSection()),
 
-            const SizedBox(height: 15),
-
-            // 7. Book again
-            _buildBookAgainSection(),
+            if (!widget.isGuest) ...[
+              const SizedBox(height: 15),
+              // 7. Book again
+              _buildBookAgainSection(),
+            ],
 
             const SizedBox(height: 90), // Bottom navigation padding
           ],
