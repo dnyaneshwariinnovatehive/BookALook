@@ -32,8 +32,10 @@ class SalonReviewController extends Controller
 
         $request->validate([
             'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:50',
             'rating' => 'nullable|integer|min:1|max:5',
             'with_comment' => 'nullable|boolean',
+            'sort' => 'nullable|string|in:'.implode(',', array_keys(ReviewService::SORTS)),
         ]);
 
         $summary = $this->reviews->summaryFor($salonId);
@@ -41,9 +43,10 @@ class SalonReviewController extends Controller
         $list = $this->reviews->listFor(
             $salonId,
             (int) $request->input('page', 1),
-            20,
+            (int) $request->input('per_page', 20),
             $request->filled('rating') ? (int) $request->rating : null,
-            $request->boolean('with_comment')
+            $request->boolean('with_comment'),
+            $request->input('sort'),
         );
 
         return response()->json([
@@ -52,6 +55,9 @@ class SalonReviewController extends Controller
                 'headline' => $this->headline($summary),
                 'trend' => $this->trend($salonId),
             ],
+            // So the app can build the sort menu from the server's list rather
+            // than keeping its own copy in step by hand.
+            'sorts' => ReviewService::SORTS,
         ] + $list);
     }
 

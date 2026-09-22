@@ -27,32 +27,92 @@ class CatalogController extends Controller
         ]);
     }
 
+    /**
+     * Store a category icon.
+     *
+     * The dashboard trims, centres and squares the artwork in the browser
+     * before it gets here, because this deployment has neither GD nor Imagick
+     * and so cannot transform an image at all. What it *can* do is measure one,
+     * and that is what this does: a lopsided or tiny icon is refused with a
+     * reason rather than accepted and left to look broken in the customer app.
+     *
+     * The check is a backstop, not the mechanism. Anything uploaded through the
+     * dashboard has already been normalised and sails through it.
+     */
     public function uploadIcon(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'icon' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'icon' => 'required|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if ($request->hasFile('icon')) {
-            $file = $request->file('icon');
-            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-            // Store in the 'public' disk under 'category_icons' directory
-            $path = $file->storeAs('category_icons', $filename, 'public');
-            
-            // Return the full URL to the file
-            $url = asset('storage/' . $path);
-            
-            return response()->json([
-                'message' => 'Icon uploaded successfully',
-                'url' => $url
-            ]);
+        if (! $request->hasFile('icon')) {
+            return response()->json(['message' => 'No file provided'], 400);
         }
 
-        return response()->json(['message' => 'No file provided'], 400);
+        $file = $request->file('icon');
+        $extension = strtolower($file->getClientOriginalExtension());
+
+        // An SVG has no pixel dimensions to measure and scales cleanly to any
+        // size by definition, so it is taken as-is.
+        if ($extension !== 'svg') {
+            if ($problem = $this->shapeProblem($file->getPathname())) {
+                return response()->json([
+                    'message' => $problem,
+                    'errors' => ['icon' => [$problem]],
+                ], 422);
+            }
+        }
+
+        $filename = Str::uuid().'.'.$extension;
+        $path = $file->storeAs('category_icons', $filename, 'public');
+
+        return response()->json([
+            'message' => 'Icon uploaded successfully',
+            'url' => asset('storage/'.$path),
+        ]);
+    }
+
+    /**
+     * Why this image would not sit properly in the customer app's tile.
+     *
+     * Returns null when it is fine. getimagesize() is part of core PHP rather
+     * than GD, so this works on a server that cannot process images at all.
+     */
+    private function shapeProblem(string $path): ?string
+    {
+        $size = @getimagesize($path);
+
+        if ($size === false) {
+            return 'That file could not be read as an image.';
+        }
+
+        [$width, $height] = $size;
+
+        if ($width < 128 || $height < 128) {
+            return sprintf(
+                'That icon is %d×%d. Category icons need to be at least 128×128 or they blur in the app.',
+                $width,
+                $height
+            );
+        }
+
+        // The tile is square. A wide or tall image is letterboxed inside it and
+        // ends up visibly smaller than its neighbours.
+        $ratio = $width / max(1, $height);
+
+        if ($ratio < 0.8 || $ratio > 1.25) {
+            return sprintf(
+                'That icon is %d×%d, which is not square. Upload it through the category form and it will be squared for you.',
+                $width,
+                $height
+            );
+        }
+
+        return null;
     }
 
     public function storeCategory(Request $request)

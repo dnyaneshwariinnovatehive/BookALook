@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../../widgets/wallet_coin_pill.dart';
 import '../../notifications_screen.dart';
 import '../../../services/notification_service.dart';
 import '../../qr_scanner_screen.dart';
@@ -275,30 +276,48 @@ class _HomeTabState extends State<HomeTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              radius: 24,
-              backgroundColor: Color(0xFFE0E0E0),
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11'), // Placeholder for Admin Profile
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hi Admin 👋',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: headingColor),
+        // Flexible now that the right-hand side is wider: a long salon name
+        // should shorten rather than overflow the row.
+        Flexible(
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 24,
+                backgroundColor: Color(0xFFE0E0E0),
+                backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11'), // Placeholder for Admin Profile
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hi Admin 👋',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: headingColor),
+                    ),
+                    Text(
+                      widget.salonName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, color: subColor),
+                    ),
+                  ],
                 ),
-                Text(
-                  widget.salonName,
-                  style: TextStyle(fontSize: 14, color: subColor),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-        Container(
+        const SizedBox(width: 8),
+        // Grouped so the row still has two sides to space apart. The balance
+        // sits left of the bell: it is something the owner glances at, while
+        // the bell is something they act on, and the control they act on stays
+        // nearest the thumb.
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            WalletCoinPill(salonId: widget.salonId, compact: true),
+            const SizedBox(width: 6),
+            Container(
           decoration: BoxDecoration(
             color: surfaceColor,
             shape: BoxShape.circle,
@@ -350,7 +369,9 @@ class _HomeTabState extends State<HomeTab> {
                 ),
             ],
           ),
-        )
+            ),
+          ],
+        ),
       ],
     );
   }

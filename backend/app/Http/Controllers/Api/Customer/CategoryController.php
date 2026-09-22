@@ -13,11 +13,22 @@ class CategoryController extends Controller
         // Only fetch active, non-custom categories (master catalog)
         $categories = ServiceCategory::where('is_active', true)
             ->where('is_custom', false)
-            ->orderBy('name', 'asc')
+            // display_order is what SuperAdmin arranges them by; name is only
+            // the tie-breaker. Ordering by name alone ignored that entirely.
+            ->orderBy('display_order')
+            ->orderBy('name')
             ->get();
 
         return response()->json([
-            'categories' => $categories
+            'categories' => $categories->map(fn (ServiceCategory $category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                // Rebuilt on the host this request came in on, so the image
+                // loads on a phone and an emulator and not just on the machine
+                // the icon was uploaded from.
+                'icon_url' => $category->publicIconUrl(),
+                'display_order' => $category->display_order,
+            ]),
         ]);
     }
 }

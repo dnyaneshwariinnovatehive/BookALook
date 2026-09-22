@@ -154,11 +154,47 @@ class ReviewService
      *
      * @return array<string, mixed>
      */
-    public function listFor(string $salonId, int $page, int $perPage, ?int $starFilter, bool $onlyWithComment): array
-    {
+    /**
+     * How a list of reviews may be ordered.
+     *
+     * Newest first is the default because a salon owner opening this page is
+     * usually asking "what has just been said about me". The other three exist
+     * for the other question — "what is the worst of it" — which is the one
+     * that actually needs acting on.
+     */
+    public const SORTS = [
+        'recent' => 'Newest first',
+        'oldest' => 'Oldest first',
+        'highest' => 'Highest rated',
+        'lowest' => 'Lowest rated',
+    ];
+
+    /**
+     * @param  string|null  $sort  One of SORTS. Anything else falls back to
+     *                             newest first rather than failing: an unknown
+     *                             sort is a bad request, not a reason to show
+     *                             an owner an error instead of their reviews.
+     */
+    public function listFor(
+        string $salonId,
+        int $page,
+        int $perPage,
+        ?int $starFilter,
+        bool $onlyWithComment,
+        ?string $sort = null,
+    ): array {
         $query = Review::with('customer:id,name')
-            ->where('salon_id', $salonId)
-            ->orderByDesc('created_at');
+            ->where('salon_id', $salonId);
+
+        // created_at resolves to the second, and a salon can take several
+        // reviews in one, so id breaks the tie and keeps paging stable —
+        // without it a row can appear on two pages or on neither.
+        match ($sort) {
+            'oldest' => $query->orderBy('created_at')->orderBy('id'),
+            'highest' => $query->orderByDesc('rating')->orderByDesc('created_at')->orderByDesc('id'),
+            'lowest' => $query->orderBy('rating')->orderByDesc('created_at')->orderByDesc('id'),
+            default => $query->orderByDesc('created_at')->orderByDesc('id'),
+        };
 
         if ($starFilter !== null) {
             $query->where('rating', $starFilter);
@@ -182,8 +218,14 @@ class ReviewService
             'meta' => [
                 'current_page' => $paginated->currentPage(),
                 'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
                 'total' => $paginated->total(),
                 'has_more' => $paginated->hasMorePages(),
+                // Echoed back so the app can show what it is actually looking
+                // at rather than what it believes it asked for.
+                'sort' => array_key_exists((string) $sort, self::SORTS) ? $sort : 'recent',
+                'rating' => $starFilter,
+                'with_comment' => $onlyWithComment,
             ],
         ];
     }

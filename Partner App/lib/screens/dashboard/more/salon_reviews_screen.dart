@@ -41,6 +41,19 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
   int? _starFilter;
   bool _onlyWithComment = false;
 
+  /// Matches the server's default. The labels come from the server too, so the
+  /// menu cannot drift out of step with what the API will actually accept.
+  String _sort = 'recent';
+  Map<String, String> _sorts = const {
+    'recent': 'Newest first',
+    'oldest': 'Oldest first',
+    'highest': 'Highest rated',
+    'lowest': 'Lowest rated',
+  };
+
+  /// How many reviews matched the current filter, for the results line.
+  int _total = 0;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +95,7 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
       final uri = Uri.parse('${ApiConfig.baseUrl}/partner/salons/${widget.salonId}/reviews')
           .replace(queryParameters: {
         'page': '$_page',
+        'sort': _sort,
         if (_starFilter != null) 'rating': '$_starFilter',
         if (_onlyWithComment) 'with_comment': '1',
       });
@@ -104,10 +118,16 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
 
+      final meta = body['meta'] as Map?;
+
       setState(() {
         _summary = Map<String, dynamic>.from(body['summary'] as Map);
         _reviews.addAll(body['reviews'] as List? ?? const []);
-        _hasMore = (body['meta'] as Map?)?['has_more'] == true;
+        _hasMore = meta?['has_more'] == true;
+        _total = (meta?['total'] as num?)?.toInt() ?? _reviews.length;
+        if (body['sorts'] is Map) {
+          _sorts = Map<String, String>.from(body['sorts'] as Map);
+        }
         if (_hasMore) _page++;
         _loading = false;
         _loadingMore = false;
@@ -344,46 +364,174 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
     );
   }
 
-  Widget _buildFilterRow() => Row(
+  /// Filter and sort, both visible rather than hidden in a gesture.
+  ///
+  /// The star bars above already filter when tapped, but nothing on screen
+  /// says so — an owner with a run of one-star reviews should not have to
+  /// discover that by accident. These say it out loud.
+  Widget _buildFilterRow() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              _starFilter == null ? 'All reviews' : 'Showing $_starFilter-star reviews',
-              style: GoogleFonts.outfit(
-                  fontSize: 13.5, fontWeight: FontWeight.bold),
-            ),
-          ),
-          if (_starFilter != null)
-            TextButton(
-              onPressed: () => _toggleStar(_starFilter!),
-              style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.accentColor,
-                  visualDensity: VisualDensity.compact),
-              child: Text('Clear', style: GoogleFonts.outfit(fontSize: 12.5)),
-            ),
-          GestureDetector(
-            onTap: () {
-              setState(() => _onlyWithComment = !_onlyWithComment);
-              _load(reset: true);
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              decoration: BoxDecoration(
-                color: _onlyWithComment ? AppTheme.lightAccentSoft : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: _onlyWithComment ? AppTheme.accentColor : AppTheme.lightBorder),
-              ),
-              child: Text('With comments',
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _resultsLabel(),
                   style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: _onlyWithComment ? FontWeight.bold : FontWeight.normal,
-                    color: _onlyWithComment ? AppTheme.accentColor : AppTheme.lightTextBody,
-                  )),
+                      fontSize: 13.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+              _buildSortButton(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _filterChip(
+                  label: 'All',
+                  active: _starFilter == null && !_onlyWithComment,
+                  onTap: () {
+                    setState(() {
+                      _starFilter = null;
+                      _onlyWithComment = false;
+                    });
+                    _load(reset: true);
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Highest first: an owner scanning for problems looks for the
+                // low ones, but the common case is checking the good ones are
+                // still coming in.
+                for (final star in [5, 4, 3, 2, 1]) ...[
+                  _filterChip(
+                    label: '$star',
+                    icon: Icons.star_rounded,
+                    active: _starFilter == star,
+                    onTap: () => _toggleStar(star),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                _filterChip(
+                  label: 'With comments',
+                  active: _onlyWithComment,
+                  onTap: () {
+                    setState(() => _onlyWithComment = !_onlyWithComment);
+                    _load(reset: true);
+                  },
+                ),
+              ],
             ),
           ),
         ],
+      );
+
+  String _resultsLabel() {
+    if (_total == 0) return 'No reviews match';
+
+    final filtered = _starFilter != null || _onlyWithComment;
+    final noun = _total == 1 ? 'review' : 'reviews';
+
+    // While more pages are outstanding, say how far through we are — a list
+    // that simply stops looks like the end of the reviews rather than the end
+    // of the page.
+    if (_reviews.length < _total) {
+      return 'Showing ${_reviews.length} of $_total $noun';
+    }
+
+    return filtered ? '$_total matching $noun' : '$_total $noun';
+  }
+
+  Widget _buildSortButton() => PopupMenuButton<String>(
+        initialValue: _sort,
+        onSelected: (value) {
+          if (value == _sort) return;
+          setState(() => _sort = value);
+          _load(reset: true);
+        },
+        itemBuilder: (context) => _sorts.entries
+            .map((entry) => PopupMenuItem(
+                  value: entry.key,
+                  child: Row(
+                    children: [
+                      Icon(
+                        entry.key == _sort
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        size: 17,
+                        color: entry.key == _sort
+                            ? AppTheme.accentColor
+                            : AppTheme.lightTextLight,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(entry.value, style: GoogleFonts.outfit(fontSize: 13.5)),
+                    ],
+                  ),
+                ))
+            .toList(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.lightBorder),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.swap_vert_rounded,
+                  size: 15, color: AppTheme.accentColor),
+              const SizedBox(width: 5),
+              Text(
+                _sorts[_sort] ?? 'Sort',
+                style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.accentColor),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _filterChip({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) =>
+      GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: active ? AppTheme.lightAccentSoft : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: active ? AppTheme.accentColor : AppTheme.lightBorder),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                    color: active ? AppTheme.accentColor : AppTheme.lightTextBody,
+                  )),
+              if (icon != null) ...[
+                const SizedBox(width: 3),
+                Icon(icon,
+                    size: 13,
+                    color: active
+                        ? AppTheme.accentColor
+                        : AppTheme.lightTextBody),
+              ],
+            ],
+          ),
+        ),
       );
 
   Widget _buildReviewTile(Map<String, dynamic> review) {

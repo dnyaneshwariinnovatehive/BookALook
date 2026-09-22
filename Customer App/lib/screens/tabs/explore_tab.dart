@@ -8,7 +8,7 @@ import '../../services/cart_service.dart';
 import '../../services/location_service.dart';
 import '../../widgets/city_picker_sheet.dart';
 import '../cart_screen.dart';
-import '../salon_list_screen.dart';
+import '../search_screen.dart';
 
 class ExploreTab extends StatefulWidget {
   @override
@@ -118,11 +118,8 @@ class _ExploreTabState extends State<ExploreTab> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SalonListScreen(
-          initialSearch: _searchController.text,
-          title: 'Search Results',
-        ),
-      )
+        builder: (context) => SearchScreen(initialQuery: _searchController.text),
+      ),
     );
   }
 

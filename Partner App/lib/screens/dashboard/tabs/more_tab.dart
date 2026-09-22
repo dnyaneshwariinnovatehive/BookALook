@@ -13,6 +13,7 @@ import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../notifications_screen.dart';
+import '../../../widgets/wallet_coin_pill.dart';
 
 class MoreTab extends StatelessWidget {
   final String salonId;
@@ -42,6 +43,10 @@ class MoreTab extends StatelessWidget {
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
+        actions: [
+          WalletCoinPill(salonId: salonId, compact: true),
+          const SizedBox(width: 16),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -7,6 +7,7 @@ import '../../appointment_details_screen.dart'; // Fixed relative path
 import '../../walk_in_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../widgets/wallet_coin_pill.dart';
 
 const String _kAllDates = 'All Dates';
 const String _kAllProviders = 'All Providers';
@@ -357,14 +358,32 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Appointments',
-            style: GoogleFonts.outfit(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: headingColor,
+          // Beside the title rather than on the right, because the right of
+          // this particular header already carries Walk-in and Close day — a
+          // third pill there overflows a small phone. Flexible so a narrow
+          // screen shortens the title instead of overflowing the row.
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    'Appointments',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: headingColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                WalletCoinPill(salonId: widget.salonId, compact: true),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [

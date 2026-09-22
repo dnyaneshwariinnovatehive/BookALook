@@ -5,6 +5,7 @@ import '../../../services/service_management_api.dart';
 import '../services/add_service_flow.dart';
 import '../services/edit_service_sheet.dart';
 import '../services/add_combo_screen.dart';
+import '../../../widgets/wallet_coin_pill.dart';
 
 class ServicesTab extends StatefulWidget {
   final String salonId;
@@ -93,6 +94,8 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
         elevation: 0,
         centerTitle: false,
         actions: [
+          WalletCoinPill(salonId: widget.salonId, compact: true),
+          const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: ElevatedButton.icon(

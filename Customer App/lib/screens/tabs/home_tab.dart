@@ -16,6 +16,8 @@ import '../salon_list_screen.dart';
 import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
 import '../qr_code_screen.dart';
+import '../../widgets/category_grid.dart';
+import '../search_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -261,16 +263,30 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _navigateToSearch({String? categoryId}) {
+    // Picking a category, or browsing everything, still goes to the salon list
+    // — those are filters over salons, not questions.
+    if (categoryId != null || _searchController.text.trim().isEmpty) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SalonListScreen(
+              initialSearch: _searchController.text,
+              initialGender: _selectedGender,
+              initialCategoryId: categoryId,
+              title: categoryId != null ? 'Category Salons' : 'All Salons',
+            ),
+          ));
+      return;
+    }
+
+    // A typed query is a question about services as much as salons, and the
+    // salon list can only answer half of it.
     Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SalonListScreen(
-            initialSearch: _searchController.text,
-            initialGender: _selectedGender,
-            initialCategoryId: categoryId,
-            title: categoryId != null ? 'Category Salons' : 'Search Results',
-          ),
-        ));
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchScreen(initialQuery: _searchController.text),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -704,12 +720,25 @@ class _HomeTabState extends State<HomeTab> {
                   color: headingColor,
                 ),
               ),
-              Text(
-                'See All',
-                style: TextStyle(
-                  color: AppTheme.accentColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              // Was plain text with nothing behind it. It now does what it
+              // says — browse every salon, unfiltered.
+              GestureDetector(
+                onTap: () => _navigateToSearch(),
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Text(
+                      'Browse all',
+                      style: TextStyle(
+                        color: AppTheme.accentColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 18, color: AppTheme.accentColor),
+                  ],
                 ),
               ),
             ],
@@ -747,60 +776,10 @@ class _HomeTabState extends State<HomeTab> {
             ),
           )
         else
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                return GestureDetector(
-                  onTap: () =>
-                      _navigateToSearch(categoryId: category.id.toString()),
-                  child: Container(
-                    height: 40,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: borderColor, width: 1), 
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (category.iconUrl != null &&
-                            category.iconUrl!.isNotEmpty)
-                          Image.network(category.iconUrl!,
-                              width: 18,
-                              height: 18,
-                              color: bodyColor, 
-                              errorBuilder: (c, e, s) => Icon(
-                                  Icons.category_rounded,
-                                  size: 18,
-                                  color: bodyColor))
-                        else
-                          Icon(Icons.category_rounded,
-                              color: bodyColor, size: 18),
-                        const SizedBox(width: 10),
-                        Text(
-                          category.name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: headingColor.withOpacity(0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+          CategoryGrid(
+            categories: _categories,
+            onTap: (category) =>
+                _navigateToSearch(categoryId: category.id.toString()),
           ),
       ],
     );

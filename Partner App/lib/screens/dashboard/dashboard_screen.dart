@@ -4,6 +4,7 @@ import 'package:partner_app/theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
+import '../../services/wallet_balance.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/appointments_tab.dart';
 import 'tabs/staff_tab.dart';
@@ -41,6 +42,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final access = await SalonAccessApi.check(widget.salonData['id'].toString());
       if (!mounted) return;
+
+      // This response already carries the coin balance, so the pill in every
+      // header costs nothing extra to fill.
+      WalletBalance.seedFrom(access);
+
       setState(() {
         _access = access;
         _checkingAccess = false;

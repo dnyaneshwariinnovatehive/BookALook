@@ -350,3 +350,214 @@
 .saveBtn:hover {
   background: var(--accent-hover);
 }
+
+/* ---------- Icon studio ----------
+   Getting a consistent set of category icons is two jobs: fixing the style
+   (the prompt) and fixing the geometry (the canvas pass). The panel is laid
+   out as those two numbered steps because that is the order they happen in. */
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.1rem;
+  background: var(--bg-color);
+}
+
+.studioStep {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+.studioStepNumber {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.studioStepBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.studioStepTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.studioStepHelp {
+  margin: 0.2rem 0 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.promptBox {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-color);
+  overflow: hidden;
+}
+
+.promptText {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  max-height: 9rem;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.73rem;
+  line-height: 1.55;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-color);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studioRow {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.dropZone {
+  flex: 1;
+  min-height: 7rem;
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.9rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dropZone:hover,
+.dropZoneActive {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+}
+
+.dropTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.dropHint {
+  font-size: 0.74rem;
+  color: var(--text-body);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* A replica of the customer app's tile, at the size it actually renders, so
+   the icon is judged where it will live rather than as a bare thumbnail. */
+.previewColumn {
+  flex: 0 0 auto;
+  width: 82px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.previewTile {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.previewImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.previewEmpty {
+  font-size: 0.65rem;
+  color: var(--text-light);
+}
+
+.previewLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.previewCaption {
+  font-size: 0.62rem;
+  color: var(--text-light);
+  text-align: center;
+}
+
+.studioNote {
+  margin: 0.7rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.studioError {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 560px) {
+  .studioRow {
+    flex-direction: column;
+  }
+
+  .previewColumn {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+  }
+}

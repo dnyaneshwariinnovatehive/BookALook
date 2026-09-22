@@ -6,6 +6,7 @@ import '../../../models/leave_models.dart';
 import '../../../services/staff_api.dart';
 import '../../../theme/app_theme.dart';
 import 'staff/add_staff_screen.dart';
+import '../../../widgets/wallet_coin_pill.dart';
 
 class StaffTab extends StatefulWidget {
   final String salonId;
@@ -413,6 +414,8 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
         elevation: 0,
         centerTitle: false,
         actions: [
+          WalletCoinPill(salonId: widget.salonId, compact: true),
+          const SizedBox(width: 8),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: ElevatedButton.icon(

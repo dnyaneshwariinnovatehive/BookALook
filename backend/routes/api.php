@@ -13,6 +13,11 @@ Route::prefix('customer')->group(function () {
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
     Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
+    // Services and salons in one query, typo-tolerant. Public: someone
+    // deciding whether to install the app should be able to look for a
+    // haircut before signing up.
+    Route::get('/search', [\App\Http\Controllers\Api\Customer\SearchController::class, 'index']);
+
     Route::get('/salons', [\App\Http\Controllers\Api\Customer\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\Customer\SalonController::class, 'show']);
     // Reading reviews needs no account — someone deciding where to book has
