@@ -130,8 +130,8 @@ class SalonInsightsService
             ->where('salon_id', $salon->id)
             ->where('status', 'completed')
             ->whereDate('appointment_date', '>=', $since)
-            ->selectRaw('SUBSTR(start_time, 1, 2) as hour, COUNT(*) as bookings')
-            ->groupBy('hour')
+            ->selectRaw('SUBSTR(CAST(start_time AS VARCHAR), 1, 2) as hour, COUNT(*) as bookings')
+            ->groupByRaw('SUBSTR(CAST(start_time AS VARCHAR), 1, 2)')
             ->pluck('bookings', 'hour');
 
         $hours = [];
