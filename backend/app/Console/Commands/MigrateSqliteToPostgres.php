@@ -15,6 +15,8 @@ class MigrateSqliteToPostgres extends Command
 
     protected $description = 'Safely migrate data from SQLite to PostgreSQL, preserving all IDs and historical data.';
 
+    protected array $deferredUpdates = [];
+
     protected array $skipTables = [
         'migrations',
         'sessions',
@@ -73,6 +75,8 @@ class MigrateSqliteToPostgres extends Command
                 $this->migrateTable($table);
             }
 
+            $this->processDeferredUpdates();
+
             if (!$this->option('no-verify')) {
                 $this->verifyMigration($orderedTables);
             }
@@ -118,11 +122,14 @@ class MigrateSqliteToPostgres extends Command
         $tables = array_column($tables, 'name');
 
         $dependencies = [];
+        $dependencyEdges = [];
         foreach ($tables as $table) {
             $fks = $this->sqlite->select("PRAGMA foreign_key_list(\"$table\")");
             $dependencies[$table] = [];
+            $dependencyEdges[$table] = [];
             foreach ($fks as $fk) {
                 $dependencies[$table][] = $fk->table;
+                $dependencyEdges[$table][] = ['parent' => $fk->table, 'col' => $fk->from];
             }
         }
         
@@ -133,18 +140,28 @@ class MigrateSqliteToPostgres extends Command
         $visited = [];
         $visiting = [];
 
-        $visit = function ($node) use (&$visit, &$visited, &$visiting, &$order, $dependencies) {
+        $visit = function ($node) use (&$visit, &$visited, &$visiting, &$order, $dependencyEdges) {
             if (isset($visited[$node])) return;
-            if (isset($visiting[$node])) {
-                $this->error("STOPPING: Circular dependency detected involving table '$node'.");
-                exit(1);
-            }
-
+            
             $visiting[$node] = true;
 
-            if (isset($dependencies[$node])) {
-                foreach ($dependencies[$node] as $dep) {
-                    $visit($dep);
+            if (isset($dependencyEdges[$node])) {
+                foreach ($dependencyEdges[$node] as $dep) {
+                    $parent = $dep['parent'];
+                    $col = $dep['col'];
+
+                    if (isset($visiting[$parent])) {
+                        if (!isset($this->deferredUpdates[$node])) {
+                            $this->deferredUpdates[$node] = [];
+                        }
+                        if (!in_array($col, $this->deferredUpdates[$node])) {
+                            $this->deferredUpdates[$node][] = $col;
+                            $this->info("Breaking circular dependency: $node.$col references $parent");
+                        }
+                        continue;
+                    }
+
+                    $visit($parent);
                 }
             }
 
@@ -281,6 +298,10 @@ class MigrateSqliteToPostgres extends Command
                 foreach ($rowArray as $col => $value) {
                     if (!isset($pgColMap[$col])) continue;
 
+                    if (isset($this->deferredUpdates[$table]) && in_array($col, $this->deferredUpdates[$table])) {
+                        continue;
+                    }
+
                     $sanitizedRow[$col] = $this->validateAndConvert(
                         $table,
                         $rowIdentifier,
@@ -295,6 +316,70 @@ class MigrateSqliteToPostgres extends Command
 
             $this->pgsql->table($table)->insert($insertData);
         });
+    }
+
+    protected function processDeferredUpdates()
+    {
+        if (empty($this->deferredUpdates)) {
+            return;
+        }
+
+        $this->info("\n--- Phase 2: Processing Deferred Circular Dependencies ---");
+
+        foreach ($this->deferredUpdates as $table => $cols) {
+            $this->info("Updating deferred columns for $table: " . implode(', ', $cols));
+            
+            $pgColMap = $this->getPostgresColumnMetadata($table);
+            $enums = $this->getPostgresEnums($table);
+            $pkColumns = $this->getPrimaryKeyColumns($table);
+
+            if (empty($pkColumns)) {
+                $this->error("Cannot perform deferred updates on $table without a primary key.");
+                exit(1);
+            }
+
+            $query = $this->sqlite->table($table);
+            
+            $query->where(function($q) use ($cols) {
+                foreach ($cols as $col) {
+                    $q->orWhereNotNull($col);
+                }
+            });
+
+            foreach ($pkColumns as $pk) {
+                $query->orderBy($pk);
+            }
+
+            $query->chunk(500, function ($rows) use ($table, $cols, $pkColumns, $pgColMap, $enums) {
+                foreach ($rows as $row) {
+                    $rowArray = (array) $row;
+                    $rowIdentifier = $this->getRowIdentifier($row, $pkColumns);
+                    $updateData = [];
+
+                    foreach ($cols as $col) {
+                        $value = $rowArray[$col] ?? null;
+                        if (is_null($value)) continue;
+
+                        $updateData[$col] = $this->validateAndConvert(
+                            $table,
+                            $rowIdentifier,
+                            $col,
+                            $value,
+                            $pgColMap[$col],
+                            $enums[$col] ?? null
+                        );
+                    }
+
+                    if (!empty($updateData)) {
+                        $pgQuery = $this->pgsql->table($table);
+                        foreach ($pkColumns as $pk) {
+                            $pgQuery->where($pk, $rowArray[$pk]);
+                        }
+                        $pgQuery->update($updateData);
+                    }
+                }
+            });
+        }
     }
 
     protected function validateAndConvert($table, $rowIdentifier, $col, $value, $pgDef, $enumValues)
