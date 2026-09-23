@@ -96,7 +96,9 @@ return new class extends Migration
         });
 
         Schema::table('salon_enquiries', function (Blueprint $table) {
-            $table->uuid('city_id')->nullable()->index();
+            if (!Schema::hasColumn('salon_enquiries', 'city_id')) {
+                $table->uuid('city_id')->nullable()->index();
+            }
             $table->uuid('sub_area_id')->nullable()->index();
         });
 
@@ -138,6 +140,10 @@ return new class extends Migration
      */
     private function resolveEnquiryCities(): void
     {
+        if (!Schema::hasColumn('salon_enquiries', 'city')) {
+            return;
+        }
+
         foreach (DB::table('salon_enquiries')->whereNotNull('city')->get(['id', 'city']) as $enquiry) {
             $cityId = DB::table('cities')
                 ->whereRaw('lower(name) = ?', [strtolower(trim($enquiry->city))])
@@ -152,7 +158,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('salon_enquiries', function (Blueprint $table) {
-            $table->dropColumn(['city_id', 'sub_area_id']);
+            // city_id belongs to the 09_02 migration. Do not drop it here.
+            $table->dropColumn('sub_area_id');
         });
 
         Schema::table('salons', function (Blueprint $table) {
