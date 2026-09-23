@@ -70,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
       StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),
-      MoreTab(salonId: widget.salonData['id']),
+      MoreTab(salonData: widget.salonData),
     ];
   }
 

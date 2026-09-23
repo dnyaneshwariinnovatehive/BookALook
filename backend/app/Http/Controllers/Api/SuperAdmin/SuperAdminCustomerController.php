@@ -40,12 +40,12 @@ class SuperAdminCustomerController extends Controller
                 DB::raw(
                     '(select customer_id,
                         count(*) as total,
-                        count(case when status = "completed" then 1 else null end) as completed,
-                        count(case when status = "cancelled" then 1 else null end) as cancelled,
-                        count(case when status = "no_show" then 1 else null end) as no_show,
-                        round(sum(case when status = "completed" then final_billed_amount else 0 end), 2) as spend
+                        count(case when status = \'completed\' then 1 else null end) as completed,
+                        count(case when status = \'cancelled\' then 1 else null end) as cancelled,
+                        count(case when status = \'no_show\' then 1 else null end) as no_show,
+                        round(sum(case when status = \'completed\' then final_billed_amount else 0 end), 2) as spend
                       from appointments
-                      where customer_id is not null and customer_id <> ""
+                      where customer_id is not null
                       group by customer_id) agg'
                 ),
                 'agg.customer_id', '=', 'u.id'
@@ -93,7 +93,6 @@ class SuperAdminCustomerController extends Controller
                 ->first();
 
             $totalBookings = DB::table('appointments')
-                ->where('customer_id', '!=', '')
                 ->whereNotNull('customer_id')
                 ->count();
 
@@ -112,7 +111,7 @@ class SuperAdminCustomerController extends Controller
             ->leftJoin('cities as c', 'c.id', '=', 'u.city_id')
             ->where('u.role', 'customer')
             ->groupBy('c.name')
-            ->selectRaw('coalesce(c.name, "Unassigned") as city, count(*) as customers,
+            ->selectRaw('coalesce(c.name, \'Unassigned\') as city, count(*) as customers,
                          sum(case when u.is_active then 1 else 0 end) as active')
             ->orderByDesc('customers')
             ->get()
@@ -153,7 +152,7 @@ class SuperAdminCustomerController extends Controller
                 DB::raw(
                     '(select customer_id, count(*) as total
                       from appointments
-                      where customer_id is not null and customer_id <> ""
+                      where customer_id is not null
                       group by customer_id) t'
                 ),
                 't.customer_id', '=', 'u.id'
@@ -272,10 +271,10 @@ class SuperAdminCustomerController extends Controller
         $agg = DB::table('appointments as a')
             ->selectRaw(
                 'count(*) as total,
-                 count(case when a.status = "completed" then 1 else null end) as completed,
-                 count(case when a.status = "cancelled" then 1 else null end) as cancelled,
-                 count(case when a.status = "no_show" then 1 else null end) as no_show,
-                 round(sum(case when a.status = "completed" then a.final_billed_amount else 0 end), 2) as spend'
+                 count(case when a.status = \'completed\' then 1 else null end) as completed,
+                 count(case when a.status = \'cancelled\' then 1 else null end) as cancelled,
+                 count(case when a.status = \'no_show\' then 1 else null end) as no_show,
+                 round(sum(case when a.status = \'completed\' then a.final_billed_amount else 0 end), 2) as spend'
             )
             ->where('a.customer_id', $id)
             ->first();
@@ -358,8 +357,8 @@ class SuperAdminCustomerController extends Controller
         $days = DB::table('users')
             ->where('role', 'customer')
             ->where('created_at', '>=', $now->copy()->subDays(365)->startOfDay())
-            ->selectRaw('date(created_at) as d, count(*) as c')
-            ->groupBy('d')
+            ->selectRaw('CAST(created_at AS DATE) as d, count(*) as c')
+            ->groupByRaw('CAST(created_at AS DATE)')
             ->orderBy('d')
             ->get();
 

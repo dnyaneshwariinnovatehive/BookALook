@@ -16,8 +16,8 @@ import '../../notifications_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 
 class MoreTab extends StatelessWidget {
-  final String salonId;
-  const MoreTab({super.key, required this.salonId});
+  final Map<String, dynamic> salonData;
+  const MoreTab({super.key, required this.salonData});
 
   void _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
@@ -44,7 +44,7 @@ class MoreTab extends StatelessWidget {
         elevation: 0,
         centerTitle: false,
         actions: [
-          WalletCoinPill(salonId: salonId, compact: true),
+          WalletCoinPill(salonId: salonData['id'].toString(), compact: true),
           const SizedBox(width: 16),
         ],
       ),
@@ -82,19 +82,28 @@ class MoreTab extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Luxe Studio Salon', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              Text(salonData['name']?.toString() ?? 'Salon Name', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
-                              Text('Shop 4, Royal Avenue, Koregaon Park, Pune - 411001', style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color)),
+                              Text(salonData['city']?['name']?.toString() ?? 'City not specified', style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color)),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
-                            borderRadius: BorderRadius.circular(8),
+                        GestureDetector(
+                          onTap: () {
+                            // Link to Location screen as it's the only editable salon info right now
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonData['id'].toString())),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('Edit', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('Edit', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
                         )
                       ],
                     ),
@@ -129,7 +138,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -157,7 +166,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -172,7 +181,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalonReviewsScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SalonReviewsScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -187,7 +196,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => InsightsScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => InsightsScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -202,7 +211,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => MarketingScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => MarketingScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -215,7 +224,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalonQrScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SalonQrScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -227,7 +236,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SubscriptionBillingScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SubscriptionBillingScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -239,7 +248,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => PayrollScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => PayrollScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -251,7 +260,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalonPayoutsScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => SalonPayoutsScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
@@ -263,7 +272,7 @@ class MoreTab extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => WalletScreen(salonId: salonId)),
+                        MaterialPageRoute(builder: (context) => WalletScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
