@@ -48,7 +48,7 @@ return new class extends Migration
         $salons = DB::table('salons')
             ->where('status', 'active')
             ->whereNull('deleted_at')
-            ->whereNotIn('id', $alreadyGranted ?: ['-'])
+            ->whereNotIn('id', $alreadyGranted)
             ->pluck('id');
 
         foreach ($salons as $salonId) {
