@@ -124,12 +124,27 @@ class MigrateSqliteToPostgres extends Command
         $dependencies = [];
         $dependencyEdges = [];
         foreach ($tables as $table) {
-            $fks = $this->sqlite->select("PRAGMA foreign_key_list(\"$table\")");
+            // Read dependencies from PostgreSQL (the target) because SQLite (the source) 
+            // may have dropped or never supported certain foreign key constraints (like salons.enquiry_id).
+            $fks = $this->pgsql->select("
+                SELECT
+                    parent_cl.relname AS parent_table,
+                    a.attname AS child_col
+                FROM pg_constraint c
+                JOIN pg_class child_cl ON c.conrelid = child_cl.oid
+                JOIN pg_class parent_cl ON c.confrelid = parent_cl.oid
+                JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+                WHERE c.contype = 'f' 
+                AND child_cl.relname = ?
+            ", [$table]);
+
             $dependencies[$table] = [];
             $dependencyEdges[$table] = [];
             foreach ($fks as $fk) {
-                $dependencies[$table][] = $fk->table;
-                $dependencyEdges[$table][] = ['parent' => $fk->table, 'col' => $fk->from];
+                if (in_array($fk->parent_table, $tables)) {
+                    $dependencies[$table][] = $fk->parent_table;
+                    $dependencyEdges[$table][] = ['parent' => $fk->parent_table, 'col' => $fk->child_col];
+                }
             }
         }
         
