@@ -33,12 +33,18 @@ return new class extends Migration {
             $table->foreignUuid('cancelled_by_user_id')->nullable()->constrained('users');
             $table->string('cancellation_reason', 255)->nullable();
             $table->timestamp('cancelled_at')->nullable();
-            $table->foreignUuid('rescheduled_from_id')->nullable()->constrained('appointments');
+            $table->uuid('rescheduled_from_id')->nullable();
             $table->string('reschedule_reason', 255)->nullable();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamp('no_show_at')->nullable();
             $table->timestamps();
+        });
+
+        Schema::table('appointments', function (Blueprint $table) {
+            $table->foreign('rescheduled_from_id')
+                ->references('id')
+                ->on('appointments');
         });
     }
     public function down(): void { Schema::dropIfExists('appointments'); }
