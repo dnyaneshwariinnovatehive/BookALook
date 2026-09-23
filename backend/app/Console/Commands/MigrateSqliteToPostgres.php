@@ -459,7 +459,21 @@ class MigrateSqliteToPostgres extends Command
     {
         foreach ($uniqueIndexes as $index) {
             $cols = implode(', ', $index);
-            $duplicates = $this->sqlite->select("SELECT $cols, COUNT(*) as c FROM $table GROUP BY $cols HAVING c > 1");
+            
+            $whereNotNulls = [];
+            foreach ($index as $col) {
+                $whereNotNulls[] = "$col IS NOT NULL";
+            }
+            $whereClause = implode(' AND ', $whereNotNulls);
+
+            $duplicates = $this->sqlite->select("
+                SELECT $cols, COUNT(*) as c 
+                FROM $table 
+                WHERE $whereClause
+                GROUP BY $cols 
+                HAVING c > 1
+            ");
+
             if (count($duplicates) > 0) {
                 $this->error("STOPPING: Duplicate values found in SQLite for unique constraint ($cols) on table $table.");
                 exit(1);
