@@ -17,10 +17,16 @@ return new class extends Migration {
             $table->date('end_date');
             $table->string('status', 20)->default('active'); // active, expired, cancelled
             $table->boolean('auto_renew')->default(false);
-            $table->foreignUuid('renewed_from_id')->nullable()->constrained('salon_subscriptions');
+            $table->uuid('renewed_from_id')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->foreignUuid('cancelled_by')->nullable()->constrained('users');
             $table->timestamps();
+        });
+
+        Schema::table('salon_subscriptions', function (Blueprint $table) {
+            $table->foreign('renewed_from_id')
+                ->references('id')
+                ->on('salon_subscriptions');
         });
     }
     public function down(): void { Schema::dropIfExists('salon_subscriptions'); }

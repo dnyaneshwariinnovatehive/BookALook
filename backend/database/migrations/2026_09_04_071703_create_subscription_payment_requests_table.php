@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('subscription_payment_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('salon_id')->constrained('salons')->onDelete('cascade');
+            $table->foreignUuid('salon_id')->constrained('salons')->onDelete('cascade');
             // Subscription plans use UUID primary keys, so this foreign key must too.
             $table->foreignUuid('subscription_plan_id')->nullable()->constrained('subscription_plans')->onDelete('cascade');
             $table->string('billing_type')->default('flat'); // 'flat' or 'commission'
