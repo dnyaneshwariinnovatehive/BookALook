@@ -315,59 +315,71 @@ export default function GlobalAppointmentsDashboard() {
         </div>
       </div>
 
-      <div className={styles.filters} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <select 
-          className={styles.selectInput} 
-          value={dateMode} 
-          onChange={(e) => { setDateMode(e.target.value); setPage(1); }}
-        >
-          <option value="specific">Specific Date</option>
-          <option value="week">Next 7 Days</option>
-          <option value="month">This Month</option>
-          <option value="lifetime">Lifetime</option>
-        </select>
+      <div className={styles.controlsCard}>
+        <div className={styles.filtersRow}>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>Date Range</label>
+            <select 
+              className={styles.selectInput} 
+              value={dateMode} 
+              onChange={(e) => { setDateMode(e.target.value); setPage(1); }}
+            >
+              <option value="specific">Specific Date</option>
+              <option value="week">Next 7 Days</option>
+              <option value="month">This Month</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
+          </div>
 
-        <select 
-          className={styles.selectInput} 
-          value={salonId} 
-          onChange={(e) => { setSalonId(e.target.value); setPage(1); }}
-        >
-          <option value="">All Salons</option>
-          {salons.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>Salon</label>
+            <select 
+              className={styles.selectInput} 
+              value={salonId} 
+              onChange={(e) => { setSalonId(e.target.value); setPage(1); }}
+            >
+              <option value="">All Salons</option>
+              {salons.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
 
-        <select 
-          className={styles.selectInput} 
-          value={status} 
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-        >
-          <option value="">All Statuses</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="no_show">No Show</option>
-          <option value="awaiting_reschedule">Awaiting Reschedule</option>
-        </select>
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel}>Status</label>
+            <select 
+              className={styles.selectInput} 
+              value={status} 
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            >
+              <option value="">All Statuses</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="no_show">No Show</option>
+              <option value="awaiting_reschedule">Awaiting Reschedule</option>
+            </select>
+          </div>
 
-        <input
-          type="text"
-          className={styles.formInput}
-          style={{ width: '250px' }}
-          placeholder="Search by customer name, phone, etc..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
-      </div>
+          <div className={styles.filterGroup} style={{ flexGrow: 2 }}>
+            <label className={styles.filterLabel}>Search</label>
+            <input
+              type="text"
+              className={styles.formInput}
+              placeholder="Search by customer name, phone, etc..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+        </div>
 
-      {dateMode === 'specific' && (
-        <div className={styles.dateStripContainer}>
-          <div className={styles.dateStrip}>
-            {dateStrip.map((d) => {
-              const dateStr = d.toISOString().split('T')[0];
-              const isSelected = date === dateStr;
+        {dateMode === 'specific' && (
+          <div className={styles.dateStripContainer}>
+            <div className={styles.dateStrip}>
+              {dateStrip.map((d) => {
+                const dateStr = d.toISOString().split('T')[0];
+                const isSelected = date === dateStr;
               const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
               const dayNum = d.getDate();
               const monthName = d.toLocaleDateString('en-US', { month: 'short' });
@@ -396,8 +408,9 @@ export default function GlobalAppointmentsDashboard() {
              />
              <span className={styles.calendarIcon}>📅</span>
           </div>
-        </div>
+         </div>
       )}
+      </div>
 
       <div className={styles.tableContainer}>
         <table className={styles.table}>

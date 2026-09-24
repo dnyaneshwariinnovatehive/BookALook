@@ -20,44 +20,75 @@
   font-size: 16px;
 }
 
-.filters {
-  display: flex;
-  gap: 16px;
+.controlsCard {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  padding: 24px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+  border: 1px solid #F3F4F6;
 }
 
-.searchInput, .selectInput {
-  padding: 10px 16px;
-  border: 1px solid #D1D5DB;
-  border-radius: 8px;
-  font-size: 14px;
+.filtersRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
   min-width: 200px;
+}
+
+.filterLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4B5563;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.searchInput, .selectInput, .formInput {
+  padding: 12px 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  font-size: 14px;
+  background-color: #F9FAFB;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.searchInput:focus, .selectInput:focus, .formInput:focus {
   background-color: white;
+  border-color: #8B5CF6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .dateStripContainer {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #F3F4F6;
 }
 
 .dateStrip {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding-bottom: 8px; /* For scrollbar */
-  scrollbar-width: thin; /* Firefox */
+  padding-bottom: 4px;
+  scrollbar-width: none;
   flex-grow: 1;
 }
 
 .dateStrip::-webkit-scrollbar {
-  height: 6px;
-}
-.dateStrip::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
-  border-radius: 9999px;
+  display: none;
 }
 
 .dateCard {

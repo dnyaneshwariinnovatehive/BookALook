@@ -42,10 +42,6 @@ interface Collaborator {
 
 /**
  * How close a collaborator is to an enquiry.
- *
- * Whoever already works in the same locality is almost always the right answer,
- * so they are lifted to the top of the list and labelled rather than left for
- * SuperAdmin to spot by reading twenty names.
  */
 type Proximity = 'same-area' | 'same-city' | 'elsewhere' | 'unknown';
 
@@ -77,13 +73,6 @@ const PROXIMITY_LABEL: Record<Proximity, string> = {
   unknown: 'No area set',
 };
 
-/**
- * Picks who goes to this enquiry, with the local people first.
- *
- * Grouped rather than merely sorted: a flat list still asks SuperAdmin to work
- * out which names are nearby. Optgroup headings say it outright, and the
- * best match is preselected so the common case is one click.
- */
 function CollaboratorPicker({
   enquiry,
   collaborators,
@@ -153,7 +142,6 @@ function CollaboratorPicker({
   );
 }
 
-/** Nearest first, then alphabetically inside each band. */
 function rankFor(enquiry: Enquiry, collaborators: Collaborator[]) {
   return [...collaborators]
     .map((c) => ({ collaborator: c, proximity: proximityOf(c, enquiry) }))
@@ -173,9 +161,20 @@ export default function SalonApprovalQueue() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Dropdown states for each enquiry row
+  // Assign collaborator states
   const [selectedCollaborator, setSelectedCollaborator] = useState<Record<string, string>>({});
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [justAssignedIds, setJustAssignedIds] = useState<string[]>([]);
+
+  // Pagination and search for enquiries
+  const [searchEnquiries, setSearchEnquiries] = useState('');
+  const [enquiriesPage, setEnquiriesPage] = useState(1);
+  const ENQUIRIES_PER_PAGE = 10;
+
+  // Pagination and search for salons
+  const [searchSalons, setSearchSalons] = useState('');
+  const [salonsPage, setSalonsPage] = useState(1);
+  const SALONS_PER_PAGE = 10;
 
   useEffect(() => {
     async function fetchData() {
@@ -214,6 +213,10 @@ export default function SalonApprovalQueue() {
       return;
     }
 
+    if (!window.confirm('Are you sure you want to assign this collaborator?')) {
+      return;
+    }
+
     setAssigningId(enquiryId);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/enquiries/${enquiryId}/assign`, {
@@ -228,7 +231,12 @@ export default function SalonApprovalQueue() {
       if (res.ok) {
         // Update local state
         setEnquiries(prev => prev.map(enq => enq.id === enquiryId ? json.data : enq));
-        alert('Collaborator assigned successfully!');
+        
+        // Trigger animation
+        setJustAssignedIds(prev => [...prev, enquiryId]);
+        setTimeout(() => {
+          setJustAssignedIds(prev => prev.filter(id => id !== enquiryId));
+        }, 2000);
       } else {
         throw new Error(json.message || 'Failed to assign collaborator');
       }
@@ -239,6 +247,41 @@ export default function SalonApprovalQueue() {
     }
   };
 
+  // Filter & paginate enquiries
+  const filteredEnquiries = useMemo(() => {
+    if (!searchEnquiries) return enquiries;
+    const lower = searchEnquiries.toLowerCase();
+    return enquiries.filter(e => 
+      e.salon_name?.toLowerCase().includes(lower) || 
+      e.owner_name?.toLowerCase().includes(lower) ||
+      e.city?.toLowerCase().includes(lower)
+    );
+  }, [enquiries, searchEnquiries]);
+  
+  const paginatedEnquiries = useMemo(() => {
+    const start = (enquiriesPage - 1) * ENQUIRIES_PER_PAGE;
+    return filteredEnquiries.slice(start, start + ENQUIRIES_PER_PAGE);
+  }, [filteredEnquiries, enquiriesPage]);
+  const enquiriesTotalPages = Math.ceil(filteredEnquiries.length / ENQUIRIES_PER_PAGE);
+
+  // Filter & paginate salons
+  const filteredSalons = useMemo(() => {
+    if (!searchSalons) return salons;
+    const lower = searchSalons.toLowerCase();
+    return salons.filter(s => 
+      s.name?.toLowerCase().includes(lower) || 
+      s.admin?.name?.toLowerCase().includes(lower) ||
+      s.city?.name?.toLowerCase().includes(lower)
+    );
+  }, [salons, searchSalons]);
+
+  const paginatedSalons = useMemo(() => {
+    const start = (salonsPage - 1) * SALONS_PER_PAGE;
+    return filteredSalons.slice(start, start + SALONS_PER_PAGE);
+  }, [filteredSalons, salonsPage]);
+  const salonsTotalPages = Math.ceil(filteredSalons.length / SALONS_PER_PAGE);
+
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -248,7 +291,16 @@ export default function SalonApprovalQueue() {
 
       {/* New Enquiries Section */}
       <div style={{ marginBottom: '4rem' }}>
-        <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>New Salon Enquiries</h2>
+        <div className={styles.controlsRow}>
+          <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: 0 }}>New Salon Enquiries</h2>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search enquiries by name or city..."
+            value={searchEnquiries}
+            onChange={(e) => { setSearchEnquiries(e.target.value); setEnquiriesPage(1); }}
+          />
+        </div>
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
@@ -266,11 +318,11 @@ export default function SalonApprovalQueue() {
                 <tr><td colSpan={6} className={styles.emptyState}>Loading enquiries...</td></tr>
               ) : error ? (
                 <tr><td colSpan={6} className={styles.emptyState} style={{ color: 'red' }}>{error}</td></tr>
-              ) : enquiries.length === 0 ? (
-                <tr><td colSpan={6} className={styles.emptyState}>No enquiries received.</td></tr>
+              ) : filteredEnquiries.length === 0 ? (
+                <tr><td colSpan={6} className={styles.emptyState}>No enquiries found.</td></tr>
               ) : (
-                enquiries.map((enq) => (
-                  <tr key={enq.id} className={styles.tr}>
+                paginatedEnquiries.map((enq) => (
+                  <tr key={enq.id} className={`${styles.tr} ${justAssignedIds.includes(enq.id) ? styles.rowSuccess : ''}`}>
                     <td className={styles.td}>
                       <div className={styles.salonName}>{enq.salon_name}</div>
                       <div style={{ fontSize: '0.85rem', color: '#666' }}>{enq.owner_name}</div>
@@ -312,7 +364,7 @@ export default function SalonApprovalQueue() {
                             disabled={assigningId === enq.id}
                             style={{ 
                               padding: '6px 12px', 
-                              backgroundColor: '#0070f3', 
+                              backgroundColor: 'var(--accent-color)', 
                               color: 'white', 
                               border: 'none', 
                               borderRadius: '4px', 
@@ -324,8 +376,8 @@ export default function SalonApprovalQueue() {
                           </button>
                         </div>
                       ) : (
-                        <div style={{ fontSize: '0.9rem', color: '#555' }}>
-                          Assigned to: <strong>{enq.assigned_collaborator?.name || 'Unknown'}</strong>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--color-success)', fontWeight: 500 }}>
+                          ✓ Assigned to {enq.assigned_collaborator?.name || 'Unknown'}
                         </div>
                       )}
                     </td>
@@ -334,12 +386,43 @@ export default function SalonApprovalQueue() {
               )}
             </tbody>
           </table>
+          
+          {enquiriesTotalPages > 1 && (
+            <div className={styles.pagination}>
+              <span>Showing page {enquiriesPage} of {enquiriesTotalPages}</span>
+              <div className={styles.pageControls}>
+                <button 
+                  className={styles.pageButton} 
+                  disabled={enquiriesPage === 1}
+                  onClick={() => setEnquiriesPage(p => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <button 
+                  className={styles.pageButton} 
+                  disabled={enquiriesPage === enquiriesTotalPages}
+                  onClick={() => setEnquiriesPage(p => Math.min(enquiriesTotalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Existing Salon Approval Queue */}
       <div>
-        <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Pending Onboarding (Salon Approval Queue)</h2>
+        <div className={styles.controlsRow}>
+          <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: 0 }}>Pending Onboarding (Salon Approval Queue)</h2>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search salons by name or city..."
+            value={searchSalons}
+            onChange={(e) => { setSearchSalons(e.target.value); setSalonsPage(1); }}
+          />
+        </div>
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
@@ -360,12 +443,12 @@ export default function SalonApprovalQueue() {
                 <tr>
                   <td colSpan={5} className={styles.emptyState} style={{ color: 'red' }}>{error}</td>
                 </tr>
-              ) : salons.length === 0 ? (
+              ) : filteredSalons.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className={styles.emptyState}>No salons pending approval.</td>
+                  <td colSpan={5} className={styles.emptyState}>No salons found.</td>
                 </tr>
               ) : (
-                salons.map((salon) => (
+                paginatedSalons.map((salon) => (
                   <tr key={salon.id} className={styles.tr}>
                     <td className={`${styles.td} ${styles.salonName}`}>{salon.name}</td>
                     <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
@@ -381,6 +464,28 @@ export default function SalonApprovalQueue() {
               )}
             </tbody>
           </table>
+
+          {salonsTotalPages > 1 && (
+            <div className={styles.pagination}>
+              <span>Showing page {salonsPage} of {salonsTotalPages}</span>
+              <div className={styles.pageControls}>
+                <button 
+                  className={styles.pageButton} 
+                  disabled={salonsPage === 1}
+                  onClick={() => setSalonsPage(p => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <button 
+                  className={styles.pageButton} 
+                  disabled={salonsPage === salonsTotalPages}
+                  onClick={() => setSalonsPage(p => Math.min(salonsTotalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -167,3 +167,68 @@
   background: rgba(21, 101, 192, 0.13);
   color: var(--color-info);
 }
+
+/* Added styles for Professional UI */
+.controlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.searchInput {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  min-width: 250px;
+  background: var(--surface-color);
+  color: var(--text-body);
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--surface-color);
+  font-size: 0.875rem;
+  color: var(--text-body);
+}
+
+.pageControls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pageButton {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-heading);
+  transition: all 0.2s;
+}
+
+.pageButton:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent-color);
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes flashSuccess {
+  0% { background-color: rgba(46, 125, 50, 0.2); transform: scale(1.02); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+
+.rowSuccess {
+  animation: flashSuccess 1.5s ease-out;
+}

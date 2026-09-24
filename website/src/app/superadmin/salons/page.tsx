@@ -32,10 +32,13 @@ export default function SalonDirectory() {
   const [error, setError] = useState('');
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [justAssignedIds, setJustAssignedIds] = useState<string[]>([]);
   
-  // Filters
+  // Filters & Sort
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [collaboratorId, setCollaboratorId] = useState('');
+  const [sort, setSort] = useState('created_at_desc');
   const [page, setPage] = useState(1);
 
   // Debounced search
@@ -68,6 +71,8 @@ export default function SalonDirectory() {
         const queryParams = new URLSearchParams();
         if (debouncedSearch) queryParams.append('search', debouncedSearch);
         if (status) queryParams.append('status', status);
+        if (collaboratorId) queryParams.append('collaborator_id', collaboratorId);
+        if (sort) queryParams.append('sort', sort);
         queryParams.append('page', page.toString());
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons?${queryParams.toString()}`);
@@ -94,22 +99,40 @@ export default function SalonDirectory() {
     }
 
     fetchSalons();
-  }, [debouncedSearch, status, page]);
+  }, [debouncedSearch, status, collaboratorId, sort, page]);
 
-  const handleAssign = async (salonId: string, collaboratorId: string) => {
+  const handleAssign = async (salonId: string, collId: string) => {
+    if (!window.confirm('Are you sure you want to change the assigned collaborator?')) {
+      // Revert the select locally since we didn't update state
+      const el = document.getElementById(`select-coll-${salonId}`) as HTMLSelectElement;
+      const salon = salons.find(s => s.id === salonId);
+      if (el) el.value = salon?.assigned_collaborator?.id || '';
+      return;
+    }
+
     setAssigningId(salonId);
     try {
       const res = await fetch(`/api/proxy/superadmin/salons/${salonId}/assign-collaborator`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ collaborator_id: collaboratorId || null })
+        body: JSON.stringify({ collaborator_id: collId || null })
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || 'Failed to assign');
       
       setSalons(prev => prev.map(s => s.id === salonId ? { ...s, assigned_collaborator: json.data?.assigned_collaborator || null } : s));
+      
+      // Trigger animation
+      setJustAssignedIds(prev => [...prev, salonId]);
+      setTimeout(() => {
+        setJustAssignedIds(prev => prev.filter(id => id !== salonId));
+      }, 2000);
     } catch (err: any) {
       alert(err.message);
+      // Revert on error
+      const el = document.getElementById(`select-coll-${salonId}`) as HTMLSelectElement;
+      const salon = salons.find(s => s.id === salonId);
+      if (el) el.value = salon?.assigned_collaborator?.id || '';
     } finally {
       setAssigningId(null);
     }
@@ -138,14 +161,16 @@ export default function SalonDirectory() {
         </div>
       </div>
 
-      <div className={styles.filters}>
+      <div className={styles.filters} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <input 
           type="text" 
           placeholder="Search by salon name or city..." 
           className={styles.searchInput}
+          style={{ flexGrow: 1 }}
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
         />
+        
         <select 
           className={styles.selectInput} 
           value={status} 
@@ -157,6 +182,29 @@ export default function SalonDirectory() {
           <option value="suspended">Suspended</option>
           <option value="deactivated">Deactivated</option>
           <option value="rejected">Rejected</option>
+        </select>
+
+        <select 
+          className={styles.selectInput} 
+          value={collaboratorId} 
+          onChange={(e) => { setCollaboratorId(e.target.value); setPage(1); }}
+        >
+          <option value="">All Collaborators</option>
+          <option value="unassigned">Only Unassigned</option>
+          {collaborators.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        <select 
+          className={styles.selectInput} 
+          value={sort} 
+          onChange={(e) => { setSort(e.target.value); setPage(1); }}
+        >
+          <option value="created_at_desc">Newest First</option>
+          <option value="created_at_asc">Oldest First</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
         </select>
       </div>
 
@@ -187,15 +235,16 @@ export default function SalonDirectory() {
               </tr>
             ) : (
               salons.map((salon) => (
-                <tr key={salon.id} className={styles.tr}>
+                <tr key={salon.id} className={`${styles.tr} ${justAssignedIds.includes(salon.id) ? styles.rowSuccess : ''}`}>
                   <td className={`${styles.td} ${styles.salonName}`}>{salon.name}</td>
                   <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
                   <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
                   <td className={styles.td}>
                     <select
+                      id={`select-coll-${salon.id}`}
                       className={styles.selectInput}
                       style={{ padding: '4px', fontSize: '0.85rem' }}
-                      value={salon.assigned_collaborator?.id || ''}
+                      defaultValue={salon.assigned_collaborator?.id || ''}
                       onChange={(e) => handleAssign(salon.id, e.target.value)}
                       disabled={assigningId === salon.id}
                     >
@@ -204,6 +253,9 @@ export default function SalonDirectory() {
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
+                    {justAssignedIds.includes(salon.id) && (
+                      <span style={{ marginLeft: '8px', color: '#2e7d32', fontSize: '0.8rem', fontWeight: 600 }}>✓ Saved</span>
+                    )}
                   </td>
                   <td className={styles.td}>
                     <span className={`${styles.badge} ${getStatusBadgeClass(salon.status)}`}>

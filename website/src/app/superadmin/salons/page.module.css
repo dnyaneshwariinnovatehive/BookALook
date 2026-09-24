@@ -203,3 +203,12 @@
 .pageButton:not(:disabled):hover {
   background: var(--bg-color);
 }
+
+@keyframes flashSuccess {
+  0% { background-color: rgba(46, 125, 50, 0.2); transform: scale(1.02); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+
+.rowSuccess {
+  animation: flashSuccess 1.5s ease-out;
+}
