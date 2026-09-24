@@ -28,7 +28,32 @@ class SalonController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $salons = $query->orderBy('created_at', 'desc')->paginate(20);
+        if ($request->has('collaborator_id') && $request->collaborator_id != '') {
+            if ($request->collaborator_id === 'unassigned') {
+                $query->whereNull('assigned_collaborator_id');
+            } else {
+                $query->where('assigned_collaborator_id', $request->input('collaborator_id'));
+            }
+        }
+
+        $sort = $request->input('sort', 'created_at_desc');
+        switch ($sort) {
+            case 'name_asc':
+                $query->orderBy('name', 'asc');
+                break;
+            case 'name_desc':
+                $query->orderBy('name', 'desc');
+                break;
+            case 'created_at_asc':
+                $query->orderBy('created_at', 'asc');
+                break;
+            case 'created_at_desc':
+            default:
+                $query->orderBy('created_at', 'desc');
+                break;
+        }
+
+        $salons = $query->paginate(20);
 
         return response()->json([
             'success' => true,

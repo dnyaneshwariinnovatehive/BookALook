@@ -51,6 +51,7 @@ export default function ReportsPage() {
   const [salonTotals, setSalonTotals] = useState<any>(null);
   const [cities, setCities] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [reviewsData, setReviewsData] = useState<any>(null);
 
   const authHeaders = (): Record<string, string> => {
     return {
@@ -75,14 +76,15 @@ export default function ReportsPage() {
       if (to) q.append('to', to);
       const suffix = q.toString() ? `?${q}` : '';
 
-      const [ovRes, salRes, cityRes, svcRes] = await Promise.all([
+      const [ovRes, salRes, cityRes, svcRes, revRes] = await Promise.all([
         fetch('/api/proxy/superadmin/reports/overview', { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/salons${suffix}`, { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/cities${suffix}`, { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/services${suffix}`, { headers: authHeaders() }),
+        fetch('/api/proxy/superadmin/reviews', { headers: authHeaders() }),
       ]);
 
-      for (const r of [ovRes, salRes, cityRes, svcRes]) {
+      for (const r of [ovRes, salRes, cityRes, svcRes, revRes]) {
         if (handleUnauthorized(r)) return;
         if (!r.ok) throw new Error('Could not load reports.');
       }
@@ -91,12 +93,14 @@ export default function ReportsPage() {
       const sal = await salRes.json();
       const city = await cityRes.json();
       const svc = await svcRes.json();
+      const rev = await revRes.json();
 
       setOverview(ov);
       setSalons(sal.salons ?? []);
       setSalonTotals(sal.totals ?? null);
       setCities(city.cities ?? []);
       setServices(svc.services ?? []);
+      setReviewsData(rev);
     } catch (e: any) {
       setError(e.message || 'Could not load reports.');
     } finally {
@@ -426,23 +430,47 @@ export default function ReportsPage() {
           )}
         </Section>
 
-        {/* ---- reviews placeholder ---- */}
-        <Section title="Customer reviews" desc="Service-level sentiment and per-salon ratings will live here." accent>
-          <div className={styles.placeholderBox}>
-            <div className={styles.placeholderIcon}>★</div>
-            <p className={styles.placeholderTitle}>
-              {r.enabled
-                ? `${int(r.review_count)} review${r.review_count === 1 ? '' : 's'} · ${r.average ? r.average.toFixed(1) : '—'} / 5`
-                : 'Review system not active yet'}
-            </p>
-            <p className={styles.placeholderText}>
-              {r.enabled
-                ? 'Ratings are being collected. A full review analysis — sentiment, themes, per-salon breakdown — will appear here.'
-                : 'Leave space for a review analysis surface — service-level sentiment, '
-                  + 'per-salon ratings and comment themes will live here once reviews are '
-                  + 'turned on.'}
-            </p>
-          </div>
+        {/* ---- customer reviews ---- */}
+        <Section title="Customer reviews" desc="Lowest rated salons that require attention." accent>
+          {!reviewsData || !reviewsData.data || reviewsData.data.length === 0 ? (
+            <p className={styles.muted}>No salon reviews yet.</p>
+          ) : (
+            <>
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Salon</th>
+                      <th>Status</th>
+                      <th>Reviews</th>
+                      <th>Average Rating</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewsData.data.map((salon: any) => (
+                      <tr key={salon.id}>
+                        <td><strong>{salon.name}</strong>{!salon.is_credible && <span style={{fontSize: '0.8rem', color: '#9ca3af', marginLeft: '6px'}}>(Low volume)</span>}</td>
+                        <td><StatusPill status={salon.status} /></td>
+                        <td>{int(salon.review_count)}</td>
+                        <td className={salon.average < 3.5 ? styles.warnText : styles.okText}>{salon.average.toFixed(1)} / 5</td>
+                        <td><a href={`/superadmin/salons/${salon.id}`} style={{color: 'var(--accent-color)', fontSize: '0.85rem', fontWeight: 500}}>View Profile</a></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className={styles.totalsRow} style={{ marginTop: '12px' }}>
+                <span className={styles.totalsLabel}>Platform Summary</span>
+                <span>·</span>
+                <span>{int(reviewsData.platform?.total_reviews)} total reviews</span>
+                <span>·</span>
+                <span>{reviewsData.platform?.average} avg platform rating</span>
+                <span>·</span>
+                <span className={reviewsData.platform?.salons_below_three > 0 ? styles.warnText : ''}>{reviewsData.platform?.salons_below_three} salons below 3.0</span>
+              </div>
+            </>
+          )}
         </Section>
       </div>
     </div>

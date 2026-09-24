@@ -64,6 +64,51 @@ const startOfCycle = (cycle: CycleType, date: Date) =>
 const money = (value: number) =>
   `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+
+function getCycleOptions(type: CycleType) {
+  const options: { value: string; label: string }[] = [];
+  const now = new Date();
+
+  if (type === 'weekly') {
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (i * 7));
+      const start = mondayOf(d);
+      
+      const sDate = new Date(start);
+      const eDate = new Date(start);
+      eDate.setDate(eDate.getDate() + 6);
+
+      const sLabel = sDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const eLabel = eDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      let label = `${sLabel} - ${eLabel}`;
+      if (i === 0) label = `This week (${label})`;
+      else if (i === 1) label = `Last week (${label})`;
+      else label = `${i} weeks ago (${label})`;
+
+      if (!options.find(o => o.value === start)) {
+         options.push({ value: start, label });
+      }
+    }
+  } else {
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const start = firstOf(d);
+      const mLabel = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      
+      let label = mLabel;
+      if (i === 0) label = `This month (${label})`;
+      else if (i === 1) label = `Last month (${label})`;
+
+      if (!options.find(o => o.value === start)) {
+         options.push({ value: start, label });
+      }
+    }
+  }
+  return options;
+}
+
 export default function PayoutsPage() {
   const lastWeek = new Date();
   lastWeek.setDate(lastWeek.getDate() - 7);
@@ -223,21 +268,17 @@ export default function PayoutsPage() {
 
         <div className={styles.field}>
           <label htmlFor="cycle-start">
-            {cycleType === 'monthly' ? 'Month' : 'Week starting (Monday)'}
+            {cycleType === 'monthly' ? 'Month' : 'Week'}
           </label>
-          <input
+          <select
             id="cycle-start"
-            type={cycleType === 'monthly' ? 'month' : 'date'}
-            value={cycleType === 'monthly' ? cycleStart.slice(0, 7) : cycleStart}
-            onChange={(e) =>
-              setCycleStart(
-                startOfCycle(
-                  cycleType,
-                  new Date(cycleType === 'monthly' ? `${e.target.value}-01` : e.target.value)
-                )
-              )
-            }
-          />
+            value={cycleStart}
+            onChange={(e) => setCycleStart(e.target.value)}
+          >
+            {getCycleOptions(cycleType).map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className={styles.field}>
