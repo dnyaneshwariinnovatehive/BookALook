@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const BACKEND_URL = 'http://localhost:8000/api/superadmin/banners';
+const BACKEND_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/banners`;
 
 export async function GET(request: Request) {
   const cookieStore = await cookies();

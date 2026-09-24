@@ -8,7 +8,7 @@ export async function POST() {
   if (token) {
     try {
       // Call the Laravel backend to revoke the token
-      await fetch('http://localhost:8000/api/superadmin/auth/logout', {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/auth/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

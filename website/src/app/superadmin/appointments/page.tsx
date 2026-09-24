@@ -273,7 +273,7 @@ export default function GlobalAppointmentsDashboard() {
     
     try {
       const token = localStorage.getItem('sa_token');
-      const res = await fetch(`http://localhost:8000/api/superadmin/appointments/${selectedAppointmentId}/add-service`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/appointments/${selectedAppointmentId}/add-service`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

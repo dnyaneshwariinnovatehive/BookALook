@@ -181,9 +181,9 @@ export default function SalonApprovalQueue() {
     async function fetchData() {
       try {
         const [salonsRes, enquiriesRes, collabRes] = await Promise.all([
-          fetch('http://localhost:8000/api/superadmin/salons/pending'),
-          fetch('http://localhost:8000/api/superadmin/enquiries'),
-          fetch('http://localhost:8000/api/superadmin/collaborators')
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/pending`),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/enquiries`),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators`)
         ]);
 
         if (!salonsRes.ok || !enquiriesRes.ok || !collabRes.ok) {
@@ -216,7 +216,7 @@ export default function SalonApprovalQueue() {
 
     setAssigningId(enquiryId);
     try {
-      const res = await fetch(`http://localhost:8000/api/superadmin/enquiries/${enquiryId}/assign`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/enquiries/${enquiryId}/assign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

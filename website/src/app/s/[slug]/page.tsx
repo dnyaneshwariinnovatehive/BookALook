@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import SalonLanding from './SalonLanding';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 /**
  * Where a salon's printed QR code lands.

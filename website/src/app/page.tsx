@@ -29,7 +29,7 @@ export default function LandingPage() {
   const [loadingAreas, setLoadingAreas] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/cities', { headers: { Accept: 'application/json' } })
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities`, { headers: { Accept: 'application/json' } })
       .then((r) => r.json())
       .then((list) => {
         if (Array.isArray(list)) {
@@ -52,7 +52,7 @@ export default function LandingPage() {
     }
 
     setLoadingAreas(true);
-    fetch(`http://localhost:8000/api/cities/${formData.city_id}/sub-areas`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities/${formData.city_id}/sub-areas`, {
       headers: { Accept: 'application/json' },
     })
       .then((r) => r.json())
@@ -83,7 +83,7 @@ export default function LandingPage() {
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/enquiries', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/enquiries`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

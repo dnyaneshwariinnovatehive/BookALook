@@ -68,8 +68,8 @@ export default function SalonDirectoryDetail() {
     async function fetchSalon() {
       try {
         const [salonRes, collabRes] = await Promise.all([
-          fetch(`http://localhost:8000/api/superadmin/salons/${id}`),
-          fetch('http://localhost:8000/api/superadmin/collaborators'),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}`),
+          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators`),
         ]);
 
         if (!salonRes.ok) throw new Error('Failed to fetch salon details');
@@ -101,7 +101,7 @@ export default function SalonDirectoryDetail() {
 
     try {
       const res = await fetch(
-        `http://localhost:8000/api/superadmin/salons/${id}/assign-collaborator`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}/assign-collaborator`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

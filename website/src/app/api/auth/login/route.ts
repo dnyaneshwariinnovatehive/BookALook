@@ -5,7 +5,7 @@ export async function POST(request: Request) {
     const { email, password } = await request.json();
 
     // Call the Laravel backend
-    const backendRes = await fetch('http://localhost:8000/api/superadmin/auth/login', {
+    const backendRes = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

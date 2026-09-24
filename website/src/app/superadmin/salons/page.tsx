@@ -48,7 +48,7 @@ export default function SalonDirectory() {
         if (status) queryParams.append('status', status);
         queryParams.append('page', page.toString());
 
-        const res = await fetch(`http://localhost:8000/api/superadmin/salons?${queryParams.toString()}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons?${queryParams.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch salons');
         
         const json = await res.json();

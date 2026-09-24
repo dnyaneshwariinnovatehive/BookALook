@@ -32,7 +32,7 @@ export default function CollaboratorManagement() {
   const [loadingAreas, setLoadingAreas] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/cities', { headers: { Accept: 'application/json' } })
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities`, { headers: { Accept: 'application/json' } })
       .then((r) => r.json())
       .then((list) => Array.isArray(list) && setCities(list))
       .catch(() => setCities([]));
@@ -44,7 +44,7 @@ export default function CollaboratorManagement() {
       return;
     }
     setLoadingAreas(true);
-    fetch(`http://localhost:8000/api/cities/${formData.city_id}/sub-areas`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities/${formData.city_id}/sub-areas`, {
       headers: { Accept: 'application/json' },
     })
       .then((r) => r.json())
@@ -57,7 +57,7 @@ export default function CollaboratorManagement() {
 
   const fetchCollaborators = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/superadmin/collaborators/stats');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators/stats`);
       if (!res.ok) throw new Error('Failed to fetch collaborators');
       const json = await res.json();
       setCollaborators(json.data || []);
@@ -90,7 +90,7 @@ export default function CollaboratorManagement() {
     setSubmitError('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/superadmin/collaborators', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

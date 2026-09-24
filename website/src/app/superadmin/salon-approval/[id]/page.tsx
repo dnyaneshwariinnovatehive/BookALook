@@ -34,7 +34,7 @@ export default function SalonReviewPage() {
   useEffect(() => {
     async function fetchSalon() {
       try {
-        const res = await fetch(`http://localhost:8000/api/superadmin/salons/pending/${id}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/pending/${id}`);
         if (!res.ok) throw new Error('Failed to fetch salon details');
         const json = await res.json();
         if (json.success) {
@@ -55,7 +55,7 @@ export default function SalonReviewPage() {
     if (!confirm('Are you sure you want to approve this salon?')) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/superadmin/salons/${id}/approve`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}/approve`, {
         method: 'POST',
       });
       const json = await res.json();
@@ -78,7 +78,7 @@ export default function SalonReviewPage() {
     setActionLoading(true);
     
     try {
-      const res = await fetch(`http://localhost:8000/api/superadmin/salons/${id}/reject`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rejection_reason: rejectReason })

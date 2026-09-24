@@ -18,7 +18,7 @@ export default function StaffDetailsModal({ salonId, providerId, onClose }: Staf
   useEffect(() => {
     async function fetchDetails() {
       try {
-        const res = await fetch(`http://localhost:8000/api/superadmin/salons/${salonId}/staff/${providerId}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${salonId}/staff/${providerId}`);
         if (!res.ok) throw new Error('Failed to fetch staff details');
         const json = await res.json();
         if (json.success) {
