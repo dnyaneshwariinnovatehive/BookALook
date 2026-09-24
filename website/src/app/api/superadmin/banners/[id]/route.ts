@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const getBackendUrl = (id: string) => `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/banners/${id}`;
+const getBackendUrl = (id: string) => `${(process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.bookalook.in').replace(/\/$/, '')}/api/superadmin/banners/${id}`;
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies();

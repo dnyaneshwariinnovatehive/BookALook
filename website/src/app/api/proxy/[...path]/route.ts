@@ -7,7 +7,9 @@ async function handleRequest(req: NextRequest, { params }: { params: Promise<{ p
   const cookieStore = await cookies();
   const token = cookieStore.get('superadmin_token')?.value;
   
-  const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/${path}${req.nextUrl.search}`;
+  const rawBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.bookalook.in';
+  const backendBase = rawBase.replace(/\/$/, '');
+  const backendUrl = `${backendBase}/api/${path}${req.nextUrl.search}`;
   
   const headers: Record<string, string> = {
     'Accept': 'application/json',
