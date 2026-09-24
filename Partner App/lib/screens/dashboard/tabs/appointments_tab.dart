@@ -39,10 +39,9 @@ const List<String> _kStatusLabels = [
 const Map<String, String> _kSourceValues = {
   'App': 'online',
   'Walk-in': 'walk_in',
-  'Phone': 'phone',
 };
 
-const List<String> _kSourceLabels = ['App', 'Walk-in', 'Phone'];
+const List<String> _kSourceLabels = ['App', 'Walk-in'];
 
 class AppointmentsTab extends StatefulWidget {
   final String salonId;

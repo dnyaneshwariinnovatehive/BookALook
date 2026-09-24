@@ -376,27 +376,7 @@ export default function SubscriptionsPage() {
               Model. A commission request has no receipt — you agree the percentage when
               you approve it.
             </p>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="Search salons..."
-            value={salonSearch}
-            onChange={(e) => setSalonSearch(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', flex: 1, minWidth: '200px', maxWidth: '300px' }}
-          />
-          <select value={salonFilterModel} onChange={(e) => setSalonFilterModel(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
-            <option value="">All Billing Models</option>
-            <option value={COMMISSION}>Commission Model</option>
-            <option value={SUBSCRIPTION}>Subscription Plan</option>
-          </select>
-          <select value={salonSort} onChange={(e) => setSalonSort(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
-            <option value="name_asc">Sort by Name (A-Z)</option>
-            <option value="name_desc">Sort by Name (Z-A)</option>
-            <option value="rate_desc">Sort by Rate (High-Low)</option>
-            <option value="expiry_asc">Sort by Expiry (Soonest)</option>
-          </select>
-        </div>
-        <table className={styles.table}>
+            <table className={styles.table}>
               <thead>
                 <tr>
                   <th>Salon</th>
@@ -765,6 +745,26 @@ export default function SubscriptionsPage() {
           A commission rate can only be changed once that salon has no open payout, so
           everything already billed stays on the rate it was billed at.
         </p>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Search salons..."
+            value={salonSearch}
+            onChange={(e) => setSalonSearch(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', flex: 1, minWidth: '200px', maxWidth: '300px' }}
+          />
+          <select value={salonFilterModel} onChange={(e) => setSalonFilterModel(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
+            <option value="">All Billing Models</option>
+            <option value={COMMISSION}>Commission Model</option>
+            <option value={SUBSCRIPTION}>Subscription Plan</option>
+          </select>
+          <select value={salonSort} onChange={(e) => setSalonSort(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
+            <option value="name_asc">Sort by Name (A-Z)</option>
+            <option value="name_desc">Sort by Name (Z-A)</option>
+            <option value="rate_desc">Sort by Rate (High-Low)</option>
+            <option value="expiry_asc">Sort by Expiry (Soonest)</option>
+          </select>
+        </div>
         <table className={styles.table}>
           <thead>
             <tr>
