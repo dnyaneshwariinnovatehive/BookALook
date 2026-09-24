@@ -155,17 +155,11 @@ export default function GlobalAppointmentsDashboard() {
       if (search) queryParams.append('search', search);
       queryParams.append('page', page.toString());
 
-      const token = localStorage.getItem('sa_token');
-      const res = await fetch(`/api/proxy/superadmin/appointments?${queryParams.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const res = await fetch(`/api/proxy/superadmin/appointments?${queryParams.toString()}`);
       
       if (!res.ok) {
         if (res.status === 401) {
-          localStorage.removeItem('sa_token');
-          window.location.href = '/superadmin/login';
+          window.location.href = '/login';
           return;
         }
         const errorData = await res.json().catch(() => null);
@@ -189,10 +183,7 @@ export default function GlobalAppointmentsDashboard() {
 
   const fetchSalons = async () => {
     try {
-      const token = localStorage.getItem('sa_token');
-      const res = await fetch('/api/proxy/superadmin/salons?per_page=100', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/proxy/superadmin/salons?per_page=100');
       if (res.ok) {
         const json = await res.json();
         setSalons(json.data || []);
@@ -272,12 +263,10 @@ export default function GlobalAppointmentsDashboard() {
     setAddServiceError('');
     
     try {
-      const token = localStorage.getItem('sa_token');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/appointments/${selectedAppointmentId}/add-service`, {
+      const res = await fetch(`/api/proxy/superadmin/appointments/${selectedAppointmentId}/add-service`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
         body: JSON.stringify({
@@ -295,8 +284,7 @@ export default function GlobalAppointmentsDashboard() {
         fetchAppointments();
       } else {
         if (res.status === 401) {
-          localStorage.removeItem('sa_token');
-          window.location.href = '/superadmin/login';
+          window.location.href = '/login';
           return;
         }
         setAddServiceError(data.message || 'Failed to add service.');

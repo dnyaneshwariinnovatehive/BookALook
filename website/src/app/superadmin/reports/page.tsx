@@ -53,17 +53,14 @@ export default function ReportsPage() {
   const [services, setServices] = useState<any[]>([]);
 
   const authHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem('sa_token');
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   };
 
   const handleUnauthorized = (res: Response) => {
     if (res.status === 401) {
-      localStorage.removeItem('sa_token');
-      window.location.href = '/superadmin/login';
+      window.location.href = '/login';
       return true;
     }
     return false;

@@ -75,10 +75,8 @@ export default function SubscriptionsPage() {
   }, []);
 
   const authHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem('sa_token');
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   };
 
