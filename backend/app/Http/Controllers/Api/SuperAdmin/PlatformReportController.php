@@ -28,9 +28,9 @@ class PlatformReportController extends Controller
 
         $salons = DB::table('salons')->selectRaw(
             'count(*) as total,
-             sum(case when status = "active" then 1 else 0 end) as active,
-             sum(case when status = "pending_approval" then 1 else 0 end) as pending,
-             sum(case when status = "suspended" then 1 else 0 end) as suspended'
+             sum(case when status = \'active\' then 1 else 0 end) as active,
+             sum(case when status = \'pending_approval\' then 1 else 0 end) as pending,
+             sum(case when status = \'suspended\' then 1 else 0 end) as suspended'
         )->first();
 
         $bookings = $this->appointmentCounts($now->copy()->startOfDay(), $now->copy()->startOfWeek(), $now->copy()->startOfMonth());
@@ -183,11 +183,11 @@ class PlatformReportController extends Controller
                  sum(case when created_at >= ? then 1 else 0 end) as today,
                  sum(case when created_at >= ? then 1 else 0 end) as this_week,
                  sum(case when created_at >= ? then 1 else 0 end) as this_month,
-                 sum(case when status = "completed" then 1 else 0 end) as completed,
-                 sum(case when status = "cancelled" then 1 else 0 end) as cancelled,
-                 sum(case when status = "no_show" then 1 else 0 end) as no_show,
-                 sum(case when booking_source = "online" then 1 else 0 end) as online,
-                 sum(case when booking_source = "walk_in" then 1 else 0 end) as walk_in',
+                 sum(case when status = \'completed\' then 1 else 0 end) as completed,
+                 sum(case when status = \'cancelled\' then 1 else 0 end) as cancelled,
+                 sum(case when status = \'no_show\' then 1 else 0 end) as no_show,
+                 sum(case when booking_source = \'online\' then 1 else 0 end) as online,
+                 sum(case when booking_source = \'walk_in\' then 1 else 0 end) as walk_in',
                 [$today, $week, $month]
             )
             ->first();
@@ -252,10 +252,10 @@ class PlatformReportController extends Controller
                 'salons.id, salons.name, salons.status, cities.name as city,
                  salons.avg_rating, salons.review_count,
                  count(appointments.id) as total,
-                 sum(case when appointments.status = "completed" then 1 else 0 end) as completed,
-                 sum(case when appointments.status = "cancelled" then 1 else 0 end) as cancelled,
-                 sum(case when appointments.status = "no_show" then 1 else 0 end) as no_show,
-                 sum(case when appointments.status = "completed" then appointments.final_billed_amount else 0 end) as revenue'
+                 sum(case when appointments.status = \'completed\' then 1 else 0 end) as completed,
+                 sum(case when appointments.status = \'cancelled\' then 1 else 0 end) as cancelled,
+                 sum(case when appointments.status = \'no_show\' then 1 else 0 end) as no_show,
+                 sum(case when appointments.status = \'completed\' then appointments.final_billed_amount else 0 end) as revenue'
             )
             ->groupBy('salons.id', 'salons.name', 'salons.status', 'cities.name', 'salons.avg_rating', 'salons.review_count')
             ->orderByDesc('revenue')
@@ -354,8 +354,8 @@ class PlatformReportController extends Controller
                 'cities.name as city,
                  count(distinct salons.id) as salons,
                  count(appointments.id) as bookings,
-                 sum(case when appointments.status = "completed" then 1 else 0 end) as completed,
-                 round(sum(case when appointments.status = "completed" then appointments.final_billed_amount else 0 end), 2) as revenue'
+                 sum(case when appointments.status = \'completed\' then 1 else 0 end) as completed,
+                 round(sum(case when appointments.status = \'completed\' then appointments.final_billed_amount else 0 end), 2) as revenue'
             )
             ->groupBy('cities.name')
             ->orderByDesc('revenue')
@@ -465,13 +465,13 @@ class PlatformReportController extends Controller
             ->whereDate('appointment_date', '<=', $to->toDateString())
             ->selectRaw(
                 'count(*) as total,
-                 sum(case when status = "completed" then 1 else 0 end) as completed,
-                 sum(case when status = "cancelled" then 1 else 0 end) as cancelled,
-                 sum(case when status = "no_show" then 1 else 0 end) as no_show,
-                 sum(case when status in ("scheduled", "in_progress", "pending_payment") then 1 else 0 end) as active,
-                 sum(case when status = "scheduled" then 1 else 0 end) as scheduled,
-                 sum(case when booking_source = "online" then 1 else 0 end) as online,
-                 sum(case when booking_source = "walk_in" then 1 else 0 end) as walk_in'
+                 sum(case when status = \'completed\' then 1 else 0 end) as completed,
+                 sum(case when status = \'cancelled\' then 1 else 0 end) as cancelled,
+                 sum(case when status = \'no_show\' then 1 else 0 end) as no_show,
+                 sum(case when status in (\'scheduled\', \'in_progress\', \'pending_payment\') then 1 else 0 end) as active,
+                 sum(case when status = \'scheduled\' then 1 else 0 end) as scheduled,
+                 sum(case when booking_source = \'online\' then 1 else 0 end) as online,
+                 sum(case when booking_source = \'walk_in\' then 1 else 0 end) as walk_in'
             )
             ->first();
 

@@ -21,7 +21,7 @@ class SuperAdminAppointmentController extends Controller
     public function index(Request $request)
     {
         $query = Appointment::with([
-            'salon:id,name,address,phone,email,status',
+            'salon:id,name,address,phone_num,status',
             'customer:id,name,phone,email',
             'appointedProvider:id,user_id,salon_id',
             'servingProvider:id,user_id,salon_id',
