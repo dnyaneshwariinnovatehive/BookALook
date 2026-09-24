@@ -11,7 +11,12 @@ interface Salon {
   created_at: string;
   city?: { name: string };
   admin?: { name: string };
-  assigned_collaborator?: { name: string } | null;
+  assigned_collaborator?: { id: string; name: string } | null;
+}
+
+interface Collaborator {
+  id: string;
+  name: string;
 }
 
 interface Meta {
@@ -25,6 +30,8 @@ export default function SalonDirectory() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   
   // Filters
   const [search, setSearch] = useState('');
@@ -33,6 +40,21 @@ export default function SalonDirectory() {
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    async function fetchCollabs() {
+      try {
+        const res = await fetch(`/api/proxy/superadmin/collaborators`);
+        if (res.ok) {
+          const json = await res.json();
+          setCollaborators(json.data || []);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    fetchCollabs();
+  }, []);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 500);
@@ -73,6 +95,25 @@ export default function SalonDirectory() {
 
     fetchSalons();
   }, [debouncedSearch, status, page]);
+
+  const handleAssign = async (salonId: string, collaboratorId: string) => {
+    setAssigningId(salonId);
+    try {
+      const res = await fetch(`/api/proxy/superadmin/salons/${salonId}/assign-collaborator`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collaborator_id: collaboratorId || null })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to assign');
+      
+      setSalons(prev => prev.map(s => s.id === salonId ? { ...s, assigned_collaborator: json.data?.assigned_collaborator || null } : s));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   const getStatusBadgeClass = (status: string) => {
     switch(status) {
@@ -151,9 +192,18 @@ export default function SalonDirectory() {
                   <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
                   <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
                   <td className={styles.td}>
-                    {salon.assigned_collaborator?.name || (
-                      <span className={styles.unassigned}>Unassigned</span>
-                    )}
+                    <select
+                      className={styles.selectInput}
+                      style={{ padding: '4px', fontSize: '0.85rem' }}
+                      value={salon.assigned_collaborator?.id || ''}
+                      onChange={(e) => handleAssign(salon.id, e.target.value)}
+                      disabled={assigningId === salon.id}
+                    >
+                      <option value="">Unassigned</option>
+                      {collaborators.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className={styles.td}>
                     <span className={`${styles.badge} ${getStatusBadgeClass(salon.status)}`}>
