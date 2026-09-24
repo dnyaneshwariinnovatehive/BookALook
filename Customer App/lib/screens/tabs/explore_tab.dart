@@ -169,11 +169,10 @@ class _ExploreTabState extends State<ExploreTab> {
                 SizedBox(height: 28),
                 _buildSectionTitle('Most Visited by You', null),
                 SizedBox(height: 16),
-                _buildMostVisited(),
+                _buildHorizontalSalonList(_mostVisitedSalons),
               ],
               
-              // Top Rated Combos Near You
-              ..._buildCombosSection(),
+              ..._buildTopRatedSalons(filteredSalons),
 
               SizedBox(height: 28),
               _buildSectionTitle('All Salons near you', '(${filteredSalons.length})'),
@@ -214,30 +213,30 @@ class _ExploreTabState extends State<ExploreTab> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        height: 48,
-        padding: EdgeInsets.symmetric(horizontal: 16),
+        height: 50,
+        padding: EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: surfaceColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: borderColor, width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: Offset(0, 2))
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: Offset(0, 2))
           ]
         ),
         child: Row(
           children: [
-            Icon(Icons.search, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, size: 20),
+            Icon(Icons.search, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, size: 22),
             SizedBox(width: 12),
             Expanded(
               child: TextField(
                 controller: _searchController,
-                style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
+                style: GoogleFonts.outfit(fontSize: 15, color: headingColor),
                 decoration: InputDecoration(
                   hintText: 'Search salons or services...',
-                  hintStyle: GoogleFonts.outfit(color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, fontSize: 14),
+                  hintStyle: GoogleFonts.outfit(color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, fontSize: 15),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
                 ),
                 onSubmitted: (_) => _navigateToSearch(),
               ),
@@ -256,12 +255,12 @@ class _ExploreTabState extends State<ExploreTab> {
 
     final filters = ['All Salons', 'Open Now', 'Top Rated (4.8+)', 'Top Rated (4.5+)'];
     return SizedBox(
-      height: 36,
+      height: 38,
       child: ListView.separated(
         padding: EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
         itemCount: filters.length + 1,
-        separatorBuilder: (_, __) => SizedBox(width: 10),
+        separatorBuilder: (_, __) => SizedBox(width: 12),
         itemBuilder: (context, index) {
           if (index == 0) {
             final cityName = LocationService.instance.city?.name ?? 'Select City';
@@ -269,24 +268,24 @@ class _ExploreTabState extends State<ExploreTab> {
               onTap: _pickCity,
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 18),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: surfaceColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
+                  border: Border.all(color: borderColor, width: 1.5),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: Offset(0, 2))
+                    BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
                   ]
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on, size: 14, color: bodyColor),
-                    SizedBox(width: 4),
+                    Icon(Icons.location_on_outlined, size: 16, color: bodyColor),
+                    SizedBox(width: 6),
                     Text(
                       cityName,
                       style: GoogleFonts.outfit(
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: bodyColor,
                       ),
@@ -302,23 +301,23 @@ class _ExploreTabState extends State<ExploreTab> {
             onTap: () => setState(() => _selectedFilter = filter),
             borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: surfaceColor,
+                color: isSelected ? (isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.lightAccentSoft) : surfaceColor,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected ? AppTheme.accentColor : borderColor,
-                  width: isSelected ? 1.5 : 1.0,
+                  width: 1.5,
                 ),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: Offset(0, 2))
+                  BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
                 ]
               ),
               child: Text(
                 filter,
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   color: isSelected ? AppTheme.accentColor : bodyColor,
                 ),
@@ -349,7 +348,29 @@ class _ExploreTabState extends State<ExploreTab> {
     );
   }
 
-  Widget _buildMostVisited() {
+  List<Widget> _buildTopRatedSalons(List<dynamic> salons) {
+    List<dynamic> topRated = List.from(salons)..sort((a, b) {
+      final avgA = (a['avg_rating'] as num?)?.toDouble() ?? 0;
+      final avgB = (b['avg_rating'] as num?)?.toDouble() ?? 0;
+      return avgB.compareTo(avgA); // descending
+    });
+    
+    topRated = topRated.where((s) {
+      final avg = (s['avg_rating'] as num?)?.toDouble() ?? 0;
+      return avg >= 4.0; 
+    }).take(8).toList();
+
+    if (topRated.isEmpty) return [];
+
+    return [
+      SizedBox(height: 28),
+      _buildSectionTitle('Top Rated Salons', null),
+      SizedBox(height: 16),
+      _buildHorizontalSalonList(topRated),
+    ];
+  }
+
+  Widget _buildHorizontalSalonList(List<dynamic> salonsList) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
@@ -357,26 +378,26 @@ class _ExploreTabState extends State<ExploreTab> {
     final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     return SizedBox(
-      height: 170,
+      height: 195, 
       child: ListView.separated(
         padding: EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
-        itemCount: _mostVisitedSalons.length,
+        itemCount: salonsList.length,
         separatorBuilder: (_, __) => SizedBox(width: 16),
         itemBuilder: (context, index) {
-          final salon = _mostVisitedSalons[index];
+          final salon = salonsList[index];
           final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
           return InkWell(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: salon['id'].toString()))),
             child: Container(
-              width: 160,
+              width: 220,
               clipBehavior: Clip.hardEdge,
               decoration: BoxDecoration(
                 color: surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
                 ]
               ),
               child: Column(
@@ -389,18 +410,18 @@ class _ExploreTabState extends State<ExploreTab> {
                         Image.network(
                           salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                          errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
                         ),
                         if (salon['distance_km'] != null)
                           Positioned(
                             bottom: 8,
                             right: 8,
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
                               child: Text(
-                                '${salon['distance_km']} km',
-                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
+                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                               ),
                             ),
                           )
@@ -408,20 +429,26 @@ class _ExploreTabState extends State<ExploreTab> {
                     ),
                   ),
                   Padding(
-                    padding: EdgeInsets.all(10),
+                    padding: EdgeInsets.fromLTRB(14, 14, 14, 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Expanded(child: Text(salon['name'] ?? 'Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: headingColor))),
-                            Icon(Icons.star, size: 12, color: AppTheme.starRating),
-                            SizedBox(width: 2),
-                            Text(avg > 0 ? avg.toStringAsFixed(1) : 'New', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: headingColor)),
+                            Expanded(child: Text(salon['name'] ?? 'Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: headingColor))),
+                            Icon(Icons.star, size: 14, color: AppTheme.starRating),
+                            SizedBox(width: 4),
+                            Text(avg > 0 ? avg.toStringAsFixed(1) : 'New', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: headingColor)),
                           ],
                         ),
-                        SizedBox(height: 2),
-                        Text(salon['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: bodyColor)),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 12, color: bodyColor),
+                            SizedBox(width: 4),
+                            Expanded(child: Text(salon['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 13, color: bodyColor))),
+                          ]
+                        ),
                       ],
                     ),
                   ),
@@ -432,156 +459,6 @@ class _ExploreTabState extends State<ExploreTab> {
         },
       ),
     );
-  }
-
-  List<Widget> _buildCombosSection() {
-    final List<Map<String, dynamic>> allCombos = [];
-    for (var salon in _salons) {
-      if (salon['combos'] != null && salon['combos'] is List) {
-        for (var combo in salon['combos']) {
-          final enrichedCombo = Map<String, dynamic>.from(combo);
-          enrichedCombo['salon_name'] = salon['name'];
-          enrichedCombo['salon_rating'] = salon['avg_rating'];
-          enrichedCombo['salon_id'] = salon['id'];
-          enrichedCombo['cover_image'] = salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'];
-          allCombos.add(enrichedCombo);
-        }
-      }
-    }
-
-    if (allCombos.isEmpty) return [];
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final lightTextColor = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
-
-    return [
-      SizedBox(height: 28),
-      Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Top Rated Combos Near You', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor)),
-            SizedBox(height: 2),
-            Text('Save more with bundled services', style: GoogleFonts.outfit(fontSize: 13, color: lightTextColor)),
-          ],
-        ),
-      ),
-      SizedBox(height: 16),
-      SizedBox(
-        height: 270,
-        child: ListView.separated(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          scrollDirection: Axis.horizontal,
-          itemCount: allCombos.length,
-          separatorBuilder: (_, __) => SizedBox(width: 16),
-          itemBuilder: (context, index) {
-            final combo = allCombos[index];
-            final avg = (combo['salon_rating'] as num?)?.toDouble() ?? 0;
-            return Container(
-              width: 240,
-              clipBehavior: Clip.hardEdge,
-              decoration: BoxDecoration(
-                color: surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
-                ]
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          combo['cover_image'] ?? '',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
-                        ),
-                        if (combo['discount_percent'] != null && combo['discount_percent'] > 0)
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: AppTheme.accentColor, borderRadius: BorderRadius.circular(6)),
-                              child: Text(
-                                'SAVE ${combo['discount_percent']}%',
-                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                              ),
-                            ),
-                          )
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text(combo['salon_name'] ?? 'Salon', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.accentColor, fontWeight: FontWeight.w600))),
-                            Icon(Icons.star, size: 12, color: AppTheme.starRating),
-                            SizedBox(width: 2),
-                            Text(avg > 0 ? avg.toStringAsFixed(1) : 'New', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: headingColor)),
-                          ],
-                        ),
-                        SizedBox(height: 4),
-                        Text(combo['name'] ?? 'Combo', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: headingColor)),
-                        SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text('₹${combo['price'] ?? 0}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
-                            SizedBox(width: 10),
-                            Icon(Icons.access_time, size: 12, color: bodyColor),
-                            SizedBox(width: 4),
-                            Text('${combo['duration_minutes'] ?? 60} mins', style: GoogleFonts.outfit(fontSize: 11, color: bodyColor)),
-                          ],
-                        ),
-                        if (combo['description'] != null) ...[
-                          SizedBox(height: 6),
-                          Text(combo['description'], maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 11, color: lightTextColor)),
-                        ],
-                        SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: combo['salon_id'].toString()))),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDark ? AppTheme.darkButtonBg : AppTheme.accentColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              padding: EdgeInsets.symmetric(vertical: 10)
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('Book Combo', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
-                                SizedBox(width: 6),
-                                Icon(Icons.arrow_forward, size: 16),
-                              ],
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      )
-    ];
   }
 
   Widget _buildAllSalons(List<dynamic> salons) {
@@ -611,29 +488,29 @@ class _ExploreTabState extends State<ExploreTab> {
               child: Opacity(
                 opacity: isServiceable ? 1.0 : 0.6,
                 child: Container(
+                  height: 140, // increased height to accommodate the divider
                   clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
                     color: surfaceColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: borderColor),
+                    border: Border.all(color: borderColor, width: 1.5),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
                     ]
                   ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Image on the left
-                        SizedBox(
-                          width: 110,
-                          child: Stack(
-                            fit: StackFit.expand,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Image on the left
+                      SizedBox(
+                        width: 120,
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
                             Image.network(
                               salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor)),
+                              errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
                             ),
                             if (salon['distance_km'] != null)
                               Positioned(
@@ -641,10 +518,10 @@ class _ExploreTabState extends State<ExploreTab> {
                                 left: 8,
                                 child: Container(
                                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
                                   child: Text(
                                     '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
-                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               )
@@ -659,6 +536,7 @@ class _ExploreTabState extends State<ExploreTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -671,30 +549,35 @@ class _ExploreTabState extends State<ExploreTab> {
                                   if (count > 0) ...[
                                     Icon(Icons.star, size: 14, color: AppTheme.starRating),
                                     SizedBox(width: 4),
-                                    Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: headingColor, fontSize: 13, fontWeight: FontWeight.bold)),
+                                    Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: headingColor, fontSize: 14, fontWeight: FontWeight.bold)),
                                   ] else
                                     Text('New', style: GoogleFonts.outfit(color: bodyColor, fontSize: 12, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                               SizedBox(height: 6),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.location_on, size: 13, color: bodyColor),
+                                  Icon(Icons.location_on_outlined, size: 14, color: bodyColor),
                                   SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       salon['address'] ?? 'No address',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(color: bodyColor, fontSize: 12)
+                                      style: GoogleFonts.outfit(color: bodyColor, fontSize: 13)
                                     )
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 12),
+                              Expanded(
+                                child: Center(
+                                  child: Divider(color: borderColor, thickness: 1, height: 1),
+                                ),
+                              ),
                               if (!isServiceable)
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
                                     borderRadius: BorderRadius.circular(6),
@@ -707,14 +590,13 @@ class _ExploreTabState extends State<ExploreTab> {
                               else
                                 Text(
                                   'Tap to view services \u2192',
-                                  style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.w600),
+                                  style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.w600),
                                 ),
                             ],
                           ),
                         ),
                       )
                     ],
-                  ),
                   ),
                 ),
               ),
