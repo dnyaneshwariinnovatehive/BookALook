@@ -25,6 +25,34 @@ class _OtpScreenState extends State<OtpScreen> {
   final _authService = AuthService();
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    for (int i = 0; i < 6; i++) {
+      _focusNodes[i].onKeyEvent = (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_controllers[i].text.isEmpty && i > 0) {
+            _focusNodes[i - 1].requestFocus();
+            _controllers[i - 1].clear();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _controllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
   void _verifyOtp() async {
     String otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) return;
@@ -158,8 +186,6 @@ class _OtpScreenState extends State<OtpScreen> {
                             _focusNodes[index].unfocus();
                             _verifyOtp();
                           }
-                        } else if (value.isEmpty && index > 0) {
-                          _focusNodes[index - 1].requestFocus();
                         }
                       },
                     ),

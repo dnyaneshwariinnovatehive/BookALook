@@ -111,9 +111,9 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
     final bool isInProgress = apt['status'] == 'in_progress';
     final bool canComplete = isScheduled || isInProgress;
 
-    final num totalAmount = apt['total_amount'] ?? 0;
-    final num advancePaid = apt['advance_amount'] ?? 0;
-    final num balanceDue = apt['balance_amount'] ?? totalAmount;
+    final num totalAmount = num.tryParse(apt['total_amount']?.toString() ?? '0') ?? 0;
+    final num advancePaid = num.tryParse(apt['advance_amount']?.toString() ?? '0') ?? 0;
+    final num balanceDue = num.tryParse(apt['balance_amount']?.toString() ?? '0') ?? totalAmount;
 
     final List services = apt['services'] ?? [];
 

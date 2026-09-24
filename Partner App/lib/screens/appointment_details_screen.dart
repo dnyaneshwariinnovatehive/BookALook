@@ -113,9 +113,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     String serviceNames = services.map((s) => s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service').join(', ');
     if (serviceNames.isEmpty) serviceNames = 'No specific service';
 
-    final num totalAmount = appointment['total_amount'] ?? 0;
-    final num advancePaid = appointment['advance_amount'] ?? 0;
-    final num balanceDue = appointment['balance_amount'] ?? totalAmount;
+    final num totalAmount = num.tryParse(appointment['total_amount']?.toString() ?? '0') ?? 0;
+    final num advancePaid = num.tryParse(appointment['advance_amount']?.toString() ?? '0') ?? 0;
+    final num balanceDue = num.tryParse(appointment['balance_amount']?.toString() ?? '0') ?? totalAmount;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
