@@ -69,6 +69,9 @@ export default function SubscriptionsPage() {
   // Salon detail popup — the ⓘ button runs this off the full salon endpoint.
   const [infoSalon, setInfoSalon] = useState<any>(null);
   const [infoLoading, setInfoLoading] = useState(false);
+  const [salonSearch, setSalonSearch] = useState('');
+  const [salonFilterModel, setSalonFilterModel] = useState('');
+  const [salonSort, setSalonSort] = useState('name_asc');
 
   useEffect(() => {
     fetchData();
@@ -325,6 +328,21 @@ export default function SubscriptionsPage() {
   if (isLoading) return <div className={styles.container}>Loading…</div>;
 
   const commissionSalons = salons.filter((s) => s.billing_model === COMMISSION);
+  
+  const filteredSalons = salons.filter(s => {
+    if (salonFilterModel && s.billing_model !== salonFilterModel) return false;
+    if (salonSearch) {
+      const q = salonSearch.toLowerCase();
+      return (s.name || '').toLowerCase().includes(q) || (s.owner || '').toLowerCase().includes(q);
+    }
+    return true;
+  }).sort((a, b) => {
+    if (salonSort === 'name_asc') return (a.name || '').localeCompare(b.name || '');
+    if (salonSort === 'name_desc') return (b.name || '').localeCompare(a.name || '');
+    if (salonSort === 'rate_desc') return (b.commission_percentage || 0) - (a.commission_percentage || 0);
+    if (salonSort === 'expiry_asc') return (a.expiry || 'Z').localeCompare(b.expiry || 'Z');
+    return 0;
+  });
 
   return (
     <div className={styles.container}>
@@ -358,7 +376,27 @@ export default function SubscriptionsPage() {
               Model. A commission request has no receipt — you agree the percentage when
               you approve it.
             </p>
-            <table className={styles.table}>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Search salons..."
+            value={salonSearch}
+            onChange={(e) => setSalonSearch(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', flex: 1, minWidth: '200px', maxWidth: '300px' }}
+          />
+          <select value={salonFilterModel} onChange={(e) => setSalonFilterModel(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
+            <option value="">All Billing Models</option>
+            <option value={COMMISSION}>Commission Model</option>
+            <option value={SUBSCRIPTION}>Subscription Plan</option>
+          </select>
+          <select value={salonSort} onChange={(e) => setSalonSort(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
+            <option value="name_asc">Sort by Name (A-Z)</option>
+            <option value="name_desc">Sort by Name (Z-A)</option>
+            <option value="rate_desc">Sort by Rate (High-Low)</option>
+            <option value="expiry_asc">Sort by Expiry (Soonest)</option>
+          </select>
+        </div>
+        <table className={styles.table}>
               <thead>
                 <tr>
                   <th>Salon</th>
@@ -453,12 +491,24 @@ export default function SubscriptionsPage() {
 
         {commissionPlanId ? (
           <div className={styles.commissionSummary}>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div className={styles.summaryLabel}>Benefits carried by</div>
-              <div className={styles.summaryValue}>
-                {plans.find((p) => p.id === commissionPlanId)?.name ?? '—'}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <select 
+                  value={commissionPlanId || ''} 
+                  onChange={(e) => {
+                    const plan = plans.find(p => p.id === e.target.value);
+                    if (plan) nominateCommissionPlan(plan);
+                  }}
+                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '1rem', fontWeight: 600 }}
+                >
+                  {plans.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
+            
             <div>
               <div className={styles.summaryLabel}>Salons on it</div>
               <div className={styles.summaryValue}>{commissionSalons.length}</div>
@@ -728,7 +778,7 @@ export default function SubscriptionsPage() {
             </tr>
           </thead>
           <tbody>
-            {salons.map((salon) => {
+            {filteredSalons.map((salon) => {
               const onCommission = salon.billing_model === COMMISSION;
               const blocked = onCommission && salon.unsettled_payouts > 0;
 

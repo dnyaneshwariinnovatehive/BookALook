@@ -123,6 +123,8 @@ export default function PayoutsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [distributeTarget, setDistributeTarget] = useState<Payout | null>(null);
+  const [distributeReference, setDistributeReference] = useState('');
 
   const authHeaders = (): Record<string, string> => {
     return {
@@ -191,24 +193,12 @@ export default function PayoutsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleType, cycleStart]);
 
-  const act = async (payout: Payout, action: 'approve' | 'distribute') => {
-    if (action === 'distribute') {
-      const confirmed = confirm(
-        `Distribute ${money(payout.net_amount)} to ${payout.salon_name}?\n\n` +
-          `${money(payout.commission_deducted)} commission is earned in this cycle. ` +
-          (payout.cycle_type === 'monthly'
-            ? 'Settling also extends their access into the next month. '
-            : '') +
-          `This cannot be undone.`
-      );
-      if (!confirmed) return;
-    }
+  const confirmDistribute = (payout: Payout) => {
+    setDistributeTarget(payout);
+    setDistributeReference('');
+  };
 
-    const reference =
-      action === 'distribute'
-        ? prompt('Payment reference (optional), e.g. NEFT number:') ?? ''
-        : '';
-
+  const act = async (payout: Payout, action: 'approve' | 'distribute', reference?: string) => {
     setBusyId(payout.id);
     setError('');
 
@@ -216,11 +206,14 @@ export default function PayoutsPage() {
       const res = await fetch(`/api/proxy/superadmin/payouts/${payout.id}/${action}`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify(action === 'distribute' ? { distribution_reference: reference } : {}),
+        body: JSON.stringify(action === 'distribute' ? { distribution_reference: reference ?? '' } : {}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'That did not work.');
       await fetchPayouts();
+      if (action === 'distribute') {
+        setDistributeTarget(null);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -426,7 +419,7 @@ export default function PayoutsPage() {
                       <button
                         className={`${styles.smallButton} ${styles.payButton}`}
                         disabled={busyId === p.id}
-                        onClick={() => act(p, 'distribute')}
+                        onClick={() => confirmDistribute(p)}
                       >
                         Distribute
                       </button>
@@ -443,6 +436,47 @@ export default function PayoutsPage() {
           </tbody>
         </table>
       )}
+    
+      {distributeTarget && (
+        <div className={styles.modalOverlay} onClick={() => setDistributeTarget(null)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Distribute Payout</h2>
+            <p style={{ color: '#4B5563', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>
+              Distribute <strong>{money(distributeTarget.net_amount)}</strong> to <strong>{distributeTarget.salon_name}</strong>?<br/><br/>
+              {money(distributeTarget.commission_deducted)} commission is earned in this cycle.
+              {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}<br/><br/>
+              <em>This cannot be undone.</em>
+            </p>
+            <div className={styles.formGroup}>
+              <label htmlFor="ref">Payment Reference (optional)</label>
+              <input
+                id="ref"
+                type="text"
+                placeholder="e.g. NEFT / UTR number"
+                value={distributeReference}
+                onChange={e => setDistributeReference(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #D1D5DB', width: '100%', fontSize: '0.95rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <button 
+                onClick={() => setDistributeTarget(null)}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #D1D5DB', background: 'white', cursor: 'pointer', fontWeight: 500 }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => act(distributeTarget, 'distribute', distributeReference)}
+                disabled={busyId === distributeTarget.id}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--accent-gradient, #4F46E5)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+              >
+                {busyId === distributeTarget.id ? 'Confirming...' : 'Confirm Distribution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
