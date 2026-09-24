@@ -5,8 +5,9 @@ import '../my_bookings_screen.dart';
 
 class BookingsTab extends StatelessWidget {
   final bool isGuest;
+  final GlobalKey<MyBookingsScreenState>? bookingsKey;
 
-  const BookingsTab({Key? key, required this.isGuest}) : super(key: key);
+  const BookingsTab({Key? key, required this.isGuest, this.bookingsKey}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -19,11 +20,7 @@ class BookingsTab extends StatelessWidget {
       );
     }
 
-    // Wrap MyBookingsScreen inside a basic scaffold if it doesn't fit or just return it directly.
-    // Since MyBookingsScreen is a full Scaffold itself, we can return it directly as a tab content.
-    // The only issue might be double AppBars if the parent tab view has one, but typically tabs don't.
-    // If double AppBars appear, MyBookingsScreen's appbar can be refactored, but returning it directly is standard.
-    return MyBookingsScreen();
+    return MyBookingsScreen(key: bookingsKey);
   }
 }
 

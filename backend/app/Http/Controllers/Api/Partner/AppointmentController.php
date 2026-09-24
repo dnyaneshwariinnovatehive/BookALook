@@ -31,14 +31,16 @@ class AppointmentController extends Controller
             ->whereNotIn('status', ['pending_payment', 'rescheduled', 'awaiting_reschedule']);
 
         if ($user->role === 'service_provider') {
-            $provider = \App\Models\ServiceProvider::where('user_id', $user->id)->first();
+            $provider = \App\Models\ServiceProvider::where('user_id', $user->id)
+                ->where('salon_id', $salon_id)
+                ->first();
             if ($provider) {
                 $query->where(function($q) use ($provider) {
                     $q->where('appointed_provider_id', $provider->id)
                       ->orWhere('serving_provider_id', $provider->id);
                 });
             } else {
-                return response()->json(['message' => 'You are not a registered service provider.'], 403);
+                return response()->json(['message' => 'You are not a registered service provider at this salon.'], 403);
             }
         } elseif (!in_array($user->role, ['admin', 'superadmin'])) {
             return response()->json(['message' => 'Unauthorized.'], 403);
@@ -69,7 +71,9 @@ class AppointmentController extends Controller
     public function verifyQrAndStartSession(Request $request, $salon_id)
     {
         $request->validate(['qr_token' => 'required|string']);
-        $provider = \App\Models\ServiceProvider::where('user_id', $request->user()->id)->first();
+        $provider = \App\Models\ServiceProvider::where('user_id', $request->user()->id)
+            ->where('salon_id', $salon_id)
+            ->first();
         
         $qrTokenHash = hash('sha256', $request->qr_token);
         $appointment = Appointment::where('salon_id', $salon_id)->where('qr_token_hash', $qrTokenHash)->first();

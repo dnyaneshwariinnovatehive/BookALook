@@ -11,10 +11,10 @@ class FavouritesTab extends StatefulWidget {
   const FavouritesTab({Key? key, required this.isGuest}) : super(key: key);
 
   @override
-  _FavouritesTabState createState() => _FavouritesTabState();
+  FavouritesTabState createState() => FavouritesTabState();
 }
 
-class _FavouritesTabState extends State<FavouritesTab> {
+class FavouritesTabState extends State<FavouritesTab> {
   final SalonService _salonService = SalonService();
   List<dynamic> _favourites = [];
   bool _isLoading = true;
@@ -27,6 +27,8 @@ class _FavouritesTabState extends State<FavouritesTab> {
       _loadFavourites();
     }
   }
+
+  Future<void> loadFavourites() => _loadFavourites();
 
   Future<void> _loadFavourites() async {
     try {

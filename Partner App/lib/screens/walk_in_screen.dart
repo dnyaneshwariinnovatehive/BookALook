@@ -46,8 +46,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
   String? _providerId;
   String _gender = 'Female';
 
-  /// null means "start now"; otherwise a time later today.
-  TimeOfDay? _startLater;
+
 
   String _search = '';
 
@@ -113,9 +112,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
   }
 
   DateTime get _startsAt {
-    final now = DateTime.now();
-    if (_startLater == null) return now;
-    return DateTime(now.year, now.month, now.day, _startLater!.hour, _startLater!.minute);
+    return DateTime.now();
   }
 
   DateTime get _endsAt => _startsAt.add(Duration(minutes: _duration));
@@ -142,16 +139,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
 
   // ------------------------------------------------------------- actions
 
-  Future<void> _pickStartTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _startLater ?? TimeOfDay.now(),
-      helpText: 'Start later today',
-    );
 
-    if (picked == null) return;
-    setState(() => _startLater = picked);
-  }
 
   Future<void> _submit({bool allowOverlap = false}) async {
     setState(() => _isSubmitting = true);
@@ -164,9 +152,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
         gender: _gender,
         serviceIds: _selectedServiceIds.toList(),
         providerId: _providerId,
-        startTime: _startLater == null
-            ? null
-            : DateFormat('yyyy-MM-dd HH:mm:ss').format(_startsAt),
+        startTime: null,
         allowOverlap: allowOverlap,
       );
 
@@ -221,7 +207,6 @@ class _WalkInScreenState extends State<WalkInScreen> {
       _nameController.clear();
       _phoneController.clear();
       _selectedServiceIds.clear();
-      _startLater = null;
       _searchController.clear();
     });
 
@@ -367,9 +352,6 @@ class _WalkInScreenState extends State<WalkInScreen> {
         _buildProviderSection(),
 
         const SizedBox(height: 26),
-        _buildTimingSection(),
-
-        const SizedBox(height: 26),
         _buildServicesSection(),
       ],
     );
@@ -447,35 +429,6 @@ class _WalkInScreenState extends State<WalkInScreen> {
       ],
     );
   }
-
-  Widget _buildTimingSection() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle('When'),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _chip(
-                  label: 'Start now',
-                  selected: _startLater == null,
-                  onTap: () => setState(() => _startLater = null),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _chip(
-                  label: _startLater == null
-                      ? 'Later today'
-                      : _startLater!.format(context),
-                  selected: _startLater != null,
-                  onTap: _pickStartTime,
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
 
   Widget _buildServicesSection() {
     final grouped = _visibleByCategory;
@@ -636,7 +589,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_startLater == null ? 'Start now' : 'Book it',
+                        : Text('Start now',
                             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),

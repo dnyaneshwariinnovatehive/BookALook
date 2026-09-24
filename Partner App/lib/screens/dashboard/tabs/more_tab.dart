@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../phone_screen.dart';
+import '../../../main.dart';
 import 'settings/salon_timings_screen.dart';
 import '../more/subscription_billing_screen.dart';
 import '../more/wallet_screen.dart';
@@ -289,6 +290,27 @@ class MoreTab extends StatelessWidget {
                     iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                     title: 'Help & Support',
                     onTap: () {},
+                  ),
+                  Divider(height: 1, indent: 56),
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: themeNotifier,
+                    builder: (context, currentMode, _) {
+                      final isDark = currentMode == ThemeMode.dark;
+                      return SwitchListTile(
+                        value: isDark,
+                        onChanged: (val) async {
+                          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('isDarkMode', val);
+                        },
+                        secondary: Icon(
+                          isDark ? Icons.dark_mode : Icons.light_mode,
+                          color: isDark ? Colors.yellow : Colors.orange,
+                        ),
+                        title: Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      );
+                    },
                   ),
                 ],
               ),

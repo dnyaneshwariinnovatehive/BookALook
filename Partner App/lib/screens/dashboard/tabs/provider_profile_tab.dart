@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../phone_screen.dart';
+import '../../../main.dart';
 import '../more/my_salary_screen.dart';
 
 class ProviderProfileTab extends StatefulWidget {
@@ -321,6 +322,36 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ),
 
                 const SizedBox(height: 16),
+                
+                // Dark Mode Toggle
+                ValueListenableBuilder<ThemeMode>(
+                  valueListenable: themeNotifier,
+                  builder: (context, currentMode, _) {
+                    final isDark = currentMode == ThemeMode.dark;
+                    return Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SwitchListTile(
+                        value: isDark,
+                        onChanged: (val) async {
+                          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('isDarkMode', val);
+                        },
+                        secondary: Icon(
+                          isDark ? Icons.dark_mode : Icons.light_mode,
+                          color: isDark ? Colors.yellow : Colors.orange,
+                        ),
+                        title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 24),
 
                 // Logout
                 SizedBox(

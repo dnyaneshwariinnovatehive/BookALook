@@ -10,11 +10,13 @@ import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
+  const MyBookingsScreen({super.key});
+
   @override
-  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+  State<MyBookingsScreen> createState() => MyBookingsScreenState();
 }
 
-class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerProviderStateMixin {
+class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final AppointmentService _appointmentService = AppointmentService();
 
@@ -37,6 +39,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPr
     _tabController.dispose();
     super.dispose();
   }
+
+  Future<void> loadBookings() => _loadBookings();
 
   Future<void> _loadBookings() async {
     setState(() => _error = '');

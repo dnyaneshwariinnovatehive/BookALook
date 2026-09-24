@@ -448,87 +448,77 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
 
   Widget _buildFilters(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: _buildDropdown(
-                  const [_kAllDates, 'Today', 'Yesterday', 'Tomorrow', _kCustomDate],
-                  _selectedDate,
-                  _onDateFilterChanged,
-                  isDark: isDark,
-                  labelFor: (item) => item == _kCustomDate && _customDate != null
-                      ? DateFormat('d MMM').format(_customDate!)
-                      : item,
-                ),
-              ),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            _buildDropdown(
+              const [_kAllDates, 'Today', 'Yesterday', 'Tomorrow', _kCustomDate],
+              _selectedDate,
+              _onDateFilterChanged,
+              isDark: isDark,
+              labelFor: (item) => item == _kCustomDate && _customDate != null
+                  ? DateFormat('d MMM').format(_customDate!)
+                  : item,
+            ),
+            const SizedBox(width: 8),
+            _buildDropdown(
+              _providerOptions,
+              _selectedProvider,
+              (v) => setState(() => _selectedProvider = v!),
+              isDark: isDark,
+            ),
+            const SizedBox(width: 8),
+            _buildDropdown(
+              _serviceOptions,
+              _selectedService,
+              (v) => setState(() => _selectedService = v!),
+              isDark: isDark,
+            ),
+            const SizedBox(width: 8),
+            _buildDropdown(
+              const [_kAllStatus, ..._kStatusLabels],
+              _selectedStatus,
+              (v) => setState(() => _selectedStatus = v!),
+              isDark: isDark,
+            ),
+            const SizedBox(width: 8),
+            _buildDropdown(
+              const [_kAllSources, ..._kSourceLabels],
+              _selectedSource,
+              (v) => setState(() => _selectedSource = v!),
+              isDark: isDark,
+            ),
+            if (_hasActiveFilter) ...[
               const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: _buildDropdown(
-                  _providerOptions,
-                  _selectedProvider,
-                  (v) => setState(() => _selectedProvider = v!),
-                  isDark: isDark,
+              Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF4C1D2F) : const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: _buildDropdown(
-                  _serviceOptions,
-                  _selectedService,
-                  (v) => setState(() => _selectedService = v!),
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: _buildDropdown(
-                  const [_kAllStatus, ..._kStatusLabels],
-                  _selectedStatus,
-                  (v) => setState(() => _selectedStatus = v!),
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown(
-                  const [_kAllSources, ..._kSourceLabels],
-                  _selectedSource,
-                  (v) => setState(() => _selectedSource = v!),
-                  isDark: isDark,
-                ),
-              ),
-              if (_hasActiveFilter) ...[
-                const SizedBox(width: 8),
-                TextButton(
+                child: TextButton.icon(
                   onPressed: _clearFilters,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: Text(
+                  icon: Icon(Icons.close, size: 14, color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFFDC2626)),
+                  label: Text(
                     'Clear',
                     style: GoogleFonts.outfit(
-                      color: AppTheme.accentColor,
+                      color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFFDC2626),
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
                   ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: Size.zero,
+                  ),
                 ),
-              ],
+              ),
             ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -549,23 +539,32 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
 
     return Container(
       height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: bgColor,
         border: Border.all(color: borderColor),
-        borderRadius: BorderRadius.circular(20), // Pill shaped filters
+        borderRadius: BorderRadius.circular(20),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          isExpanded: true,
+          isExpanded: false,
           dropdownColor: bgColor,
-          icon: Icon(Icons.keyboard_arrow_down, size: 16, color: iconColor),
-          style: GoogleFonts.outfit(color: textColor, fontSize: 11, fontWeight: FontWeight.w500),
+          icon: Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Icon(Icons.keyboard_arrow_down, size: 16, color: iconColor),
+          ),
+          style: GoogleFonts.outfit(color: textColor, fontSize: 13, fontWeight: FontWeight.w500),
           items: items.map((String item) {
             return DropdownMenuItem<String>(
               value: item,
-              child: Text(labelFor?.call(item) ?? item, overflow: TextOverflow.ellipsis),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  labelFor?.call(item) ?? item, 
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             );
           }).toList(),
           onChanged: onChanged,

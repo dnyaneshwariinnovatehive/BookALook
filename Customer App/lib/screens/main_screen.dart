@@ -9,6 +9,7 @@ import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
 import 'tabs/favourites_tab.dart';
 import 'tabs/profile_tab.dart';
+import 'my_bookings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final bool isGuest;
@@ -29,6 +30,9 @@ class _MainScreenState extends State<MainScreen> {
   /// that tab and the bottom navigation bar remains visible.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
+
+  final GlobalKey<FavouritesTabState> _favouritesKey = GlobalKey<FavouritesTabState>();
+  final GlobalKey<MyBookingsScreenState> _bookingsKey = GlobalKey<MyBookingsScreenState>();
 
   /// Visits waiting to be rated, asked about one at a time.
   ///
@@ -51,13 +55,20 @@ class _MainScreenState extends State<MainScreen> {
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
       ExploreTab(),
-      BookingsTab(isGuest: widget.isGuest),
-      FavouritesTab(isGuest: widget.isGuest),
+      BookingsTab(bookingsKey: _bookingsKey, isGuest: widget.isGuest),
+      FavouritesTab(key: _favouritesKey, isGuest: widget.isGuest),
       ProfileTab(isGuest: widget.isGuest),
     ];
   }
 
   void _onTabTapped(int index) {
+    if (index == 2 && !widget.isGuest) {
+      _bookingsKey.currentState?.loadBookings();
+    }
+    if (index == 3 && !widget.isGuest) {
+      _favouritesKey.currentState?.loadFavourites();
+    }
+    
     if (index == _currentIndex) {
       // Tapping the tab you are already on goes back to its first page.
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);

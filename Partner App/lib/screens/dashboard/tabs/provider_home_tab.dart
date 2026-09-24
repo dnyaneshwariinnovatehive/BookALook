@@ -30,7 +30,6 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
   final PartnerAppointmentService _service = PartnerAppointmentService();
   List<dynamic> _appointments = [];
   bool _isLoading = true;
-  String _availability = 'Available';
 
   @override
   void initState() {
@@ -176,18 +175,6 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
               _buildScanCard(),
               const SizedBox(height: 24),
 
-              // Availability Toggle
-              Row(
-                children: [
-                  Expanded(child: _buildAvailabilityButton('Available', Icons.check_circle_outline, _availability == 'Available', const Color(0xFFF3E8FF), const Color(0xFF9333EA))),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildAvailabilityButton('On Break', Icons.coffee_outlined, _availability == 'On Break', const Color(0xFFF3E8FF), const Color(0xFF9333EA))),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildAvailabilityButton('Busy', Icons.remove_circle_outline, _availability == 'Busy', const Color(0xFFDC2626), Colors.white)),
-                ],
-              ),
-              const SizedBox(height: 24),
-
               // Next Appointment Card
               if (nextApt != null) _buildNextAppointmentCard(nextApt),
               if (nextApt != null) const SizedBox(height: 24),
@@ -219,28 +206,34 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text("Today's Appointments", style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: const Color(0xFF1F2937))),
-                  Text('$total appointments', style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF9CA3AF))),
+                  Text('$total total', style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF9CA3AF))),
                 ],
               ),
               const SizedBox(height: 16),
 
               if (_isLoading)
                 const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
-              else if (_appointments.isEmpty)
-                Center(child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Text('No appointments today!', style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16)),
-                ))
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _appointments.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final apt = _appointments[index];
-                    return _buildQueueCard(apt);
-                  },
+              else 
+                Builder(
+                  builder: (context) {
+                    final scheduledAppointments = _appointments.where((apt) => apt['status'] == 'scheduled').toList();
+                    if (scheduledAppointments.isEmpty) {
+                      return Center(child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Text('No scheduled appointments today!', style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16)),
+                      ));
+                    }
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: scheduledAppointments.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final apt = scheduledAppointments[index];
+                        return _buildQueueCard(apt);
+                      },
+                    );
+                  }
                 ),
             ],
           ),
@@ -300,32 +293,6 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
               ),
             ),
             const Icon(Icons.chevron_right, color: Colors.white70),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvailabilityButton(String label, IconData icon, bool isSelected, Color bgColor, Color fgColor) {
-    return GestureDetector(
-      onTap: () => setState(() => _availability = label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? fgColor : bgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSelected ? fgColor : (fgColor == Colors.white ? const Color(0xFFDC2626) : Colors.transparent)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: isSelected && fgColor != Colors.white ? Colors.white : fgColor),
-            const SizedBox(width: 6),
-            Text(label, style: GoogleFonts.outfit(
-              color: isSelected && fgColor != Colors.white ? Colors.white : fgColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            )),
           ],
         ),
       ),
