@@ -155,7 +155,7 @@ class _ProfileTabState extends State<ProfileTab> {
       backgroundColor: bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          padding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 140.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

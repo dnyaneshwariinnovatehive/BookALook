@@ -277,7 +277,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
       onRefresh: _loadBookings,
       child: ListView.builder(
         physics: AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 140),
         itemCount: isUpcoming ? list.length + 1 : list.length,
         itemBuilder: (context, index) {
           if (isUpcoming && index == 0) {

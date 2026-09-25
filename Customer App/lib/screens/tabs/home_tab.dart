@@ -359,7 +359,7 @@ class _HomeTabState extends State<HomeTab> {
               _buildBookAgainSection(),
             ],
 
-            const SizedBox(height: 90), // Bottom navigation padding
+            const SizedBox(height: 140), // Bottom navigation padding
           ],
         ),
       ),

@@ -184,21 +184,24 @@ class _ExploreTabState extends State<ExploreTab> {
               else
                 _buildAllSalons(filteredSalons),
                 
-              SizedBox(height: 90),
+              SizedBox(height: 140),
             ],
           ),
         ),
       ),
       floatingActionButton: _globalCart != null && (_globalCart!['items'] as List).isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => CartScreen()
-                )).then((_) => _loadSalons());
-              },
-              backgroundColor: AppTheme.accentColor,
-              icon: Icon(Icons.shopping_cart, color: Colors.white),
-              label: Text('View Cart (${_globalCart!['salon']?['name'] ?? 'Cart'})', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 95.0),
+              child: FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => CartScreen()
+                  )).then((_) => _loadSalons());
+                },
+                backgroundColor: AppTheme.accentColor,
+                icon: Icon(Icons.shopping_cart, color: Colors.white),
+                label: Text('View Cart (${_globalCart!['salon']?['name'] ?? 'Cart'})', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
             )
           : null,
     );

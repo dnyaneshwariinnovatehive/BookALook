@@ -159,7 +159,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                       color: AppTheme.accentColor,
                       onRefresh: _loadFavourites,
                       child: GridView.builder(
-                        padding: EdgeInsets.fromLTRB(20, 4, 20, 90),
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, 140),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,
