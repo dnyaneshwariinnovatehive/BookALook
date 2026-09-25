@@ -20,6 +20,8 @@ class SalonEnquiry extends Model
         'city',
         'city_id',
         'sub_area_id',
+        'street_address',
+        'pincode',
         'message',
         'status',
         'assigned_collaborator_id',
