@@ -831,9 +831,9 @@ class _HomeTabState extends State<HomeTab> {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            Color(0xFFF3EBFE),
-            Color(0xFFF0E5FE),
-            Color(0xFFE9D9FC),
+            Color(0xFFEBE1FA),
+            Color(0xFFE8DBFA),
+            Color(0xFFE1CEF8),
           ],
           stops: [0.0, 0.5, 1.0],
         ),
@@ -857,7 +857,7 @@ class _HomeTabState extends State<HomeTab> {
               height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE4D0FA).withOpacity(0.7),
+                color: const Color(0xFFDCC6F6).withOpacity(0.7),
               ),
             ),
           ),
@@ -932,9 +932,9 @@ class _HomeTabState extends State<HomeTab> {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            Color(0xFFF3EBFE),
-            Color(0xFFF0E5FE),
-            Color(0xFFE9D9FC),
+            Color(0xFFEBE1FA),
+            Color(0xFFE8DBFA),
+            Color(0xFFE1CEF8),
           ],
           stops: [0.0, 0.5, 1.0],
         ),
@@ -959,7 +959,7 @@ class _HomeTabState extends State<HomeTab> {
               height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE4D0FA).withOpacity(0.7),
+                color: const Color(0xFFDCC6F6).withOpacity(0.7),
               ),
             ),
           ),

@@ -1,15 +1,18 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/category.dart';
 import '../theme/app_theme.dart';
+import 'logo_marquee.dart';
 
 /// The category picker on the home screen.
 ///
-/// A horizontally scrolling carousel of categories, showing 4 items at a time.
-/// It automatically scrolls every 5 seconds and guarantees that the 'Combo'
-/// category appears first.
-class CategoryGrid extends StatefulWidget {
+/// A single row of categories that drifts right to left and loops seamlessly,
+/// showing 4 tiles at a time, and guarantees that the 'Combo' category appears
+/// first.
+///
+/// The motion lives in [InfiniteLogoMarquee]; this widget owns which categories
+/// are shown, how big they are, and what each one looks like.
+class CategoryGrid extends StatelessWidget {
   final List<ServiceCategory> categories;
   final void Function(ServiceCategory category) onTap;
 
@@ -31,16 +34,6 @@ class CategoryGrid extends StatefulWidget {
     return Icons.category_rounded;
   }
 
-  @override
-  State<CategoryGrid> createState() => _CategoryGridState();
-}
-
-class _CategoryGridState extends State<CategoryGrid> {
-  PageController? _pageController;
-  Timer? _timer;
-  int? _currentPage;
-  double? _lastWidth;
-
   /// Soft backgrounds behind the icons.
   static const List<(Color, Color)> _tints = [
     (Color(0xFFF3EBFE), Color(0xFF9C54F2)), // lavender
@@ -51,33 +44,12 @@ class _CategoryGridState extends State<CategoryGrid> {
     (Color(0xFFFFF6DA), Color(0xFFF59E0B)), // honey
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _pageController?.dispose();
-    super.dispose();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted || widget.categories.isEmpty || _pageController == null) return;
-      if (!_pageController!.hasClients) return;
-      
-      _pageController!.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
+  /// How many tiles fit across the screen at once.
+  static const int _visibleTiles = 4;
+  static const double _gap = 12;
 
   List<ServiceCategory> _getProcessedCategories() {
-    List<ServiceCategory> cats = List.from(widget.categories);
+    List<ServiceCategory> cats = List.from(categories);
     int comboIndex = cats.indexWhere((c) => c.name.toLowerCase() == 'combo');
     if (comboIndex != -1) {
       final combo = cats.removeAt(comboIndex);
@@ -94,65 +66,32 @@ class _CategoryGridState extends State<CategoryGrid> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allCats = _getProcessedCategories();
 
-    if (allCats.isEmpty) return const SizedBox();
+    if (allCats.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth;
-          const gap = 12.0;
-          
-          if (_pageController == null || _lastWidth != availableWidth) {
-            _lastWidth = availableWidth;
-            final stride = (availableWidth + gap) / 4;
-            final fraction = stride / availableWidth;
-            final len = allCats.isNotEmpty ? allCats.length : 1;
-            final base = 10000;
-            final defaultPage = base - (base % len);
-            
-            final initial = _currentPage ?? defaultPage;
-            
-            final old = _pageController;
-            _pageController = PageController(
-              initialPage: initial,
-              viewportFraction: fraction,
-            );
-            if (old != null) {
-              Future.microtask(() => old.dispose());
-            }
-          }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportWidth = constraints.maxWidth;
+        if (viewportWidth <= 0) return const SizedBox.shrink();
 
-          final stride = (availableWidth + gap) / 4;
-          final actualTileWidth = stride - gap;
-          final itemHeight = actualTileWidth + 7 + 32;
+        // Tiles are square, so the label under them just hangs off the bottom
+        // of the icon box.
+        final tileWidth =
+            (viewportWidth - _gap * (_visibleTiles - 1)) / _visibleTiles;
+        final tileHeight = tileWidth + 7 + 32;
 
-          return SizedBox(
-            height: itemHeight,
-            child: PageView.builder(
-              controller: _pageController,
-              padEnds: false,
-              onPageChanged: (index) {
-                _currentPage = index;
-              },
-              itemBuilder: (context, index) {
-                final realIndex = index % allCats.length;
-                final category = allCats[realIndex];
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: gap),
-                  child: _CategoryTile(
-                    category: category,
-                    tint: _tints[realIndex % _tints.length],
-                    isDark: isDark,
-                    onTap: () => widget.onTap(category),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
+        return InfiniteLogoMarquee(
+          itemCount: allCats.length,
+          itemExtent: tileWidth,
+          gap: _gap,
+          height: tileHeight,
+          itemBuilder: (context, index) => _CategoryTile(
+            category: allCats[index],
+            tint: _tints[index % _tints.length],
+            isDark: isDark,
+            onTap: () => onTap(allCats[index]),
+          ),
+        );
+      },
     );
   }
 }

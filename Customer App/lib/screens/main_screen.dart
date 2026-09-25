@@ -138,7 +138,13 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: [
           for (var i = 0; i < _tabs.length; i++)
-            TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
+            // IndexedStack keeps every tab alive and does not mute its tickers,
+            // so anything animating on a hidden tab — the category marquee, the
+            // banner carousel — would keep running off screen.
+            TickerMode(
+              enabled: i == _currentIndex,
+              child: TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
+            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
