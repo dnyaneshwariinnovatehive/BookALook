@@ -52,9 +52,6 @@ class PublicEnquiryController extends Controller
                 'sub_area_id' => $request->sub_area_id,
                 'street_address' => $request->street_address,
                 'pincode' => $request->pincode,
-                // The readable name is still stored, so the older rows and the
-                // new ones read the same way anywhere that only wants a label.
-                'city' => $city?->name,
                 'message' => $request->message,
                 'status' => 'new',
             ]);
