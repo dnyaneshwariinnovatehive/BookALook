@@ -79,6 +79,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Future<void> _toggleFavourite() async {
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      final loggedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+      );
+      if (loggedIn != true) return;
+    }
+
     if (_isTogglingFavourite) return;
     setState(() => _isTogglingFavourite = true);
     
@@ -100,6 +110,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Future<void> _addToCart({String? serviceId, String? comboId, required String label}) async {
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      final loggedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+      );
+      if (loggedIn != true) return;
+    }
+
     try {
       final cart = serviceId != null
           ? await _cartService.addItem(widget.salonId, serviceId)

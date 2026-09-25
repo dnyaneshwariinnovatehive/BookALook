@@ -306,7 +306,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
     String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
     
-    int duration = services.fold(0, (sum, s) => sum + (s['duration_minutes_at_booking'] as int? ?? 0));
+    int duration = services.fold(0, (sum, s) => sum + (int.tryParse(s['duration_minutes_at_booking']?.toString() ?? '') ?? 0));
     
     return Container(
       padding: const EdgeInsets.all(20),

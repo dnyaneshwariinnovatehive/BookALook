@@ -303,7 +303,7 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
     
-    int duration = services.fold(0, (sum, s) => sum + (s['duration_minutes_at_booking'] as int? ?? 0));
+    int duration = services.fold(0, (sum, s) => sum + (int.tryParse(s['duration_minutes_at_booking']?.toString() ?? '') ?? 0));
     
     String time = _formatTime(apt['start_time']);
     String timeNumber = time.isNotEmpty ? time.split(' ')[0] : '';
@@ -392,7 +392,7 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
                         const SizedBox(width: 8),
                         Text(isWalkIn ? 'Offline' : 'Online', style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 11, fontWeight: FontWeight.bold)),
                         const Spacer(),
-                        if (apt['balance_amount'] != null && apt['balance_amount'] > 0)
+                        if (apt['balance_amount'] != null && (num.tryParse(apt['balance_amount'].toString()) ?? 0) > 0)
                           Text('Due ₹${apt['balance_amount']}', style: GoogleFonts.outfit(color: const Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.bold)),
                       ],
                     )

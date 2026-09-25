@@ -25,6 +25,7 @@ class ProviderProfileTab extends StatefulWidget {
 class _ProviderProfileTabState extends State<ProviderProfileTab> {
   bool _showAllServices = false;
   bool _showWorkingHours = false;
+  bool _showPersonalInfo = false;
   static const int _maxVisibleServices = 2;
 
   Future<void> _logout(BuildContext context) async {
@@ -59,6 +60,82 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const PhoneScreen()),
       (route) => false,
+    );
+  }
+
+  void _requestLeave(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            top: 24, left: 24, right: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Request Time Off', 
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.onSurface)
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'From Date',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  suffixIcon: const Icon(Icons.calendar_today, size: 18),
+                ),
+                readOnly: true,
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'To Date',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  suffixIcon: const Icon(Icons.calendar_today, size: 18),
+                ),
+                readOnly: true,
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Reason for leave',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Leave request submitted successfully.'),
+                      backgroundColor: AppTheme.accentColor,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Submit Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -208,22 +285,66 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ],
 
                 // Personal Information Section
-                Text(
-                  'Personal Information',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                // Personal Information Section
+                GestureDetector(
+                  onTap: () => setState(() => _showPersonalInfo = !_showPersonalInfo),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Personal Information',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                      AnimatedRotation(
+                        turns: _showPersonalInfo ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.keyboard_arrow_down,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          size: 28,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 
-                _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
-                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                
-                _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
-                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                
-                _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
-                Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                
-                _buildPhotoUploadRow(context),
+                AnimatedCrossFade(
+                  firstChild: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tap to view personal info',
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  secondChild: Column(
+                    children: [
+                      _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
+                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                      
+                      _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
+                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                      
+                      _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
+                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                      
+                      _buildPhotoUploadRow(context),
+                    ],
+                  ),
+                  crossFadeState: _showPersonalInfo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 200),
+                ),
                 
                 const SizedBox(height: 40),
 
@@ -300,6 +421,51 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ),
 
                 const SizedBox(height: 32),
+
+                // Time Off Section
+                GestureDetector(
+                  onTap: () => _requestLeave(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.calendar_today_outlined, color: AppTheme.accentColor, size: 20),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Request Time Off',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Apply for a leave or vacation',
+                                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
 
                 // Salary button
                 SizedBox(
