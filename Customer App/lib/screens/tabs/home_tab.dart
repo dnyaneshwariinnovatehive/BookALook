@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
@@ -44,6 +45,9 @@ class _HomeTabState extends State<HomeTab> {
   String _selectedGender = 'All';
   final TextEditingController _searchController = TextEditingController();
 
+  ScrollController? _bookAgainScrollController;
+  Timer? _bookAgainTimer;
+
   @override
   void initState() {
     super.initState();
@@ -52,13 +56,35 @@ class _HomeTabState extends State<HomeTab> {
     _fetchAlerts();
     // Another screen can change the city; the header has to follow it.
     LocationService.instance.addListener(_onCityChanged);
+
+    _bookAgainScrollController = ScrollController();
+    _startBookAgainTimer();
   }
 
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
     _searchController.dispose();
+    _bookAgainTimer?.cancel();
+    _bookAgainScrollController?.dispose();
     super.dispose();
+  }
+
+  void _startBookAgainTimer() {
+    _bookAgainTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (!mounted || _past.isEmpty || _bookAgainScrollController == null) return;
+      if (!_bookAgainScrollController!.hasClients) return;
+      
+      final currentOffset = _bookAgainScrollController!.offset;
+      final stride = 250.0 + 14.0; // card width + gap
+      final targetOffset = ((currentOffset / stride).floor() + 1) * stride;
+
+      _bookAgainScrollController!.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   /// The stored city has to be read before anything city-scoped is fetched,
@@ -1139,12 +1165,18 @@ class _HomeTabState extends State<HomeTab> {
         if (_past.isNotEmpty && !widget.isGuest)
           SizedBox(
             height: 200,
-            child: ListView.separated(
+            child: ListView.builder(
+              controller: _bookAgainScrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(20, 5, 20, 15),
-              itemCount: _past.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, index) => _buildBookAgainCard(_past[index]),
+              // Omit itemCount for infinite loop
+              itemBuilder: (context, index) {
+                final realIndex = index % _past.length;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: _buildBookAgainCard(_past[realIndex]),
+                );
+              },
             ),
           )
         else

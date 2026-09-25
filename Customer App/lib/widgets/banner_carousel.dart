@@ -93,122 +93,83 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
     return SizedBox(
       height: 160,
-      child: Stack(
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            onPageChanged: (int page) {
-              setState(() {
-                _currentPage = page;
-              });
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (int page) {
+          setState(() {
+            _currentPage = page;
+          });
+        },
+        itemCount: isInfinite ? null : widget.banners.length,
+        itemBuilder: (context, index) {
+          final realIndex = isInfinite ? index % widget.banners.length : index;
+          final banner = widget.banners[realIndex];
+          return GestureDetector(
+            onTap: () async {
+              if (banner.actionUrl != null && banner.actionUrl!.isNotEmpty) {
+                final uri = Uri.parse(banner.actionUrl!);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              }
             },
-            itemCount: isInfinite ? null : widget.banners.length,
-            itemBuilder: (context, index) {
-              final realIndex = isInfinite ? index % widget.banners.length : index;
-              final banner = widget.banners[realIndex];
-              return GestureDetector(
-                onTap: () async {
-                  if (banner.actionUrl != null && banner.actionUrl!.isNotEmpty) {
-                    final uri = Uri.parse(banner.actionUrl!);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  }
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 1),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    color: AppTheme.lightAccentSoft,
-                    image: DecorationImage(
-                      image: NetworkImage(banner.imageUrl),
-                      fit: BoxFit.cover,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                color: AppTheme.lightAccentSoft,
+                image: DecorationImage(
+                  image: NetworkImage(banner.imageUrl),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Very subtle gradient overlay so the image is the main focus
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.2),
+                        ],
+                      ),
                     ),
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Gradient overlay as per spec
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withOpacity(0.1),
-                              Colors.black.withOpacity(0.5),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                banner.title,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.2,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Stack(
-                          children: [
-                            Align(
-                              alignment: Alignment.topLeft,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    banner.title,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.2,
-                                      shadows: [
-                                        Shadow(
-                                          color: Color(0x4D000000),
-                                          offset: Offset(0, 2),
-                                          blurRadius: 4,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          if (widget.banners.length > 1)
-            Positioned(
-              bottom: 12,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  widget.banners.length,
-                  (index) {
-                    final realCurrentPage = _currentPage % widget.banners.length;
-                    final isActive = realCurrentPage == index;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.symmetric(horizontal: 3), // gap 6px total
-                      height: 5,
-                      width: isActive ? 16 : 5,
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(2.5),
-                      ),
-                    );
-                  },
-                ),
+                ],
               ),
             ),
-        ],
+          );
+        },
       ),
     );
   }

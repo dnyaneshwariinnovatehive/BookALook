@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/category.dart';
@@ -5,41 +6,19 @@ import '../theme/app_theme.dart';
 
 /// The category picker on the home screen.
 ///
-/// A grid rather than the row of chips it replaces, because the two do
-/// different jobs. A horizontal strip shows three categories and hides the
-/// rest behind a swipe most people never make; a grid shows a customer
-/// everything the app can do for them in one glance, which is the whole point
-/// of putting categories on a home screen.
-///
-/// Each tile is an image in a soft tinted square with the name underneath —
-/// the pattern every Indian services app uses, and the one customers already
-/// know how to read.
-class CategoryGrid extends StatelessWidget {
+/// A horizontally scrolling carousel of categories, showing 4 items at a time.
+/// It automatically scrolls every 5 seconds and guarantees that the 'Combo'
+/// category appears first.
+class CategoryGrid extends StatefulWidget {
   final List<ServiceCategory> categories;
   final void Function(ServiceCategory category) onTap;
 
   const CategoryGrid({super.key, required this.categories, required this.onTap});
 
-  /// Soft backgrounds behind the icons.
-  ///
-  /// Rotated by position rather than chosen per category, so the palette stays
-  /// balanced however many categories SuperAdmin adds, and a new one never
-  /// arrives looking out of place.
-  static const List<(Color, Color)> _tints = [
-    (Color(0xFFF3EBFE), Color(0xFF9C54F2)), // lavender
-    (Color(0xFFFFF1E6), Color(0xFFEF6C00)), // peach
-    (Color(0xFFE6F6EF), Color(0xFF2E7D32)), // mint
-    (Color(0xFFFDE8EF), Color(0xFFD81B60)), // rose
-    (Color(0xFFE7F0FD), Color(0xFF1565C0)), // sky
-    (Color(0xFFFFF6DA), Color(0xFFF59E0B)), // honey
-  ];
-
   /// A sensible picture when a category has no icon yet.
-  ///
-  /// Better than one generic shape on every tile: a customer can still tell
-  /// Hair from Nails while SuperAdmin is still uploading artwork.
   static IconData fallbackIcon(String name) {
     final n = name.toLowerCase();
+    if (n.contains('combo')) return Icons.card_giftcard_rounded;
     if (n.contains('hair')) return Icons.content_cut_rounded;
     if (n.contains('skin') || n.contains('facial')) return Icons.face_retouching_natural;
     if (n.contains('nail')) return Icons.back_hand_outlined;
@@ -53,34 +32,124 @@ class CategoryGrid extends StatelessWidget {
   }
 
   @override
+  State<CategoryGrid> createState() => _CategoryGridState();
+}
+
+class _CategoryGridState extends State<CategoryGrid> {
+  PageController? _pageController;
+  Timer? _timer;
+  int? _currentPage;
+  double? _lastWidth;
+
+  /// Soft backgrounds behind the icons.
+  static const List<(Color, Color)> _tints = [
+    (Color(0xFFF3EBFE), Color(0xFF9C54F2)), // lavender
+    (Color(0xFFFFF1E6), Color(0xFFEF6C00)), // peach
+    (Color(0xFFE6F6EF), Color(0xFF2E7D32)), // mint
+    (Color(0xFFFDE8EF), Color(0xFFD81B60)), // rose
+    (Color(0xFFE7F0FD), Color(0xFF1565C0)), // sky
+    (Color(0xFFFFF6DA), Color(0xFFF59E0B)), // honey
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController?.dispose();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || widget.categories.isEmpty || _pageController == null) return;
+      if (!_pageController!.hasClients) return;
+      
+      _pageController!.nextPage(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  List<ServiceCategory> _getProcessedCategories() {
+    List<ServiceCategory> cats = List.from(widget.categories);
+    int comboIndex = cats.indexWhere((c) => c.name.toLowerCase() == 'combo');
+    if (comboIndex != -1) {
+      final combo = cats.removeAt(comboIndex);
+      cats.insert(0, combo);
+    } else {
+      // Create a synthesized 'Combo' category if not present
+      cats.insert(0, ServiceCategory(id: 'combo', name: 'Combo'));
+    }
+    return cats;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final allCats = _getProcessedCategories();
+
+    if (allCats.isEmpty) return const SizedBox();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Four across on a normal phone, five on a wide one. Deriving it from
-          // the width rather than hard-coding four keeps the tiles from
-          // stretching absurdly on a tablet.
-          final columns = constraints.maxWidth > 520 ? 5 : 4;
+          final availableWidth = constraints.maxWidth;
           const gap = 12.0;
-          final tileWidth = (constraints.maxWidth - gap * (columns - 1)) / columns;
+          
+          if (_pageController == null || _lastWidth != availableWidth) {
+            _lastWidth = availableWidth;
+            final stride = (availableWidth + gap) / 4;
+            final fraction = stride / availableWidth;
+            final len = allCats.isNotEmpty ? allCats.length : 1;
+            final base = 10000;
+            final defaultPage = base - (base % len);
+            
+            final initial = _currentPage ?? defaultPage;
+            
+            final old = _pageController;
+            _pageController = PageController(
+              initialPage: initial,
+              viewportFraction: fraction,
+            );
+            if (old != null) {
+              Future.microtask(() => old.dispose());
+            }
+          }
 
-          return Wrap(
-            spacing: gap,
-            runSpacing: 18,
-            children: List.generate(categories.length, (index) {
-              return SizedBox(
-                width: tileWidth,
-                child: _CategoryTile(
-                  category: categories[index],
-                  tint: _tints[index % _tints.length],
-                  isDark: isDark,
-                  onTap: () => onTap(categories[index]),
-                ),
-              );
-            }),
+          final stride = (availableWidth + gap) / 4;
+          final actualTileWidth = stride - gap;
+          final itemHeight = actualTileWidth + 7 + 32;
+
+          return SizedBox(
+            height: itemHeight,
+            child: PageView.builder(
+              controller: _pageController,
+              padEnds: false,
+              onPageChanged: (index) {
+                _currentPage = index;
+              },
+              itemBuilder: (context, index) {
+                final realIndex = index % allCats.length;
+                final category = allCats[realIndex];
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: gap),
+                  child: _CategoryTile(
+                    category: category,
+                    tint: _tints[realIndex % _tints.length],
+                    isDark: isDark,
+                    onTap: () => widget.onTap(category),
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
@@ -117,20 +186,14 @@ class _CategoryTile extends StatelessWidget {
             aspectRatio: 1,
             child: Container(
               decoration: BoxDecoration(
-                color: isDark ? foreground.withValues(alpha: 0.16) : background,
+                color: isDark ? foreground.withOpacity(0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
-              // The padding is what makes uploaded artwork sit consistently:
-              // the icon breathes inside the tile instead of touching its
-              // edges, whatever its own margins happen to be.
               padding: const EdgeInsets.all(14),
               child: hasIcon
                   ? Image.network(
                       category.iconUrl!,
                       fit: BoxFit.contain,
-                      // Deliberately no colour filter. Tinting the image was
-                      // flattening every uploaded icon into a single-colour
-                      // silhouette, which is why the artwork never showed.
                       errorBuilder: (context, error, stack) => Icon(
                         CategoryGrid.fallbackIcon(category.name),
                         color: foreground,
@@ -138,12 +201,9 @@ class _CategoryTile extends StatelessWidget {
                       ),
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;
-                        // A spinner per tile would make the whole grid flicker
-                        // on every home-screen visit; the fallback shape holds
-                        // the space quietly instead.
                         return Icon(
                           CategoryGrid.fallbackIcon(category.name),
-                          color: foreground.withValues(alpha: 0.35),
+                          color: foreground.withOpacity(0.35),
                           size: 26,
                         );
                       },

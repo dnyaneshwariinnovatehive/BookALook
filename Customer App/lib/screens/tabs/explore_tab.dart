@@ -25,6 +25,7 @@ class _ExploreTabState extends State<ExploreTab> {
 
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'All Salons';
+  bool _isCardView = true;
 
   final CartService _cartService = CartService();
   Map<String, dynamic>? _globalCart;
@@ -175,7 +176,7 @@ class _ExploreTabState extends State<ExploreTab> {
               ..._buildTopRatedSalons(filteredSalons),
 
               SizedBox(height: 28),
-              _buildSectionTitle('All Salons near you', '(${filteredSalons.length})'),
+              _buildAllSalonsHeader(filteredSalons.length),
               SizedBox(height: 16),
               
               if (filteredSalons.isEmpty) 
@@ -461,148 +462,367 @@ class _ExploreTabState extends State<ExploreTab> {
     );
   }
 
+  Widget _buildAllSalonsHeader(int count) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Text('All Salons near you', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor)),
+                SizedBox(width: 6),
+                Text('($count)', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: bodyColor)),
+              ],
+            ),
+          ),
+          _buildViewToggle(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewToggle() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final activeBg = AppTheme.accentColor;
+    final activeIcon = Colors.white;
+    final inactiveIcon = isDark ? AppTheme.darkTextLight : const Color(0xFF9E98AE);
+
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _isCardView = true),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isCardView ? activeBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.grid_view_rounded, size: 18, color: _isCardView ? activeIcon : inactiveIcon),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _isCardView = false),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 200),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: !_isCardView ? activeBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.format_list_bulleted_rounded, size: 18, color: !_isCardView ? activeIcon : inactiveIcon),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAllSalons(List<dynamic> salons) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: salons.map((salon) => _isCardView ? _buildDetailedSalonCard(salon) : _buildCompactSalonCard(salon)).toList(),
+      ),
+    );
+  }
+
+  Widget _buildDetailedSalonCard(dynamic salon) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
     final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
     final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final lightTextColor = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final isServiceable = salon['is_serviceable'] != false;
+    final count = (salon['review_count'] as num?)?.toInt() ?? 0;
+    final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: salons.map((salon) {
-          final isServiceable = salon['is_serviceable'] != false;
-          final count = (salon['review_count'] as num?)?.toInt() ?? 0;
-          final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
-
-          return Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
-                ));
-              },
-              child: Opacity(
-                opacity: isServiceable ? 1.0 : 0.6,
-                child: Container(
-                  height: 140, // increased height to accommodate the divider
-                  clipBehavior: Clip.hardEdge,
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: borderColor, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
-                    ]
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: EdgeInsets.only(bottom: 20),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
+          ));
+        },
+        child: Opacity(
+          opacity: isServiceable ? 1.0 : 0.6,
+          child: Container(
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1.5),
+              boxShadow: [
+                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
+              ]
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 180,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      // Image on the left
-                      SizedBox(
-                        width: 120,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.network(
-                              salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
-                            ),
-                            if (salon['distance_km'] != null)
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
-                                  child: Text(
-                                    '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
-                                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              )
-                          ],
-                        ),
+                      Image.network(
+                        salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40)),
                       ),
-                      // Details on the right
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      salon['name'] ?? 'Unnamed Salon',
-                                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (count > 0) ...[
-                                    Icon(Icons.star, size: 14, color: AppTheme.starRating),
-                                    SizedBox(width: 4),
-                                    Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: headingColor, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  ] else
-                                    Text('New', style: GoogleFonts.outfit(color: bodyColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                              SizedBox(height: 6),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.location_on_outlined, size: 14, color: bodyColor),
-                                  SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      salon['address'] ?? 'No address',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(color: bodyColor, fontSize: 13)
-                                    )
-                                  ),
-                                ],
-                              ),
-                              Expanded(
-                                child: Center(
-                                  child: Divider(color: borderColor, thickness: 1, height: 1),
-                                ),
-                              ),
-                              if (!isServiceable)
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    salon['unavailable_reason'] ?? 'Not taking bookings',
-                                    style: GoogleFonts.outfit(color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning, fontSize: 11, fontWeight: FontWeight.w600),
-                                  ),
-                                )
-                              else
-                                Text(
-                                  'Tap to view services \u2192',
-                                  style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.w600),
-                                ),
-                            ],
+                      if (salon['distance_km'] != null)
+                        Positioned(
+                          bottom: 12,
+                          right: 12,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
+                            child: Text(
+                              '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
+                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
-                      )
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.darkSurface.withOpacity(0.9) : Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.favorite_border, size: 18, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              salon['name'] ?? 'Unnamed Salon',
+                              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: headingColor),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (count > 0) ...[
+                            Icon(Icons.star, size: 16, color: AppTheme.starRating),
+                            SizedBox(width: 4),
+                            Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: headingColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ] else
+                            Text('New', style: GoogleFonts.outfit(color: bodyColor, fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 16, color: bodyColor),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              salon['address'] ?? 'No address',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(color: bodyColor, fontSize: 14)
+                            )
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Divider(color: borderColor, thickness: 1, height: 1),
+                      SizedBox(height: 12),
+                      if (!isServiceable)
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            salon['unavailable_reason'] ?? 'Not taking bookings',
+                            style: GoogleFonts.outfit(color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        )
+                      else
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Tap to view services',
+                              style: GoogleFonts.outfit(color: bodyColor, fontSize: 13),
+                            ),
+                            Icon(Icons.arrow_forward_ios, size: 12, color: AppTheme.accentColor),
+                          ],
+                        ),
+                    ],
+                  ),
+                )
+              ],
             ),
-          );
-        }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactSalonCard(dynamic salon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final isServiceable = salon['is_serviceable'] != false;
+    final count = (salon['review_count'] as num?)?.toInt() ?? 0;
+    final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => SalonDetailScreen(salonId: salon['id'].toString())
+          ));
+        },
+        child: Opacity(
+          opacity: isServiceable ? 1.0 : 0.6,
+          child: Container(
+            height: 140, // increased height to accommodate the divider
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1.5),
+              boxShadow: [
+                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+              ]
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Image on the left
+                SizedBox(
+                  width: 120,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
+                      ),
+                      if (salon['distance_km'] != null)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
+                              style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        )
+                    ],
+                  ),
+                ),
+                // Details on the right
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                salon['name'] ?? 'Unnamed Salon',
+                                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (count > 0) ...[
+                              Icon(Icons.star, size: 14, color: AppTheme.starRating),
+                              SizedBox(width: 4),
+                              Text(avg.toStringAsFixed(1), style: GoogleFonts.outfit(color: headingColor, fontSize: 14, fontWeight: FontWeight.bold)),
+                            ] else
+                              Text('New', style: GoogleFonts.outfit(color: bodyColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: bodyColor),
+                            SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                salon['address'] ?? 'No address',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(color: bodyColor, fontSize: 13)
+                              )
+                            ),
+                          ],
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Divider(color: borderColor, thickness: 1, height: 1),
+                          ),
+                        ),
+                        if (!isServiceable)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              salon['unavailable_reason'] ?? 'Not taking bookings',
+                              style: GoogleFonts.outfit(color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning, fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          )
+                        else
+                          Text(
+                            'Tap to view services \u2192',
+                            style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                      ],
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
