@@ -142,4 +142,18 @@ class StaffApi {
       throw Exception('Failed to update leave status: ${response.body}');
     }
   }
+
+  static Future<Map<String, dynamic>> requestLeave(String salonId, Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/salons/$salonId/leaves'),
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to request leave: ${response.body}');
+    }
+  }
 }

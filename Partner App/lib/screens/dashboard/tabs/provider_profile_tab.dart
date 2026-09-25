@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../phone_screen.dart';
 import '../../../main.dart';
 import '../more/my_salary_screen.dart';
+import '../../../services/staff_api.dart';
 
 class ProviderProfileTab extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -64,76 +65,250 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
   }
 
   void _requestLeave(BuildContext context) {
+    DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
+    bool isFullDay = true;
+    TimeOfDay? startTime;
+    TimeOfDay? endTime;
+    String leaveType = 'unpaid';
+    final reasonController = TextEditingController();
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            top: 24, left: 24, right: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Request Time Off', 
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.onSurface)
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'From Date',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: const Icon(Icons.calendar_today, size: 18),
-                ),
-                readOnly: true,
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'To Date',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: const Icon(Icons.calendar_today, size: 18),
-                ),
-                readOnly: true,
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Reason for leave',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            Future<void> pickDate() async {
+              final picked = await showDatePicker(
+                context: ctx,
+                initialDate: selectedDate,
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null) {
+                setModalState(() => selectedDate = picked);
+              }
+            }
+
+            Future<void> pickTime(bool isStart) async {
+              final picked = await showTimePicker(
+                context: ctx,
+                initialTime: isStart 
+                    ? (startTime ?? const TimeOfDay(hour: 9, minute: 0))
+                    : (endTime ?? const TimeOfDay(hour: 17, minute: 0)),
+              );
+              if (picked != null) {
+                setModalState(() {
+                  if (isStart) startTime = picked;
+                  else endTime = picked;
+                });
+              }
+            }
+
+            Future<void> submitLeave() async {
+              if (!isFullDay && (startTime == null || endTime == null)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: const Text('Please select start and end time for partial day leave.'), backgroundColor: AppTheme.darkDanger),
+                );
+                return;
+              }
+              if (!isFullDay && startTime != null && endTime != null) {
+                final startMin = startTime!.hour * 60 + startTime!.minute;
+                final endMin = endTime!.hour * 60 + endTime!.minute;
+                if (endMin <= startMin) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: const Text('End time must be after start time.'), backgroundColor: AppTheme.darkDanger),
+                  );
+                  return;
+                }
+              }
+
+              setModalState(() => isSubmitting = true);
+              try {
+                final data = {
+                  'leave_date': DateFormat('yyyy-MM-dd').format(selectedDate),
+                  'leave_type': leaveType,
+                  'is_full_day': isFullDay,
+                  if (!isFullDay) 'start_time': '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
+                  if (!isFullDay) 'end_time': '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
+                  if (reasonController.text.isNotEmpty) 'reason': reasonController.text,
+                };
+                
+                final response = await StaffApi.requestLeave(widget.salon['id'], data);
+                
+                if (ctx.mounted) {
                   Navigator.pop(ctx);
+                  final isAutoApproved = response['auto_approved'] == true;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Leave request submitted successfully.'),
+                      content: Text(isAutoApproved ? 'Leave approved automatically.' : 'Leave requested successfully. Waiting for admin approval.'),
                       backgroundColor: AppTheme.accentColor,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Submit Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                }
+              } catch (e) {
+                setModalState(() => isSubmitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to submit leave: ${e.toString()}'), backgroundColor: AppTheme.darkDanger),
+                );
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                top: 24, left: 24, right: 24,
               ),
-              const SizedBox(height: 24),
-            ],
-          ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Request Time Off', 
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.onSurface)
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    GestureDetector(
+                      onTap: pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              DateFormat('EEEE, MMM d, yyyy').format(selectedDate),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const Icon(Icons.calendar_today, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Unpaid'),
+                            value: 'unpaid',
+                            groupValue: leaveType,
+                            onChanged: (val) => setModalState(() => leaveType = val!),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Paid'),
+                            value: 'paid',
+                            groupValue: leaveType,
+                            onChanged: (val) => setModalState(() => leaveType = val!),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SwitchListTile(
+                      title: const Text('Full Day Leave', style: TextStyle(fontWeight: FontWeight.w600)),
+                      value: isFullDay,
+                      onChanged: (val) => setModalState(() => isFullDay = val),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    
+                    if (!isFullDay) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => pickTime(true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Start Time', style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6))),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      startTime != null ? startTime!.format(context) : 'Select Time',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => pickTime(false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('End Time', style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6))),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      endTime != null ? endTime!.format(context) : 'Select Time',
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Reason for leave (Optional)',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: isSubmitting ? null : submitLeave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isSubmitting 
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Submit Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          }
         );
       },
     );
