@@ -189,21 +189,73 @@ class _ExploreTabState extends State<ExploreTab> {
           ),
         ),
       ),
-      floatingActionButton: _globalCart != null && (_globalCart!['items'] as List).isNotEmpty
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 95.0),
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (context) => CartScreen()
-                  )).then((_) => _loadSalons());
-                },
-                backgroundColor: AppTheme.accentColor,
-                icon: Icon(Icons.shopping_cart, color: Colors.white),
-                label: Text('View Cart (${_globalCart!['salon']?['name'] ?? 'Cart'})', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
+    );
+  }
+
+  /// The cart moved off the floating button and up into the header next to the
+  /// search field, so the salon list gets the full width it was sharing before.
+  ///
+  /// It stays put whether or not there is anything in it, so the icon reads as
+  /// part of the header rather than something that appears and vanishes.
+  Widget _buildCartButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final iconColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final count = ((_globalCart?['items'] as List?) ?? []).length;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(
+          builder: (context) => CartScreen()
+        )).then((_) => _loadSalons());
+      },
+      child: Container(
+        height: 50,
+        width: 50,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(100),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
             )
-          : null,
+          ]
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(
+              child: Icon(Icons.shopping_cart_rounded, color: iconColor, size: 22),
+            ),
+            if (count > 0)
+              Positioned(
+                top: 6,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error,
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isDark ? AppTheme.darkSurface : Colors.white,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: GoogleFonts.outfit(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -216,37 +268,51 @@ class _ExploreTabState extends State<ExploreTab> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        height: 50,
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: borderColor, width: 1.5),
-          boxShadow: [
-            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02), blurRadius: 10, offset: Offset(0, 2))
-          ]
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.search, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, size: 22),
-            SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.outfit(fontSize: 15, color: headingColor),
-                decoration: InputDecoration(
-                  hintText: 'Search salons or services...',
-                  hintStyle: GoogleFonts.outfit(color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, fontSize: 15),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
-                ),
-                onSubmitted: (_) => _navigateToSearch(),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 50,
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: BorderRadius.circular(100),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search_rounded, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, size: 22),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: GoogleFonts.outfit(fontSize: 15, color: headingColor),
+                      decoration: InputDecoration(
+                        hintText: 'Search salons or services...',
+                        hintStyle: GoogleFonts.outfit(color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, fontSize: 15),
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onSubmitted: (_) => _navigateToSearch(),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          SizedBox(width: 10),
+          _buildCartButton(),
+        ],
       ),
     );
   }

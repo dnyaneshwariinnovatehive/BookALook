@@ -614,21 +614,20 @@ class _HomeTabState extends State<HomeTab> {
             padding: const EdgeInsets.only(left: 16, right: 16),
             decoration: BoxDecoration(
               color: surfaceColor,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: borderColor, width: 1),
+              borderRadius: BorderRadius.circular(100),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.accentColor.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+                  color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                  blurRadius: 15,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Row(
               children: [
-                Icon(Icons.search,
-                    color: bodyColor, size: 18),
-                const SizedBox(width: 12),
+                Icon(Icons.search_rounded,
+                    color: bodyColor.withOpacity(0.7), size: 22),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _searchController,
@@ -639,9 +638,11 @@ class _HomeTabState extends State<HomeTab> {
                     decoration: InputDecoration(
                       hintText: 'Search salons, services...',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF9E98AE), // muted gray-purple
-                        fontSize: 14,
+                        color: bodyColor.withOpacity(0.5),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
                       ),
+                      filled: false,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -666,17 +667,14 @@ class _HomeTabState extends State<HomeTab> {
                 ? AppTheme.accentColor.withOpacity(0.1)
                 : surfaceColor,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: _selectedGender != 'All'
-                  ? AppTheme.accentColor
-                  : borderColor,
-              width: 1,
-            ),
+            border: _selectedGender != 'All'
+                ? Border.all(color: AppTheme.accentColor, width: 1.5)
+                : null,
             boxShadow: [
               BoxShadow(
-                color: AppTheme.accentColor.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -827,21 +825,26 @@ class _HomeTabState extends State<HomeTab> {
       width: double.infinity,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [
-            Color(0xFFEBE1FA),
-            Color(0xFFE8DBFA),
-            Color(0xFFE1CEF8),
-          ],
-          stops: [0.0, 0.5, 1.0],
+          colors: isDark 
+            ? [
+                const Color(0xFF3B2A56),
+                const Color(0xFF382650),
+                const Color(0xFF332047),
+              ]
+            : [
+                const Color(0xFFEDE4FF),
+                const Color(0xFFE9DDFD),
+                const Color(0xFFE3D3FB),
+              ],
+          stops: const [0.0, 0.5, 1.0],
         ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppTheme.lightPurpleBorder, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.02),
+            color: isDark ? Colors.black.withOpacity(0.2) : AppTheme.accentColor.withOpacity(0.05),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -850,55 +853,71 @@ class _HomeTabState extends State<HomeTab> {
       child: Stack(
         children: [
           Positioned(
-            top: -30,
-            right: -30,
+            top: -50,
+            right: -50,
             child: Container(
-              width: 130,
-              height: 130,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFDCC6F6).withOpacity(0.7),
+                gradient: RadialGradient(
+                  colors: [
+                    isDark ? const Color(0xFF7451A4).withOpacity(0.35) : const Color(0xFFCBA4F2).withOpacity(0.45),
+                    isDark ? const Color(0xFF7451A4).withOpacity(0.0) : const Color(0xFFCBA4F2).withOpacity(0.0),
+                  ],
+                ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
-                    borderRadius: BorderRadius.circular(20),
+                    color: isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isDark ? AppTheme.accentColor.withOpacity(0.3) : AppTheme.accentColor.withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
-                  child: const Text(
-                    'YOUR NEXT APPOINTMENT',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_month_rounded, size: 12, color: AppTheme.accentColor),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'YOUR NEXT APPOINTMENT',
+                        style: TextStyle(
+                            color: AppTheme.accentColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Column(
                       children: [
                         Icon(Icons.calendar_today_outlined,
-                            size: 36,
-                            color: AppTheme.accentColor.withOpacity(0.3)),
-                        const SizedBox(height: 12),
+                            size: 48,
+                            color: isDark ? AppTheme.accentColor.withOpacity(0.4) : AppTheme.accentColor.withOpacity(0.25)),
+                        const SizedBox(height: 16),
                         Text(
                           widget.isGuest
                               ? 'Sign in to see your appointments'
                               : 'No upcoming appointments',
                           style: TextStyle(
-                              color: bodyColor,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14),
+                              color: isDark ? Colors.white70 : const Color(0xFF756A8F),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16),
                         ),
                       ],
                     ),
@@ -923,6 +942,7 @@ class _HomeTabState extends State<HomeTab> {
 
     final headingColor = AppTheme.lightTextHeading;
     final bodyColor = AppTheme.lightTextBody;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
@@ -950,16 +970,21 @@ class _HomeTabState extends State<HomeTab> {
       ),
       child: Stack(
         children: [
-          // Decorative circle in upper-right corner
+          // Decorative glow in upper-right corner
           Positioned(
-            top: -30,
-            right: -30,
+            top: -50,
+            right: -50,
             child: Container(
-              width: 130,
-              height: 130,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFDCC6F6).withOpacity(0.7),
+                gradient: RadialGradient(
+                  colors: [
+                    isDark ? const Color(0xFF7451A4).withOpacity(0.35) : const Color(0xFFCBA4F2).withOpacity(0.45),
+                    isDark ? const Color(0xFF7451A4).withOpacity(0.0) : const Color(0xFFCBA4F2).withOpacity(0.0),
+                  ],
+                ),
               ),
             ),
           ),
@@ -971,19 +996,29 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 // Status pill
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
-                    borderRadius: BorderRadius.circular(20),
+                    color: isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.accentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isDark ? AppTheme.accentColor.withOpacity(0.3) : AppTheme.accentColor.withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
-                  child: const Text(
-                    'YOUR NEXT APPOINTMENT',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_month_rounded, size: 12, color: AppTheme.accentColor),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'YOUR NEXT APPOINTMENT',
+                        style: TextStyle(
+                            color: AppTheme.accentColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),

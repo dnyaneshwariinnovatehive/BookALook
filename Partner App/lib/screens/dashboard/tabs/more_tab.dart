@@ -15,6 +15,7 @@ import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../notifications_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
+import '../more/edit_salon_profile_screen.dart';
 
 class MoreTab extends StatelessWidget {
   final Map<String, dynamic> salonData;
@@ -71,8 +72,13 @@ class MoreTab extends StatelessWidget {
                     child: Container(
                       height: 120,
                       color: isDark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor,
-                      // Placeholder for actual salon image
-                      child: Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                      child: salonData['cover_image'] != null
+                          ? Image.network(
+                              salonData['cover_image'],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                            )
+                          : Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                     ),
                   ),
                   Padding(
@@ -83,7 +89,7 @@ class MoreTab extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(salonData['name']?.toString() ?? 'Salon Name', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              Text(salonData['name']?.toString() ?? 'Salon Name', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Text(salonData['city']?['name']?.toString() ?? 'City not specified', style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color)),
                             ],
@@ -91,10 +97,9 @@ class MoreTab extends StatelessWidget {
                         ),
                         GestureDetector(
                           onTap: () {
-                            // Link to Location screen as it's the only editable salon info right now
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonData['id'].toString())),
+                              MaterialPageRoute(builder: (context) => EditSalonProfileScreen(salonData: salonData)),
                             );
                           },
                           child: Container(
@@ -103,7 +108,7 @@ class MoreTab extends StatelessWidget {
                               color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text('Edit', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
+                            child: const Text('Edit', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
                           ),
                         )
                       ],

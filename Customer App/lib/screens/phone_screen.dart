@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_haptics.dart';
 
 class PhoneScreen extends StatefulWidget {
   final bool isModal;
@@ -35,6 +36,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
     if (mounted) setState(() => _isLoading = false);
 
     if (result == 'success') {
+      AppHaptics.success();
       final loggedIn = await Navigator.push<bool>(
         context,
         MaterialPageRoute(builder: (context) => OtpScreen(phone: phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
@@ -43,6 +45,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
         if (mounted) Navigator.pop(context, true);
       }
     } else {
+      AppHaptics.error();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: $result')),
       );
@@ -84,22 +87,29 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   // Login / Sign Up Toggle
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).dividerColor.withOpacity(0.7),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.darkSurface
+                          : const Color(0xFFF3F0FF),
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    padding: EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(4),
                     child: Row(
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _isLogin = true),
+                            onTap: () {
+                              AppHaptics.selectionClick();
+                              setState(() => _isLogin = true);
+                            },
                             child: Container(
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _isLogin ? Theme.of(context).colorScheme.surface : Colors.transparent,
+                                color: _isLogin 
+                                    ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: _isLogin
-                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
                                     : [],
                               ),
                               child: Text(
@@ -107,7 +117,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: _isLogin ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                  color: _isLogin 
+                                      ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
+                                      : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                                 ),
                               ),
                             ),
@@ -115,14 +127,19 @@ class _PhoneScreenState extends State<PhoneScreen> {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => _isLogin = false),
+                            onTap: () {
+                              AppHaptics.selectionClick();
+                              setState(() => _isLogin = false);
+                            },
                             child: Container(
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: !_isLogin ? Theme.of(context).colorScheme.surface : Colors.transparent,
+                                color: !_isLogin 
+                                    ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(26),
                                 boxShadow: !_isLogin
-                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
                                     : [],
                               ),
                               child: Text(
@@ -130,7 +147,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: !_isLogin ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                  color: !_isLogin 
+                                      ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
+                                      : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                                 ),
                               ),
                             ),
@@ -174,7 +193,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
 
                 // Continue Button
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _sendOtp,
+                  onPressed: _isLoading ? null : () {
+                    AppHaptics.lightImpact();
+                    _sendOtp();
+                  },
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: Theme.of(context).colorScheme.primary,
@@ -202,7 +224,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     children: [
                       Text('New to BookALook? ', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
                       GestureDetector(
-                        onTap: () => setState(() => _isLogin = false),
+                        onTap: () {
+                          AppHaptics.selectionClick();
+                          setState(() => _isLogin = false);
+                        },
                         child: Text(
                           'Register',
                           style: TextStyle(
@@ -222,6 +247,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 Center(
                   child: TextButton.icon(
                     onPressed: () {
+                      AppHaptics.lightImpact();
                       if (widget.isModal) {
                         Navigator.pop(context, false);
                       } else {

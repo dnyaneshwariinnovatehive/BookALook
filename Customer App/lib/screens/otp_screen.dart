@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'main_screen.dart';
 import 'profile_screen.dart';
+import '../utils/app_haptics.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -22,6 +23,7 @@ class _OtpScreenState extends State<OtpScreen> {
   void _verifyOtp() async {
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
+      AppHaptics.error();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('OTP must be exactly 6 characters')),
       );
@@ -34,6 +36,7 @@ class _OtpScreenState extends State<OtpScreen> {
       final result = await _authService.verifyOtp(widget.phone, otp);
 
       if (result == true) {
+        AppHaptics.success();
         if (widget.isModal) {
           Navigator.pop(context, true);
         } else {
@@ -52,11 +55,13 @@ class _OtpScreenState extends State<OtpScreen> {
           if (mounted) Navigator.pop(context, true);
         }
       } else {
+        AppHaptics.error();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Invalid OTP. Please try again.')),
         );
       }
     } catch (e) {
+      AppHaptics.error();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An error occurred. Please try again.')),
       );
@@ -99,7 +104,10 @@ class _OtpScreenState extends State<OtpScreen> {
             
             SizedBox(height: 32),
             ElevatedButton(
-              onPressed: _isLoading ? null : _verifyOtp,
+              onPressed: _isLoading ? null : () {
+                AppHaptics.lightImpact();
+                _verifyOtp();
+              },
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
               ),

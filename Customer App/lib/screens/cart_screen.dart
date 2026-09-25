@@ -7,6 +7,7 @@ import 'phone_screen.dart';
 import '../widgets/cart_offers.dart';
 import 'checkout_screen.dart';
 import 'main_screen.dart';
+import '../utils/app_haptics.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -57,9 +58,11 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _isAdding = true);
 
     try {
+      AppHaptics.lightImpact();
       await _cartService.addItem(salonId, serviceId);
       await _loadCart();
     } catch (e) {
+      AppHaptics.error();
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isAdding = false);
@@ -73,11 +76,13 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _isAdding = true);
 
     try {
+      AppHaptics.lightImpact();
       for (final id in serviceIds) {
         await _cartService.addItem(salonId, id);
       }
       await _loadCart();
     } catch (e) {
+      AppHaptics.error();
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isAdding = false);
@@ -91,9 +96,12 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _removeItem(String itemId) async {
     try {
+      AppHaptics.lightImpact();
       await _cartService.removeItem(itemId);
+      AppHaptics.mediumImpact();
       _loadCart(); // Reload cart after removing item
     } catch (e) {
+      AppHaptics.error();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to remove item: $e', style: AppTheme.lightTheme.snackBarTheme.contentTextStyle)),
       );
@@ -383,6 +391,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                AppHaptics.lightImpact();
                 final token = await AuthService.getToken();
                 if (token == null || token.isEmpty) {
                   final loggedIn = await Navigator.of(context, rootNavigator: true).push<bool>(

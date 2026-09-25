@@ -7,6 +7,7 @@ import '../widgets/tab_navigator.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
+import '../utils/app_haptics.dart';
 import 'tabs/favourites_tab.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
@@ -62,6 +63,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onTabTapped(int index) {
+    AppHaptics.selectionClick();
     if (index == 2 && !widget.isGuest) {
       _bookingsKey.currentState?.loadBookings();
     }

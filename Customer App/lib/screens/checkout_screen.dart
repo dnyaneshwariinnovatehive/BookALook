@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../utils/app_haptics.dart';
 
 /// Sentinel provider key for the "Any Available" option.
 const String _kAnyProvider = '__any__';
@@ -179,6 +180,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _selectProvider(String key) {
+    AppHaptics.selectionClick();
     setState(() {
       _selectedProviderKey = key;
       _selectedTime = null;
@@ -203,6 +205,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (date != null) {
+      AppHaptics.selectionClick();
       setState(() => _selectedDate = date);
       _fetchSlots();
     }
@@ -246,6 +249,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             actions: [
               TextButton(
                 onPressed: () {
+                  AppHaptics.lightImpact();
                   Navigator.pop(dialogContext);
                   _appointmentService.abandonPayment(appointmentId);
                   _pendingPaymentAppointmentId = null;
@@ -254,6 +258,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
+                  AppHaptics.lightImpact();
                   Navigator.pop(dialogContext);
                   setState(() => _isBooking = true);
                   try {
@@ -281,6 +286,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _razorpay.open(options);
       }
     } catch (e) {
+      AppHaptics.error();
       setState(() => _isBooking = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
       // The slot may have been taken while the customer was deciding.
@@ -290,6 +296,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _showSuccessDialog() {
     if (!mounted) return;
+    AppHaptics.success();
 
     showDialog(
       context: context,
@@ -624,8 +631,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               // Greying a block is only a preview of the span — tapping a free
               // one still moves the start time there.
               onTap: isAvailable
-                  ? () => setState(() => _selectedTime = slot['time'])
-                  : () => _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}'),
+                  ? () {
+                      AppHaptics.selectionClick();
+                      setState(() => _selectedTime = slot['time']);
+                    }
+                  : () {
+                      AppHaptics.error();
+                      _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                    },
               child: Container(
                 width: (MediaQuery.of(context).size.width - 64) / 3,
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -702,7 +715,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: canBook ? _bookAppointment : null,
+                onPressed: canBook ? () {
+                  AppHaptics.lightImpact();
+                  _bookAppointment();
+                } : null,
                 style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
                   padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
                 ),

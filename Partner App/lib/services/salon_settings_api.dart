@@ -50,4 +50,32 @@ class SalonSettingsApi {
       throw Exception('Failed to update working hours: ${response.body}');
     }
   }
+
+  static Future<void> updateSalonProfile({
+    required String salonId,
+    required String name,
+    required String phone,
+    required String description,
+    String? imagePath,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/salons/$salonId'),
+    )..headers.addAll(await _getHeaders());
+
+    request.fields['_method'] = 'PUT'; // Common convention for multipart PUT in PHP/Laravel
+    request.fields['name'] = name;
+    request.fields['phone'] = phone;
+    request.fields['description'] = description;
+
+    if (imagePath != null) {
+      request.files.add(await http.MultipartFile.fromPath('cover_image', imagePath));
+    }
+
+    final response = await request.send();
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final bodyStr = await response.stream.bytesToString();
+      throw Exception('Failed to update salon profile: $bodyStr');
+    }
+  }
 }

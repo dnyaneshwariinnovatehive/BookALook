@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../utils/app_haptics.dart';
 
 /// Sentinel provider key for the "Any Available" option.
 const String _kAnyProvider = '__any__';
@@ -134,6 +135,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     );
 
     if (date != null) {
+      AppHaptics.selectionClick();
       setState(() => _selectedDate = date);
       _fetchSlots();
     }
@@ -156,8 +158,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       if (!mounted) return;
       setState(() => _isSaving = false);
       Navigator.pop(context, true);
+      AppHaptics.mediumImpact();
       _showMessage(result['message'] ?? 'Appointment rescheduled.');
     } catch (e) {
+      AppHaptics.error();
       setState(() => _isSaving = false);
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
       _fetchSlots(); // the slot may have been taken meanwhile
@@ -328,13 +332,17 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         borderRadius: BorderRadius.circular(14),
         onTap: isEligible
             ? () {
+                AppHaptics.selectionClick();
                 setState(() {
                   _selectedProviderKey = key;
                   _selectedTime = null;
                 });
                 _fetchSlots();
               }
-            : () => _showMessage('$name cannot perform every service in this booking.'),
+            : () {
+                AppHaptics.error();
+                _showMessage('$name cannot perform every service in this booking.');
+              },
         child: Opacity(
           opacity: isEligible ? 1.0 : 0.5,
           child: Container(
@@ -387,7 +395,12 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     return Opacity(
       opacity: enabled ? 1.0 : 0.5,
       child: InkWell(
-        onTap: enabled ? _pickDate : () => _showMessage('Choose a service provider first.'),
+        onTap: enabled
+            ? _pickDate
+            : () {
+                AppHaptics.error();
+                _showMessage('Choose a service provider first.');
+              },
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           decoration: BoxDecoration(
@@ -448,8 +461,14 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
             return InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: isAvailable
-                  ? () => setState(() => _selectedTime = slot['time'])
-                  : () => _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}'),
+                  ? () {
+                      AppHaptics.selectionClick();
+                      setState(() => _selectedTime = slot['time']);
+                    }
+                  : () {
+                      AppHaptics.error();
+                      _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                    },
               child: Container(
                 width: (MediaQuery.of(context).size.width - 64) / 3,
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -509,7 +528,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: canSave ? _confirm : null,
+            onPressed: canSave ? () {
+              AppHaptics.lightImpact();
+              _confirm();
+            } : null,
             style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
               padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
             ),

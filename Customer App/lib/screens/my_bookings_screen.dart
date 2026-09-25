@@ -384,17 +384,22 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
         ),
         child: Stack(
           children: [
-            // Decorative circle in upper-right corner
+            // Decorative glow in upper-right corner
             if (!isDark)
               Positioned(
-                top: -30,
-                right: -30,
+                top: -50,
+                right: -50,
                 child: Container(
-                  width: 130,
-                  height: 130,
+                  width: 180,
+                  height: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFE4D0FA).withOpacity(0.7),
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFCBA4F2).withOpacity(0.45),
+                        const Color(0xFFCBA4F2).withOpacity(0.0),
+                      ],
+                    ),
                   ),
                 ),
               ),

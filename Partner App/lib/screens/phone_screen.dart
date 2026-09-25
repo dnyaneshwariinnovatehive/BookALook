@@ -77,7 +77,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 // Login / Sign Up Toggle
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.darkSurface
+                        : const Color(0xFFF3F0FF),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   padding: const EdgeInsets.all(4),
@@ -89,10 +91,12 @@ class _PhoneScreenState extends State<PhoneScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: _isLogin ? Colors.white : Colors.transparent,
+                              color: _isLogin 
+                                  ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(26),
                               boxShadow: _isLogin
-                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
                                   : [],
                             ),
                             child: Text(
@@ -100,7 +104,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: _isLogin ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
+                                color: _isLogin 
+                                    ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
+                                    : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                               ),
                             ),
                           ),
@@ -114,10 +120,12 @@ class _PhoneScreenState extends State<PhoneScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: !_isLogin ? Colors.white : Colors.transparent,
+                              color: !_isLogin 
+                                  ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(26),
                               boxShadow: !_isLogin
-                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: Offset(0, 2))]
+                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
                                   : [],
                             ),
                             child: Text(
@@ -125,7 +133,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: !_isLogin ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
+                                color: !_isLogin 
+                                    ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
+                                    : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                               ),
                             ),
                           ),

@@ -9,6 +9,7 @@ import 'cart_screen.dart';
 import 'salon_reviews_screen.dart';
 import '../widgets/cart_offers.dart';
 import '../widgets/rating_bars.dart';
+import '../utils/app_haptics.dart';
 
 class SalonDetailScreen extends StatefulWidget {
   final String salonId;
@@ -95,12 +96,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     try {
       final isFavourited = await _salonService.toggleFavourite(widget.salonId);
       if (!mounted) return;
+      AppHaptics.lightImpact();
       setState(() {
         _isFavourited = isFavourited;
       });
       _showMessage(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites');
     } catch (e) {
       if (!mounted) return;
+      AppHaptics.error();
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
@@ -127,6 +130,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
       if (!mounted) return;
 
+      AppHaptics.lightImpact();
       setState(() => _cart = cart);
 
       // The moment after adding is when a package nudge is worth anything, so
@@ -136,6 +140,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       }
     } on CartConflictException catch (e) {
       if (!mounted) return;
+      AppHaptics.error();
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -147,11 +152,15 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: () {
+                AppHaptics.lightImpact();
+                Navigator.pop(ctx);
+              },
               child: Text('Cancel', style: GoogleFonts.outfit(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
             ),
             ElevatedButton(
               onPressed: () async {
+                AppHaptics.lightImpact();
                 Navigator.pop(ctx);
                 await _cartService.clearGlobalCart();
                 _addToCart(serviceId: serviceId, comboId: comboId, label: label);
@@ -163,6 +172,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }

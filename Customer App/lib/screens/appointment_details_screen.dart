@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../utils/app_haptics.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
 import '../widgets/rating_bars.dart';
@@ -41,6 +42,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   }
 
   Future<void> _confirmCancel() async {
+    AppHaptics.lightImpact();
     final refundable = _toDouble(_booking['refundable_advance']);
     final forfeited = _toDouble(_booking['forfeited_advance']);
     final advance = _toDouble(_booking['advance_paid']);
@@ -83,11 +85,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
             child: Text('Keep booking', style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, true);
+            },
             child: Text('Cancel booking',
                 style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontWeight: FontWeight.bold)),
           ),
@@ -105,6 +113,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _showMessage(refunded > 0
           ? 'Booking cancelled. ₹${refunded.toStringAsFixed(2)} will be refunded.'
           : 'Booking cancelled.');
+      AppHaptics.mediumImpact();
 
       final requirement = result['payment_requirement'];
       if (requirement != null && requirement['full_upfront'] == true) {
@@ -117,6 +126,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       _hasChanges = true;
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
+      AppHaptics.error();
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
