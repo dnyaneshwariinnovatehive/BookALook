@@ -231,7 +231,6 @@ class StaffManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'leave_date' => 'required|date|after_or_equal:today',
-            'leave_type' => 'required|in:paid,unpaid',
             'is_full_day' => 'boolean',
             'start_time' => 'nullable|date_format:H:i:s|required_if:is_full_day,false',
             'end_time' => 'nullable|date_format:H:i:s|required_if:is_full_day,false|after:start_time',
@@ -253,11 +252,21 @@ class StaffManagementController extends Controller
 
         $isFullDay = $request->boolean('is_full_day', true);
         $autoApprove = (bool) $provider->auto_approve_leave;
+        
+        $year = date('Y', strtotime($request->leave_date));
+        $usedPaidLeaves = ProviderLeave::where('provider_id', $provider->id)
+            ->where('leave_type', 'paid')
+            ->whereYear('leave_date', $year)
+            ->whereIn('status', [ProviderLeave::STATUS_PENDING, ProviderLeave::STATUS_APPROVED])
+            ->count();
+            
+        $allowance = $provider->paid_leave_allowance ?? 0;
+        $leaveType = ($usedPaidLeaves < $allowance) ? 'paid' : 'unpaid';
 
         $leave = ProviderLeave::create([
             'provider_id' => $provider->id,
             'leave_date' => $request->leave_date,
-            'leave_type' => $request->leave_type,
+            'leave_type' => $leaveType,
             'is_full_day' => $isFullDay,
             'start_time' => $isFullDay ? null : $request->start_time,
             'end_time' => $isFullDay ? null : $request->end_time,

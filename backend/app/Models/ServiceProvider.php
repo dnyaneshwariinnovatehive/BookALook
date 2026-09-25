@@ -19,12 +19,14 @@ class ServiceProvider extends Model
         'base_salary',
         'commission_percentage',
         'auto_approve_leave',
+        'paid_leave_allowance',
         'is_active',
         'joined_at',
     ];
 
     protected $casts = [
         'auto_approve_leave' => 'boolean',
+        'paid_leave_allowance' => 'integer',
         'is_active' => 'boolean',
         'base_salary' => 'decimal:2',
         'commission_percentage' => 'decimal:2',

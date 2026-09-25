@@ -156,4 +156,19 @@ class StaffApi {
       throw Exception('Failed to request leave: ${response.body}');
     }
   }
+
+  static Future<List<ProviderLeave>> fetchMyLeaves(String salonId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/salons/$salonId/my-leaves'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final List<dynamic> data = jsonResponse['leaves'];
+      return data.map((json) => ProviderLeave.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to fetch my leaves: ${response.body}');
+    }
+  }
 }

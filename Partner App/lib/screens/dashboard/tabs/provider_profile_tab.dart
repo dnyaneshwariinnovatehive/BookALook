@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../phone_screen.dart';
 import '../../../main.dart';
 import '../more/my_salary_screen.dart';
+import '../more/provider_leaves_screen.dart';
 import '../../../services/staff_api.dart';
 
 class ProviderProfileTab extends StatefulWidget {
@@ -599,7 +600,14 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
 
                 // Time Off Section
                 GestureDetector(
-                  onTap: () => _requestLeave(context),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProviderLeavesScreen(salon: widget.salon),
+                      ),
+                    );
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -623,12 +631,12 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Request Time Off',
+                                'My Leaves',
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Apply for a leave or vacation',
+                                'View leaves and apply for time off',
                                 style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                               ),
                             ],
