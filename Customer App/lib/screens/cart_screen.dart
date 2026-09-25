@@ -233,7 +233,7 @@ class _CartScreenState extends State<CartScreen> {
             border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.03),
                 blurRadius: 16,
                 offset: Offset(0, 4),
               ),
@@ -335,7 +335,7 @@ class _CartScreenState extends State<CartScreen> {
         boxShadow: [
           if (!isDark)
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
               offset: Offset(0, -6),
               blurRadius: 24,
             )

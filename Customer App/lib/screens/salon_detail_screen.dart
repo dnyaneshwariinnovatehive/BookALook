@@ -384,7 +384,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.35),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
             shape: BoxShape.circle,
           ),
           child: IconButton(
@@ -399,7 +399,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: Container(
             width: 44,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -415,7 +415,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: Container(
             width: 44,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.35),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -515,7 +515,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Widget _glassChip(String text) => Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.45),
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(text,
@@ -1308,7 +1308,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         border: isDark ? Border(top: BorderSide(color: AppTheme.darkBorder)) : null,
         boxShadow: [
           if (!isDark)
-            BoxShadow(color: Colors.black.withOpacity(0.05), offset: Offset(0, -4), blurRadius: 20),
+            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), offset: Offset(0, -4), blurRadius: 20),
         ],
       ),
       child: SafeArea(
@@ -1397,7 +1397,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       borderRadius: BorderRadius.circular(24),
       border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
       boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 16, offset: Offset(0, 4)),
+        BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 16, offset: Offset(0, 4)),
       ],
     );
   }

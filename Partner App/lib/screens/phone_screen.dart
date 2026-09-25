@@ -47,7 +47,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -67,7 +67,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   'Manage your salon, services, and staff seamlessly',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppTheme.lightTextBody,
+                    color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -77,7 +77,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                 // Login / Sign Up Toggle
                 Container(
                   decoration: BoxDecoration(
-                    color: AppTheme.lightBorder.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   padding: const EdgeInsets.all(4),
@@ -100,7 +100,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: _isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextBody,
+                                color: _isLogin ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                               ),
                             ),
                           ),
@@ -125,7 +125,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: !_isLogin ? AppTheme.lightTextHeading : AppTheme.lightTextBody,
+                                color: !_isLogin ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading) : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
                               ),
                             ),
                           ),
@@ -142,7 +142,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.lightTextHeading,
+                    color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -154,11 +154,11 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     hintText: 'Enter your mobile no.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
                     ),
                     filled: true,
                     fillColor: Theme.of(context).colorScheme.surface,
@@ -194,7 +194,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Don\'t have an account? ', style: TextStyle(color: AppTheme.lightTextBody)),
+                      Text('Don\'t have an account? ', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
                       GestureDetector(
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));

@@ -18,8 +18,8 @@ class SalonRegistrationController extends Controller
         $request->validate([
             // Owner Account Details
             'full_name' => 'required|string|max:150',
-            'email' => 'required|email|max:150|unique:users,email',
-            'phone_number' => 'required|string|max:15|unique:users,phone',
+            'email' => 'required|email|max:150',
+            'phone_number' => 'required|string|max:15',
             'password' => 'required|string|min:6',
             
             // Salon Details
@@ -46,14 +46,31 @@ class SalonRegistrationController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. Create the Admin User
-            $adminUser = User::create([
-                'role' => 'admin',
-                'name' => $request->full_name,
-                'email' => $request->email,
-                'phone' => $request->phone_number,
-                'password_hash' => Hash::make($request->password),
-            ]);
+            // 1. Find or Create the Admin User
+            $adminUser = User::where('email', $request->email)
+                ->orWhere('phone', $request->phone_number)
+                ->first();
+
+            if ($adminUser) {
+                if ($adminUser->role !== 'admin') {
+                    throw ValidationException::withMessages(['email' => 'This account exists but is not an admin account.']);
+                }
+                if (!Hash::check($request->password, $adminUser->password_hash)) {
+                    throw ValidationException::withMessages(['password' => 'Incorrect password for existing account.']);
+                }
+                // Verify both email and phone match the existing account to prevent hijacking someone else's phone/email
+                if ($adminUser->email !== $request->email || $adminUser->phone !== $request->phone_number) {
+                    throw ValidationException::withMessages(['email' => 'Email and phone number do not match the existing account.']);
+                }
+            } else {
+                $adminUser = User::create([
+                    'role' => 'admin',
+                    'name' => $request->full_name,
+                    'email' => $request->email,
+                    'phone' => $request->phone_number,
+                    'password_hash' => Hash::make($request->password),
+                ]);
+            }
 
             // 2. Format Address & Description
             $fullAddress = $request->street_address;

@@ -220,7 +220,7 @@ class _ExploreTabState extends State<ExploreTab> {
           borderRadius: BorderRadius.circular(25),
           border: Border.all(color: borderColor, width: 1.5),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: Offset(0, 2))
+            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02), blurRadius: 10, offset: Offset(0, 2))
           ]
         ),
         child: Row(
@@ -275,7 +275,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: borderColor, width: 1.5),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
+                    BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
                   ]
                 ),
                 child: Row(
@@ -311,7 +311,7 @@ class _ExploreTabState extends State<ExploreTab> {
                   width: 1.5,
                 ),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
                 ]
               ),
               child: Text(
@@ -397,7 +397,7 @@ class _ExploreTabState extends State<ExploreTab> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
                 ]
               ),
               child: Column(
@@ -418,7 +418,7 @@ class _ExploreTabState extends State<ExploreTab> {
                             right: 8,
                             child: Container(
                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
+                              decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
                               child: Text(
                                 '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
                                 style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
@@ -495,7 +495,7 @@ class _ExploreTabState extends State<ExploreTab> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: borderColor, width: 1.5),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                      BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
                     ]
                   ),
                   child: Row(
@@ -518,7 +518,7 @@ class _ExploreTabState extends State<ExploreTab> {
                                 left: 8,
                                 child: Container(
                                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
+                                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
                                   child: Text(
                                     '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
                                     style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),

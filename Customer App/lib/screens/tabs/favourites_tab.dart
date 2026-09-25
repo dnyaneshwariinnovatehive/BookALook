@@ -127,7 +127,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                 shape: BoxShape.circle,
                                 border: Border.all(color: borderColor),
                                 boxShadow: [
-                                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 12, offset: Offset(0, 4))
+                                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02), blurRadius: 12, offset: Offset(0, 4))
                                 ]
                               ),
                               child: Icon(Icons.favorite_border, size: 64, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
@@ -192,7 +192,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(color: borderColor),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                                    BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
                                   ]
                                 ),
                                 child: Column(
@@ -213,7 +213,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                               left: 8,
                                               child: Container(
                                                 padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
+                                                decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
                                                 child: Text(
                                                   '${salon['distance_km']} km',
                                                   style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
@@ -231,7 +231,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                                   color: isDark ? AppTheme.darkSurface : Colors.white,
                                                   shape: BoxShape.circle,
                                                   boxShadow: [
-                                                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: Offset(0, 2))
+                                                    BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), blurRadius: 4, offset: Offset(0, 2))
                                                   ]
                                                 ),
                                                 child: Icon(Icons.favorite, size: 16, color: AppTheme.lightDanger),

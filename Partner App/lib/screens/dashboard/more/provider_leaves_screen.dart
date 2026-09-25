@@ -172,7 +172,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isDark ? AppTheme.darkCardColor : AppTheme.lightCardColor,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
                       ),
@@ -213,7 +213,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isDark ? AppTheme.darkCardColor : AppTheme.lightCardColor,
+                                color: Theme.of(context).cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
                               ),
@@ -235,7 +235,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isDark ? AppTheme.darkCardColor : AppTheme.lightCardColor,
+                                color: Theme.of(context).cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
                               ),
@@ -291,7 +291,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'approved': return AppTheme.successColor;
+      case 'approved': return AppTheme.lightSuccess;
       case 'rejected': return AppTheme.darkDanger;
       case 'pending': return Colors.orange;
       default: return Colors.grey;
@@ -336,7 +336,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      color: isDark ? AppTheme.darkCardColor : AppTheme.lightCardColor,
+                      color: Theme.of(context).cardColor,
                       elevation: 1,
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -351,7 +351,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                                     Icon(Icons.calendar_today, size: 16, color: isDark ? Colors.grey[400] : Colors.grey[600]),
                                     const SizedBox(width: 8),
                                     Text(
-                                      DateFormat('MMM dd, yyyy').format(leave.leaveDate),
+                                      DateFormat('MMM dd, yyyy').format(DateTime.parse(leave.leaveDate)),
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                   ],
@@ -385,7 +385,7 @@ class _ProviderLeavesScreenState extends State<ProviderLeavesScreen> {
                                 const SizedBox(width: 8),
                                 _buildBadge(
                                   leave.leaveType.toUpperCase(),
-                                  leave.leaveType == 'paid' ? AppTheme.successColor : Colors.grey,
+                                  leave.leaveType == 'paid' ? AppTheme.lightSuccess : Colors.grey,
                                   isDark
                                 ),
                               ],

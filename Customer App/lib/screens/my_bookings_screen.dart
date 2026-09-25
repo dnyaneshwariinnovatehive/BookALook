@@ -206,7 +206,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                           color: isDark ? AppTheme.darkSurface : Colors.white,
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
                           ],
                         ),
                         indicatorSize: TabBarIndicatorSize.tab,

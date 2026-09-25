@@ -266,7 +266,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -351,7 +351,7 @@ class _ProfileTabState extends State<ProfileTab> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

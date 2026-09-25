@@ -116,7 +116,7 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
@@ -134,18 +134,18 @@ class _OtpScreenState extends State<OtpScreen> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.lightTextHeading,
+                  color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
                 ),
               ),
               const SizedBox(height: 8),
               RichText(
                 text: TextSpan(
-                  style: TextStyle(color: AppTheme.lightTextBody, fontSize: 16),
+                  style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody, fontSize: 16),
                   children: [
                     const TextSpan(text: 'Code sent to '),
                     TextSpan(
                       text: widget.phone,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
                     ),
                   ],
                 ),
@@ -171,7 +171,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppTheme.lightBorder),
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),

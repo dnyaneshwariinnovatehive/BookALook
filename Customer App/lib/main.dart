@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/splash_screen.dart';
 import 'services/deep_link_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 
 // Global notifier for theme mode
@@ -11,6 +12,15 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  
+  final prefs = await SharedPreferences.getInstance();
+  final isDark = prefs.getBool('isDark') ?? false;
+  themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+  
+  themeNotifier.addListener(() {
+    prefs.setBool('isDark', themeNotifier.value == ThemeMode.dark);
+  });
+
   // Started before the first frame so a QR scan that launched the app is
   // already waiting to be routed rather than arriving too late to matter.
   await DeepLinkService.instance.start();

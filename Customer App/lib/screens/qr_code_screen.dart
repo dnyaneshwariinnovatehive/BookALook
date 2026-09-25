@@ -140,7 +140,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       child: Column(

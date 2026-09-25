@@ -173,7 +173,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppTheme.lightBorder),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))
+              BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))
             ]
           ),
           child: Row(
