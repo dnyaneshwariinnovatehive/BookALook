@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import Icon from '@/components/admin/Icon';
+import {
+  Alert, Badge, Button, Card, DescriptionList, EmptyState, Field, IconButton, Modal, PageHeader,
+  Person, SearchInput, Segmented, Skeleton, StatCard, cx, formatINR, localISODate, ui, useConfirm,
+} from '@/components/admin/ui';
 import styles from './page.module.css';
 
 /**
@@ -15,6 +20,8 @@ import styles from './page.module.css';
  * control for it stays locked until the money is settled.
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- plans/salons come back as untyped JSON */
+
 const SUBSCRIPTION = 'subscription';
 const COMMISSION = 'commission';
 
@@ -24,6 +31,47 @@ const modelLabel = (model: string) =>
 const pct = (value: number | null) =>
   value === null || value === undefined ? '—' : `${Number(value)}%`;
 
+const EMPTY_PLAN = {
+  name: '',
+  price: '',
+  whatsapp_campaign_limit: '',
+  has_customer_segmentation: false,
+  has_service_based_targeting: false,
+  has_high_value_targeting: false,
+  has_advanced_insights: false,
+  has_upsell_recommendations: 'none',
+  has_cross_sell_recommendations: 'none',
+  has_priority_visibility: false,
+  is_active: true,
+  validity_days: '30',
+};
+
+type PlanForm = typeof EMPTY_PLAN;
+
+const FEATURE_FLAGS: { key: keyof PlanForm; label: string }[] = [
+  { key: 'has_customer_segmentation', label: 'Customer segmentation' },
+  { key: 'has_service_based_targeting', label: 'Service-based targeting' },
+  { key: 'has_high_value_targeting', label: 'High-value targeting' },
+  { key: 'has_advanced_insights', label: 'Advanced insights' },
+  { key: 'has_priority_visibility', label: 'Priority visibility' },
+];
+
+const LEVEL_LABEL: Record<string, string> = { none: 'None', basic: 'Basic', advanced: 'Advanced' };
+
+/** Days from today until a Y-m-d date (negative once it has passed). */
+const daysUntil = (ymd?: string | null) => {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split('-').map(Number);
+  const [ty, tm, td] = localISODate().split('-').map(Number);
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000);
+};
+
+const fmtDay = (ymd?: string | null) => {
+  if (!ymd) return '—';
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [salons, setSalons] = useState<any[]>([]);
@@ -32,25 +80,14 @@ export default function SubscriptionsPage() {
   const [subscriptionRequests, setSubscriptionRequests] = useState<any[]>([]);
   const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   // Form State for Creating/Editing Plans
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [planFormData, setPlanFormData] = useState({
-    name: '',
-    price: '',
-    whatsapp_campaign_limit: '',
-    has_customer_segmentation: false,
-    has_service_based_targeting: false,
-    has_high_value_targeting: false,
-    has_advanced_insights: false,
-    has_upsell_recommendations: 'none',
-    has_cross_sell_recommendations: 'none',
-    has_priority_visibility: false,
-    is_active: true,
-    validity_days: '30',
-  });
+  const [planFormData, setPlanFormData] = useState<PlanForm>(EMPTY_PLAN);
 
   // Form State for putting a salon on one of the two arrangements
   const [assigningSalon, setAssigningSalon] = useState<any>(null);
@@ -66,22 +103,23 @@ export default function SubscriptionsPage() {
   const [blockingPayouts, setBlockingPayouts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Salon detail popup — the ⓘ button runs this off the full salon endpoint.
+  // Salon detail popup — runs off the full salon endpoint.
   const [infoSalon, setInfoSalon] = useState<any>(null);
   const [infoLoading, setInfoLoading] = useState(false);
   const [salonSearch, setSalonSearch] = useState('');
   const [salonFilterModel, setSalonFilterModel] = useState('');
   const [salonSort, setSalonSort] = useState('name_asc');
 
+  // Success notes fade on their own; errors stay until dismissed.
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (banner?.kind !== 'ok') return;
+    const t = setTimeout(() => setBanner(null), 6000);
+    return () => clearTimeout(t);
+  }, [banner]);
 
-  const authHeaders = (): Record<string, string> => {
-    return {
-      'Content-Type': 'application/json',
-    };
-  };
+  const authHeaders = (): Record<string, string> => ({
+    'Content-Type': 'application/json',
+  });
 
   const purchasablePlans = plans.filter((p) => !p.is_commission_plan);
 
@@ -90,30 +128,41 @@ export default function SubscriptionsPage() {
       const res = await fetch('/api/proxy/superadmin/subscriptions/plans', { headers: authHeaders() });
       const data = await res.json();
       if (data.success) {
-        setPlans(data.plans);
-        setSalons(data.salons);
+        setLoadError('');
+        const planList = Array.isArray(data.plans) ? data.plans : [];
+        setPlans(planList);
+        setSalons(Array.isArray(data.salons) ? data.salons : []);
         setCommissionPlanId(data.commission_plan_id ?? null);
         setGraceDays(data.commission_grace_days ?? 7);
 
-        const sellable = data.plans.filter((p: any) => !p.is_commission_plan);
+        const sellable = planList.filter((p: any) => !p.is_commission_plan);
         if (sellable.length > 0) setSelectedPlanId(sellable[0].id);
+      } else {
+        setLoadError(data.message || 'Could not load plans.');
       }
 
       const reqRes = await fetch('/api/proxy/superadmin/subscription-requests', { headers: authHeaders() });
       const reqData = await reqRes.json();
       if (reqData.success) {
-        setSubscriptionRequests(reqData.requests);
+        setSubscriptionRequests(Array.isArray(reqData.requests) ? reqData.requests : []);
       }
     } catch (e) {
       console.error(e);
+      setLoadError('Could not reach the server.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch the full salon record and pop the details dialog. The list row only
-  // carries subscription-scoped fields, so we go back to the salon endpoint for
-  // address, contact, city, staff and service counts.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is only set after the network responds
+    fetchData();
+    // Load once on mount; fetchData is re-called explicitly after every change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The list row only carries subscription-scoped fields, so we go back to the
+  // salon endpoint for address, contact, city, staff and service counts.
   const openSalonInfo = async (salon: any) => {
     setInfoSalon({ ...salon, detail: null });
     setInfoLoading(true);
@@ -134,38 +183,25 @@ export default function SubscriptionsPage() {
 
   const openCreateModal = () => {
     setEditingPlanId(null);
-    setPlanFormData({
-      name: '',
-      price: '',
-      whatsapp_campaign_limit: '',
-      has_customer_segmentation: false,
-      has_service_based_targeting: false,
-      has_high_value_targeting: false,
-      has_advanced_insights: false,
-      has_upsell_recommendations: 'none',
-      has_cross_sell_recommendations: 'none',
-      has_priority_visibility: false,
-      is_active: true,
-      validity_days: '30',
-    });
+    setPlanFormData(EMPTY_PLAN);
     setIsPlanModalOpen(true);
   };
 
   const openEditModal = (plan: any) => {
     setEditingPlanId(plan.id);
     setPlanFormData({
-      name: plan.name,
-      price: plan.price.toString(),
-      whatsapp_campaign_limit: plan.whatsapp_campaign_limit.toString(),
-      has_customer_segmentation: plan.has_customer_segmentation,
-      has_service_based_targeting: plan.has_service_based_targeting,
-      has_high_value_targeting: plan.has_high_value_targeting,
-      has_advanced_insights: plan.has_advanced_insights,
-      has_upsell_recommendations: plan.has_upsell_recommendations,
-      has_cross_sell_recommendations: plan.has_cross_sell_recommendations,
-      has_priority_visibility: plan.has_priority_visibility,
-      is_active: plan.is_active,
-      validity_days: plan.validity_days.toString(),
+      name: plan.name ?? '',
+      price: String(plan.price ?? ''),
+      whatsapp_campaign_limit: String(plan.whatsapp_campaign_limit ?? ''),
+      has_customer_segmentation: !!plan.has_customer_segmentation,
+      has_service_based_targeting: !!plan.has_service_based_targeting,
+      has_high_value_targeting: !!plan.has_high_value_targeting,
+      has_advanced_insights: !!plan.has_advanced_insights,
+      has_upsell_recommendations: plan.has_upsell_recommendations ?? 'none',
+      has_cross_sell_recommendations: plan.has_cross_sell_recommendations ?? 'none',
+      has_priority_visibility: !!plan.has_priority_visibility,
+      is_active: !!plan.is_active,
+      validity_days: String(plan.validity_days ?? '30'),
     });
     setIsPlanModalOpen(true);
   };
@@ -198,7 +234,13 @@ export default function SubscriptionsPage() {
   };
 
   const handleDeletePlan = async (plan: any) => {
-    if (!confirm(`Delete “${plan.name}”? Salons subscribed to it must be moved first.`)) return;
+    const ok = await confirm({
+      title: `Delete “${plan.name}”?`,
+      body: 'Salons subscribed to it must be moved to another plan first. This cannot be undone.',
+      confirmLabel: 'Delete plan',
+      tone: 'danger',
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/proxy/superadmin/subscriptions/plans/${plan.id}`, {
         method: 'DELETE',
@@ -215,12 +257,12 @@ export default function SubscriptionsPage() {
 
   /* Nominate the plan whose benefits every Commission Model salon enjoys. */
   const nominateCommissionPlan = async (plan: any) => {
-    const confirmed = confirm(
-      `Make “${plan.name}” the Commission Model plan?\n\n` +
-        `Every salon on the Commission Model gets this plan's benefits, including ` +
-        `those already trading. It will no longer be sellable as a subscription.`
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: `Make “${plan.name}” the Commission Model plan?`,
+      body: 'Every salon on the Commission Model gets this plan’s benefits, including those already trading. It will no longer be sellable as a subscription.',
+      confirmLabel: 'Make commission plan',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch('/api/proxy/superadmin/subscriptions/commission-plan', {
@@ -237,7 +279,7 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const openAssign = (salon: any, presetModel?: string) => {
+  const openAssign = (salon: any, presetModel?: string, presetPlanId?: string) => {
     setAssigningSalon(salon);
     setBillingModel(presetModel ?? salon.billing_model ?? SUBSCRIPTION);
     setCommissionPercentage(
@@ -245,7 +287,7 @@ export default function SubscriptionsPage() {
         ? String(salon.commission_percentage)
         : ''
     );
-    setSelectedPlanId(purchasablePlans[0]?.id ?? '');
+    setSelectedPlanId(presetPlanId ?? purchasablePlans[0]?.id ?? '');
   };
 
   const handleAssignPlan = async (e: React.FormEvent) => {
@@ -325,12 +367,26 @@ export default function SubscriptionsPage() {
     }
   };
 
-  if (isLoading) return <div className={styles.container}>Loading…</div>;
-
   const commissionSalons = salons.filter((s) => s.billing_model === COMMISSION);
-  
+  const subscriptionSalons = salons.filter((s) => s.billing_model !== COMMISSION);
+  const expiringSoon = salons.filter((s) => {
+    const d = daysUntil(s.expiry);
+    return s.billing_model !== COMMISSION && d !== null && d >= 0 && d <= 7;
+  });
+  const commissionPlan = plans.find((p) => p.id === commissionPlanId);
+
+  const planSalonCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of salons) if (s.current_plan) counts[s.current_plan] = (counts[s.current_plan] ?? 0) + 1;
+    return counts;
+  }, [salons]);
+
   const filteredSalons = salons.filter(s => {
-    if (salonFilterModel && s.billing_model !== salonFilterModel) return false;
+    if (salonFilterModel === 'expiring') {
+      if (!expiringSoon.includes(s)) return false;
+    } else if (salonFilterModel && (s.billing_model === COMMISSION ? COMMISSION : SUBSCRIPTION) !== salonFilterModel) {
+      return false;
+    }
     if (salonSearch) {
       const q = salonSearch.toLowerCase();
       return (s.name || '').toLowerCase().includes(q) || (s.owner || '').toLowerCase().includes(q);
@@ -346,44 +402,69 @@ export default function SubscriptionsPage() {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Plans &amp; billing models</h1>
-      <p className={styles.pageIntro}>
-        Every salon trades on one of two arrangements. A <strong>Subscription Plan</strong>{' '}
-        is prepaid and expires. The <strong>Commission Model</strong> is postpaid — the
-        salon pays a percentage of what it bills, settled on the 1st of each month for the
-        month just finished.
-      </p>
+      <PageHeader
+        eyebrow="Billing"
+        title="Plans & billing models"
+        subtitle={
+          <>
+            Every salon trades on one of two arrangements. A <strong>Subscription Plan</strong> is prepaid and
+            expires. The <strong>Commission Model</strong> is postpaid — a percentage of what the salon bills,
+            settled on the 1st for the month just finished.
+          </>
+        }
+        actions={<Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
+      />
 
       {banner && (
-        <div className={banner.kind === 'ok' ? styles.bannerOk : styles.bannerError}>
-          <span>{banner.text}</span>
-          <button type="button" onClick={() => setBanner(null)} aria-label="Dismiss">
-            ✕
-          </button>
-        </div>
+        <Alert tone={banner.kind === 'ok' ? 'success' : 'error'} onClose={() => setBanner(null)}>
+          {banner.text}
+        </Alert>
       )}
+
+      {loadError && !isLoading && (
+        <Alert tone="error">
+          {loadError} <button type="button" className={styles.linkBtn} onClick={fetchData}>Retry</button>
+        </Alert>
+      )}
+
+      {/* ------------------------------------------------ overview */}
+      <div className={ui.statGrid}>
+        <StatCard label="On subscription" icon="crown" tone="info" loading={isLoading} value={subscriptionSalons.length} sub={`${purchasablePlans.length} plan${purchasablePlans.length === 1 ? '' : 's'} for sale`} />
+        <StatCard label="On commission" icon="percent" tone="accent" loading={isLoading} value={commissionSalons.length} sub="Settled monthly, on the 1st" />
+        <StatCard
+          label="Waiting on you"
+          icon="receipt"
+          tone={subscriptionRequests.length ? 'warning' : 'success'}
+          loading={isLoading}
+          value={subscriptionRequests.length}
+          sub={subscriptionRequests.length ? 'Requests to verify' : 'Nothing pending'}
+        />
+        <StatCard
+          label="Expiring in 7 days"
+          icon="clock"
+          tone={expiringSoon.length ? 'danger' : 'neutral'}
+          loading={isLoading}
+          value={expiringSoon.length}
+          sub={expiringSoon.length ? 'Subscriptions about to lapse' : 'No renewals due'}
+        />
+      </div>
 
       {/* ------------------------------------------------ pending requests */}
       {subscriptionRequests.length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.pendingPanel}>
-            <h2 className={styles.pendingTitle}>
-              Waiting on you
-              <span className={styles.countChip}>{subscriptionRequests.length}</span>
-            </h2>
-            <p className={styles.sectionHint}>
-              Paid subscriptions to verify, and salons asking to move onto the Commission
-              Model. A commission request has no receipt — you agree the percentage when
-              you approve it.
-            </p>
-            <table className={styles.table}>
+        <Card
+          className={styles.pendingCard}
+          title={<>Waiting on you <Badge tone="warning" dot={false}>{subscriptionRequests.length}</Badge></>}
+          subtitle="Paid subscriptions to verify, and salons asking to move onto the Commission Model. A commission request has no receipt — you agree the percentage when you approve it."
+        >
+          <div className={ui.tableWrap}>
+            <table className={ui.table}>
               <thead>
                 <tr>
                   <th>Salon</th>
                   <th>Asking for</th>
                   <th>Plan</th>
                   <th>Raised</th>
-                  <th style={{ textAlign: 'right' }}>Action</th>
+                  <th className={ui.alignRight}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -391,41 +472,27 @@ export default function SubscriptionsPage() {
                   const isCommission = req.billing_type === COMMISSION;
                   return (
                     <tr key={req.id}>
+                      <td><Person name={req.salon?.name ?? 'Unknown salon'} size={32} /></td>
                       <td>
-                        <strong>{req.salon?.name}</strong>
-                      </td>
-                      <td>
-                        <span
-                          className={`${styles.pill} ${
-                            isCommission ? styles.pillCommission : styles.pillSubscription
-                          }`}
-                        >
-                          {req.billing_label ?? modelLabel(req.billing_type)}
-                        </span>
+                        <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
                       </td>
                       <td>{req.plan?.name || '—'}</td>
-                      <td>{new Date(req.created_at).toLocaleDateString()}</td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className={ui.num}>{new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</td>
+                      <td className={ui.alignRight}>
                         <div className={styles.rowActions}>
                           {req.screenshot_url ? (
-                            <button
-                              className={styles.smallButton}
-                              onClick={() => setViewingScreenshot(req.screenshot_url)}
-                            >
-                              View receipt
-                            </button>
+                            <Button size="sm" icon="receipt" onClick={() => setViewingScreenshot(req.screenshot_url)}>Receipt</Button>
                           ) : (
-                            <span className={styles.mutedNote}>Nothing paid yet</span>
+                            !isCommission && <span className={styles.mutedNote}>Nothing paid yet</span>
                           )}
-                          <button
-                            className={`${styles.smallButton} ${styles.approveButton}`}
-                            onClick={() => {
-                              openAssign(req.salon, req.billing_type);
-                              if (!isCommission) setSelectedPlanId(req.plan?.id || purchasablePlans[0]?.id);
-                            }}
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon="check"
+                            onClick={() => openAssign(req.salon, req.billing_type, isCommission ? undefined : req.plan?.id)}
                           >
-                            {isCommission ? 'Set rate & approve' : 'Approve & assign'}
-                          </button>
+                            {isCommission ? 'Set rate & approve' : 'Approve'}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -434,659 +501,544 @@ export default function SubscriptionsPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {viewingScreenshot && (
-        <div className={styles.modalOverlay} onClick={() => setViewingScreenshot(null)}>
-          <div
-            className={styles.modalContent}
-            style={{ maxWidth: '800px', textAlign: 'center' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Payment receipt</h3>
-            <img
-              src={viewingScreenshot}
-              alt="Payment receipt"
-              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', margin: '16px 0' }}
-            />
-            <div className={styles.formActions}>
-              <button type="button" onClick={() => setViewingScreenshot(null)} className={styles.cancelButton}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        </Card>
       )}
 
       {/* ------------------------------------------------ commission model */}
-      <div className={styles.section}>
-        <h2>The Commission Model</h2>
-        <p className={styles.sectionHint}>
-          Every commission salon enjoys the same benefits, so one plan carries them. The
-          percentage is agreed per salon; the plan is not. A salon has {graceDays} day
-          {graceDays === 1 ? '' : 's'} after a month closes to settle before it goes
-          offline.
-        </p>
+      <Card padded>
+        <div className={styles.commission}>
+          <div className={styles.commissionIntro}>
+            <span className={styles.commissionIcon}><Icon name="percent" size={22} /></span>
+            <div>
+              <h2 className={ui.cardTitle}>The Commission Model</h2>
+              <p className={ui.cardSubtitle}>
+                Every commission salon enjoys the same benefits, so one plan carries them. The percentage is agreed
+                per salon; the plan is not. A salon has {graceDays} day{graceDays === 1 ? '' : 's'} after a month
+                closes to settle before it goes offline.
+              </p>
+            </div>
+          </div>
 
-        {commissionPlanId ? (
-          <div className={styles.commissionSummary}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div className={styles.summaryLabel}>Benefits carried by</div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <select 
-                  value={commissionPlanId || ''} 
+          {isLoading ? (
+            <Skeleton height={64} radius={14} />
+          ) : commissionPlanId ? (
+            <div className={styles.commissionFacts}>
+              <Field label="Benefits carried by">
+                <select
+                  className={ui.control}
+                  value={commissionPlanId || ''}
                   onChange={(e) => {
-                    const plan = plans.find(p => p.id === e.target.value);
+                    const plan = plans.find((p) => p.id === e.target.value);
                     if (plan) nominateCommissionPlan(plan);
                   }}
-                  style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #D1D5DB', fontSize: '1rem', fontWeight: 600 }}
                 >
-                  {plans.map(p => (
+                  {plans.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+              </Field>
+              <div className={styles.fact}>
+                <span>Salons on it</span>
+                <b>{commissionSalons.length}</b>
+              </div>
+              <div className={styles.fact}>
+                <span>Settlement</span>
+                <b>Monthly, 1st</b>
               </div>
             </div>
-            
-            <div>
-              <div className={styles.summaryLabel}>Salons on it</div>
-              <div className={styles.summaryValue}>{commissionSalons.length}</div>
-            </div>
-            <div>
-              <div className={styles.summaryLabel}>Settlement</div>
-              <div className={styles.summaryValue}>Monthly, on the 1st</div>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.warningPanel}>
-            No plan carries the Commission Model yet, so no salon can be moved onto it.
-            Pick one below with <strong>Make commission plan</strong>.
-          </div>
-        )}
-      </div>
+          ) : (
+            <Alert tone="warning">
+              No plan carries the Commission Model yet, so no salon can be moved onto it. Pick one below with{' '}
+              <strong>Make commission plan</strong>.
+            </Alert>
+          )}
+        </div>
+      </Card>
 
       {/* ------------------------------------------------------------ plans */}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
+      <section>
+        <div className={styles.sectionHead}>
           <div>
-            <h2>Subscription plans</h2>
-            <p className={styles.sectionHint}>
-              What a salon can buy. One plan also carries the Commission Model — salons on
-              that arrangement get its benefits for a percentage instead of a monthly fee.
-            </p>
-          </div>
-          <button className={styles.button} onClick={openCreateModal}>
-            + Create new plan
-          </button>
-        </div>
-
-        <div className={styles.grid}>
-          {plans.map((plan) => {
-            const isCommissionPlan = plan.id === commissionPlanId;
-            return (
-              <div
-                key={plan.id}
-                className={isCommissionPlan ? `${styles.card} ${styles.cardHighlight}` : styles.card}
-              >
-                <div className={styles.cardTop}>
-                  <h3>{plan.name}</h3>
-                  {isCommissionPlan ? (
-                    <span className={`${styles.pill} ${styles.pillCommission}`}>Commission Model</span>
-                  ) : plan.is_active ? (
-                    <span className={`${styles.pill} ${styles.pillSubscription}`}>For sale</span>
-                  ) : (
-                    <span className={`${styles.pill} ${styles.pillMuted}`}>Inactive</span>
-                  )}
-                </div>
-
-                <dl className={styles.specList}>
-                  <div>
-                    <dt>Price</dt>
-                    <dd>₹{Number(plan.price).toLocaleString('en-IN')}</dd>
-                  </div>
-                  <div>
-                    <dt>Validity</dt>
-                    <dd>{plan.validity_days} days</dd>
-                  </div>
-                  <div>
-                    <dt>WhatsApp limit</dt>
-                    <dd>{plan.whatsapp_campaign_limit}</dd>
-                  </div>
-                </dl>
-
-                {isCommissionPlan && (
-                  <p className={styles.inlineHint} style={{ marginBottom: 12 }}>
-                    Salons on the Commission Model get these benefits without paying the
-                    monthly fee. It can still be sold as a subscription.
-                  </p>
-                )}
-
-                <div className={styles.cardActions}>
-                  <button className={styles.smallButton} onClick={() => openEditModal(plan)}>
-                    Edit
-                  </button>
-                  {!isCommissionPlan && (
-                    <button className={styles.smallButton} onClick={() => nominateCommissionPlan(plan)}>
-                      Make commission plan
-                    </button>
-                  )}
-                  {!isCommissionPlan && (
-                    <button className={styles.dangerButton} onClick={() => handleDeletePlan(plan)}>
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {isPlanModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>{editingPlanId ? 'Edit' : 'Create'} plan</h3>
-            <form onSubmit={handleSavePlan} className={styles.form}>
-              <h4 className={styles.featureSectionTitle} style={{ marginTop: 0 }}>
-                Basic details
-              </h4>
-              <div className={styles.featuresGrid}>
-                <div className={styles.formGroup}>
-                  <label>Plan name</label>
-                  <input
-                    type="text"
-                    value={planFormData.name}
-                    onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Price (₹)</label>
-                  <input
-                    type="number"
-                    value={planFormData.price}
-                    onChange={(e) => setPlanFormData({ ...planFormData, price: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Validity days</label>
-                  <input
-                    type="number"
-                    value={planFormData.validity_days}
-                    onChange={(e) => setPlanFormData({ ...planFormData, validity_days: e.target.value })}
-                    required
-                    min="1"
-                  />
-                </div>
-                <div className={styles.formGroup} style={{ gridColumn: 'span 2' }}>
-                  <label>WhatsApp campaign limit</label>
-                  <input
-                    type="number"
-                    value={planFormData.whatsapp_campaign_limit}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, whatsapp_campaign_limit: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </div>
-
-              <h4 className={styles.featureSectionTitle}>Targeting &amp; insights</h4>
-              <div className={styles.featuresGrid}>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.has_customer_segmentation}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_customer_segmentation: e.target.checked })
-                    }
-                  />{' '}
-                  Customer segmentation
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.has_service_based_targeting}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_service_based_targeting: e.target.checked })
-                    }
-                  />{' '}
-                  Service based targeting
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.has_high_value_targeting}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_high_value_targeting: e.target.checked })
-                    }
-                  />{' '}
-                  High value targeting
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.has_advanced_insights}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_advanced_insights: e.target.checked })
-                    }
-                  />{' '}
-                  Advanced insights
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.has_priority_visibility}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_priority_visibility: e.target.checked })
-                    }
-                  />{' '}
-                  Priority visibility
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={planFormData.is_active}
-                    onChange={(e) => setPlanFormData({ ...planFormData, is_active: e.target.checked })}
-                  />{' '}
-                  Is active
-                </label>
-              </div>
-
-              <h4 className={styles.featureSectionTitle}>Advanced recommendations</h4>
-              <div className={styles.featuresGrid}>
-                <div className={styles.formGroup}>
-                  <label>Upsell recommendations</label>
-                  <select
-                    value={planFormData.has_upsell_recommendations}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_upsell_recommendations: e.target.value })
-                    }
-                  >
-                    <option value="none">None</option>
-                    <option value="basic">Basic</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Cross-sell recommendations</label>
-                  <select
-                    value={planFormData.has_cross_sell_recommendations}
-                    onChange={(e) =>
-                      setPlanFormData({ ...planFormData, has_cross_sell_recommendations: e.target.value })
-                    }
-                  >
-                    <option value="none">None</option>
-                    <option value="basic">Basic</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Save plan'}
-                </button>
-                <button type="button" onClick={() => setIsPlanModalOpen(false)} className={styles.cancelButton}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+            <h2 className={ui.cardTitle}>Subscription plans</h2>
+            <p className={ui.cardSubtitle}>What a salon can buy. The commission plan’s benefits go to commission salons instead of being sold.</p>
           </div>
         </div>
-      )}
 
-      {/* ----------------------------------------------------------- salons */}
-      <div className={styles.section}>
-        <h2>Salons</h2>
-        <p className={styles.sectionHint}>
-          A commission rate can only be changed once that salon has no open payout, so
-          everything already billed stays on the rate it was billed at.
-        </p>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="Search salons..."
-            value={salonSearch}
-            onChange={(e) => setSalonSearch(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', flex: 1, minWidth: '200px', maxWidth: '300px' }}
-          />
-          <select value={salonFilterModel} onChange={(e) => setSalonFilterModel(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
-            <option value="">All Billing Models</option>
-            <option value={COMMISSION}>Commission Model</option>
-            <option value={SUBSCRIPTION}>Subscription Plan</option>
-          </select>
-          <select value={salonSort} onChange={(e) => setSalonSort(e.target.value)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB' }}>
-            <option value="name_asc">Sort by Name (A-Z)</option>
-            <option value="name_desc">Sort by Name (Z-A)</option>
-            <option value="rate_desc">Sort by Rate (High-Low)</option>
-            <option value="expiry_asc">Sort by Expiry (Soonest)</option>
-          </select>
-        </div>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Salon</th>
-              <th>Owner</th>
-              <th>Billing model</th>
-              <th>Plan</th>
-              <th>Rate</th>
-              <th>Access until</th>
-              <th style={{ textAlign: 'right' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSalons.map((salon) => {
-              const onCommission = salon.billing_model === COMMISSION;
-              const blocked = onCommission && salon.unsettled_payouts > 0;
-
+        {isLoading ? (
+          <div className={styles.planGrid}>
+            {[1, 2, 3].map((i) => <Skeleton key={i} height={300} radius={18} />)}
+          </div>
+        ) : plans.length === 0 ? (
+          <Card padded>
+            <EmptyState
+              icon="crown"
+              title="No plans yet"
+              hint="Create the first plan salons can subscribe to."
+              action={<Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
+            />
+          </Card>
+        ) : (
+          <div className={styles.planGrid}>
+            {plans.map((plan) => {
+              const isCommissionPlan = plan.id === commissionPlanId;
+              const count = planSalonCounts[plan.name] ?? 0;
               return (
-                <tr key={salon.id}>
-                  <td>
-                    <strong>{salon.name}</strong>
-                    <button
-                      className={styles.infoButton}
-                      onClick={() => openSalonInfo(salon)}
-                      title="View salon details"
-                    >
-                      &#9432;
-                    </button>
-                  </td>
-                  <td>{salon.owner}</td>
-                  <td>
-                    <span
-                      className={`${styles.pill} ${
-                        onCommission ? styles.pillCommission : styles.pillSubscription
-                      }`}
-                    >
-                      {salon.billing_label ?? modelLabel(salon.billing_model)}
-                    </span>
-                  </td>
-                  <td>{salon.current_plan}</td>
-                  <td>
-                    {onCommission ? (
-                      <>
-                        <strong>{pct(salon.commission_percentage)}</strong>
-                        {salon.commission_rate_effective_from && (
-                          <>
-                            <br />
-                            <small className={styles.mutedNote}>
-                              since {salon.commission_rate_effective_from}
-                            </small>
-                          </>
-                        )}
-                      </>
+                <article key={plan.id} className={cx(styles.plan, isCommissionPlan && styles.planFeatured, !plan.is_active && !isCommissionPlan && styles.planInactive)}>
+                  <div className={styles.planTop}>
+                    <h3 className={styles.planName}>{plan.name}</h3>
+                    {isCommissionPlan ? (
+                      <Badge tone="accent">Commission plan</Badge>
+                    ) : plan.is_active ? (
+                      <Badge tone="success">For sale</Badge>
                     ) : (
-                      '—'
+                      <Badge tone="neutral">Inactive</Badge>
                     )}
-                  </td>
-                  <td>
-                    {salon.expiry || 'N/A'}
-                    {blocked && (
-                      <>
-                        <br />
-                        <small className={styles.blockedNote}>
-                          {salon.unsettled_payouts} payout
-                          {salon.unsettled_payouts === 1 ? '' : 's'} open
-                        </small>
-                      </>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div className={styles.rowActions}>
-                      {onCommission && (
-                        <button
-                          className={styles.smallButton}
-                          onClick={() => openRateChange(salon)}
-                          disabled={blocked}
-                          title={
-                            blocked
-                              ? 'Settle this salon’s open payouts before changing the rate'
-                              : 'Change the agreed commission percentage'
-                          }
-                        >
-                          Change rate
-                        </button>
-                      )}
-                      <button className={styles.button} onClick={() => openAssign(salon)}>
-                        Change model
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </div>
 
-      {/* --------------------------------------------------- assign a model */}
-      {assigningSalon && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3>How {assigningSalon.name} pays</h3>
-            <form onSubmit={handleAssignPlan} className={styles.form}>
-              <div className={styles.formGroup}>
-                <label>Billing model</label>
-                <select value={billingModel} onChange={(e) => setBillingModel(e.target.value)}>
-                  <option value={SUBSCRIPTION}>Subscription Plan — prepaid, expires</option>
-                  <option value={COMMISSION}>Commission Model — postpaid, monthly</option>
-                </select>
-              </div>
+                  <div className={styles.planPrice}>
+                    <span className={styles.planAmount}>{formatINR(plan.price)}</span>
+                    <span className={styles.planPer}>/ {plan.validity_days} days</span>
+                  </div>
+                  <p className={styles.planMeta}>
+                    {count} salon{count === 1 ? '' : 's'} on this plan
+                  </p>
 
-              {billingModel === SUBSCRIPTION ? (
-                <div className={styles.formGroup}>
-                  <label>Plan to sell them</label>
-                  <select
-                    value={selectedPlanId}
-                    onChange={(e) => setSelectedPlanId(e.target.value)}
-                    required
-                  >
-                    {purchasablePlans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} — ₹{p.price} ({p.validity_days} days)
-                      </option>
+                  <ul className={styles.featureList}>
+                    <li className={styles.featureOn}>
+                      <Icon name="message" size={15} />
+                      {Number(plan.whatsapp_campaign_limit).toLocaleString('en-IN')} WhatsApp campaign{Number(plan.whatsapp_campaign_limit) === 1 ? '' : 's'}
+                    </li>
+                    {FEATURE_FLAGS.map((f) => (
+                      <li key={f.key} className={plan[f.key] ? styles.featureOn : styles.featureOff}>
+                        <Icon name={plan[f.key] ? 'check' : 'close'} size={15} strokeWidth={2.2} />
+                        {f.label}
+                      </li>
                     ))}
-                  </select>
-                  {purchasablePlans.length === 0 && (
-                    <p className={styles.inlineWarning}>
-                      Every plan is nominated for the Commission Model. Create one to sell.
+                    <li className={plan.has_upsell_recommendations !== 'none' ? styles.featureOn : styles.featureOff}>
+                      <Icon name={plan.has_upsell_recommendations !== 'none' ? 'check' : 'close'} size={15} strokeWidth={2.2} />
+                      Upsell · {LEVEL_LABEL[plan.has_upsell_recommendations] ?? '—'}
+                    </li>
+                    <li className={plan.has_cross_sell_recommendations !== 'none' ? styles.featureOn : styles.featureOff}>
+                      <Icon name={plan.has_cross_sell_recommendations !== 'none' ? 'check' : 'close'} size={15} strokeWidth={2.2} />
+                      Cross-sell · {LEVEL_LABEL[plan.has_cross_sell_recommendations] ?? '—'}
+                    </li>
+                  </ul>
+
+                  {isCommissionPlan && (
+                    <p className={styles.planNote}>
+                      Commission salons get these benefits without the fee. It isn’t sold while it carries the Commission Model.
                     </p>
                   )}
-                </div>
-              ) : (
-                <>
-                  <div className={styles.formGroup}>
-                    <label>Commission percentage (%)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={commissionPercentage}
-                      onChange={(e) => setCommissionPercentage(e.target.value)}
-                      required
-                    />
+
+                  <div className={styles.planActions}>
+                    <Button size="sm" icon="edit" onClick={() => openEditModal(plan)}>Edit</Button>
+                    {!isCommissionPlan && (
+                      <>
+                        <Button size="sm" variant="soft" onClick={() => nominateCommissionPlan(plan)}>Make commission plan</Button>
+                        <IconButton icon="trash" label={`Delete ${plan.name}`} className={styles.deleteBtn} onClick={() => handleDeletePlan(plan)} />
+                      </>
+                    )}
                   </div>
-                  <p className={styles.inlineHint}>
-                    They get the{' '}
-                    <strong>{plans.find((p) => p.id === commissionPlanId)?.name ?? 'commission'}</strong>{' '}
-                    plan&apos;s benefits and pay {commissionPercentage || '—'}% of everything they
-                    bill, settled on the 1st of each month.
-                  </p>
-                </>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ----------------------------------------------------------- salons */}
+      <Card>
+        <div className={ui.toolbar}>
+          <div className={styles.salonsTitle}>
+            <h2 className={ui.cardTitle}>Salons</h2>
+            <p className={ui.cardSubtitle}>A commission rate can only change once that salon has no open payout.</p>
+          </div>
+          <Segmented
+            ariaLabel="Billing model"
+            value={salonFilterModel}
+            onChange={setSalonFilterModel}
+            options={[
+              { value: '', label: 'All', count: salons.length },
+              { value: SUBSCRIPTION, label: 'Subscription', count: subscriptionSalons.length },
+              { value: COMMISSION, label: 'Commission', count: commissionSalons.length },
+              ...(expiringSoon.length ? [{ value: 'expiring', label: 'Expiring', count: expiringSoon.length }] : []),
+            ]}
+          />
+        </div>
+        <div className={cx(ui.toolbar, styles.subToolbar)}>
+          <SearchInput className={ui.toolbarGrow} value={salonSearch} onChange={setSalonSearch} placeholder="Search salon or owner…" />
+          <select className={cx(ui.control, styles.sortSelect)} value={salonSort} onChange={(e) => setSalonSort(e.target.value)} aria-label="Sort salons">
+            <option value="name_asc">Name (A–Z)</option>
+            <option value="name_desc">Name (Z–A)</option>
+            <option value="rate_desc">Commission rate (high–low)</option>
+            <option value="expiry_asc">Access ends (soonest)</option>
+          </select>
+        </div>
+
+        <div className={ui.tableWrap}>
+          <table className={ui.table}>
+            <thead>
+              <tr>
+                <th>Salon</th>
+                <th>Billing model</th>
+                <th>Plan</th>
+                <th>Rate</th>
+                <th>Access until</th>
+                <th className={ui.alignRight}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 5 }, (_, i) => (
+                  <tr key={i}>
+                    <td><div className={ui.personCell}><Skeleton width={34} height={34} radius={11} /><Skeleton width={140} /></div></td>
+                    <td><Skeleton width={120} height={22} radius={999} /></td>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={40} /></td>
+                    <td><Skeleton width={90} /></td>
+                    <td><Skeleton width={120} /></td>
+                  </tr>
+                ))
+              ) : filteredSalons.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    <EmptyState icon="store" title="No salons match" hint="Try another search or billing model." />
+                  </td>
+                </tr>
+              ) : (
+                filteredSalons.map((salon) => {
+                  const onCommission = salon.billing_model === COMMISSION;
+                  const blocked = onCommission && salon.unsettled_payouts > 0;
+                  const left = onCommission ? null : daysUntil(salon.expiry);
+
+                  return (
+                    <tr key={salon.id}>
+                      <td>
+                        <button type="button" className={styles.salonBtn} onClick={() => openSalonInfo(salon)} title="View salon details">
+                          <Person name={salon.name} sub={salon.owner} size={34} />
+                        </button>
+                      </td>
+                      <td>
+                        <Badge tone={onCommission ? 'accent' : 'info'}>{salon.billing_label ?? modelLabel(salon.billing_model)}</Badge>
+                      </td>
+                      <td className={salon.current_plan === 'None' ? styles.mutedNote : ui.cellPrimary}>{salon.current_plan}</td>
+                      <td>
+                        {onCommission ? (
+                          <>
+                            <div className={cx(ui.cellPrimary, ui.num)}>{pct(salon.commission_percentage)}</div>
+                            {salon.commission_rate_effective_from && (
+                              <div className={ui.cellSub}>since {fmtDay(salon.commission_rate_effective_from)}</div>
+                            )}
+                          </>
+                        ) : (
+                          <span className={styles.mutedNote}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {onCommission ? (
+                          <span className={styles.mutedNote}>Ongoing</span>
+                        ) : salon.expiry ? (
+                          <>
+                            <div className={ui.num}>{fmtDay(salon.expiry)}</div>
+                            {left !== null && left < 0 && <Badge tone="danger" dot={false}>Expired</Badge>}
+                            {left !== null && left >= 0 && left <= 7 && (
+                              <Badge tone="warning" dot={false}>{left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left`}</Badge>
+                            )}
+                          </>
+                        ) : (
+                          <span className={styles.mutedNote}>No access</span>
+                        )}
+                        {blocked && (
+                          <div className={styles.blockedNote}>
+                            <Icon name="alert" size={12} />
+                            {salon.unsettled_payouts} payout{salon.unsettled_payouts === 1 ? '' : 's'} open
+                          </div>
+                        )}
+                      </td>
+                      <td className={ui.alignRight}>
+                        <div className={styles.rowActions}>
+                          {onCommission && (
+                            <Button
+                              size="sm"
+                              onClick={() => openRateChange(salon)}
+                              disabled={blocked}
+                              title={blocked ? 'Settle this salon’s open payouts before changing the rate' : 'Change the agreed commission percentage'}
+                            >
+                              Change rate
+                            </Button>
+                          )}
+                          <Button size="sm" variant="soft" onClick={() => openAssign(salon)}>Change model</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
-
-              <div className={styles.formActions}>
-                <button
-                  type="submit"
-                  className={styles.primaryButton}
-                  disabled={isSaving || (billingModel === SUBSCRIPTION && !selectedPlanId)}
-                >
-                  {isSaving ? 'Applying…' : 'Apply'}
-                </button>
-                <button type="button" onClick={() => setAssigningSalon(null)} className={styles.cancelButton}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+            </tbody>
+          </table>
         </div>
-      )}
+      </Card>
 
-      {/* ------------------------------------------------------ change rate */}
-      {ratingSalon && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3>Commission for {ratingSalon.name}</h3>
-            <p className={styles.inlineHint}>
-              Currently {pct(ratingSalon.commission_percentage)}. The new rate is charged on
-              everything billed from today; already-settled payouts keep the rate they were
-              charged at.
-            </p>
+      {/* ============================================================ overlays */}
 
-            {rateError && (
-              <div className={styles.bannerError} style={{ marginTop: 12 }}>
-                <span>{rateError}</span>
-              </div>
+      <Modal
+        open={!!viewingScreenshot}
+        onClose={() => setViewingScreenshot(null)}
+        size="lg"
+        title="Payment receipt"
+        footer={
+          <>
+            {viewingScreenshot && (
+              <a href={viewingScreenshot} target="_blank" rel="noreferrer" className={cx(ui.btn, ui.btnGhost)}>
+                Open original <Icon name="external" size={14} />
+              </a>
             )}
+            <Button variant="primary" onClick={() => setViewingScreenshot(null)}>Close</Button>
+          </>
+        }
+      >
+        {viewingScreenshot && (
+          // eslint-disable-next-line @next/next/no-img-element -- user-uploaded receipt from an arbitrary host
+          <img src={viewingScreenshot} alt="Payment receipt" className={styles.receipt} />
+        )}
+      </Modal>
 
-            {blockingPayouts.length > 0 && (
-              <ul className={styles.blockingList}>
-                {blockingPayouts.map((p) => (
-                  <li key={p.id}>
-                    {p.cycle_start_date} → {p.cycle_end_date} · ₹{p.net_amount} · {p.status}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <form onSubmit={handleRateChange} className={styles.form}>
-              <div className={styles.formGroup}>
-                <label>New percentage (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={newRate}
-                  onChange={(e) => setNewRate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Reason (optional)</label>
-                <input
-                  type="text"
-                  value={rateReason}
-                  onChange={(e) => setRateReason(e.target.value)}
-                  placeholder="e.g. Renegotiated at renewal"
-                />
-              </div>
-
-              <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={isSaving}>
-                  {isSaving ? 'Saving…' : 'Change rate'}
-                </button>
-                <button type="button" onClick={() => setRatingSalon(null)} className={styles.cancelButton}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={isPlanModalOpen}
+        onClose={() => setIsPlanModalOpen(false)}
+        size="lg"
+        title={editingPlanId ? 'Edit plan' : 'New plan'}
+        description="What a salon gets, and what it costs."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsPlanModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="planForm" loading={isSaving}>
+              {editingPlanId ? 'Save changes' : 'Create plan'}
+            </Button>
+          </>
+        }
+      >
+        <form id="planForm" onSubmit={handleSavePlan} className={styles.form}>
+          <h4 className={ui.sectionLabel}>Basics</h4>
+          <div className={styles.formGrid}>
+            <Field label="Plan name" className={styles.span2}>
+              <input className={ui.control} value={planFormData.name} onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })} required placeholder="e.g. Growth" />
+            </Field>
+            <Field label="Price (₹)">
+              <input className={ui.control} type="number" min="0" value={planFormData.price} onChange={(e) => setPlanFormData({ ...planFormData, price: e.target.value })} required />
+            </Field>
+            <Field label="Validity (days)">
+              <input className={ui.control} type="number" min="1" value={planFormData.validity_days} onChange={(e) => setPlanFormData({ ...planFormData, validity_days: e.target.value })} required />
+            </Field>
+            <Field label="WhatsApp campaign limit" hint="Campaigns a salon can send per validity period." className={styles.span2}>
+              <input className={ui.control} type="number" min="0" value={planFormData.whatsapp_campaign_limit} onChange={(e) => setPlanFormData({ ...planFormData, whatsapp_campaign_limit: e.target.value })} required />
+            </Field>
           </div>
-        </div>
-      )}
 
-      {/* -------------------------------------------------- salon details */}
-      {infoSalon && (
-        <div className={styles.modalOverlay} onClick={() => setInfoSalon(null)}>
-          <div
-            className={styles.modalContent}
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}
-          >
-            <div className={styles.infoModalHeader}>
-              <h3 style={{ margin: 0 }}>{infoSalon.name}</h3>
-              <button className={styles.infoClose} onClick={() => setInfoSalon(null)} aria-label="Close">
-                &times;
-              </button>
-            </div>
+          <h4 className={ui.sectionLabel}>Targeting &amp; insights</h4>
+          <div className={styles.checkGrid}>
+            {FEATURE_FLAGS.map((f) => {
+              const on = !!planFormData[f.key];
+              return (
+                <label key={f.key} className={cx(ui.check, on && ui.checkOn)}>
+                  <input type="checkbox" checked={on} onChange={(e) => setPlanFormData({ ...planFormData, [f.key]: e.target.checked })} />
+                  {f.label}
+                </label>
+              );
+            })}
+          </div>
 
-            {infoLoading && infoSalon.detail == null ? (
-              <p className={styles.inlineHint}>Loading details…</p>
-            ) : infoSalon.detail ? (
-              <div className={styles.infoBody}>
-                <div className={styles.infoGrid}>
-                  <InfoField label="Status" value={infoSalon.detail.status} />
-                  <InfoField label="City" value={infoSalon.detail.city?.name} />
-                  <InfoField label="Address" value={infoSalon.detail.address} />
-                  <InfoField label="Pincode" value={infoSalon.detail.pincode} />
-                  <InfoField label="Gender focus" value={infoSalon.detail.gender_focus} />
-                  <InfoField label="Description" value={infoSalon.detail.description} />
-                </div>
+          <h4 className={ui.sectionLabel}>Recommendations</h4>
+          <div className={styles.formGrid}>
+            <Field label="Upsell recommendations">
+              <select className={ui.control} value={planFormData.has_upsell_recommendations} onChange={(e) => setPlanFormData({ ...planFormData, has_upsell_recommendations: e.target.value })}>
+                <option value="none">None</option>
+                <option value="basic">Basic</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </Field>
+            <Field label="Cross-sell recommendations">
+              <select className={ui.control} value={planFormData.has_cross_sell_recommendations} onChange={(e) => setPlanFormData({ ...planFormData, has_cross_sell_recommendations: e.target.value })}>
+                <option value="none">None</option>
+                <option value="basic">Basic</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </Field>
+          </div>
 
-                <h4 className={styles.infoSectionTitle}>Owner / Admin</h4>
-                <div className={styles.infoGrid}>
-                  <InfoField label="Name" value={infoSalon.detail.admin?.name} />
-                  <InfoField label="Phone" value={infoSalon.detail.admin?.phone} />
-                  <InfoField label="Email" value={infoSalon.detail.admin?.email} />
-                </div>
+          <label className={cx(ui.check, planFormData.is_active && ui.checkOn, styles.activeToggle)}>
+            <input type="checkbox" checked={planFormData.is_active} onChange={(e) => setPlanFormData({ ...planFormData, is_active: e.target.checked })} />
+            <span>
+              <b>Available for sale</b>
+              <span className={styles.checkHint}>Inactive plans stay on existing salons but can’t be newly assigned.</span>
+            </span>
+          </label>
+        </form>
+      </Modal>
 
-                <h4 className={styles.infoSectionTitle}>Billing (as of now)</h4>
-                <div className={styles.infoGrid}>
-                  <InfoField label="Owner display" value={infoSalon.owner} />
-                  <InfoField
-                    label="Billing model"
-                    value={infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)}
-                  />
-                  <InfoField label="Plan" value={infoSalon.current_plan} />
-                  {infoSalon.billing_model === COMMISSION && (
-                    <InfoField
-                      label="Commission"
-                      value={infoSalon.commission_percentage != null ? `${infoSalon.commission_percentage}%` : '—'}
-                    />
-                  )}
-                  <InfoField label="Access until" value={infoSalon.expiry || 'N/A'} />
-                  <InfoField label="Registered" value={infoSalon.detail.created_at} />
-                </div>
-
-                <div className={styles.infoStats}>
-                  <InfoStat label="Staff" value={infoSalon.detail.providers?.length} />
-                  <InfoStat label="Services" value={infoSalon.detail.services?.length} />
-                  <InfoStat label="Combos" value={infoSalon.detail.combos?.length} />
-                </div>
-              </div>
-            ) : (
-              <p className={styles.inlineHint}>Could not load salon details.</p>
-            )}
-
-            <div
-              className={styles.formActions}
-              style={{ marginTop: 20, justifyContent: 'flex-end' }}
+      <Modal
+        open={!!assigningSalon}
+        onClose={() => setAssigningSalon(null)}
+        title={assigningSalon ? `How ${assigningSalon.name} pays` : ''}
+        description="Switching models takes effect immediately."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAssigningSalon(null)}>Cancel</Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="assignForm"
+              loading={isSaving}
+              disabled={billingModel === SUBSCRIPTION && !selectedPlanId}
             >
-              <button className={styles.primaryButton} onClick={() => setInfoSalon(null)}>
-                Close
-              </button>
-            </div>
+              Apply
+            </Button>
+          </>
+        }
+      >
+        <form id="assignForm" onSubmit={handleAssignPlan} className={styles.form}>
+          <div className={styles.modelChoice} role="radiogroup" aria-label="Billing model">
+            {[
+              { value: SUBSCRIPTION, title: 'Subscription Plan', desc: 'Prepaid, expires at the end of the plan.', icon: 'crown' as const },
+              { value: COMMISSION, title: 'Commission Model', desc: 'Postpaid, a % of billing settled monthly.', icon: 'percent' as const },
+            ].map((m) => (
+              <label key={m.value} className={cx(styles.modelCard, billingModel === m.value && styles.modelCardOn)}>
+                <input type="radio" name="billing_model" value={m.value} checked={billingModel === m.value} onChange={() => setBillingModel(m.value)} />
+                <span className={styles.modelIcon}><Icon name={m.icon} size={18} /></span>
+                <span className={styles.modelTitle}>{m.title}</span>
+                <span className={styles.modelDesc}>{m.desc}</span>
+              </label>
+            ))}
           </div>
-        </div>
-      )}
+
+          {billingModel === SUBSCRIPTION ? (
+            <Field label="Plan to sell them">
+              <select className={ui.control} value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)} required>
+                {purchasablePlans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {formatINR(p.price)} ({p.validity_days} days)
+                  </option>
+                ))}
+              </select>
+              {purchasablePlans.length === 0 && (
+                <Alert tone="warning">Every plan is nominated for the Commission Model. Create one to sell.</Alert>
+              )}
+            </Field>
+          ) : (
+            <>
+              <Field label="Commission percentage">
+                <div className={styles.suffixInput}>
+                  <input className={ui.control} type="number" step="0.01" min="0" max="100" value={commissionPercentage} onChange={(e) => setCommissionPercentage(e.target.value)} required />
+                  <span>%</span>
+                </div>
+              </Field>
+              <p className={styles.hint}>
+                They get the <strong>{commissionPlan?.name ?? 'commission'}</strong> plan’s benefits and pay{' '}
+                {commissionPercentage || '—'}% of everything they bill, settled on the 1st of each month.
+              </p>
+            </>
+          )}
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!ratingSalon}
+        onClose={() => setRatingSalon(null)}
+        title={ratingSalon ? `Commission for ${ratingSalon.name}` : ''}
+        description={
+          ratingSalon &&
+          `Currently ${pct(ratingSalon.commission_percentage)}. The new rate is charged on everything billed from today; settled payouts keep the rate they were charged at.`
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRatingSalon(null)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="rateForm" loading={isSaving}>Change rate</Button>
+          </>
+        }
+      >
+        <form id="rateForm" onSubmit={handleRateChange} className={styles.form}>
+          {rateError && <Alert tone="error">{rateError}</Alert>}
+          {blockingPayouts.length > 0 && (
+            <ul className={styles.blockingList}>
+              {blockingPayouts.map((p) => (
+                <li key={p.id}>
+                  <span>{fmtDay(p.cycle_start_date)} → {fmtDay(p.cycle_end_date)}</span>
+                  <b>{formatINR(p.net_amount, 2)}</b>
+                  <Badge tone="warning">{p.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Field label="New percentage">
+            <div className={styles.suffixInput}>
+              <input className={ui.control} type="number" step="0.01" min="0" max="100" value={newRate} onChange={(e) => setNewRate(e.target.value)} required />
+              <span>%</span>
+            </div>
+          </Field>
+          <Field label="Reason" hint="Optional — recorded in the audit log.">
+            <input className={ui.control} value={rateReason} onChange={(e) => setRateReason(e.target.value)} placeholder="e.g. Renegotiated at renewal" />
+          </Field>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!infoSalon}
+        onClose={() => setInfoSalon(null)}
+        size="md"
+        title={infoSalon?.name ?? 'Salon'}
+        header={infoSalon && <Person name={infoSalon.name} sub={infoSalon.owner} size={44} />}
+        footer={<Button variant="primary" onClick={() => setInfoSalon(null)}>Close</Button>}
+      >
+        {infoSalon && (infoLoading && infoSalon.detail == null ? (
+          <div className={styles.form}>
+            <Skeleton height={140} radius={14} />
+            <Skeleton height={100} radius={14} />
+          </div>
+        ) : infoSalon.detail ? (
+          <>
+            <div className={styles.infoStats}>
+              <div className={styles.fact}><span>Staff</span><b>{infoSalon.detail.providers?.length ?? '—'}</b></div>
+              <div className={styles.fact}><span>Services</span><b>{infoSalon.detail.services?.length ?? '—'}</b></div>
+              <div className={styles.fact}><span>Combos</span><b>{infoSalon.detail.combos?.length ?? '—'}</b></div>
+            </div>
+            <h4 className={ui.sectionLabel}>Salon</h4>
+            <DescriptionList
+              items={[
+                ['Status', infoSalon.detail.status],
+                ['City', infoSalon.detail.city?.name],
+                ['Address', infoSalon.detail.address],
+                ['Pincode', infoSalon.detail.pincode],
+                ['Gender focus', infoSalon.detail.gender_focus],
+                ['Description', infoSalon.detail.description],
+              ]}
+            />
+            <h4 className={ui.sectionLabel}>Owner</h4>
+            <DescriptionList
+              items={[
+                ['Name', infoSalon.detail.admin?.name],
+                ['Phone', infoSalon.detail.admin?.phone],
+                ['Email', infoSalon.detail.admin?.email],
+              ]}
+            />
+            <h4 className={ui.sectionLabel}>Billing</h4>
+            <DescriptionList
+              items={[
+                ['Model', infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)],
+                ['Plan', infoSalon.current_plan],
+                ...(infoSalon.billing_model === COMMISSION
+                  ? ([['Commission', pct(infoSalon.commission_percentage)]] as [string, string][])
+                  : []),
+                ['Access until', infoSalon.expiry ? fmtDay(infoSalon.expiry) : 'N/A'],
+                ['Registered', infoSalon.detail.created_at ? new Date(infoSalon.detail.created_at).toLocaleDateString('en-IN') : '—'],
+              ]}
+            />
+          </>
+        ) : (
+          <EmptyState icon="alert" title="Could not load salon details" />
+        ))}
+      </Modal>
+
+      {confirmDialog}
     </div>
   );
 }
-
-const InfoField = ({ label, value }: { label: string; value: any }) => (
-  <div>
-    <div className={styles.infoLabel}>{label}</div>
-    <div className={styles.infoValue}>{value ?? '—'}</div>
-  </div>
-);
-
-const InfoStat = ({ label, value }: { label: string; value: any }) => (
-  <div className={styles.infoStat}>
-    <div className={styles.infoStatValue}>{value ?? '—'}</div>
-    <div className={styles.infoStatLabel}>{label}</div>
-  </div>
-);

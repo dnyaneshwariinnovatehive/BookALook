@@ -450,7 +450,7 @@ export default function ReportsPage() {
                   <tbody>
                     {reviewsData.data.map((salon: any) => (
                       <tr key={salon.id}>
-                        <td><strong>{salon.name}</strong>{!salon.is_credible && <span style={{fontSize: '0.8rem', color: '#9ca3af', marginLeft: '6px'}}>(Low volume)</span>}</td>
+                        <td><strong>{salon.name}</strong>{!salon.is_credible && <span style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px'}}>(Low volume)</span>}</td>
                         <td><StatusPill status={salon.status} /></td>
                         <td>{int(salon.review_count)}</td>
                         <td className={salon.average < 3.5 ? styles.warnText : styles.okText}>{salon.average.toFixed(1)} / 5</td>

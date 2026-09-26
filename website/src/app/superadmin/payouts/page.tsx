@@ -144,7 +144,7 @@ export default function PayoutsPage() {
 
       if (!res.ok || !data.success) throw new Error(data.message || 'Could not load payouts.');
 
-      setPayouts(data.payouts);
+      setPayouts(Array.isArray(data?.payouts) ? data.payouts : []);
       setTotals(data.totals);
       setCycleEnd(data.cycle_end);
       setCycleLabel(data.cycle_label);
@@ -234,7 +234,7 @@ export default function PayoutsPage() {
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Payouts &amp; distribution</h1>
-      <p style={{ color: '#6B7280', fontSize: 14, marginTop: -8 }}>
+      <p style={{ color: 'var(--text-body)', fontSize: 14, marginTop: -8 }}>
         {cycleType === 'monthly'
           ? 'Monthly settlement for salons on the Commission Model, run on the 1st for the month just finished. Commission comes off inside this cycle, and settling extends the salon\u2019s access into the next month.'
           : 'Weekly settlement for salons on a Subscription Plan. They have already paid for access, so this only hands back the advances the platform collected on their behalf.'}
@@ -294,12 +294,12 @@ export default function PayoutsPage() {
       </div>
 
       {cycleEnd && (
-        <p style={{ color: '#6B7280', fontSize: 13, marginTop: -8 }}>
+        <p style={{ color: 'var(--text-body)', fontSize: 13, marginTop: -8 }}>
           {cycleLabel} · {cycleStart} → {cycleEnd}
         </p>
       )}
 
-      {error && <p style={{ color: '#DC2626' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
 
       {totals && (
         <div className={styles.summaryGrid}>
@@ -317,7 +317,7 @@ export default function PayoutsPage() {
           </div>
           <div className={styles.summaryTile}>
             <div className={styles.summaryLabel}>Commission earned</div>
-            <div className={styles.summaryValue} style={{ color: '#15803D' }}>
+            <div className={styles.summaryValue} style={{ color: 'var(--color-success)' }}>
               {money(totals.commission_deducted)}
             </div>
           </div>
@@ -327,7 +327,7 @@ export default function PayoutsPage() {
           </div>
           <div className={styles.summaryTile}>
             <div className={styles.summaryLabel}>Distributed</div>
-            <div className={styles.summaryValue} style={{ color: '#15803D' }}>
+            <div className={styles.summaryValue} style={{ color: 'var(--color-success)' }}>
               {money(totals.distributed)}
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function PayoutsPage() {
                   {p.distribution_reference && (
                     <>
                       <br />
-                      <small style={{ color: '#6B7280' }}>ref {p.distribution_reference}</small>
+                      <small style={{ color: 'var(--text-body)' }}>ref {p.distribution_reference}</small>
                     </>
                   )}
                 </td>
@@ -387,7 +387,7 @@ export default function PayoutsPage() {
                   {p.commission_percentage > 0 && (
                     <>
                       <br />
-                      <small style={{ color: '#6B7280' }}>at {p.commission_percentage}%</small>
+                      <small style={{ color: 'var(--text-body)' }}>at {p.commission_percentage}%</small>
                     </>
                   )}
                 </td>
@@ -396,7 +396,7 @@ export default function PayoutsPage() {
                     <div className={styles.deduction}>− {money(p.refund_adjustment)} refunds</div>
                   )}
                   {p.wallet_redeemed_amount > 0 && (
-                    <div style={{ color: '#15803D' }}>
+                    <div style={{ color: 'var(--color-success)' }}>
                       + {money(p.wallet_redeemed_amount)} coins
                     </div>
                   )}
@@ -425,7 +425,7 @@ export default function PayoutsPage() {
                       </button>
                     )}
                     {p.status === 'distributed' && (
-                      <small style={{ color: '#6B7280' }}>
+                      <small style={{ color: 'var(--text-body)' }}>
                         {p.distributed_at ? new Date(p.distributed_at).toLocaleDateString() : 'done'}
                       </small>
                     )}
@@ -441,7 +441,7 @@ export default function PayoutsPage() {
         <div className={styles.modalOverlay} onClick={() => setDistributeTarget(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Distribute Payout</h2>
-            <p style={{ color: '#4B5563', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>
+            <p style={{ color: 'var(--text-strong)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>
               Distribute <strong>{money(distributeTarget.net_amount)}</strong> to <strong>{distributeTarget.salon_name}</strong>?<br/><br/>
               {money(distributeTarget.commission_deducted)} commission is earned in this cycle.
               {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}<br/><br/>
@@ -455,13 +455,13 @@ export default function PayoutsPage() {
                 placeholder="e.g. NEFT / UTR number"
                 value={distributeReference}
                 onChange={e => setDistributeReference(e.target.value)}
-                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #D1D5DB', width: '100%', fontSize: '0.95rem' }}
+                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)', width: '100%', fontSize: '0.95rem' }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
               <button 
                 onClick={() => setDistributeTarget(null)}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #D1D5DB', background: 'white', cursor: 'pointer', fontWeight: 500 }}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-strong)', cursor: 'pointer', fontWeight: 500 }}
               >
                 Cancel
               </button>

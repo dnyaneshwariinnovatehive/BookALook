@@ -1,12 +1,14 @@
 .container {
-  padding: 24px;
+  width: 100%;
 }
 
 .title {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 24px;
-  color: var(--foreground);
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin-bottom: 8px;
+  color: var(--text-heading);
 }
 
 .section {
@@ -145,13 +147,13 @@
 .field label {
   font-size: 12px;
   font-weight: 600;
-  color: #6B7280;
+  color: var(--text-body);
 }
 
 .field input,
 .field select {
   padding: 8px 10px;
-  border: 1px solid #D1D5DB;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   font-size: 14px;
 }
@@ -164,8 +166,8 @@
 }
 
 .summaryTile {
-  background: #fff;
-  border: 1px solid #E5E7EB;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 14px 16px;
 }
@@ -175,20 +177,20 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6B7280;
+  color: var(--text-body);
 }
 
 .summaryValue {
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-heading);
   margin-top: 4px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--surface-color);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -198,26 +200,26 @@
   padding: 12px 14px;
   font-size: 12px;
   font-weight: 700;
-  color: #6B7280;
-  border-bottom: 1px solid #E5E7EB;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
 }
 
 .table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border-color);
   font-size: 14px;
-  color: #111827;
+  color: var(--text-heading);
   vertical-align: top;
 }
 
 .deduction {
-  color: #DC2626;
+  color: var(--color-danger);
   font-weight: 600;
 }
 
 .earned {
-  color: #15803D;
+  color: var(--color-success);
   font-weight: 600;
 }
 
@@ -234,11 +236,11 @@
   white-space: nowrap;
 }
 
-.pillPending { background: #FEF3C7; color: #B45309; }
-.pillApproved { background: #E0F2FE; color: #0369A1; }
-.pillDistributed { background: #DCFCE7; color: #15803D; }
-.pillSubscription { background: #E0E7FF; color: #4338CA; }
-.pillCommission { background: #F3E8FF; color: #9333EA; }
+.pillPending { background: var(--color-warning-bg); color: var(--color-warning); }
+.pillApproved { background: var(--color-info-bg); color: var(--color-info); }
+.pillDistributed { background: var(--color-success-bg); color: var(--color-success); }
+.pillSubscription { background: var(--accent-soft); color: var(--accent-text); }
+.pillCommission { background: var(--accent-soft); color: var(--accent-text); }
 
 .rowActions {
   display: flex;
@@ -249,17 +251,17 @@
 .smallButton {
   padding: 6px 12px;
   border-radius: 8px;
-  border: 1px solid #D1D5DB;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-color);
   font-size: 13px;
   cursor: pointer;
 }
 
-.smallButton:hover:not(:disabled) { background: #F9FAFB; }
+.smallButton:hover:not(:disabled) { background: var(--surface-2); }
 .smallButton:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .payButton {
-  border-color: #16A34A;
-  color: #16A34A;
+  border-color: var(--color-success);
+  color: var(--color-success);
   font-weight: 600;
 }

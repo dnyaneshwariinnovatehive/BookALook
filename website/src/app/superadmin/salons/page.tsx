@@ -254,7 +254,7 @@ export default function SalonDirectory() {
                       ))}
                     </select>
                     {justAssignedIds.includes(salon.id) && (
-                      <span style={{ marginLeft: '8px', color: '#2e7d32', fontSize: '0.8rem', fontWeight: 600 }}>✓ Saved</span>
+                      <span style={{ marginLeft: '8px', color: 'var(--color-success)', fontSize: '0.8rem', fontWeight: 600 }}>✓ Saved</span>
                     )}
                   </td>
                   <td className={styles.td}>

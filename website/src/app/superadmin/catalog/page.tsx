@@ -349,7 +349,7 @@ export default function CatalogPage() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span className={styles.categoryName}>
                     {cat.name} 
-                    <span style={{ fontSize: '0.85rem', color: '#6B7280', fontWeight: 500, marginLeft: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-body)', fontWeight: 500, marginLeft: '8px' }}>
                       ({cat.templates?.length || 0})
                     </span>
                   </span>
@@ -412,7 +412,7 @@ export default function CatalogPage() {
             
             <div className={styles.templatesList}>
               {viewingCategory.templates.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#6B7280', padding: '24px' }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-body)', padding: '24px' }}>
                   No templates configured in this category yet.
                 </div>
               ) : (

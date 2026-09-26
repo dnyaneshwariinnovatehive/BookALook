@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import styles from '../salon-approval/page.module.css';
+import ui from './page.module.css';
 
 interface CollaboratorStat {
   id: string;
@@ -125,82 +126,53 @@ export default function CollaboratorManagement() {
       </div>
 
       {/* Create Form */}
-      <div style={{ marginBottom: '3rem', padding: '2rem', background: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Add New Collaborator</h2>
-        
+      <div className={ui.card}>
+        <h2 className={ui.cardTitle}>Add new collaborator</h2>
+        <p className={ui.cardDesc}>Collaborators are matched to salon enquiries from the area they cover.</p>
+
         {submitStatus === 'success' && (
-          <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', marginBottom: '1rem' }}>
-            Collaborator created successfully!
-          </div>
+          <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">Collaborator created successfully.</div>
         )}
-        
+
         {submitStatus === 'error' && (
-          <div style={{ padding: '1rem', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', marginBottom: '1rem' }}>
-            {submitError}
-          </div>
+          <div className={`${ui.alert} ${ui.alertError}`} role="alert">{submitError}</div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Name *</label>
-            <input 
-              type="text" 
-              name="name" 
-              required 
-              value={formData.name} 
-              onChange={handleInputChange}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-            />
-          </div>
+        <form onSubmit={handleSubmit} className={ui.form}>
+          <label className={ui.field}>
+            <span className={ui.label}>Name<span className={ui.required}>*</span></span>
+            <input className={ui.input} type="text" name="name" required value={formData.name} onChange={handleInputChange} placeholder="Full name" />
+          </label>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Phone Number *</label>
-            <input 
-              type="tel" 
-              name="phone" 
-              required 
-              value={formData.phone} 
-              onChange={handleInputChange}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-            />
-          </div>
+          <label className={ui.field}>
+            <span className={ui.label}>Phone number<span className={ui.required}>*</span></span>
+            <input className={ui.input} type="tel" name="phone" required value={formData.phone} onChange={handleInputChange} placeholder="10-digit mobile" />
+          </label>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Email Address</label>
-            <input 
-              type="email" 
-              name="email" 
-              value={formData.email} 
-              onChange={handleInputChange}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-            />
-          </div>
+          <label className={ui.field}>
+            <span className={ui.label}>Email address</span>
+            <input className={ui.input} type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="name@example.com" />
+          </label>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City *</label>
-            <select
-              name="city_id"
-              required
-              value={formData.city_id}
-              onChange={handleInputChange}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
-            >
+          <label className={ui.field}>
+            <span className={ui.label}>City<span className={ui.required}>*</span></span>
+            <select className={ui.input} name="city_id" required value={formData.city_id} onChange={handleInputChange}>
               <option value="">Select city</option>
               {cities.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}, {c.state}</option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Area *</label>
+          <label className={ui.field}>
+            <span className={ui.label}>Area<span className={ui.required}>*</span></span>
             <select
+              className={ui.input}
               name="sub_area_id"
               required
               disabled={!formData.city_id || loadingAreas}
               value={formData.sub_area_id}
               onChange={handleInputChange}
-              style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
             >
               <option value="">
                 {!formData.city_id
@@ -215,27 +187,12 @@ export default function CollaboratorManagement() {
                 <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
-            <p style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#777' }}>
-              Enquiries from this area are offered to them first.
-            </p>
-          </div>
+            <span className={ui.hint}>Enquiries from this area are offered to them first.</span>
+          </label>
 
-          <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <button 
-              type="submit" 
-              disabled={submitStatus === 'submitting'}
-              style={{ 
-                padding: '0.75rem 2rem', 
-                backgroundColor: '#0070f3', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '8px', 
-                fontWeight: 'bold',
-                cursor: submitStatus === 'submitting' ? 'not-allowed' : 'pointer',
-                opacity: submitStatus === 'submitting' ? 0.7 : 1
-              }}
-            >
-              {submitStatus === 'submitting' ? 'Creating...' : 'Create Collaborator'}
+          <div className={ui.actions}>
+            <button type="submit" className={ui.submit} disabled={submitStatus === 'submitting'}>
+              {submitStatus === 'submitting' ? 'Creating…' : 'Create collaborator'}
             </button>
           </div>
         </form>
@@ -243,7 +200,7 @@ export default function CollaboratorManagement() {
 
       {/* Collaborators List */}
       <div>
-        <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>All Collaborators</h2>
+        <h2 className={ui.sectionTitle}>All collaborators</h2>
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
@@ -259,7 +216,7 @@ export default function CollaboratorManagement() {
               {loading ? (
                 <tr><td colSpan={5} className={styles.emptyState}>Loading collaborators...</td></tr>
               ) : error ? (
-                <tr><td colSpan={5} className={styles.emptyState} style={{ color: 'red' }}>{error}</td></tr>
+                <tr><td colSpan={5} className={`${styles.emptyState} ${ui.errorText}`}>{error}</td></tr>
               ) : collaborators.length === 0 ? (
                 <tr><td colSpan={5} className={styles.emptyState}>No collaborators found.</td></tr>
               ) : (
@@ -269,13 +226,8 @@ export default function CollaboratorManagement() {
                     <td className={styles.td}>{collab.phone || 'N/A'}</td>
                     <td className={styles.td}>{collab.email || 'N/A'}</td>
                     <td className={styles.td}>{new Date(collab.created_at).toLocaleDateString()}</td>
-                    <td className={styles.td} style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                      <span style={{ 
-                        padding: '4px 12px', 
-                        borderRadius: '12px', 
-                        backgroundColor: collab.onboarded_salons_count > 0 ? '#e0f2f1' : '#f5f5f5',
-                        color: collab.onboarded_salons_count > 0 ? '#00796b' : '#666'
-                      }}>
+                    <td className={styles.td} style={{ textAlign: 'right' }}>
+                      <span className={`${ui.countPill} ${collab.onboarded_salons_count > 0 ? ui.countPillActive : ''}`}>
                         {collab.onboarded_salons_count}
                       </span>
                     </td>

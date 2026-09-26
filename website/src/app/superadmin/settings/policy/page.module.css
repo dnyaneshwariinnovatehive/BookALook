@@ -1,9 +1,7 @@
 .container {
-  padding: 2rem;
-  max-width: 780px;
-  margin: 0 auto;
+  max-width: 860px;
   /* Room for the sticky save bar so the last field is never trapped under it. */
-  padding-bottom: 7rem;
+  padding-bottom: 5rem;
 }
 
 .loading {
@@ -18,8 +16,10 @@
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   color: var(--text-heading);
   margin: 0 0 0.5rem;
 }

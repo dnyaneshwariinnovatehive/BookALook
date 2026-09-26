@@ -1,42 +1,83 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
+/* ============================================================
+   Design tokens
+   One source of truth for both themes. Components should only
+   ever reference these — never a raw hex — so light and dark
+   stay in lockstep. `.dark` is set on <html> by the inline
+   script in app/layout.tsx before first paint.
+   ============================================================ */
 :root {
+  color-scheme: light;
+
   /* Brand / Accent */
   --accent-color: #9C54F2;
-  --accent-hover: #7B32EC;
-  --accent-gradient: linear-gradient(135deg, #9C54F2 0%, #7B32EC 100%);
+  --accent-hover: #8540EE;
+  --accent-text: #7B32EC;            /* accent used as text: 5.9:1 on white */
+  --accent-gradient: linear-gradient(135deg, #A462F4 0%, #7B32EC 100%);
   --accent-soft: #F3EBFE;
   --accent-soft-hover: #E9DAFD;
+  --accent-ring: rgba(156, 84, 242, 0.28);
+  --gold: #C9A24B;
 
-  /* Backgrounds */
-  --bg-color: #F8F7FC;
+  /* Surfaces — canvas → card → inset → hover */
+  --bg-color: #F6F5FA;
   --surface-color: #FFFFFF;
+  --surface-2: #FAF9FD;
+  --surface-3: #F2F0F7;
+  --surface-overlay: rgba(20, 14, 32, 0.46);
+  --surface-glass: rgba(255, 255, 255, 0.78);
 
-  /* Text */
-  --text-heading: #1C1726;
-  --text-body: #7C758D;
-  --text-light: #B7B2C5;
+  /* Text — heading / strong / body / muted / light */
+  --text-heading: #1A1523;
+  --text-strong: #3B3450;
+  --text-body: #5F5873;
+  --text-muted: #8A849C;
+  --text-light: #A9A4B8;
+  --text-on-accent: #FFFFFF;
 
   /* Borders */
-  --border-color: #ECEAF2;
+  --border-color: #ECE9F2;
+  --border-strong: #DCD7E6;
 
-  /* Shadows (purple-tinted) */
-  --shadow-soft: 0 8px 30px rgba(156, 84, 242, 0.04);
-  --shadow-medium: 0 12px 40px rgba(156, 84, 242, 0.08);
-  --shadow-card: 0 4px 20px rgba(156, 84, 242, 0.02);
+  /* Shadows (purple-tinted, layered) */
+  --shadow-xs: 0 1px 2px rgba(26, 21, 35, 0.05);
+  --shadow-soft: 0 1px 2px rgba(26, 21, 35, 0.04), 0 8px 24px rgba(92, 52, 160, 0.05);
+  --shadow-medium: 0 2px 6px rgba(26, 21, 35, 0.05), 0 16px 40px rgba(92, 52, 160, 0.10);
+  --shadow-card: 0 1px 2px rgba(26, 21, 35, 0.04), 0 4px 16px rgba(92, 52, 160, 0.04);
+  --shadow-pop: 0 10px 38px rgba(26, 21, 35, 0.16), 0 2px 8px rgba(26, 21, 35, 0.06);
   --card-shadow: var(--shadow-card);
 
-  /* Semantic / Status Colors */
-  --color-success: #2E7D32;
-  --color-success-bg: #E8F5E9;
-  --color-warning: #EF6C00;
-  --color-warning-bg: #FFF3E0;
+  /* Semantic / Status */
+  --color-success: #18794E;
+  --color-success-bg: #E6F6EC;
+  --color-success-border: #B7E3C8;
+  --color-warning: #B25B05;
+  --color-warning-bg: #FFF2E0;
+  --color-warning-border: #F9D2A0;
   --color-danger: #C62828;
-  --color-danger-bg: #FFEBEE;
-  --color-info: #1565C0;
-  --color-info-bg: #E3F2FD;
+  --color-danger-bg: #FDECEC;
+  --color-danger-border: #F5C2C2;
+  --color-danger-solid: #DC2626;
+  --color-danger-solid-hover: #B91C1C;
+  --color-info: #1D5FB8;
+  --color-info-bg: #E6F0FC;
+  --color-info-border: #B9D3F5;
   --color-notes-bg: #FFF8E1;
+
+  /* Charts */
+  --chart-1: #9C54F2;
+  --chart-2: #14B8A6;
+  --chart-3: #F59E0B;
+  --chart-4: #EF4444;
+  --chart-5: #3B82F6;
+  --chart-grid: #ECE9F2;
+  --chart-axis: #8A849C;
+  --chart-cursor: rgba(156, 84, 242, 0.07);
+
+  /* Skeleton shimmer */
+  --skeleton-base: #EEEBF4;
+  --skeleton-shine: rgba(255, 255, 255, 0.65);
 
   /* Warm Brown System */
   --brown-dark: #2A2320;
@@ -46,53 +87,91 @@
   --brown-light-bg: #E3D9CE;
 
   /* Typography & Motion */
-  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --transition-speed: 0.3s;
+  --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --transition-speed: 0.2s;
   --transition-cubic: cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* Aliases */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Aliases (kept for existing modules) */
   --background: var(--bg-color);
   --foreground: var(--text-heading);
   --surface: var(--surface-color);
   --border: var(--border-color);
   --accent: var(--accent-color);
-  --radius-lg: 24px;
-  --radius-pill: 999px;
+  --text-primary: var(--text-heading);
+  --text-secondary: var(--text-body);
+  --surface-subtle: var(--surface-2);
 }
 
 .dark {
-  --bg-color: #13111A;
-  --surface-color: #1D1A26;
-  --text-heading: #F3F0FA;
-  --text-body: #A7A1B8;
-  --text-light: #676275;
-  --border-color: #2B2738;
+  color-scheme: dark;
 
-  --accent-hover: #8D41EA;
-  --accent-soft: #2C223C;
-  --accent-soft-hover: #3B2D50;
+  --accent-color: #A366F5;
+  --accent-hover: #B27CF7;
+  --accent-text: #C29BFA;
+  --accent-soft: rgba(163, 102, 245, 0.14);
+  --accent-soft-hover: rgba(163, 102, 245, 0.22);
+  --accent-ring: rgba(178, 124, 247, 0.38);
 
-  --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.3);
-  --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.2);
+  --bg-color: #0E0C14;
+  --surface-color: #16131E;
+  --surface-2: #1B1825;
+  --surface-3: #231F2F;
+  --surface-overlay: rgba(4, 2, 10, 0.66);
+  --surface-glass: rgba(22, 19, 30, 0.78);
+
+  --text-heading: #F4F1FA;
+  --text-strong: #D9D4E6;
+  --text-body: #ABA5BD;
+  --text-muted: #837D96;
+  --text-light: #635E74;
+
+  --border-color: #272334;
+  --border-strong: #363146;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-medium: 0 2px 6px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.015);
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --card-shadow: var(--shadow-card);
 
-  --color-success: #81C784;
-  --color-success-bg: #1B3F22;
-  --color-warning: #FFB74D;
-  --color-warning-bg: #3E2712;
-  --color-danger: #E57373;
-  --color-danger-bg: #4A1C1C;
-  --color-info: #64B5F6;
-  --color-info-bg: #0D2744;
-  --color-notes-bg: #3E2712;
-  
-  /* Aliases */
-  --background: var(--bg-color);
-  --foreground: var(--text-heading);
-  --surface: var(--surface-color);
-  --border: var(--border-color);
-  --accent: var(--accent-color);
+  --color-success: #5FD39A;
+  --color-success-bg: rgba(52, 199, 123, 0.13);
+  --color-success-border: rgba(52, 199, 123, 0.3);
+  --color-warning: #F7B955;
+  --color-warning-bg: rgba(245, 166, 35, 0.13);
+  --color-warning-border: rgba(245, 166, 35, 0.3);
+  --color-danger: #F58A8A;
+  --color-danger-bg: rgba(239, 68, 68, 0.14);
+  --color-danger-border: rgba(239, 68, 68, 0.32);
+  --color-danger-solid: #DC3B3B;
+  --color-danger-solid-hover: #E85555;
+  --color-info: #7DB5F7;
+  --color-info-bg: rgba(59, 130, 246, 0.14);
+  --color-info-border: rgba(59, 130, 246, 0.32);
+  --color-notes-bg: rgba(245, 166, 35, 0.1);
+
+  --chart-1: #B27CF7;
+  --chart-2: #2DD4BF;
+  --chart-3: #FBBF24;
+  --chart-4: #F87171;
+  --chart-5: #60A5FA;
+  --chart-grid: #262232;
+  --chart-axis: #7D778F;
+  --chart-cursor: rgba(178, 124, 247, 0.09);
+
+  --skeleton-base: #221E2D;
+  --skeleton-shine: rgba(255, 255, 255, 0.05);
 }
 
 html {
@@ -114,6 +193,7 @@ body {
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -127,30 +207,146 @@ a {
   text-decoration: none;
 }
 
+::selection {
+  background: var(--accent-soft-hover);
+  color: var(--text-heading);
+}
+
+/* Form controls inherit the theme instead of the UA's white defaults. */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+select option {
+  background: var(--surface-color);
+  color: var(--text-heading);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
+/* Thin, theme-aware scrollbars everywhere */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: var(--text-light); }
+
+/* Smooth theme swaps without animating every hover */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, fill 0.25s ease, stroke 0.25s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Recharts: tooltips follow the theme */
+.recharts-default-tooltip {
+  background: var(--surface-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-pop) !important;
+  padding: 10px 14px !important;
+  color: var(--text-heading);
+  font-size: 13px;
+}
+.recharts-tooltip-label {
+  color: var(--text-muted) !important;
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px !important;
+}
+.recharts-legend-item-text {
+  color: var(--text-body) !important;
+  font-size: 13px;
+}
+.recharts-cartesian-axis-tick-value,
+.recharts-cartesian-axis-tick text {
+  fill: var(--chart-axis) !important;
+}
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid) !important;
+}
+.recharts-rectangle.recharts-tooltip-cursor {
+  fill: var(--chart-cursor) !important;
+}
+.recharts-curve.recharts-tooltip-cursor {
+  stroke: var(--border-strong) !important;
+}
+.recharts-pie-sector path,
+.recharts-sector {
+  stroke: var(--surface-color);
+}
+.recharts-surface:focus,
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus {
+  outline: none;
+}
+
 /* React Select Theme Overrides */
 .react-select__control {
-  background-color: transparent !important;
-  border-color: var(--border) !important;
+  background-color: var(--surface-color) !important;
+  border-color: var(--border-strong) !important;
   color: var(--foreground) !important;
   border-radius: 12px !important;
   padding: 2px !important;
 }
 
 .react-select__control--is-focused {
-  box-shadow: 0 0 0 3px rgba(156,84,242,0.1) !important;
+  box-shadow: 0 0 0 3px var(--accent-ring) !important;
   border-color: var(--accent) !important;
 }
 
-.react-select__single-value, 
+.react-select__single-value,
 .react-select__input-container {
   color: var(--foreground) !important;
+}
+
+.react-select__placeholder {
+  color: var(--text-muted) !important;
 }
 
 .react-select__menu {
   background-color: var(--surface) !important;
   border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-pop) !important;
   z-index: 100 !important;
   border-radius: 12px !important;
+  overflow: hidden;
 }
 
 .react-select__option {
@@ -159,12 +355,21 @@ a {
 }
 
 .react-select__option--is-focused {
-  background-color: var(--background) !important;
+  background-color: var(--surface-3) !important;
 }
 
 .react-select__option--is-selected {
   background-color: var(--accent) !important;
   color: white !important;
+}
+
+.react-select__multi-value {
+  background-color: var(--accent-soft) !important;
+  border-radius: 8px !important;
+}
+
+.react-select__multi-value__label {
+  color: var(--accent-text) !important;
 }
 
 /* Primary Button Style */
@@ -187,13 +392,13 @@ a {
 }
 
 .btn-primary:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
 }
 
 /* Secondary Button Style */
 .btn-secondary {
   background: var(--accent-soft);
-  color: var(--accent-color);
+  color: var(--accent-text);
   border-radius: 12px;
   padding: 12px 24px;
   font-weight: 600;
@@ -208,7 +413,7 @@ a {
 }
 
 .btn-secondary:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
 }
 
 /* ============================================================

@@ -355,7 +355,7 @@ export default function BannersPage() {
           <button 
             disabled={currentPage === 1}
             onClick={() => setCurrentPage(p => p - 1)}
-            style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid #ccc' }}
+            style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)' }}
           >
             Previous
           </button>
@@ -365,7 +365,7 @@ export default function BannersPage() {
           <button 
             disabled={currentPage === lastPage}
             onClick={() => setCurrentPage(p => p + 1)}
-            style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid #ccc' }}
+            style={{ padding: '8px 16px', borderRadius: '4px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)' }}
           >
             Next
           </button>
@@ -406,12 +406,12 @@ export default function BannersPage() {
                   }} 
                   required={!editingBannerId} 
                 />
-                <small style={{ color: '#666', marginTop: '4px', display: 'block' }}>
+                <small style={{ color: 'var(--text-body)', marginTop: '4px', display: 'block' }}>
                   Recommended size: 800x400px (2:1 ratio) for consistent carousel appearance.
                 </small>
                 {imagePreviewUrl && (
                   <div style={{ marginTop: '10px' }}>
-                    <p style={{ fontSize: '14px', marginBottom: '4px', color: '#666' }}>Preview:</p>
+                    <p style={{ fontSize: '14px', marginBottom: '4px', color: 'var(--text-body)' }}>Preview:</p>
                     <img 
                       src={imagePreviewUrl} 
                       alt="Banner Preview" 
@@ -421,7 +421,7 @@ export default function BannersPage() {
                         maxHeight: '200px', 
                         objectFit: 'cover', 
                         borderRadius: '8px',
-                        border: '1px solid #ddd'
+                        border: '1px solid var(--border-color)'
                       }} 
                     />
                   </div>

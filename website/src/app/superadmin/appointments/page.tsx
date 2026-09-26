@@ -1,7 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import Icon, { type IconName } from '@/components/admin/Icon';
+import {
+  Alert, Badge, Button, Card, DescriptionList, Drawer, EmptyState, Field, IconButton, Modal,
+  PageHeader, Pagination, Person, SearchInput, Segmented, Skeleton, Tabs, clickableRow, cx,
+  downloadCSV, formatINR, localISODate, ui, useDebounced, type Tone,
+} from '@/components/admin/ui';
 import styles from './page.module.css';
 
 // The API is Laravel, so every relation arrives snake_cased.
@@ -46,9 +53,18 @@ interface ServiceAddition {
   added_at?: string;
 }
 
+interface SalonRef {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  status?: string;
+}
+
 interface Appointment {
   id: string;
-  salon: { id: string; name: string; phone?: string; email?: string; address?: string; status?: string };
+  salon: SalonRef;
   customer?: UserRef | null;
   appointed_provider?: ProviderRef | null;
   serving_provider?: ProviderRef | null;
@@ -99,169 +115,226 @@ interface Salon {
   name: string;
 }
 
+type DateMode = 'specific' | 'week' | 'month' | 'lifetime';
+type DetailsTab = 'overview' | 'services' | 'payment' | 'timeline';
+
+// Mid-appointment additions are driven from the partner app for now; the
+// admin form stays wired up but hidden until it gets real pickers.
+const ADD_SERVICE_ENABLED = false;
+
+const POLL_MS = 5000;
+
+const STATUS_META: Record<string, { label: string; tone: Tone; pulse?: boolean }> = {
+  scheduled: { label: 'Scheduled', tone: 'info' },
+  in_progress: { label: 'In progress', tone: 'accent', pulse: true },
+  completed: { label: 'Completed', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+  no_show: { label: 'No-show', tone: 'danger' },
+  awaiting_reschedule: { label: 'Awaiting reschedule', tone: 'warning' },
+};
+
+// Statuses where a balance can still be collected at the salon.
+const OPEN_STATUSES = new Set(['scheduled', 'in_progress', 'awaiting_reschedule']);
+
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  ...Object.entries(STATUS_META).map(([value, m]) => ({ value, label: m.label })),
+];
+
+const SOURCE_META: Record<string, { label: string; icon: IconName }> = {
+  online: { label: 'Customer app', icon: 'smartphone' },
+  walk_in: { label: 'Walk-in', icon: 'walkIn' },
+  phone: { label: 'Phone', icon: 'phone' },
+};
+
+// ---------------------------------------------------------------- display
+
+const statusMeta = (status: string) =>
+  STATUS_META[status] ?? { label: status.replace(/_/g, ' '), tone: 'neutral' as Tone };
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const m = statusMeta(status);
+  return <Badge tone={m.tone} pulse={m.pulse}>{m.label}</Badge>;
+};
+
+const providerName = (apt: Appointment) =>
+  apt.serving_provider?.user?.name || apt.appointed_provider?.user?.name || null;
+
+const serviceName = (line: { service?: ServiceRef }) =>
+  line.service?.template?.name || 'Unnamed service';
+
+const serviceNames = (apt: Appointment) => [
+  ...(apt.services || []).map(serviceName),
+  ...(apt.service_additions || []).map(serviceName),
+];
+
+const customerName = (apt: Appointment) =>
+  apt.customer?.name || apt.walk_in_customer_name || 'Walk-in';
+
+const customerPhone = (apt: Appointment) =>
+  apt.customer?.phone || apt.walk_in_customer_phone || null;
+
+const sourceLabel = (source?: string) => SOURCE_META[source ?? '']?.label ?? source ?? '—';
+
+const money = (value?: string | number | null) => formatINR(value, 2);
+
+const verificationLabel = (method?: string) => {
+  if (!method) return undefined;
+  if (method === 'qr') return 'QR scan';
+  if (method.length <= 3) return method.toUpperCase();
+  return method.replace(/_/g, ' ');
+};
+
+const dateTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+
+/** "2026-09-25" → a local date (new Date(iso) would be UTC midnight). */
+const parseDay = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+const dayLabel = (iso: string) =>
+  parseDay(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+
+/** "14:30:00" → "2:30 pm" */
+const clock = (t?: string) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h)) return t;
+  const d = new Date();
+  d.setHours(h, m || 0, 0, 0);
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+};
+
+const addDays = (iso: string, days: number) => {
+  const d = parseDay(iso);
+  d.setDate(d.getDate() + days);
+  return localISODate(d);
+};
+
 export default function GlobalAppointmentsDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+
   // Filters
-  const [dateMode, setDateMode] = useState('specific');
-  const [date, setDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [dateMode, setDateMode] = useState<DateMode>('specific');
+  const [date, setDate] = useState(() => localISODate());
   const [status, setStatus] = useState('');
   const [salonId, setSalonId] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search);
   const [page, setPage] = useState(1);
   const [salons, setSalons] = useState<Salon[]>([]);
 
-  // Modal states
+  // Overlays
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [providerId, setProviderId] = useState('');
   const [addServiceError, setAddServiceError] = useState('');
-  const [infoModalData, setInfoModalData] = useState<{type: 'salon' | 'customer', data: any} | null>(null);
+  const [infoModalData, setInfoModalData] = useState<{ type: 'salon' | 'customer'; data: SalonRef | UserRef } | null>(null);
   const [detailsAppointment, setDetailsAppointment] = useState<Appointment | null>(null);
-  const [activeDetailsTab, setActiveDetailsTab] = useState('Overview');
+  const [activeDetailsTab, setActiveDetailsTab] = useState<DetailsTab>('overview');
 
-  // We should ideally fetch services and providers based on the selected salon, 
-  // but for the demo, we'll keep it simple.
+  const router = useRouter();
 
-  const fetchAppointments = async (isPolling = false) => {
-    if (!isPolling) setLoading(true);
+  // Polls overlap with filter changes; only the newest request may land.
+  const requestSeq = useRef(0);
+
+  // Loading is derived: true until a response for the current filters lands.
+  const queryKey = [date, dateMode, status, salonId, debouncedSearch, page].join('|');
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== queryKey;
+
+  const fetchAppointments = useCallback(async (isPolling = false) => {
+    const seq = ++requestSeq.current;
     try {
       const queryParams = new URLSearchParams();
+      const today = localISODate();
       if (dateMode === 'specific' && date) {
         queryParams.append('date', date);
       } else if (dateMode === 'week') {
-        const today = new Date();
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        queryParams.append('start_date', today.toISOString().split('T')[0]);
-        queryParams.append('end_date', nextWeek.toISOString().split('T')[0]);
+        queryParams.append('start_date', today);
+        queryParams.append('end_date', addDays(today, 7));
       } else if (dateMode === 'month') {
         const d = new Date();
-        const start = new Date(d.getFullYear(), d.getMonth(), 1);
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-        queryParams.append('start_date', start.toISOString().split('T')[0]);
-        queryParams.append('end_date', end.toISOString().split('T')[0]);
+        queryParams.append('start_date', localISODate(new Date(d.getFullYear(), d.getMonth(), 1)));
+        queryParams.append('end_date', localISODate(new Date(d.getFullYear(), d.getMonth() + 1, 0)));
       }
 
       if (status) queryParams.append('status', status);
       if (salonId) queryParams.append('salon_id', salonId);
-      if (search) queryParams.append('search', search);
+      if (debouncedSearch) queryParams.append('search', debouncedSearch);
       queryParams.append('page', page.toString());
 
       const res = await fetch(`/api/proxy/superadmin/appointments?${queryParams.toString()}`);
-      
+
       if (!res.ok) {
         if (res.status === 401) {
-          window.location.href = '/login';
+          router.push('/login');
           return;
         }
         const errorData = await res.json().catch(() => null);
         throw new Error(errorData?.message || 'Failed to fetch appointments');
       }
-      
-      const json = await res.json();
-      setAppointments(json.data);
-      setMeta({
-        current_page: json.current_page,
-        last_page: json.last_page,
-        total: json.total
-      });
-      setError(''); // Clear error if fetch succeeds
-    } catch (err: any) {
-      if (!isPolling) setError(err.message);
-    } finally {
-      if (!isPolling) setLoading(false);
-    }
-  };
 
-  const fetchSalons = async () => {
-    try {
-      const res = await fetch('/api/proxy/superadmin/salons?per_page=100');
-      if (res.ok) {
-        const json = await res.json();
-        setSalons(json.data || []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch salons', e);
+      const json = await res.json();
+      if (seq !== requestSeq.current) return;
+      setAppointments(Array.isArray(json.data) ? json.data : []);
+      setMeta({
+        current_page: json.current_page ?? 1,
+        last_page: json.last_page ?? 1,
+        total: json.total ?? 0,
+      });
+      setLastSynced(new Date());
+      setError('');
+      setLoadedKey(queryKey);
+    } catch (err) {
+      if (!isPolling && seq === requestSeq.current) setError(err instanceof Error ? err.message : 'Failed to fetch appointments');
+    } finally {
+      if (!isPolling && seq === requestSeq.current) setLoadedKey(queryKey);
     }
-  };
+  }, [date, dateMode, status, salonId, debouncedSearch, page, queryKey, router]);
 
   useEffect(() => {
-    fetchSalons();
+    fetch('/api/proxy/superadmin/salons?per_page=100')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => json && setSalons(json.data || []))
+      .catch((e) => console.error('Failed to fetch salons', e));
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is only set after the network responds
     fetchAppointments();
-    
-    // Poll every 5 seconds for real-time updates
+
+    // Near-real-time: poll while the tab is visible, catch up when it returns.
     const intervalId = setInterval(() => {
-      fetchAppointments(true);
-    }, 5000);
+      if (!document.hidden) fetchAppointments(true);
+    }, POLL_MS);
+    const onVisible = () => {
+      if (!document.hidden) fetchAppointments(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
-    return () => clearInterval(intervalId);
-  }, [date, dateMode, status, salonId, search, page]);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchAppointments]);
 
-  const getStatusBadgeClass = (status: string) => {
-    switch(status) {
-      case 'scheduled': return styles.badgeScheduled;
-      case 'in_progress': return styles.badgeInProgress;
-      case 'completed': return styles.badgeCompleted;
-      case 'cancelled': return styles.badgeCancelled;
-      case 'no_show': return styles.badgeNoShow;
-      case 'awaiting_reschedule': return styles.badgeAwaitingReschedule;
-      default: return styles.badgeScheduled;
-    }
-  };
-
-  const formatStatus = (status: string) => {
-    return status.replace(/_/g, ' ');
-  };
-
-  // ---------------------------------------------------------------- display
-
-  const providerName = (apt: Appointment) =>
-    apt.serving_provider?.user?.name || apt.appointed_provider?.user?.name || null;
-
-  const serviceName = (line: { service?: ServiceRef }) =>
-    line.service?.template?.name || 'Unnamed service';
-
-  const serviceNames = (apt: Appointment) => [
-    ...(apt.services || []).map(serviceName),
-    ...(apt.service_additions || []).map(serviceName),
-  ];
-
-  const customerName = (apt: Appointment) =>
-    apt.customer?.name || apt.walk_in_customer_name || 'Walk-in';
-
-  const customerPhone = (apt: Appointment) =>
-    apt.customer?.phone || apt.walk_in_customer_phone || null;
-
-  const sourceLabel = (source?: string) => {
-    switch (source) {
-      case 'online': return 'Customer app';
-      case 'walk_in': return 'Walk-in';
-      case 'phone': return 'Phone';
-      default: return source || '—';
-    }
-  };
-
-  const money = (value?: string | number | null) =>
-    value === null || value === undefined || value === '' ? '—' : `₹${Number(value).toFixed(2)}`;
-
-  const dateTime = (value?: string | null) =>
-    value ? new Date(value).toLocaleString() : '—';
+  // Keep an open drawer in sync with the latest poll.
+  const liveDetails = useMemo(
+    () => (detailsAppointment ? appointments.find((a) => a.id === detailsAppointment.id) ?? detailsAppointment : null),
+    [appointments, detailsAppointment],
+  );
 
   const handleAddService = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddServiceError('');
-    
+
     try {
       const res = await fetch(`/api/proxy/superadmin/appointments/${selectedAppointmentId}/add-service`, {
         method: 'POST',
@@ -274,9 +347,9 @@ export default function GlobalAppointmentsDashboard() {
           provider_id: providerId
         })
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok) {
         setIsAddServiceModalOpen(false);
         setServiceId('');
@@ -284,588 +357,598 @@ export default function GlobalAppointmentsDashboard() {
         fetchAppointments();
       } else {
         if (res.status === 401) {
-          window.location.href = '/login';
+          router.push('/login');
           return;
         }
         setAddServiceError(data.message || 'Failed to add service.');
       }
-    } catch (err: any) {
-      setAddServiceError(err.message);
+    } catch (err) {
+      setAddServiceError(err instanceof Error ? err.message : 'Failed to add service.');
     }
   };
 
-  // Generate date strip (-3 days to +10 days)
-  const generateDateStrip = () => {
-    const dates = [];
-    for (let i = -3; i <= 10; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      dates.push(d);
-    }
-    return dates;
+  const openDetails = (apt: Appointment) => {
+    setDetailsAppointment(apt);
+    setActiveDetailsTab('overview');
   };
-  const dateStrip = generateDateStrip();
+
+  const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setPage(1);
+  };
+
+  const exportPage = () =>
+    downloadCSV(
+      `appointments-${dateMode === 'specific' ? date : dateMode}.csv`,
+      ['Date', 'Start', 'End', 'Customer', 'Phone', 'Salon', 'Staff', 'Services', 'Source', 'Status', 'Total', 'Advance', 'Balance', 'Final billed'],
+      appointments.map((a) => [
+        a.appointment_date?.slice(0, 10), a.start_time, a.end_time ?? '', customerName(a), customerPhone(a) ?? '',
+        a.salon?.name, providerName(a) ?? '', serviceNames(a).join(' | '), sourceLabel(a.booking_source),
+        statusMeta(a.status).label, a.total_amount, a.advance_amount ?? '', a.balance_amount ?? '', a.final_billed_amount ?? '',
+      ]),
+    );
+
+  // 3 days back to 10 days ahead, anchored on today.
+  const today = localISODate();
+  const dateStrip = useMemo(() => Array.from({ length: 14 }, (_, i) => addDays(today, i - 3)), [today]);
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector<HTMLElement>('[data-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [date, dateMode]);
+
+  const rangeTitle =
+    dateMode === 'specific'
+      ? date === today ? 'Today' : dayLabel(date)
+      : dateMode === 'week' ? 'Next 7 days' : dateMode === 'month' ? 'This month' : 'All time';
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Global Appointments</h1>
-          <p className={styles.subtitle}>View and manage all appointments across all salons.</p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Operations"
+        title="Appointments"
+        subtitle="Every booking across every salon, updated live."
+        actions={
+          <>
+            <span className={styles.liveTag} title={lastSynced ? `Last synced ${lastSynced.toLocaleTimeString('en-IN')}` : undefined}>
+              <span className={styles.liveDot} />
+              Live
+              {lastSynced && (
+                <span className={styles.liveTime}>
+                  {lastSynced.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+            </span>
+            <Button icon="download" onClick={exportPage} disabled={appointments.length === 0}>
+              Export
+            </Button>
+          </>
+        }
+      />
 
-      <div className={styles.controlsCard}>
-        <div className={styles.filtersRow}>
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Date Range</label>
-            <select 
-              className={styles.selectInput} 
-              value={dateMode} 
-              onChange={(e) => { setDateMode(e.target.value); setPage(1); }}
-            >
-              <option value="specific">Specific Date</option>
-              <option value="week">Next 7 Days</option>
-              <option value="month">This Month</option>
-              <option value="lifetime">Lifetime</option>
-            </select>
-          </div>
-
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Salon</label>
-            <select 
-              className={styles.selectInput} 
-              value={salonId} 
-              onChange={(e) => { setSalonId(e.target.value); setPage(1); }}
-            >
-              <option value="">All Salons</option>
-              {salons.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Status</label>
-            <select 
-              className={styles.selectInput} 
-              value={status} 
-              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            >
-              <option value="">All Statuses</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="no_show">No Show</option>
-              <option value="awaiting_reschedule">Awaiting Reschedule</option>
-            </select>
-          </div>
-
-          <div className={styles.filterGroup} style={{ flexGrow: 2 }}>
-            <label className={styles.filterLabel}>Search</label>
-            <input
-              type="text"
-              className={styles.formInput}
-              placeholder="Search by customer name, phone, etc..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            />
-          </div>
+      {/* ---------------------------------------------------------- filters */}
+      <Card className={styles.filters}>
+        <div className={styles.filterRow}>
+          <Segmented<DateMode>
+            ariaLabel="Date range"
+            value={dateMode}
+            onChange={resetPage(setDateMode)}
+            options={[
+              { value: 'specific', label: 'Day' },
+              { value: 'week', label: 'Next 7 days' },
+              { value: 'month', label: 'This month' },
+              { value: 'lifetime', label: 'All time' },
+            ]}
+          />
+          <select
+            className={cx(ui.control, styles.salonSelect)}
+            value={salonId}
+            onChange={(e) => resetPage(setSalonId)(e.target.value)}
+            aria-label="Salon"
+          >
+            <option value="">All salons</option>
+            {salons.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <SearchInput
+            className={styles.search}
+            value={search}
+            onChange={resetPage(setSearch)}
+            placeholder="Search customer, phone or salon…"
+          />
         </div>
 
         {dateMode === 'specific' && (
-          <div className={styles.dateStripContainer}>
-            <div className={styles.dateStrip}>
-              {dateStrip.map((d) => {
-                const dateStr = d.toISOString().split('T')[0];
-                const isSelected = date === dateStr;
-              const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-              const dayNum = d.getDate();
-              const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-              const isToday = new Date().toISOString().split('T')[0] === dateStr;
-
-              return (
-                <button 
-                  key={dateStr}
-                  className={`${styles.dateCard} ${isSelected ? styles.dateCardSelected : ''}`}
-                  onClick={() => { setDate(dateStr); setPage(1); }}
-                >
-                  <span className={styles.dateCardMonth}>{monthName}</span>
-                  <span className={styles.dateCardNum}>{dayNum}</span>
-                  <span className={styles.dateCardDay}>{isToday ? 'Today' : dayName}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className={styles.datePickerWrapper}>
-             <input 
-                type="date" 
-                className={styles.hiddenDateInput}
+          <div className={styles.stripRow}>
+            <IconButton icon="chevronLeft" label="Previous day" onClick={() => resetPage(setDate)(addDays(date, -1))} />
+            <div className={styles.dateStrip} ref={stripRef}>
+              {dateStrip.map((iso) => {
+                const d = parseDay(iso);
+                const selected = iso === date;
+                const isToday = iso === today;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    data-selected={selected}
+                    className={cx(styles.dateCard, selected && styles.dateCardSelected, isToday && styles.dateCardToday)}
+                    onClick={() => resetPage(setDate)(iso)}
+                    aria-pressed={selected}
+                    aria-label={d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  >
+                    <span className={styles.dateCardDay}>{isToday ? 'Today' : d.toLocaleDateString('en-IN', { weekday: 'short' })}</span>
+                    <span className={styles.dateCardNum}>{d.getDate()}</span>
+                    <span className={styles.dateCardMonth}>{d.toLocaleDateString('en-IN', { month: 'short' })}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <IconButton icon="chevronRight" label="Next day" onClick={() => resetPage(setDate)(addDays(date, 1))} />
+            <label className={styles.pickDate} title="Pick any date">
+              <Icon name="calendar" size={17} />
+              <input
+                type="date"
                 value={date}
-                onChange={(e) => { setDate(e.target.value); setPage(1); }}
-                title="Pick a date"
-             />
-             <span className={styles.calendarIcon}>📅</span>
-          </div>
-         </div>
-      )}
-      </div>
-
-      <div className={styles.tableContainer}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.th}>Date & Time</th>
-              <th className={styles.th}>Customer</th>
-              <th className={styles.th}>Salon</th>
-              <th className={styles.th}>Provider</th>
-              <th className={styles.th}>Services</th>
-              <th className={styles.th}>Source</th>
-              <th className={styles.th}>Status</th>
-              <th className={styles.th}>Amount</th>
-              <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && appointments.length === 0 ? (
-              <tr>
-                <td colSpan={9} className={styles.emptyState}>Loading...</td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={9} className={styles.emptyState} style={{ color: 'red' }}>{error}</td>
-              </tr>
-            ) : appointments.length === 0 ? (
-              <tr>
-                <td colSpan={9} className={styles.emptyState}>No appointments found.</td>
-              </tr>
-            ) : (
-              appointments.map((apt) => (
-                <tr key={apt.id} className={styles.tr}>
-                  <td className={styles.td}>
-                    {new Date(apt.appointment_date).toLocaleDateString()} <br/>
-                    <small style={{ color: '#6B7280' }}>
-                      {apt.start_time}{apt.end_time ? ` – ${apt.end_time}` : ''}
-                    </small>
-                  </td>
-                  <td className={styles.td}>
-                    {customerName(apt)}
-                    {apt.customer && (
-                      <button
-                        style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: '#3B82F6' }}
-                        onClick={() => setInfoModalData({ type: 'customer', data: apt.customer })}
-                        title="View Customer Info"
-                      >
-                        &#9432;
-                      </button>
-                    )}
-                    {customerPhone(apt) && (
-                      <>
-                        <br/>
-                        <small style={{ color: '#6B7280' }}>{customerPhone(apt)}</small>
-                      </>
-                    )}
-                  </td>
-                  <td className={styles.td}>
-                    {apt.salon.name}
-                    <button
-                      style={{ marginLeft: '8px', cursor: 'pointer', background: 'none', border: 'none', color: '#3B82F6' }}
-                      onClick={() => setInfoModalData({ type: 'salon', data: apt.salon })}
-                      title="View Salon Info"
-                    >
-                      &#9432;
-                    </button>
-                  </td>
-                  <td className={styles.td}>
-                    {providerName(apt) || <span style={{ color: '#9CA3AF' }}>Unassigned</span>}
-                    {apt.serving_provider?.user?.name &&
-                      apt.appointed_provider?.user?.name &&
-                      apt.serving_provider.user.name !== apt.appointed_provider.user.name && (
-                        <>
-                          <br/>
-                          <small style={{ color: '#6B7280' }}>
-                            booked with {apt.appointed_provider.user.name}
-                          </small>
-                        </>
-                      )}
-                  </td>
-                  <td className={styles.td}>
-                    {serviceNames(apt).length === 0
-                      ? <span style={{ color: '#9CA3AF' }}>—</span>
-                      : (
-                        <>
-                          {serviceNames(apt).slice(0, 2).join(', ')}
-                          {serviceNames(apt).length > 2 && (
-                            <small style={{ color: '#6B7280' }}>
-                              {' '}+{serviceNames(apt).length - 2} more
-                            </small>
-                          )}
-                        </>
-                      )}
-                  </td>
-                  <td className={styles.td}>{sourceLabel(apt.booking_source)}</td>
-                  <td className={styles.td}>
-                    <span className={`${styles.badge} ${getStatusBadgeClass(apt.status)}`}>
-                      {formatStatus(apt.status)}
-                    </span>
-                  </td>
-                  <td className={styles.td}>
-                    {money(apt.total_amount)}
-                    <br/>
-                    <small style={{ color: '#6B7280' }}>
-                      adv {money(apt.advance_amount)} · bal {money(apt.balance_amount)}
-                    </small>
-                  </td>
-                  <td className={styles.td} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button
-                      className={styles.secondaryButton}
-                      style={{ padding: '6px 12px', fontSize: '13px' }}
-                      onClick={() => {
-                        setDetailsAppointment(apt);
-                        setActiveDetailsTab('Overview');
-                      }}
-                    >
-                      Details
-                    </button>
-                    {false && apt.status === 'in_progress' && (
-                        <button
-                            className={styles.secondaryButton}
-                            style={{ padding: '6px 12px', fontSize: '13px', marginLeft: '8px' }}
-                            onClick={() => {
-                                setSelectedAppointmentId(apt.id);
-                                setIsAddServiceModalOpen(true);
-                            }}
-                        >
-                            + Add Service
-                        </button>
-                    )}
-                  </td>
-                </tr>
-              ))
+                onChange={(e) => e.target.value && resetPage(setDate)(e.target.value)}
+                aria-label="Pick a date"
+              />
+            </label>
+            {date !== today && (
+              <Button size="sm" variant="soft" onClick={() => resetPage(setDate)(today)}>Today</Button>
             )}
-          </tbody>
-        </table>
-        
-        {meta && meta.last_page > 1 && (
-          <div className={styles.pagination}>
-            <div className={styles.pageInfo}>
-              Showing page {meta.current_page} of {meta.last_page} ({meta.total} total)
-            </div>
-            <div className={styles.pageControls}>
-              <button 
-                className={styles.pageButton} 
-                disabled={meta.current_page === 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-              >
-                Previous
-              </button>
-              <button 
-                className={styles.pageButton} 
-                disabled={meta.current_page === meta.last_page}
-                onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}
-              >
-                Next
-              </button>
-            </div>
           </div>
         )}
+      </Card>
+
+      {/* ------------------------------------------------------------ table */}
+      <Card>
+        <div className={styles.tableHead}>
+          <div>
+            <h2 className={ui.cardTitle}>{rangeTitle}</h2>
+            <p className={ui.cardSubtitle}>
+              {meta ? `${meta.total.toLocaleString('en-IN')} appointment${meta.total === 1 ? '' : 's'}` : 'Loading…'}
+              {salonId && salons.length > 0 && ` · ${salons.find((s) => s.id === salonId)?.name ?? ''}`}
+            </p>
+          </div>
+          <Segmented
+            ariaLabel="Status"
+            value={status}
+            onChange={resetPage(setStatus)}
+            options={STATUS_FILTERS}
+          />
+        </div>
+
+        {error && (
+          <div className={styles.alertWrap}>
+            <Alert tone="error">
+              {error} <button type="button" className={styles.linkBtn} onClick={() => fetchAppointments()}>Retry</button>
+            </Alert>
+          </div>
+        )}
+
+        <div className={ui.tableWrap}>
+          <table className={ui.table}>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Customer</th>
+                <th>Salon</th>
+                <th>Staff</th>
+                <th>Services</th>
+                <th>Source</th>
+                <th>Status</th>
+                <th className={ui.alignRight}>Amount</th>
+                <th aria-label="Open" />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && appointments.length === 0 ? (
+                Array.from({ length: 6 }, (_, i) => (
+                  <tr key={i}>
+                    <td><Skeleton width={70} /><div style={{ height: 6 }} /><Skeleton width={90} height={10} /></td>
+                    <td><div className={ui.personCell}><Skeleton width={34} height={34} radius={11} /><Skeleton width={110} /></div></td>
+                    <td><Skeleton width={120} /></td>
+                    <td><Skeleton width={70} /></td>
+                    <td><Skeleton width={140} /></td>
+                    <td><Skeleton width={80} /></td>
+                    <td><Skeleton width={84} height={22} radius={999} /></td>
+                    <td><Skeleton width={70} /></td>
+                    <td />
+                  </tr>
+                ))
+              ) : appointments.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>
+                    <EmptyState
+                      icon="calendar"
+                      title={debouncedSearch || status || salonId ? 'No appointments match these filters' : 'No appointments in this range'}
+                      hint={debouncedSearch || status || salonId ? 'Try clearing the search or picking another status.' : 'Bookings will appear here the moment they are made.'}
+                      action={(debouncedSearch || status || salonId) ? (
+                        <Button size="sm" onClick={() => { setSearch(''); setStatus(''); setSalonId(''); setPage(1); }}>
+                          Clear filters
+                        </Button>
+                      ) : undefined}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                appointments.map((apt) => {
+                  const names = serviceNames(apt);
+                  const source = SOURCE_META[apt.booking_source ?? ''];
+                  const reassigned =
+                    apt.serving_provider?.user?.name &&
+                    apt.appointed_provider?.user?.name &&
+                    apt.serving_provider.user.name !== apt.appointed_provider.user.name;
+                  return (
+                    <tr key={apt.id} {...clickableRow(() => openDetails(apt))} aria-label={`Appointment for ${customerName(apt)}`}>
+                      <td>
+                        <div className={cx(ui.cellPrimary, ui.num)}>{clock(apt.start_time)}</div>
+                        <div className={ui.cellSub}>
+                          {dateMode === 'specific' ? (apt.end_time ? `until ${clock(apt.end_time)}` : '') : dayLabel(apt.appointment_date)}
+                        </div>
+                      </td>
+                      <td>
+                        <Person name={customerName(apt)} sub={customerPhone(apt) ?? (apt.customer ? undefined : 'Walk-in guest')} size={34} />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.salonLink}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInfoModalData({ type: 'salon', data: apt.salon });
+                          }}
+                        >
+                          {apt.salon?.name}
+                        </button>
+                      </td>
+                      <td>
+                        {providerName(apt) || <span className={styles.muted}>Unassigned</span>}
+                        {reassigned && <div className={ui.cellSub}>booked with {apt.appointed_provider?.user?.name}</div>}
+                      </td>
+                      <td>
+                        {names.length === 0 ? (
+                          <span className={styles.muted}>—</span>
+                        ) : (
+                          <div className={styles.chips}>
+                            {names.slice(0, 2).map((n, i) => <span key={i} className={styles.chip}>{n}</span>)}
+                            {names.length > 2 && <span className={cx(styles.chip, styles.chipMore)}>+{names.length - 2}</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <span className={styles.source}>
+                          {source && <Icon name={source.icon} size={15} />}
+                          {sourceLabel(apt.booking_source)}
+                        </span>
+                      </td>
+                      <td><StatusBadge status={apt.status} /></td>
+                      <td className={ui.alignRight}>
+                        <div className={cx(ui.cellPrimary, ui.num)}>{money(apt.final_billed_amount ?? apt.total_amount)}</div>
+                        {Number(apt.advance_amount) > 0 && OPEN_STATUSES.has(apt.status) && (
+                          <div className={cx(ui.cellSub, ui.num)}>
+                            {money(apt.advance_amount)} paid · {money(apt.balance_amount)} due
+                          </div>
+                        )}
+                      </td>
+                      <td className={styles.chevronCell}>
+                        <Icon name="chevronRight" size={16} />
+                        {ADD_SERVICE_ENABLED && apt.status === 'in_progress' && (
+                          <Button
+                            size="sm"
+                            icon="plus"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAppointmentId(apt.id);
+                              setIsAddServiceModalOpen(true);
+                            }}
+                          >
+                            Add service
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {meta && (
+          <Pagination
+            page={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            noun="appointments"
+            onChange={setPage}
+          />
+        )}
+      </Card>
+
+      {/* ---------------------------------------------- add-service (hidden) */}
+      <Modal
+        open={isAddServiceModalOpen}
+        onClose={() => setIsAddServiceModalOpen(false)}
+        title="Add mid-appointment service"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsAddServiceModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="addServiceForm">Add service</Button>
+          </>
+        }
+      >
+        {addServiceError && <div style={{ marginBottom: 14 }}><Alert tone="error">{addServiceError}</Alert></div>}
+        <form id="addServiceForm" onSubmit={handleAddService} className={styles.formStack}>
+          <Field label="Service ID">
+            <input className={ui.control} value={serviceId} onChange={(e) => setServiceId(e.target.value)} required placeholder="Service UUID" />
+          </Field>
+          <Field label="Provider ID" hint="Who is performing this service?">
+            <input className={ui.control} value={providerId} onChange={(e) => setProviderId(e.target.value)} required placeholder="Provider UUID" />
+          </Field>
+        </form>
+      </Modal>
+
+      {/* ------------------------------------------------ details drawer */}
+      <Drawer
+        open={!!liveDetails}
+        onClose={() => setDetailsAppointment(null)}
+        title="Appointment details"
+        header={liveDetails && (
+          <div className={styles.drawerHead}>
+            <div className={styles.drawerHeadTop}>
+              <StatusBadge status={liveDetails.status} />
+              <span className={styles.drawerWhen}>
+                {dayLabel(liveDetails.appointment_date)} · {clock(liveDetails.start_time)}
+                {liveDetails.end_time ? ` – ${clock(liveDetails.end_time)}` : ''}
+              </span>
+            </div>
+            <Person
+              name={customerName(liveDetails)}
+              sub={`${liveDetails.salon?.name ?? ''}${providerName(liveDetails) ? ` · with ${providerName(liveDetails)}` : ''}`}
+              size={44}
+            />
+          </div>
+        )}
+        footer={
+          liveDetails && (
+            <>
+              <Link href={`/superadmin/salons/${liveDetails.salon?.id}`} className={cx(ui.btn, ui.btnGhost)}>
+                Salon profile <Icon name="external" size={14} />
+              </Link>
+              <Button variant="primary" onClick={() => setDetailsAppointment(null)}>Done</Button>
+            </>
+          )
+        }
+      >
+        {liveDetails && (
+          <AppointmentDetails apt={liveDetails} tab={activeDetailsTab} onTab={setActiveDetailsTab} />
+        )}
+      </Drawer>
+
+      {/* ------------------------------------------------ salon / customer info */}
+      <Modal
+        open={!!infoModalData}
+        onClose={() => setInfoModalData(null)}
+        size="sm"
+        title={infoModalData?.type === 'salon' ? 'Salon' : 'Customer'}
+        header={infoModalData && (
+          <Person
+            name={infoModalData.data.name}
+            sub={infoModalData.type === 'salon' ? 'Salon' : 'Customer'}
+            size={44}
+          />
+        )}
+        footer={
+          infoModalData?.type === 'salon' && 'id' in infoModalData.data && infoModalData.data.id ? (
+            <Link href={`/superadmin/salons/${infoModalData.data.id}`} className={cx(ui.btn, ui.btnPrimary)}>
+              View full profile <Icon name="arrowRight" size={15} />
+            </Link>
+          ) : (
+            <Button variant="primary" onClick={() => setInfoModalData(null)}>Close</Button>
+          )
+        }
+      >
+        {infoModalData && (
+          <DescriptionList
+            items={[
+              ['Phone', infoModalData.data.phone || '—'],
+              ['Email', infoModalData.data.email || '—'],
+              ...(infoModalData.type === 'salon'
+                ? ([
+                    ['Address', (infoModalData.data as SalonRef).address || '—'],
+                    ['Status', (infoModalData.data as SalonRef).status || '—'],
+                  ] as [string, string][])
+                : []),
+            ]}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- drawer body */
+
+function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: DetailsTab; onTab: (t: DetailsTab) => void }) {
+  const lines = apt.services || [];
+  const additions = apt.service_additions || [];
+
+  const timeline: { label: string; at?: string | null; note?: string; tone: Tone }[] = [
+    { label: 'Booked', at: apt.created_at, note: sourceLabel(apt.booking_source), tone: 'info' },
+    ...(apt.rescheduled_from_id ? [{ label: 'Rescheduled', at: null, note: apt.reschedule_reason || undefined, tone: 'warning' as Tone }] : []),
+    ...(apt.qr_verified_at ? [{ label: 'Checked in', at: apt.qr_verified_at, note: verificationLabel(apt.verification_method), tone: 'accent' as Tone }] : []),
+    ...(apt.started_at ? [{ label: 'Service started', at: apt.started_at, tone: 'accent' as Tone }] : []),
+    ...(apt.completed_at ? [{ label: 'Completed', at: apt.completed_at, tone: 'success' as Tone }] : []),
+    ...(apt.no_show_at ? [{ label: 'Marked no-show', at: apt.no_show_at, tone: 'danger' as Tone }] : []),
+    ...(apt.cancelled_at
+      ? [{
+          label: 'Cancelled',
+          at: apt.cancelled_at,
+          note: [apt.cancelled_by && `by ${apt.cancelled_by}`, apt.cancelled_by_user?.name, apt.cancellation_reason].filter(Boolean).join(' · '),
+          tone: 'neutral' as Tone,
+        }]
+      : []),
+    ...(apt.salon_closure_id
+      ? [{
+          label: 'Released by salon closure',
+          at: apt.closure_notified_at,
+          note: [apt.salon_closure?.closed_date, apt.salon_closure?.reason].filter(Boolean).join(' — ') || 'Emergency closure',
+          tone: 'warning' as Tone,
+        }]
+      : []),
+  ];
+
+  return (
+    <>
+      <div className={styles.moneyRow}>
+        <div className={styles.moneyCell}>
+          <span>Total</span>
+          <b>{money(apt.total_amount)}</b>
+        </div>
+        <div className={styles.moneyCell}>
+          <span>Advance</span>
+          <b>{money(apt.advance_amount)}</b>
+        </div>
+        <div className={styles.moneyCell}>
+          <span>{apt.final_billed_amount ? 'Final billed' : 'Balance due'}</span>
+          <b>{money(apt.final_billed_amount ?? apt.balance_amount)}</b>
+        </div>
       </div>
 
-      {/* Add Service Modal */}
-      {isAddServiceModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Add Mid-Appointment Service</h2>
-              <button className={styles.closeButton} onClick={() => setIsAddServiceModalOpen(false)}>&times;</button>
-            </div>
-            <div className={styles.modalBody}>
-              {addServiceError && <p style={{ color: 'red', marginBottom: '12px' }}>{addServiceError}</p>}
-              <form id="addServiceForm" onSubmit={handleAddService}>
-                <div className={styles.formGroup}>
-                  <label>Service ID</label>
-                  <input 
-                    type="text" 
-                    className={styles.formInput} 
-                    value={serviceId}
-                    onChange={(e) => setServiceId(e.target.value)}
-                    required
-                    placeholder="Enter Service UUID"
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Provider ID (Who is doing this?)</label>
-                  <input 
-                    type="text" 
-                    className={styles.formInput} 
-                    value={providerId}
-                    onChange={(e) => setProviderId(e.target.value)}
-                    required
-                    placeholder="Enter Provider UUID"
-                  />
-                </div>
-              </form>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.secondaryButton} onClick={() => setIsAddServiceModalOpen(false)}>Cancel</button>
-              <button type="submit" form="addServiceForm" className={styles.primaryButton}>Add Service</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Tabs<DetailsTab>
+        value={tab}
+        onChange={onTab}
+        tabs={[
+          { value: 'overview', label: 'Overview' },
+          { value: 'services', label: `Services (${lines.length + additions.length})` },
+          { value: 'payment', label: 'Payment' },
+          { value: 'timeline', label: 'Timeline' },
+        ]}
+      />
 
-      {/* Full appointment record */}
-      {detailsAppointment && (
-        <div className={styles.modalOverlay} onClick={() => setDetailsAppointment(null)}>
-          <div
-            className={`${styles.modalContent} ${styles.detailsModal}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Appointment details</h2>
-              <button className={styles.closeButton} onClick={() => setDetailsAppointment(null)}>&times;</button>
-            </div>
-            <div className={styles.modalBody}>
-              {(() => {
-                const apt = detailsAppointment;
-                const lines = apt.services || [];
-                const additions = apt.service_additions || [];
+      <div className={styles.tabBody}>
+        {tab === 'overview' && (
+          <>
+            <h3 className={ui.sectionLabel}>Customer</h3>
+            <DescriptionList
+              items={[
+                ['Name', customerName(apt)],
+                ['Phone', customerPhone(apt) || '—'],
+                ['Email', apt.customer?.email || '—'],
+                ...(!apt.customer ? ([['Gender', apt.walk_in_customer_gender || '—']] as [string, string][]) : []),
+              ]}
+            />
+            <h3 className={ui.sectionLabel}>Salon &amp; staff</h3>
+            <DescriptionList
+              items={[
+                ['Salon', apt.salon?.name || '—'],
+                ['Salon phone', apt.salon?.phone || '—'],
+                ['Address', apt.salon?.address || '—'],
+                ['Booked with', `${apt.appointed_provider?.user?.name || 'Unassigned'}${apt.appointed_provider?.user?.phone ? ` · ${apt.appointed_provider.user.phone}` : ''}`],
+                ['Served by', `${apt.serving_provider?.user?.name || 'Not started'}${apt.serving_provider?.user?.phone ? ` · ${apt.serving_provider.user.phone}` : ''}`],
+              ]}
+            />
+            <h3 className={ui.sectionLabel}>Booking</h3>
+            <DescriptionList
+              items={[
+                ['Appointment ID', <span key="id" className={ui.mono}>{apt.id}</span>],
+                ['Source', sourceLabel(apt.booking_source)],
+                ['Booked on', dateTime(apt.created_at)],
+              ]}
+            />
+          </>
+        )}
 
-                return (
-                  <>
-                    <div className={styles.tabsContainer}>
-                      {['Overview', 'Services', 'Payment', 'Lifecycle'].map(tab => (
-                        <button 
-                          key={tab}
-                          className={`${styles.tab} ${activeDetailsTab === tab ? styles.tabActive : ''}`}
-                          onClick={() => setActiveDetailsTab(tab)}
-                        >
-                          {tab}
-                        </button>
-                      ))}
+        {tab === 'services' && (
+          lines.length === 0 && additions.length === 0 ? (
+            <EmptyState icon="catalog" title="No service lines recorded" />
+          ) : (
+            <ul className={styles.serviceList}>
+              {lines.map((line) => (
+                <li key={line.id} className={styles.serviceItem}>
+                  <div className={styles.serviceMain}>
+                    <div className={ui.cellPrimary}>
+                      {serviceName(line)}
+                      {line.combo_id && <span className={styles.tag}>Package</span>}
                     </div>
-
-                    {activeDetailsTab === 'Overview' && (
-                      <>
-                        <h3 className={styles.detailsSectionTitle}>Booking</h3>
-                        <dl className={styles.detailsGrid}>
-                          <dt>Appointment ID</dt><dd className={styles.detailsMono}>{apt.id}</dd>
-                          <dt>Status</dt>
-                          <dd>
-                            <span className={`${styles.badge} ${getStatusBadgeClass(apt.status)}`}>
-                              {formatStatus(apt.status)}
-                            </span>
-                          </dd>
-                          <dt>Date</dt><dd>{new Date(apt.appointment_date).toLocaleDateString()}</dd>
-                          <dt>Time</dt><dd>{apt.start_time} – {apt.end_time || '—'}</dd>
-                          <dt>Source</dt><dd>{sourceLabel(apt.booking_source)}</dd>
-                          <dt>Booked on</dt><dd>{dateTime(apt.created_at)}</dd>
-                        </dl>
-
-                        <h3 className={styles.detailsSectionTitle}>Customer</h3>
-                        <dl className={styles.detailsGrid}>
-                          <dt>Name</dt><dd>{customerName(apt)}</dd>
-                          <dt>Phone</dt><dd>{customerPhone(apt) || '—'}</dd>
-                          <dt>Email</dt><dd>{apt.customer?.email || '—'}</dd>
-                          {!apt.customer && (
-                            <>
-                              <dt>Gender</dt><dd>{apt.walk_in_customer_gender || '—'}</dd>
-                            </>
-                          )}
-                        </dl>
-
-                        <h3 className={styles.detailsSectionTitle}>Salon & staff</h3>
-                        <dl className={styles.detailsGrid}>
-                          <dt>Salon</dt><dd>{apt.salon?.name || '—'}</dd>
-                          <dt>Salon phone</dt><dd>{apt.salon?.phone || '—'}</dd>
-                          <dt>Address</dt><dd>{apt.salon?.address || '—'}</dd>
-                          <dt>Booked with</dt>
-                          <dd>
-                            {apt.appointed_provider?.user?.name || 'Unassigned'}
-                            {apt.appointed_provider?.user?.phone
-                              ? ` · ${apt.appointed_provider.user.phone}` : ''}
-                          </dd>
-                          <dt>Served by</dt>
-                          <dd>
-                            {apt.serving_provider?.user?.name || 'Not started'}
-                            {apt.serving_provider?.user?.phone
-                              ? ` · ${apt.serving_provider.user.phone}` : ''}
-                          </dd>
-                        </dl>
-                      </>
-                    )}
-
-                    {activeDetailsTab === 'Services' && (
-                      <>
-                        <h3 className={styles.detailsSectionTitle}>
-                          Services ({lines.length} booked
-                          {additions.length > 0 ? ` + ${additions.length} added mid-appointment` : ''})
-                        </h3>
-                        <table className={styles.detailsTable}>
-                          <thead>
-                            <tr>
-                              <th>Service</th>
-                              <th>Provider</th>
-                              <th>Duration</th>
-                              <th>Price</th>
-                              <th>Line status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lines.length === 0 && additions.length === 0 && (
-                              <tr><td colSpan={5} style={{ color: '#9CA3AF' }}>No service lines recorded.</td></tr>
-                            )}
-                            {lines.map((line) => (
-                              <tr key={line.id}>
-                                <td>
-                                  {serviceName(line)}
-                                  {line.combo_id && <small style={{ color: '#6B7280' }}> (package)</small>}
-                                </td>
-                                <td>{line.serving_provider?.user?.name || providerName(apt) || '—'}</td>
-                                <td>{line.duration_minutes_at_booking ? `${line.duration_minutes_at_booking} min` : '—'}</td>
-                                <td>
-                                  {money(line.price_at_booking)}
-                                  {line.original_service_price !== undefined &&
-                                    Number(line.original_service_price) !== Number(line.price_at_booking) && (
-                                      <small style={{ color: '#6B7280' }}>
-                                        {' '}(list {money(line.original_service_price)})
-                                      </small>
-                                    )}
-                                </td>
-                                <td>{line.line_status || '—'}</td>
-                              </tr>
-                            ))}
-                            {additions.map((add) => (
-                              <tr key={add.id}>
-                                <td>
-                                  {serviceName(add)}
-                                  <small style={{ color: '#6B7280' }}> (added mid-appointment)</small>
-                                </td>
-                                <td>{add.provider?.user?.name || '—'}</td>
-                                <td>{add.duration_minutes_at_addition ? `${add.duration_minutes_at_addition} min` : '—'}</td>
-                                <td>{money(add.price_at_addition)}</td>
-                                <td>
-                                  {/* Reads as a line status so a settled extra
-                                      matches the booked lines beside it. */}
-                                  {add.status === 'voided' ? 'removed' : (add.status || '—')}
-                                  {add.added_by?.name && (
-                                    <>
-                                      <br/>
-                                      <small style={{ color: '#6B7280' }}>
-                                        by {add.added_by.name}
-                                        {add.added_at ? ` · ${dateTime(add.added_at)}` : ''}
-                                      </small>
-                                    </>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </>
-                    )}
-
-                    {activeDetailsTab === 'Payment' && (
-                      <>
-                        <h3 className={styles.detailsSectionTitle}>Payment</h3>
-                        <dl className={styles.detailsGrid}>
-                          <dt>Option</dt><dd>{apt.payment_option?.replace(/_/g, ' ') || '—'}</dd>
-                          <dt>Total</dt><dd>{money(apt.total_amount)}</dd>
-                          <dt>Advance paid</dt><dd>{money(apt.advance_amount)}</dd>
-                          <dt>Balance due</dt><dd>{money(apt.balance_amount)}</dd>
-                          <dt>Final billed</dt><dd>{money(apt.final_billed_amount)}</dd>
-                        </dl>
-                      </>
-                    )}
-
-                    {activeDetailsTab === 'Lifecycle' && (
-                      <>
-                        <h3 className={styles.detailsSectionTitle}>Lifecycle</h3>
-                        <dl className={styles.detailsGrid}>
-                          <dt>Verification</dt><dd>{apt.verification_method || '—'}</dd>
-                          <dt>QR verified</dt><dd>{dateTime(apt.qr_verified_at)}</dd>
-                          <dt>Started</dt><dd>{dateTime(apt.started_at)}</dd>
-                          <dt>Completed</dt><dd>{dateTime(apt.completed_at)}</dd>
-                          <dt>No show</dt><dd>{dateTime(apt.no_show_at)}</dd>
-                          {apt.cancelled_at && (
-                            <>
-                              <dt>Cancelled</dt>
-                              <dd>
-                                {dateTime(apt.cancelled_at)}
-                                {apt.cancelled_by ? ` by ${apt.cancelled_by}` : ''}
-                                {apt.cancelled_by_user?.name ? ` (${apt.cancelled_by_user.name})` : ''}
-                              </dd>
-                              <dt>Reason</dt><dd>{apt.cancellation_reason || '—'}</dd>
-                            </>
-                          )}
-                          {apt.rescheduled_from_id && (
-                            <>
-                              <dt>Rescheduled from</dt>
-                              <dd className={styles.detailsMono}>{apt.rescheduled_from_id}</dd>
-                              <dt>Reschedule reason</dt><dd>{apt.reschedule_reason || '—'}</dd>
-                            </>
-                          )}
-                          {apt.salon_closure_id && (
-                            <>
-                              <dt>Released by closure</dt>
-                              <dd>
-                                {apt.salon_closure?.closed_date || 'Emergency closure'}
-                                {apt.salon_closure?.reason ? ` — ${apt.salon_closure.reason}` : ''}
-                              </dd>
-                              <dt>Customer notified</dt><dd>{dateTime(apt.closure_notified_at)}</dd>
-                            </>
-                          )}
-                        </dl>
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.primaryButton} onClick={() => setDetailsAppointment(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Info Modal */}
-      {infoModalData && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>
-                {infoModalData.type === 'salon' ? 'Salon Info' : 'Customer Info'}
-              </h2>
-              <button className={styles.closeButton} onClick={() => setInfoModalData(null)}>&times;</button>
-            </div>
-            <div className={styles.modalBody}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <p><strong>Name:</strong> {infoModalData.data.name}</p>
-                {infoModalData.data.phone && <p><strong>Phone:</strong> {infoModalData.data.phone}</p>}
-                {infoModalData.data.email && <p><strong>Email:</strong> {infoModalData.data.email}</p>}
-                {infoModalData.data.address && <p><strong>Address:</strong> {infoModalData.data.address}</p>}
-                {infoModalData.data.status && <p><strong>Status:</strong> {infoModalData.data.status}</p>}
-                
-                {infoModalData.type === 'salon' && infoModalData.data.id && (
-                  <div style={{ marginTop: '8px' }}>
-                    <Link href={`/superadmin/salons/${infoModalData.data.id}`}>
-                      <span style={{ color: '#4F46E5', textDecoration: 'underline', cursor: 'pointer', fontWeight: 500 }}>
-                        View Full Salon Profile &rarr;
-                      </span>
-                    </Link>
+                    <div className={ui.cellSub}>
+                      {line.serving_provider?.user?.name || providerName(apt) || 'Unassigned'}
+                      {line.duration_minutes_at_booking ? ` · ${line.duration_minutes_at_booking} min` : ''}
+                      {line.line_status ? ` · ${line.line_status.replace(/_/g, ' ')}` : ''}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.primaryButton} onClick={() => setInfoModalData(null)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+                  <div className={styles.servicePrice}>
+                    <b className={ui.num}>{money(line.price_at_booking)}</b>
+                    {line.original_service_price !== undefined &&
+                      Number(line.original_service_price) !== Number(line.price_at_booking) && (
+                        <s className={ui.cellSub}>{money(line.original_service_price)}</s>
+                      )}
+                  </div>
+                </li>
+              ))}
+              {additions.map((add) => (
+                <li key={add.id} className={cx(styles.serviceItem, add.status === 'voided' && styles.serviceVoided)}>
+                  <div className={styles.serviceMain}>
+                    <div className={ui.cellPrimary}>
+                      {serviceName(add)}
+                      <span className={styles.tag}>Added</span>
+                    </div>
+                    <div className={ui.cellSub}>
+                      {add.provider?.user?.name || '—'}
+                      {add.duration_minutes_at_addition ? ` · ${add.duration_minutes_at_addition} min` : ''}
+                      {/* Reads as a line status so a settled extra matches the booked lines beside it. */}
+                      {` · ${add.status === 'voided' ? 'removed' : (add.status || '—')}`}
+                      {add.added_by?.name && ` · by ${add.added_by.name}${add.added_at ? `, ${dateTime(add.added_at)}` : ''}`}
+                    </div>
+                  </div>
+                  <div className={styles.servicePrice}>
+                    <b className={ui.num}>{money(add.price_at_addition)}</b>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
 
-    </div>
+        {tab === 'payment' && (
+          <DescriptionList
+            items={[
+              ['Option', apt.payment_option?.replace(/_/g, ' ') || '—'],
+              ['Total', money(apt.total_amount)],
+              ['Advance paid', money(apt.advance_amount)],
+              ['Balance due', money(apt.balance_amount)],
+              ['Final billed', money(apt.final_billed_amount)],
+            ]}
+          />
+        )}
+
+        {tab === 'timeline' && (
+          <ol className={styles.timeline}>
+            {timeline.map((ev, i) => (
+              <li key={i} className={styles.timelineItem}>
+                <span className={cx(styles.timelineDot, styles[`dot_${ev.tone}`])} />
+                <div>
+                  <div className={ui.cellPrimary}>{ev.label}</div>
+                  <div className={ui.cellSub}>
+                    {ev.at ? dateTime(ev.at) : ''}
+                    {ev.at && ev.note ? ' · ' : ''}
+                    {ev.note}
+                  </div>
+                </div>
+              </li>
+            ))}
+            {apt.rescheduled_from_id && (
+              <li className={styles.timelineFoot}>
+                Rescheduled from <span className={ui.mono}>{apt.rescheduled_from_id}</span>
+              </li>
+            )}
+          </ol>
+        )}
+      </div>
+    </>
   );
 }

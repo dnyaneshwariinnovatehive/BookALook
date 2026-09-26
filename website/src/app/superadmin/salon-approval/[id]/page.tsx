@@ -174,7 +174,7 @@ export default function SalonReviewPage() {
                 </div>
               </>
             ) : (
-              <p style={{ color: '#64748b' }}>No admin information found.</p>
+              <p style={{ color: 'var(--text-body)' }}>No admin information found.</p>
             )}
           </div>
         </div>

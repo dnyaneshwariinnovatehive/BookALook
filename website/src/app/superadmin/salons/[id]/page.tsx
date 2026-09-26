@@ -228,7 +228,7 @@ export default function SalonDirectoryDetail() {
                   </div>
                 </>
               ) : (
-                <p style={{ color: '#64748b' }}>No admin information found.</p>
+                <p style={{ color: 'var(--text-body)' }}>No admin information found.</p>
               )}
             </div>
           </div>
@@ -315,7 +315,7 @@ export default function SalonDirectoryDetail() {
               ))}
             </div>
           ) : (
-            <p style={{ color: '#64748b' }}>No staff members registered.</p>
+            <p style={{ color: 'var(--text-body)' }}>No staff members registered.</p>
           )}
         </div>
       )}
@@ -348,7 +348,7 @@ export default function SalonDirectoryDetail() {
                 ))}
               </div>
             ) : (
-              <p style={{ color: '#64748b' }}>No services configured.</p>
+              <p style={{ color: 'var(--text-body)' }}>No services configured.</p>
             )}
           </div>
 
@@ -362,7 +362,7 @@ export default function SalonDirectoryDetail() {
                     <div key={combo.id} className={styles.comboItem}>
                       <div className={styles.comboName}>{combo.name}</div>
                       {combo.services && combo.services.length > 0 && (
-                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '-4px', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-body)', marginTop: '-4px', marginBottom: '4px' }}>
                           {combo.services.length} services included
                         </div>
                       )}
@@ -373,7 +373,7 @@ export default function SalonDirectoryDetail() {
                 })}
               </div>
             ) : (
-              <p style={{ color: '#64748b' }}>No combos configured.</p>
+              <p style={{ color: 'var(--text-body)' }}>No combos configured.</p>
             )}
           </div>
         </>

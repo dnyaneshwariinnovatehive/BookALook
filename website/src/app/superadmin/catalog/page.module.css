@@ -1,7 +1,5 @@
 .container {
-  padding: 2rem;
-  max-width: 1280px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 /* ---------------------------------------------------------- page header */
@@ -15,9 +13,10 @@
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   color: var(--text-heading);
   margin: 0 0 6px;
 }
@@ -95,7 +94,7 @@
   width: 56px;
   height: 56px;
   border-radius: 8px;
-  background-color: #F3F4F6;
+  background-color: var(--surface-3);
   border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -113,7 +112,7 @@
 .catImagePlaceholder {
   font-size: 24px;
   font-weight: 700;
-  color: #9CA3AF;
+  color: var(--text-muted);
 }
 
 .categoryName {
@@ -141,7 +140,7 @@
 
 .badgeInactive {
   background-color: rgba(148, 163, 184, 0.15);
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .iconBtn {
@@ -237,7 +236,7 @@
 
 .templateDuration {
   font-size: 13px;
-  color: #6B7280;
+  color: var(--text-body);
 }
 
 .templateActions {
@@ -303,7 +302,7 @@
   gap: 12px;
   margin-bottom: 16px;
   padding: 8px 12px;
-  background: #F9FAFB;
+  background: var(--surface-2);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   cursor: pointer;

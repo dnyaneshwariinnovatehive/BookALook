@@ -1,200 +1,578 @@
+/* ============================================================
+   Super Admin shell — sidebar, topbar, content frame.
+   Collapsed state is driven by [data-sidebar-collapsed] on <html>
+   (set before paint), so a reload never jumps.
+   ============================================================ */
+
 .layoutContainer {
+  --sidebar-w: 264px;
+  --topbar-h: 64px;
   display: flex;
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   overflow: hidden;
   background-color: var(--bg-color);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family);
+  color: var(--text-body);
 }
 
+:global(html[data-sidebar-collapsed]) .layoutContainer {
+  --sidebar-w: 76px;
+}
+
+.skipLink {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 200;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--accent-color);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  transition: top 0.15s ease;
+}
+
+.skipLink:focus {
+  top: 12px;
+}
+
+/* ---------------- Sidebar ---------------- */
 .sidebar {
-  width: 280px;
-  background-color: var(--surface-color);
-  color: var(--text-body);
+  width: var(--sidebar-w);
+  flex: none;
   display: flex;
   flex-direction: column;
   height: 100%;
-  box-shadow: var(--card-shadow);
-  z-index: 10;
+  background-color: var(--surface-color);
   border-right: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  z-index: 40;
+  transition: width 0.22s var(--ease-out);
 }
 
 .sidebarHeader {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  height: var(--topbar-h);
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0 18px;
 }
 
-.logoText {
-  font-size: 1.25rem;
+.brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 10px;
+}
+
+.logoFull {
+  width: 138px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+:global(html:not(.dark)) .logoDark,
+:global(html.dark) .logoLight {
+  display: none !important;
+}
+
+.logoMark {
+  display: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-family: var(--font-display);
   font-weight: 800;
-  color: var(--accent-color);
-  letter-spacing: -0.02em;
+  font-size: 20px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(156, 84, 242, 0.35);
 }
 
 .navMenu {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem 0.75rem;
+  overflow-x: hidden;
+  padding: 6px 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 14px;
+  scrollbar-width: none;
 }
 
 .navMenu::-webkit-scrollbar {
-  width: 6px;
+  display: none;
 }
 
-.navMenu::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.navMenu::-webkit-scrollbar-track {
-  background: transparent;
+.navGroupLabel {
+  padding: 8px 12px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .navItem {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+  gap: 12px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
   color: var(--text-body);
-  opacity: 0.8;
-  text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 13.5px;
   font-weight: 500;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .navItem:hover {
-  background-color: rgba(156, 84, 242, 0.05);
-  color: var(--accent-color);
+  background-color: var(--surface-3);
+  color: var(--text-heading);
 }
 
-.activeNavItem {
-  background-color: rgba(156, 84, 242, 0.1);
-  color: var(--accent-color);
+.navIcon {
+  flex: none;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.navItem:hover .navIcon {
+  color: var(--text-heading);
+}
+
+.navLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activeNavItem,
+.activeNavItem:hover {
+  background-color: var(--accent-soft);
+  color: var(--accent-text);
   font-weight: 600;
+}
+
+.activeNavItem .navIcon,
+.activeNavItem:hover .navIcon {
+  color: var(--accent-text);
 }
 
 .activeNavItem::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 15%;
-  height: 70%;
-  width: 4px;
-  background-color: var(--accent-color);
-  border-radius: 0 4px 4px 0;
+  left: -12px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-color);
+}
+
+.navBadge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebarFooter {
-  padding: 1rem;
+  flex: none;
+  padding: 12px;
   border-top: 1px solid var(--border-color);
 }
 
-.logoutButton {
-  width: 100%;
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+}
+
+.userAvatar {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem;
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--color-danger);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.userMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.userRole {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.logoutButton {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .logoutButton:hover {
-  background-color: rgba(239, 68, 68, 0.2);
+  background: var(--color-danger-bg);
   color: var(--color-danger);
 }
 
+/* Collapsed rail */
+:global(html[data-sidebar-collapsed]) .logoFull,
+:global(html[data-sidebar-collapsed]) .navLabel,
+:global(html[data-sidebar-collapsed]) .userMeta,
+:global(html[data-sidebar-collapsed]) .logoutButton {
+  display: none;
+}
+
+:global(html[data-sidebar-collapsed]) .logoMark {
+  display: inline-flex;
+}
+
+:global(html[data-sidebar-collapsed]) .sidebarHeader {
+  justify-content: center;
+  padding: 0;
+}
+
+:global(html[data-sidebar-collapsed]) .navGroupLabel {
+  font-size: 0;
+  padding: 6px 0;
+  height: 13px;
+}
+
+:global(html[data-sidebar-collapsed]) .navGroupLabel::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 1px;
+  margin: 0 auto;
+  background: var(--border-strong);
+}
+
+:global(html[data-sidebar-collapsed]) .navItem {
+  justify-content: center;
+  padding: 0;
+}
+
+:global(html[data-sidebar-collapsed]) .navBadge {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  box-shadow: 0 0 0 2px var(--surface-color);
+}
+
+:global(html[data-sidebar-collapsed]) .userCard {
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border-color: transparent;
+}
+
+/* ---------------- Main column ---------------- */
 .mainContentWrapper {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .topbar {
-  height: 72px;
-  background-color: var(--surface-color);
-  border-bottom: 1px solid var(--border-color);
+  height: var(--topbar-h);
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 2rem;
-  box-shadow: var(--card-shadow);
-  z-index: 5;
-  border-radius: var(--radius-lg);
+  gap: 8px;
+  padding: 0 24px 0 16px;
+  background-color: var(--surface-glass);
+  backdrop-filter: saturate(1.4) blur(12px);
+  -webkit-backdrop-filter: saturate(1.4) blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 20;
 }
 
-.userProfile {
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.iconBtn:hover {
+  background: var(--surface-3);
+  color: var(--text-heading);
+}
+
+.menuBtn,
+.drawerClose {
+  display: none;
+}
+
+.breadcrumb {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 6px;
+  min-width: 0;
+  margin-left: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.crumbGroup {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.crumbSep {
+  color: var(--text-light);
+  flex: none;
+}
+
+.crumbLink {
+  color: var(--text-body);
+  font-weight: 500;
+}
+
+.crumbLink:hover {
+  color: var(--accent-text);
+}
+
+.crumbCurrent {
+  color: var(--text-heading);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbarActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.searchTrigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  width: 280px;
+  padding: 0 8px 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.searchTrigger:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-color);
+  box-shadow: var(--shadow-xs);
+}
+
+.searchText {
+  flex: 1;
+  text-align: left;
+}
+
+.searchKbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-color);
+  color: var(--text-body);
 }
 
 .themeToggleBtn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   border: 1px solid var(--border-color);
-  background-color: var(--bg-color);
+  background-color: var(--surface-2);
   color: var(--text-body);
-  font-size: 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
-  margin-right: 1.5rem;
-  transition: all 0.2s ease;
+  overflow: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .themeToggleBtn:hover {
   background-color: var(--surface-color);
-  box-shadow: var(--card-shadow);
+  border-color: var(--border-strong);
+  color: var(--accent-text);
 }
 
-.userAvatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--accent-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
+.themeIcon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transition: transform 0.35s var(--ease-out), opacity 0.25s ease;
 }
 
-.userName {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-body);
-}
-
-.userRole {
-  font-size: 0.75rem;
-  color: var(--text-body);
-  opacity: 0.8;
+.themeIconHidden {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
 }
 
 .mainContent {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  overflow-x: hidden;
   background-color: var(--bg-color);
+  scroll-behavior: smooth;
+}
+
+.pageFrame {
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 28px 32px 48px;
+  animation: pageIn 0.35s var(--ease-out);
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.scrim {
+  display: none;
+}
+
+/* ---------------- Responsive ---------------- */
+@media (max-width: 1180px) {
+  .searchTrigger { width: 220px; }
+}
+
+@media (max-width: 1024px) {
+  .layoutContainer,
+  :global(html[data-sidebar-collapsed]) .layoutContainer {
+    --sidebar-w: 280px;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    transform: translateX(-100%);
+    transition: transform 0.26s var(--ease-out);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .sidebarOpen {
+    transform: none;
+  }
+
+  /* The drawer always shows the full, labelled menu */
+  :global(html[data-sidebar-collapsed]) .logoFull { display: block; }
+  :global(html[data-sidebar-collapsed]) .navLabel { display: inline; }
+  :global(html[data-sidebar-collapsed]) .userMeta { display: block; }
+  :global(html[data-sidebar-collapsed]) .logoutButton { display: grid; }
+  :global(html[data-sidebar-collapsed]) .logoMark { display: none; }
+  :global(html[data-sidebar-collapsed]) .sidebarHeader { justify-content: space-between; padding: 0 18px; }
+  :global(html[data-sidebar-collapsed]) .navGroupLabel { font-size: 10.5px; padding: 8px 12px 6px; height: auto; }
+  :global(html[data-sidebar-collapsed]) .navGroupLabel::after { display: none; }
+  :global(html[data-sidebar-collapsed]) .navItem { justify-content: flex-start; padding: 0 12px; }
+  :global(html[data-sidebar-collapsed]) .navBadge { position: static; box-shadow: none; }
+  :global(html[data-sidebar-collapsed]) .userCard { justify-content: flex-start; padding: 8px; background: var(--surface-2); border-color: var(--border-color); }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: var(--surface-overlay);
+    backdrop-filter: blur(2px);
+    animation: pageIn 0.2s ease-out;
+  }
+
+  .menuBtn,
+  .drawerClose {
+    display: grid;
+  }
+
+  .collapseBtn {
+    display: none;
+  }
+
+  .pageFrame {
+    padding: 22px 20px 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar { padding: 0 12px 0 8px; }
+  .searchTrigger { width: 38px; padding: 0; justify-content: center; }
+  .searchText,
+  .searchKbd { display: none; }
+  .crumbGroup,
+  .crumbGroup + .crumbSep { display: none; }
+  .pageFrame { padding: 18px 16px 32px; }
 }

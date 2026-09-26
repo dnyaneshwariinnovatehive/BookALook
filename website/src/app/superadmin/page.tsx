@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, AreaChart, Area
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import Icon, { type IconName } from '@/components/admin/Icon';
+import { useChartPalette } from '@/lib/theme';
 import styles from './dashboard.module.css';
-
 // --- SKELETON PLACEHOLDERS ---
 const SKELETON_ROWS = [1, 2, 3];
 
@@ -209,6 +210,7 @@ export default function AdminDashboard() {
   };
 
   // --- DERIVED / FORMATTED DATA ---
+  const palette = useChartPalette();
   const kpis = data?.kpis;
   const activeBookingsToday = kpis?.active_bookings?.today ?? 0;
   const activeBookingsYesterday = kpis?.active_bookings?.yesterday ?? 0;
@@ -225,38 +227,62 @@ export default function AdminDashboard() {
   const topServices = data?.top_services ?? [];
   const rangeRevenue = trend.reduce((s, p) => s + (Number(p.revenue) || 0), 0);
   const rangeBookings = trend.reduce((s, p) => s + (Number(p.bookings) || 0), 0);
+  const maxSalonRevenue = Math.max(1, ...topSalons.map((s) => Number(s.revenue) || 0));
+  const maxServiceRevenue = Math.max(1, ...topServices.map((s) => Number(s.revenue) || 0));
 
   const bookingStatusData = data?.bookings
     ? [
-        { name: 'Completed', value: data.bookings.completed, color: '#16a34a' },
-        { name: 'Active', value: data.bookings.active, color: '#3b82f6' },
-        { name: 'Cancelled', value: data.bookings.cancelled, color: '#f97316' },
-        { name: 'No-Show', value: data.bookings.no_show, color: '#dc2626' },
+        { name: 'Completed', value: data.bookings.completed, color: palette.c2 },
+        { name: 'Active', value: data.bookings.active, color: palette.c1 },
+        { name: 'Cancelled', value: data.bookings.cancelled, color: palette.c3 },
+        { name: 'No-show', value: data.bookings.no_show, color: palette.c4 },
       ].filter((d) => d.value > 0)
     : [];
+  const statusTotal = bookingStatusData.reduce((s, d) => s + d.value, 0);
 
-  if (bookingStatusData.length === 0 && !loading) {
-    bookingStatusData.push({ name: 'No Data', value: 1, color: '#cbd5e1' });
-  }
+  const online = data?.bookings?.online ?? 0;
+  const walkIn = data?.bookings?.walk_in ?? 0;
+  const channelTotal = online + walkIn;
+  const onlinePct = channelTotal ? Math.round((online / channelTotal) * 100) : 0;
 
   const rangeLabel = from && to ? `${formatFullDate(from)} – ${formatFullDate(to)}` : '';
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const todayLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <div>
+    <div className={styles.page}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Dashboard Overview</h1>
-        <p className={styles.pageSubtitle}>Welcome back. Here is what is happening across the marketplace today.</p>
+        <div>
+          <p className={styles.eyebrow} suppressHydrationWarning>{todayLabel}</p>
+          <h1 className={styles.pageTitle} suppressHydrationWarning>{greeting}, Admin</h1>
+          <p className={styles.pageSubtitle}>Here is what is happening across the marketplace.</p>
+        </div>
+        <button
+          type="button"
+          className={`${styles.livePill} ${autoRefresh ? styles.livePillOn : ''}`}
+          onClick={() => setAutoRefresh((v) => !v)}
+          title={autoRefresh ? 'Auto-refresh every minute — click to pause' : 'Auto-refresh paused — click to resume'}
+        >
+          <span className={`${styles.liveDot} ${autoRefresh ? styles.liveDotActive : ''}`} />
+          {autoRefresh ? 'Live' : 'Paused'}
+          <span className={styles.autoTime}>
+            {lastUpdated ? lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+          </span>
+        </button>
       </header>
 
       {/* CONTROLS BAR */}
       <div className={styles.controlsBar}>
         <div className={styles.controlsGroup}>
-          <div className={styles.presetGroup}>
+          <div className={styles.segmented} role="group" aria-label="Date range preset">
             {PRESETS.map((p) => (
               <button
                 key={p.key}
                 type="button"
-                className={`${styles.presetBtn} ${preset === p.key ? styles.presetBtnActive : ''}`}
+                className={`${styles.segBtn} ${preset === p.key ? styles.segBtnActive : ''}`}
+                aria-pressed={preset === p.key}
                 onClick={() => applyPreset(p)}
               >
                 {p.label}
@@ -274,7 +300,7 @@ export default function AdminDashboard() {
                 onChange={(e) => handleFromChange(e.target.value)}
               />
             </label>
-            <span className={styles.dateSep}>→</span>
+            <Icon name="arrowRight" size={14} className={styles.dateSep} />
             <label className={styles.dateField}>
               <span className={styles.dateLabel}>To</span>
               <input
@@ -289,12 +315,13 @@ export default function AdminDashboard() {
         </div>
 
         <div className={styles.controlsGroup}>
-          <div className={styles.granularityToggle}>
+          <div className={styles.segmented} role="group" aria-label="Granularity">
             {GRANULARITIES.map((g) => (
               <button
                 key={g}
                 type="button"
-                className={`${styles.granularityBtn} ${granularity === g ? styles.granularityBtnActive : ''}`}
+                className={`${styles.segBtn} ${granularity === g ? styles.segBtnActive : ''}`}
+                aria-pressed={granularity === g}
                 onClick={() => setGranularity(g)}
               >
                 {g.charAt(0).toUpperCase() + g.slice(1)}
@@ -307,328 +334,400 @@ export default function AdminDashboard() {
             onClick={handleManualRefresh}
             disabled={refreshing}
           >
-            {refreshing ? 'Refreshing…' : '↻ Refresh'}
-          </button>
-          <button
-            type="button"
-            className={`${styles.updatedAt}`}
-            onClick={() => setAutoRefresh((v) => !v)}
-            title={autoRefresh ? 'Auto-refresh: ON (click to pause)' : 'Auto-refresh: OFF (click to enable)'}
-          >
-            <span className={`${styles.liveDot} ${autoRefresh ? styles.liveDotActive : ''}`} />
-            <span className={styles.autoLabel}>{autoRefresh ? 'Auto ON' : 'Auto OFF'}</span>
-            <span className={styles.autoTime}>
-              {lastUpdated
-                ? ` · ${lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
-                : ' · …'}
-            </span>
+            <Icon name="refresh" size={15} className={refreshing ? styles.spin : undefined} />
+            {refreshing ? 'Refreshing' : 'Refresh'}
           </button>
         </div>
       </div>
 
       {/* KPI GRID */}
       <div className={styles.kpiGrid}>
-        <Link href="/superadmin/appointments" className={`${styles.kpiCard} ${styles.clickableCard}`}>
-          <div className={styles.kpiHeader}>
-            <span className={styles.kpiLabel}>Active Bookings Today</span>
-            <div className={`${styles.kpiIcon} ${styles.kpiIconBlue}`}>📅</div>
-          </div>
-          <div className={styles.kpiValue}>
-            {loading ? '…' : activeBookingsToday}
-          </div>
-          <div className={styles.kpiTrend}>
-            <span className={bookingDelta.dir === 'up' ? styles.trendUp : bookingDelta.dir === 'down' ? styles.trendDown : styles.trendNeutral}>
-              {bookingDelta.dir === 'up' ? '▲' : bookingDelta.dir === 'down' ? '▼' : '—'} {bookingDelta.pct}%
-            </span>
-            <span className={styles.trendSub}>vs {activeBookingsYesterday} yesterday</span>
-          </div>
-        </Link>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiHeader}>
-            <span className={styles.kpiLabel}>Revenue Today</span>
-            <div className={`${styles.kpiIcon} ${styles.kpiIconGreen}`}>₹</div>
-          </div>
-          <div className={styles.kpiValue}>
-            {loading ? '…' : formatINR(revenueToday)}
-          </div>
-          <div className={styles.kpiTrend}>
-            <span className={revenueDelta.dir === 'up' ? styles.trendUp : revenueDelta.dir === 'down' ? styles.trendDown : styles.trendNeutral}>
-              {revenueDelta.dir === 'up' ? '▲' : revenueDelta.dir === 'down' ? '▼' : '—'} {revenueDelta.pct}%
-            </span>
-            <span className={styles.trendSub}>vs {formatINR(revenueYesterday)} yesterday</span>
-          </div>
-        </div>
-
-        <Link href="/superadmin/salon-approval" className={`${styles.kpiCard} ${styles.clickableCard}`}>
-          <div className={styles.kpiHeader}>
-            <span className={styles.kpiLabel}>Pending Approvals</span>
-            <div className={`${styles.kpiIcon} ${styles.kpiIconOrange}`}>⏳</div>
-          </div>
-          <div className={styles.kpiValue}>
-            {loading ? '…' : pendingApprovals}
-          </div>
-          <div className={styles.kpiTrend}>
-            <span className={styles.trendNeutral}>Salons awaiting review</span>
-          </div>
-        </Link>
-
-        <Link href="/superadmin/salons" className={`${styles.kpiCard} ${styles.clickableCard}`}>
-          <div className={styles.kpiHeader}>
-            <span className={styles.kpiLabel}>Active Salons</span>
-            <div className={`${styles.kpiIcon} ${styles.kpiIconPurple}`}>🏪</div>
-          </div>
-          <div className={styles.kpiValue}>
-            {loading ? '…' : activeSalons}
-          </div>
-          <div className={styles.kpiTrend}>
-            <span className={styles.trendNeutral}>Current network size</span>
-          </div>
-        </Link>
+        <KpiCard
+          href="/superadmin/appointments"
+          label="Active bookings today"
+          icon="calendar"
+          tone="violet"
+          loading={loading}
+          value={activeBookingsToday.toLocaleString('en-IN')}
+          delta={bookingDelta}
+          sub={`vs ${activeBookingsYesterday} yesterday`}
+        />
+        <KpiCard
+          label="Revenue today"
+          icon="rupee"
+          tone="teal"
+          loading={loading}
+          value={formatINR(revenueToday)}
+          delta={revenueDelta}
+          sub={`vs ${formatINR(revenueYesterday)} yesterday`}
+        />
+        <KpiCard
+          href="/superadmin/salon-approval"
+          label="Pending approvals"
+          icon="clock"
+          tone="amber"
+          loading={loading}
+          value={pendingApprovals.toLocaleString('en-IN')}
+          sub={pendingApprovals ? 'Salons awaiting your review' : 'All caught up'}
+        />
+        <KpiCard
+          href="/superadmin/salons"
+          label="Active salons"
+          icon="store"
+          tone="blue"
+          loading={loading}
+          value={activeSalons.toLocaleString('en-IN')}
+          sub="Current network size"
+        />
       </div>
 
-      {/* REVENUE TREND (full width) */}
-      <div className={`${styles.chartCard} ${styles.fullWidthCard}`}>
-        <div className={styles.chartHeaderRow}>
-          <div>
-            <h2 className={styles.cardTitle}>Revenue & Bookings Trend</h2>
-            <p className={styles.chartSubtext}>
-              {rangeLabel} · {formatINR(rangeRevenue)} · {rangeBookings.toLocaleString('en-IN')} completed bookings
-            </p>
-          </div>
-          <div className={styles.chartLegend}>
-            <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#3b82f6' }} /> Revenue
-            </span>
-            <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#22c55e' }} /> Bookings
-            </span>
-          </div>
-        </div>
-        <div style={{ width: '100%', height: 320 }}>
-          {loading ? (
-            <div className={styles.chartLoading}>Loading chart…</div>
-          ) : trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="bookGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  minTickGap={32}
-                />
-                <YAxis
-                  yAxisId="rev"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  tickFormatter={(v) => `₹${Math.round(v).toLocaleString('en-IN')}`}
-                  width={80}
-                />
-                <YAxis
-                  yAxisId="bookings"
-                  orientation="right"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  tickCount={4}
-                  width={40}
-                />
-                <RechartsTooltip
-                  formatter={(value, name) =>
-                    name === 'Revenue'
-                      ? [`₹${Math.round(Number(value)).toLocaleString('en-IN')}`, 'Revenue']
-                      : [`${Math.round(Number(value)).toLocaleString('en-IN')}`, 'Bookings']
-                  }
-                  labelFormatter={(label) => {
-                    const l = String(label ?? '');
-                    return trend.find((t) => t.label === l)?.date ?? l;
-                  }}
-                  contentStyle={{
-                    borderRadius: 8,
-                    border: '1px solid #e2e8f0',
-                    boxShadow: 'var(--card-shadow)',
-                  }}
-                />
-                <Area yAxisId="rev" type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#revGrad)" name="Revenue" />
-                <Area yAxisId="bookings" type="monotone" dataKey="bookings" stroke="#22c55e" strokeWidth={2} fill="url(#bookGrad)" name="Bookings" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className={styles.chartLoading}>No data available</div>
-          )}
-        </div>
-      </div>
-
-      {/* CHARTS GRID */}
+      {/* REVENUE TREND + BOOKING MIX */}
       <div className={styles.chartsGrid}>
-        <div className={styles.chartCard}>
-          <div className={styles.chartHeaderRow}>
-            <h2 className={styles.cardTitle}>Top Performing Salons</h2>
-            <Link href="/superadmin/salons" className={styles.viewAllBtn}>View Directory</Link>
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>Revenue &amp; bookings</h2>
+              <p className={styles.cardSubtitle}>{rangeLabel}</p>
+            </div>
+            <div className={styles.trendTotals}>
+              <div className={styles.trendTotal}>
+                <span className={styles.legendDot} style={{ background: palette.c1 }} />
+                <div>
+                  <div className={styles.trendTotalValue}>{loading ? '—' : formatINR(rangeRevenue)}</div>
+                  <div className={styles.trendTotalLabel}>Revenue</div>
+                </div>
+              </div>
+              <div className={styles.trendTotal}>
+                <span className={styles.legendDot} style={{ background: palette.c2 }} />
+                <div>
+                  <div className={styles.trendTotalValue}>{loading ? '—' : rangeBookings.toLocaleString('en-IN')}</div>
+                  <div className={styles.trendTotalLabel}>Completed bookings</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div style={{ width: '100%', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className={styles.trendChart}>
             {loading ? (
-              <div style={{ color: 'var(--text-body)' }}>Loading chart…</div>
-            ) : topSalons.length > 0 ? (
+              <div className={`${styles.skeleton} ${styles.skeletonChart}`} />
+            ) : trend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topSalons} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(v) => formatINR(v)} />
-                  <RechartsTooltip
-                    cursor={{ fill: '#f8fafc' }}
-                    formatter={(value) => [`₹${Math.round(Number(value)).toLocaleString('en-IN')}`, 'Revenue']}
+                <AreaChart data={trend} margin={{ top: 10, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={palette.c1} stopOpacity={0.32} />
+                      <stop offset="100%" stopColor={palette.c1} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="bookGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={palette.c2} stopOpacity={0.22} />
+                      <stop offset="100%" stopColor={palette.c2} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={palette.grid} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: palette.axis }} minTickGap={32} dy={6} />
+                  <YAxis
+                    yAxisId="rev"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: palette.axis }}
+                    tickFormatter={(v) => compactINR(Number(v))}
+                    width={56}
                   />
-                  <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                </BarChart>
+                  <YAxis yAxisId="bookings" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: palette.axis }} tickCount={4} width={32} />
+                  <RechartsTooltip
+                    cursor={{ stroke: palette.grid, strokeWidth: 1 }}
+                    formatter={(value, name) =>
+                      name === 'Revenue'
+                        ? [formatINR(Number(value)), 'Revenue']
+                        : [Math.round(Number(value)).toLocaleString('en-IN'), 'Bookings']
+                    }
+                    labelFormatter={(label) => {
+                      const l = String(label ?? '');
+                      const iso = trend.find((t) => t.label === l)?.date;
+                      return iso ? formatFullDate(iso) : l;
+                    }}
+                  />
+                  <Area yAxisId="rev" type="monotone" dataKey="revenue" stroke={palette.c1} strokeWidth={2.4} fill="url(#revGrad)" name="Revenue" activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface-color)' }} />
+                  <Area yAxisId="bookings" type="monotone" dataKey="bookings" stroke={palette.c2} strokeWidth={2} fill="url(#bookGrad)" name="Bookings" activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface-color)' }} />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ color: 'var(--text-body)' }}>No data available</div>
+              <EmptyState icon="chart" title="No activity in this range" hint="Try a wider date range." />
             )}
           </div>
-        </div>
+        </section>
 
-        <div className={styles.chartCard}>
-          <h2 className={styles.cardTitle}>Booking Status Distribution</h2>
-          <div style={{ width: '100%', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {loading ? (
-              <div style={{ color: 'var(--text-body)' }}>Loading chart…</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={bookingStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={95}
-                    paddingAngle={5}
-                    dataKey="value"
-                    nameKey="name"
-                  >
-                    {bookingStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip formatter={(value) => [`${Number(value).toLocaleString('en-IN')}`, 'Bookings']} />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>Booking mix</h2>
+              <p className={styles.cardSubtitle}>Status of bookings in range</p>
+            </div>
           </div>
-        </div>
+          {loading ? (
+            <div className={`${styles.skeleton} ${styles.skeletonDonut}`} />
+          ) : statusTotal === 0 ? (
+            <EmptyState icon="calendar" title="No bookings yet" hint="Status split appears once bookings come in." />
+          ) : (
+            <>
+              <div className={styles.donutWrap}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={bookingStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="68%"
+                      outerRadius="92%"
+                      paddingAngle={2}
+                      cornerRadius={4}
+                      dataKey="value"
+                      nameKey="name"
+                      stroke="none"
+                    >
+                      {bookingStatusData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip formatter={(value, name) => [Number(value).toLocaleString('en-IN'), name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className={styles.donutCenter}>
+                  <div className={styles.donutValue}>{statusTotal.toLocaleString('en-IN')}</div>
+                  <div className={styles.donutLabel}>bookings</div>
+                </div>
+              </div>
+              <ul className={styles.statusList}>
+                {bookingStatusData.map((d) => (
+                  <li key={d.name} className={styles.statusRow}>
+                    <span className={styles.legendDot} style={{ background: d.color }} />
+                    <span className={styles.statusName}>{d.name}</span>
+                    <span className={styles.statusValue}>{d.value.toLocaleString('en-IN')}</span>
+                    <span className={styles.statusPct}>{Math.round((d.value / statusTotal) * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+              {channelTotal > 0 && (
+                <div className={styles.channel}>
+                  <div className={styles.channelHead}>
+                    <span>Online <strong>{onlinePct}%</strong></span>
+                    <span>Walk-in <strong>{100 - onlinePct}%</strong></span>
+                  </div>
+                  <div className={styles.channelBar} aria-label={`${onlinePct}% online, ${100 - onlinePct}% walk-in`}>
+                    <span style={{ width: `${onlinePct}%`, background: palette.c1 }} />
+                    <span style={{ width: `${100 - onlinePct}%`, background: palette.c5 }} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </div>
 
-      {/* TABLES GRID */}
+      {/* LEADERBOARDS */}
       <div className={styles.tablesGrid}>
-        <div className={styles.tableContainer}>
-          <div className={styles.tableHeader}>
-            <h2 className={styles.tableTitle}>Top Performing Services</h2>
-            <Link href="/superadmin/catalog" className={styles.viewAllBtn}>View Catalog</Link>
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>Top salons</h2>
+              <p className={styles.cardSubtitle}>By revenue in range</p>
+            </div>
+            <Link href="/superadmin/salons" className={styles.viewAllBtn}>
+              Directory <Icon name="arrowRight" size={14} />
+            </Link>
           </div>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>#</th>
-                <th className={styles.th}>Service</th>
-                <th className={styles.th}>Category</th>
-                <th className={styles.th}>Bookings</th>
-                <th className={styles.th}>Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                SKELETON_ROWS.map((id) => (
-                  <tr key={id} className={styles.tr}>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                  </tr>
-                ))
-              ) : topServices.length > 0 ? (
-                topServices.slice(0, 5).map((svc, idx) => (
-                  <tr key={`${svc.service}-${idx}`} className={styles.tr}>
-                    <td className={styles.td}>
-                      <span className={styles.rankBadge}>{idx + 1}</span>
-                    </td>
-                    <td className={styles.td} style={{ fontWeight: 500 }}>{svc.service}</td>
-                    <td className={styles.td}>
-                      <span className={styles.categoryBadge}>{svc.category}</span>
-                    </td>
-                    <td className={styles.td}>{svc.bookings}</td>
-                    <td className={styles.td} style={{ color: '#16a34a', fontWeight: 500 }}>{formatINR(svc.revenue)}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className={styles.td} style={{ textAlign: 'center', color: '#64748b' }}>No services booked in this period.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+          {loading ? (
+            <SkeletonRows />
+          ) : topSalons.length === 0 ? (
+            <EmptyState icon="store" title="No salon revenue yet" hint="Rankings appear after the first completed booking." />
+          ) : (
+            <ol className={styles.rankList}>
+              {topSalons.slice(0, 6).map((salon, idx) => (
+                <li key={salon.id ?? salon.name} className={styles.rankRow}>
+                  <span className={`${styles.rankBadge} ${idx < 3 ? styles[`rank${idx + 1}` as 'rank1'] : ''}`}>{idx + 1}</span>
+                  <div className={styles.rankBody}>
+                    <div className={styles.rankTop}>
+                      <span className={styles.rankName}>{salon.name}</span>
+                      <span className={styles.rankValue}>{formatINR(salon.revenue)}</span>
+                    </div>
+                    <div className={styles.rankMeta}>
+                      <span>{cityName(salon.city)}</span>
+                      <span>{Number(salon.bookings).toLocaleString('en-IN')} bookings</span>
+                    </div>
+                    <div className={styles.meter}>
+                      <span style={{ width: `${(Number(salon.revenue) / maxSalonRevenue) * 100}%` }} />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
 
-        <div className={styles.tableContainer}>
-          <div className={styles.tableHeader}>
-            <h2 className={styles.tableTitle}>Pending Salon Approvals</h2>
-            <Link href="/superadmin/salon-approval" className={styles.viewAllBtn}>View All</Link>
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>Top services</h2>
+              <p className={styles.cardSubtitle}>Most booked across all salons</p>
+            </div>
+            <Link href="/superadmin/catalog" className={styles.viewAllBtn}>
+              Catalog <Icon name="arrowRight" size={14} />
+            </Link>
           </div>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Salon Name</th>
-                <th className={styles.th}>City</th>
-                <th className={styles.th}>Applied Date</th>
-                <th className={styles.th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                SKELETON_ROWS.map((id) => (
-                  <tr key={id} className={styles.tr}>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                    <td className={styles.td}>...</td>
-                  </tr>
-                ))
-              ) : pendingSalons.length > 0 ? (
-                pendingSalons.slice(0, 5).map((salon) => (
-                  <tr key={salon.id} className={styles.tr}>
-                    <td className={styles.td} style={{ fontWeight: 500 }}>{salon.name}</td>
-                    <td className={styles.td}>
-                      {typeof salon.city === 'object' ? (salon.city as any)?.name : salon.city || 'Unknown'}
-                    </td>
-                    <td className={styles.td}>{new Date(salon.created_at).toLocaleDateString('en-IN')}</td>
-                    <td className={styles.td}>
-                      <span className={`${styles.badge} ${styles.badgeWarning}`}>Pending</span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className={styles.td} style={{ textAlign: 'center', color: '#64748b' }}>No pending approvals.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+          {loading ? (
+            <SkeletonRows />
+          ) : topServices.length === 0 ? (
+            <EmptyState icon="catalog" title="No services booked" hint="Nothing was booked in this period." />
+          ) : (
+            <ol className={styles.rankList}>
+              {topServices.slice(0, 6).map((svc, idx) => (
+                <li key={`${svc.service}-${idx}`} className={styles.rankRow}>
+                  <span className={styles.rankBadge}>{idx + 1}</span>
+                  <div className={styles.rankBody}>
+                    <div className={styles.rankTop}>
+                      <span className={styles.rankName}>{svc.service}</span>
+                      <span className={styles.rankValue}>{formatINR(svc.revenue)}</span>
+                    </div>
+                    <div className={styles.rankMeta}>
+                      <span className={styles.categoryBadge}>{svc.category}</span>
+                      <span>{Number(svc.bookings).toLocaleString('en-IN')} bookings</span>
+                    </div>
+                    <div className={`${styles.meter} ${styles.meterTeal}`}>
+                      <span style={{ width: `${(Number(svc.revenue) / maxServiceRevenue) * 100}%` }} />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>Awaiting approval</h2>
+              <p className={styles.cardSubtitle}>Newest salon applications</p>
+            </div>
+            <Link href="/superadmin/salon-approval" className={styles.viewAllBtn}>
+              Queue <Icon name="arrowRight" size={14} />
+            </Link>
+          </div>
+          {loading ? (
+            <SkeletonRows />
+          ) : pendingSalons.length === 0 ? (
+            <EmptyState icon="approval" title="All caught up" hint="No salons are waiting for review." />
+          ) : (
+            <ul className={styles.pendingList}>
+              {pendingSalons.slice(0, 5).map((salon) => {
+                const city = cityName(salon.city);
+                return (
+                  <li key={salon.id}>
+                    <Link href={`/superadmin/salon-approval/${salon.id}`} className={styles.pendingRow}>
+                      <span className={styles.pendingAvatar}>{initialsOf(salon.name)}</span>
+                      <div className={styles.pendingBody}>
+                        <div className={styles.rankName}>{salon.name}</div>
+                        <div className={styles.rankMeta}>
+                          <span>{city || 'Unknown city'}</span>
+                          <span>Applied {new Date(salon.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                        </div>
+                      </div>
+                      <span className={styles.reviewChip}>Review</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );
 }
+
+// --- PRESENTATIONAL PIECES ---
+
+const TONES = {
+  violet: styles.toneViolet,
+  teal: styles.toneTeal,
+  amber: styles.toneAmber,
+  blue: styles.toneBlue,
+} as const;
+
+function KpiCard({
+  href, label, icon, tone, loading, value, delta, sub,
+}: {
+  href?: string;
+  label: string;
+  icon: IconName;
+  tone: keyof typeof TONES;
+  loading: boolean;
+  value: string;
+  delta?: { pct: number; dir: 'up' | 'down' | 'flat' };
+  sub: string;
+}) {
+  const body = (
+    <>
+      <div className={styles.kpiHeader}>
+        <span className={`${styles.kpiIcon} ${TONES[tone]}`}><Icon name={icon} size={20} /></span>
+        {href && <Icon name="arrowRight" size={16} className={styles.kpiArrow} />}
+      </div>
+      <div className={styles.kpiLabel}>{label}</div>
+      {loading ? (
+        <div className={`${styles.skeleton} ${styles.skeletonValue}`} />
+      ) : (
+        <div className={styles.kpiValue}>{value}</div>
+      )}
+      <div className={styles.kpiTrend}>
+        {delta && !loading && (
+          <span className={`${styles.deltaChip} ${delta.dir === 'up' ? styles.deltaUp : delta.dir === 'down' ? styles.deltaDown : styles.deltaFlat}`}>
+            {delta.dir !== 'flat' && <Icon name={delta.dir === 'up' ? 'trendUp' : 'trendDown'} size={13} strokeWidth={2.2} />}
+            {delta.pct}%
+          </span>
+        )}
+        <span className={styles.trendSub}>{sub}</span>
+      </div>
+    </>
+  );
+
+  return href ? (
+    <Link href={href} className={`${styles.kpiCard} ${styles.clickableCard}`}>{body}</Link>
+  ) : (
+    <div className={styles.kpiCard}>{body}</div>
+  );
+}
+
+function EmptyState({ icon, title, hint }: { icon: IconName; title: string; hint: string }) {
+  return (
+    <div className={styles.empty}>
+      <span className={styles.emptyIcon}><Icon name={icon} size={20} /></span>
+      <div className={styles.emptyTitle}>{title}</div>
+      <div className={styles.emptyHint}>{hint}</div>
+    </div>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <div className={styles.skeletonList}>
+      {SKELETON_ROWS.map((id) => (
+        <div key={id} className={styles.skeletonRow}>
+          <span className={`${styles.skeleton} ${styles.skeletonDot}`} />
+          <span className={`${styles.skeleton} ${styles.skeletonLine}`} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The API returns city as a name or as a { name } object depending on the endpoint. */
+const cityName = (city: unknown): string =>
+  city && typeof city === 'object' ? String((city as { name?: string }).name ?? '') : String(city ?? '');
+
+const initialsOf = (name: string) =>
+  (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+
+const compactINR = (n: number) => {
+  if (n >= 1e7) return `₹${(n / 1e7).toFixed(1).replace(/\.0$/, '')}Cr`;
+  if (n >= 1e5) return `₹${(n / 1e5).toFixed(1).replace(/\.0$/, '')}L`;
+  if (n >= 1e3) return `₹${(n / 1e3).toFixed(0)}k`;
+  return `₹${Math.round(n)}`;
+};

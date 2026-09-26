@@ -1,7 +1,5 @@
 .container {
-  padding: 2rem;
-  max-width: 1000px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .header {
@@ -9,8 +7,10 @@
 }
 
 .title {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   color: var(--text-heading);
   margin-bottom: 0.5rem;
 }
@@ -149,7 +149,7 @@
 
 .badge_dismissed {
   background: rgba(148, 163, 184, 0.18);
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 /* Buttons */

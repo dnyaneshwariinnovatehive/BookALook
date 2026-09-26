@@ -1,8 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
+import Icon from '@/components/admin/Icon';
+import {
+  Alert, Avatar, Badge, Button, Card, Drawer, EmptyState, PageHeader, Pagination, Person,
+  SearchInput, Segmented, Skeleton, SortHeader, StatCard, Tabs, clickableRow, cx, downloadCSV,
+  formatINR, ui, useDebounced, type Tone,
+} from '@/components/admin/ui';
+import { useChartPalette } from '@/lib/theme';
 import styles from './page.module.css';
 
 /**
@@ -15,15 +24,12 @@ import styles from './page.module.css';
  * appointment history and reviews. Everything can be exported to CSV.
  */
 
-const money = (v: any) => {
-  const n = Number(v || 0);
-  return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+/* eslint-disable @typescript-eslint/no-explicit-any -- the customers API is untyped JSON */
+
+const money = (v: any) => formatINR(Number(v || 0), 2);
+const moneyShort = (v: any) => formatINR(Number(v || 0));
 
 const int = (v: any) => Number(v || 0).toLocaleString('en-IN');
-
-const initials = (name: string) =>
-  (name || '?').split(' ').map((w) => w.charAt(0)).slice(0, 2).join('').toUpperCase();
 
 const fmtDate = (d: any) => {
   if (!d) return '—';
@@ -32,56 +38,41 @@ const fmtDate = (d: any) => {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-function downloadCSV(filename: string, headers: string[], rows: any[][]) {
-  const escape = (v: any) => {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lines = [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))];
-  const csv = '\uFEFF' + lines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 const GRANULARITIES = [
-  { key: 'day', label: 'Daily' },
-  { key: 'week', label: 'Weekly' },
-  { key: 'month', label: 'Monthly' },
-] as const;
+  { value: 'day', label: 'Daily' },
+  { value: 'week', label: 'Weekly' },
+  { value: 'month', label: 'Monthly' },
+];
+
+const GROWTH_COPY: Record<string, string> = {
+  day: 'New registrations per day',
+  week: 'New registrations per week',
+  month: 'New registrations per month',
+};
 
 export default function CustomersPage() {
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState<any>(null);
 
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounced(search);
   const [page, setPage] = useState(1);
   const [granularity, setGranularity] = useState('day');
   const [sortBy, setSortBy] = useState('joined_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const [detail, setDetail] = useState<any>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 350);
-    return () => clearTimeout(t);
-  }, [search]);
+  const palette = useChartPalette();
+
+  // Loading is derived: true until a response for the current query lands.
+  const queryKey = [page, debouncedSearch, granularity, sortBy, sortDir].join('|');
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== queryKey;
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
     try {
       const q = new URLSearchParams();
       q.append('page', String(page));
@@ -93,16 +84,23 @@ export default function CustomersPage() {
       const res = await fetch(`/api/proxy/superadmin/customers?${q}`);
       if (!res.ok) throw new Error('Could not load customers.');
       setData(await res.json());
+      setError('');
     } catch (e: any) {
       setError(e.message || 'Could not load customers.');
     } finally {
-      setLoading(false);
+      setLoadedKey(queryKey);
     }
-  }, [page, debouncedSearch, granularity, sortBy, sortDir]);
+  }, [page, debouncedSearch, granularity, sortBy, sortDir, queryKey]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is only set after the network responds
     load();
   }, [load]);
+
+  const handleSearch = (v: string) => {
+    setSearch(v);
+    setPage(1);
+  };
 
   const handleSort = (col: string) => {
     setPage(1);
@@ -115,6 +113,7 @@ export default function CustomersPage() {
   };
 
   const openDetail = async (id: string) => {
+    setDetailOpen(true);
     setDetailLoading(true);
     setDetail(null);
     try {
@@ -129,357 +128,408 @@ export default function CustomersPage() {
   };
 
   const exportDirectory = () => {
-    const dir = data?.directory?.data ?? [];
+    const rows = data?.directory?.data ?? [];
     downloadCSV(
-      'customers.csv',
-      ['Name', 'Phone', 'Email', 'City', 'Gender', 'Joined', 'Last seen', 'Status', 'Bookings', 'Completed', 'Cancelled', 'No-show', 'Spend'],
-      dir.map((c: any) => [
-        c.name, c.phone, c.email ?? '', c.city ?? '', c.gender, c.joined_at, c.last_seen ?? '',
+      `customers-page-${page}.csv`,
+      ['Name', 'Phone', 'Email', 'City', 'Area', 'Gender', 'Joined', 'Last seen', 'Status', 'Bookings', 'Completed', 'Cancelled', 'No-show', 'Spend'],
+      rows.map((c: any) => [
+        c.name, c.phone, c.email ?? '', c.city ?? '', c.sub_area ?? '', c.gender, c.joined_at, c.last_seen ?? '',
         c.is_active ? 'Active' : 'Inactive', c.bookings, c.completed, c.cancelled, c.no_show, money(c.spend),
-      ])
+      ]),
     );
   };
 
-  const growthData = useMemo(() => {
-    return (data?.summary?.growth ?? []).slice();
-  }, [data]);
+  const growthData = useMemo(() => (data?.summary?.growth ?? []).slice(), [data]);
 
   const s = data?.summary ?? {};
   const dir = data?.directory ?? {};
   const rows = dir.data ?? [];
   const conversion = s.total > 0 ? Math.round(((s.booked ?? 0) / s.total) * 100) : 0;
   const retention = s.booked > 0 ? Math.round(((s.retained ?? 0) / s.booked) * 100) : 0;
-
-  const activeShare = s.total > 0
-    ? [
-        { name: 'Active', value: s.active ?? 0 },
-        { name: 'Inactive', value: (s.total ?? 0) - (s.active ?? 0) },
-      ]
-    : [];
+  const inactive = Math.max(0, (s.total ?? 0) - (s.active ?? 0));
+  const activePct = s.total > 0 ? Math.round(((s.active ?? 0) / s.total) * 100) : 0;
+  const growthTotal = growthData.reduce((n: number, g: any) => n + (Number(g.customers) || 0), 0);
 
   const cities = (s.cities ?? []).slice(0, 8);
+  const maxCity = Math.max(1, ...cities.map((c: any) => Number(c.customers) || 0));
   const noShowLeaders = s.top_no_shows ?? [];
+  const firstLoad = loading && !data;
 
   return (
     <div className={styles.container}>
-      {/* ---- header banner ---- */}
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title}>Customers</h1>
-            <span className={styles.badge}><span className={styles.badgeDot} /> Read-only</span>
+      <PageHeader
+        eyebrow={<>Customers <Badge tone="neutral">Read-only</Badge></>}
+        title="Customer intelligence"
+        subtitle="Registrations, activity, retention and value across the whole platform."
+        actions={
+          data?.generated_at && (
+            <span className={styles.generated}>
+              <Icon name="clock" size={14} />
+              Updated {new Date(data.generated_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )
+        }
+      />
+
+      {!loading && error && !data && (
+        <Card padded>
+          <EmptyState
+            icon="alert"
+            title="Unable to load customers"
+            hint={error}
+            action={<Button variant="primary" icon="refresh" onClick={() => { setLoadedKey(null); load(); }}>Try again</Button>}
+          />
+        </Card>
+      )}
+
+      {(data || firstLoad) && (
+        <>
+          {/* ---- KPIs ---- */}
+          <div className={ui.statGrid}>
+            <StatCard
+              label="Registered customers"
+              icon="users"
+              tone="accent"
+              loading={firstLoad}
+              value={int(s.total)}
+              sub={`+${int(s.new_today)} today · +${int(s.new_this_month)} this month`}
+            />
+            <StatCard
+              label="Booked at least once"
+              icon="calendar"
+              tone="info"
+              loading={firstLoad}
+              value={int(s.booked)}
+              sub={`${conversion}% conversion from sign-up`}
+            />
+            <StatCard
+              label="Repeat customers"
+              icon="repeat"
+              tone="success"
+              loading={firstLoad}
+              value={int(s.retained)}
+              sub={`${retention}% of bookers came back`}
+            />
+            <StatCard
+              label="Average lifetime value"
+              icon="rupee"
+              tone="warning"
+              loading={firstLoad}
+              value={money(s.avg_spend)}
+              sub={`${s.avg_bookings ?? 0} bookings per customer`}
+            />
           </div>
-          <p className={styles.subtitle}>
-            A complete, cross-platform view of your customer base — registrations, activity, retention and value.
-          </p>
-          {data?.generated_at && (
-            <p className={styles.generatedAt}>
-              Generated {new Date(data.generated_at).toLocaleString('en-IN', {
-                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-              })}
-            </p>
-          )}
-        </div>
-      </div>
 
-      <div className={styles.content}>
-        {/* ---- skeleton ---- */}
-        {loading && !data && (
-          <>
-            <div className={styles.skeletonGrid}>
-              {[1, 2, 3, 4].map((i) => <div key={i} className={`${styles.skeletonKpi} ${styles.skeleton}`} />)}
-            </div>
-            <div className={`${styles.skeletonCard} ${styles.skeleton}`} />
-            <div className={`${styles.skeletonCard} ${styles.skeleton}`} />
-            <p className={styles.loadingLabel}>Gathering customer intelligence…</p>
-          </>
-        )}
-
-        {/* ---- error ---- */}
-        {!loading && error && (
-          <div className={styles.errorCard}>
-            <p className={styles.errorTitle}>Unable to load customers</p>
-            <p className={styles.errorMessage}>{error}</p>
-            <button className={styles.retryButton} onClick={load}>Try again</button>
-          </div>
-        )}
-
-        {data && (
-          <>
-            {/* ---- KPI cards ---- */}
-            <div className={styles.kpiGrid}>
-              <KPI label="Registered customers" value={int(s.total)} sub={`${int(s.new_today)} today · ${int(s.new_this_month)} this month`} dotColor="#7c3aed" accent />
-              <KPI label="Booked at least once" value={int(s.booked)} sub={`${conversion}% of all customers`} dotColor="#6366f1" />
-              <KPI label="Repeat customers" value={int(s.retained)} sub={`${retention}% retention of bookers`} dotColor="#10b981" />
-              <KPI label="Average value" value={money(s.avg_spend)} sub={`${s.avg_bookings} bookings per customer`} dotColor="#ec4899" />
-            </div>
-
-            {/* ---- two-column: growth + activity ---- */}
-            <div className={styles.splitRow}>
-              <div className={`${styles.card} ${styles.cardAccent} ${styles.growCard}`}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h2 className={styles.cardTitle}>Customer growth</h2>
-                    <p className={styles.cardDesc}>New registrations over the last 30 days.</p>
-                  </div>
-                  <div className={styles.seg}>
-                    {GRANULARITIES.map((g) => (
-                      <button
-                        key={g.key}
-                        className={`${styles.segBtn} ${granularity === g.key ? styles.segActive : ''}`}
-                        onClick={() => setGranularity(g.key)}
-                      >
-                        {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className={styles.chartBox}>
+          {/* ---- growth + account status ---- */}
+          <div className={styles.splitRow}>
+            <Card
+              title="Customer growth"
+              subtitle={`${GROWTH_COPY[granularity]} · ${int(growthTotal)} in view`}
+              actions={
+                <Segmented ariaLabel="Granularity" value={granularity} onChange={(g) => { setGranularity(g); setPage(1); }} options={GRANULARITIES} />
+              }
+              padded
+            >
+              <div className={styles.chartBox}>
+                {firstLoad ? (
+                  <Skeleton height="100%" radius={12} />
+                ) : growthData.length === 0 ? (
+                  <EmptyState icon="chart" title="No sign-ups in this period" />
+                ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={growthData} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
+                    <AreaChart data={growthData} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
                       <defs>
                         <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.28} />
-                          <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.02} />
+                          <stop offset="0%" stopColor={palette.c1} stopOpacity={0.3} />
+                          <stop offset="100%" stopColor={palette.c1} stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0eef6" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
-                      <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }} />
-                      <Area type="monotone" dataKey="customers" name="New customers" stroke="#7c3aed" strokeWidth={2.4} fill="url(#growthFill)" />
+                      <CartesianGrid strokeDasharray="4 4" stroke={palette.grid} vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: palette.axis }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} dy={6} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: palette.axis }} tickLine={false} axisLine={false} />
+                      <RechartsTooltip cursor={{ stroke: palette.grid }} />
+                      <Area
+                        type="monotone"
+                        dataKey="customers"
+                        name="New customers"
+                        stroke={palette.c1}
+                        strokeWidth={2.4}
+                        fill="url(#growthFill)"
+                        activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface-color)' }}
+                        isAnimationActive={false}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className={`${styles.card} ${styles.cardAccent} ${styles.donutCard}`}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h2 className={styles.cardTitle}>Account status</h2>
-                    <p className={styles.cardDesc}>Active vs inactive customer accounts.</p>
-                  </div>
-                </div>
-                <div className={styles.donutWrap}>
-                  <ResponsiveContainer width="100%" height={210}>
-                    <PieChart>
-                      <Pie data={activeShare} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={82} paddingAngle={3} strokeWidth={0}>
-                        <Cell fill="#7c3aed" />
-                        <Cell fill="#e3e0ee" />
-                      </Pie>
-                      <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className={styles.donutCenter}>
-                    <div className={styles.donutValue}>{int(s.active)}</div>
-                    <div className={styles.donutLabel}>ACTIVE</div>
-                  </div>
-                </div>
-                <div className={styles.chipRow}>
-                  <Chip color="#7c3aed" label="Active" value={int(s.active)} />
-                  <Chip color="#9ca3af" label="Inactive" value={int((s.total ?? 0) - (s.active ?? 0))} />
-                </div>
-              </div>
-            </div>
-
-            {/* ---- cities ---- */}
-            <div className={`${styles.card} ${styles.cardAccent}`}>
-              <div className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Where customers are</h2>
-                  <p className={styles.cardDesc}>Customer distribution across cities.</p>
-                </div>
-              </div>
-              <div className={styles.chartBox}>
-                {cities.length === 0 ? (
-                  <p className={styles.muted}>No customers with a city assigned yet.</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={190 + cities.length * 8}>
-                    <BarChart data={cities} layout="vertical" margin={{ top: 4, right: 18, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0eef6" horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
-                      <YAxis type="category" dataKey="city" width={104} tick={{ fontSize: 11, fill: '#4b5563' }} tickLine={false} axisLine={false} />
-                      <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 12 }}
-                        formatter={(value: any) => [`${value} customer${value === 1 ? '' : 's'}`, 'Customers']} />
-                      <Bar dataKey="customers" name="Customers" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={18} />
-                    </BarChart>
-                  </ResponsiveContainer>
                 )}
               </div>
-            </div>
+            </Card>
 
-            {/* ---- leaderboards: value + no-show risk ---- */}
-            <div className={styles.leaderGrid}>
-              <div className={`${styles.card} ${styles.cardAccent} ${styles.leaderCard}`}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h2 className={styles.cardTitle}>Most valuable customers</h2>
-                    <p className={styles.cardDesc}>Top customers by total spend on completed appointments.</p>
-                  </div>
-                </div>
-                {(s.top_customers ?? []).length === 0 ? (
-                  <p className={styles.muted}>No completed bookings yet.</p>
-                ) : (
-                  <div className={styles.miniList}>
-                    {(s.top_customers ?? []).map((c: any, idx: number) => (
-                      <div className={styles.vipRow} key={c.id} onClick={() => openDetail(c.id)}>
-                        <span className={`${styles.rankBadge} ${idx === 0 ? styles.rank1 : idx === 1 ? styles.rank2 : idx === 2 ? styles.rank3 : styles.rankN}`}>{idx + 1}</span>
-                        <div className={`${styles.vipAvatar} ${styles.vipAvatarBrand}`}>{initials(c.name)}</div>
-                        <div className={styles.vipInfo}>
-                          <div className={styles.vipName}>{c.name}</div>
-                          <div className={styles.vipMeta}>{c.phone ?? '—'}</div>
-                        </div>
-                        <div className={styles.vipStats}>
-                          <div className={styles.vipStat}><span className={styles.vipStatLabel}>Bookings</span><b>{int(c.bookings)}</b></div>
-                          <div className={styles.vipStat}><span className={styles.vipStatLabel}>Spend</span><b className={styles.vipSpend}>{money(c.spend)}</b></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className={`${styles.card} ${styles.cardAccentWarn} ${styles.leaderCard}`}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h2 className={styles.cardTitle}>Most no-shows</h2>
-                    <p className={styles.cardDesc}>Who keeps missing bookings, ranked by no-show count.</p>
-                  </div>
-                </div>
-                {noShowLeaders.length === 0 ? (
-                  <p className={styles.muted}>No no-shows recorded yet — your record is clean.</p>
-                ) : (
-                  <div className={styles.miniList}>
-                    {noShowLeaders.map((c: any, idx: number) => {
-                      const rate = c.bookings > 0 ? Math.round((c.no_shows / c.bookings) * 100) : 100;
-                      return (
-                        <div className={styles.vipRow} key={c.id} onClick={() => openDetail(c.id)}>
-                          <span className={`${styles.rankBadge} ${idx === 0 ? styles.rank1 : idx === 1 ? styles.rank2 : idx === 2 ? styles.rank3 : styles.rankN}`}>{idx + 1}</span>
-                          <div className={`${styles.vipAvatar} ${styles.vipAvatarBrand}`}>{initials(c.name)}</div>
-                          <div className={styles.vipInfo}>
-                            <div className={styles.vipName}>{c.name}</div>
-                            <div className={styles.vipMeta}>{c.phone ?? '—'}</div>
-                          </div>
-                          <div className={styles.vipStats}>
-                            <div className={styles.vipStat}><span className={styles.vipStatLabel}>No-shows</span><b className={styles.noShowNum}>{int(c.no_shows)}</b></div>
-                            <div className={styles.vipStat}><span className={styles.vipStatLabel}>Rate</span><b>{rate}%</b></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ---- directory ---- */}
-            <div className={`${styles.card} ${styles.cardAccent}`}>
-              <div className={styles.cardHeader}>
-                <div>
-                  <h2 className={styles.cardTitle}>Customer directory</h2>
-                  <p className={styles.cardDesc}>
-                    {int(dir.total)} customer{dir.total === 1 ? '' : 's'} registered · search by name, phone or email.
-                  </p>
-                </div>
-                <div className={styles.dirActions}>
-                  <div className={styles.searchBox}>
-                    <span className={styles.searchIcon}>⌕</span>
-                    <input
-                      type="text"
-                      value={search}
-                      placeholder="Search customers…"
-                      onChange={(e) => setSearch(e.target.value)}
-                      className={styles.searchInput}
-                    />
-                  </div>
-                  <button className={styles.smallButton} onClick={exportDirectory}>↓ CSV</button>
-                </div>
-              </div>
-
-              {rows.length === 0 ? (
-                <p className={styles.muted}>No customers match your search.</p>
+            <Card title="Account status" subtitle="Active vs deactivated accounts" padded>
+              {firstLoad ? (
+                <Skeleton width={180} height={180} radius={999} />
               ) : (
                 <>
-                  <div className={styles.tableScroll}>
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          <SortHeader label="Customer" sortKey="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Location" sortKey="city" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Joined" sortKey="joined_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Bookings" sortKey="bookings" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Completed" sortKey="completed" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Cancelled" sortKey="cancelled" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="No-show" sortKey="no_show" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                          <SortHeader label="Spend" sortKey="spend" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
-                          <SortHeader label="Status" sortKey="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((c: any) => (
-                          <tr key={c.id} className={styles.clickableRow} onClick={() => openDetail(c.id)}>
-                            <td>
-                              <div className={styles.custCell}>
-                                <div className={styles.custAvatar}>{initials(c.name)}</div>
-                                <div>
-                                  <div className={styles.custName}>{c.name}</div>
-                                  <div className={styles.custMeta}>{c.phone}{c.email ? ` · ${c.email}` : ''}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>{c.city ?? '—'}{c.sub_area ? `, ${c.sub_area}` : ''}</td>
-                            <td>{fmtDate(c.joined_at)}</td>
-                            <td>{int(c.bookings)}</td>
-                            <td>{int(c.completed)}</td>
-                            <td>{int(c.cancelled)}</td>
-                            <td>{c.no_show > 0 ? <b className={styles.noShowBadge}>{int(c.no_show)}</b> : <span className={styles.mutedCell}>0</span>}</td>
-                            <td className={styles.textRightBold}>{money(c.spend)}</td>
-                            <td><StatusPill active={c.is_active} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* ---- pagination ---- */}
-                  {dir.last_page > 1 && (
-                    <div className={styles.pagination}>
-                      <button className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
-                      <span className={styles.pageInfo}>
-                        Page {int(dir.current_page)} of {int(dir.last_page)}
-                        {debouncedSearch ? '' : ` · ${int(dir.total)} customers`}
-                      </span>
-                      <button className={styles.pageBtn} disabled={page >= dir.last_page} onClick={() => setPage(page + 1)}>Next →</button>
+                  <div className={styles.donutWrap}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[{ name: 'Active', value: s.active ?? 0 }, { name: 'Inactive', value: inactive }]}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="70%"
+                          outerRadius="94%"
+                          paddingAngle={2}
+                          cornerRadius={4}
+                          stroke="none"
+                          startAngle={90}
+                          endAngle={-270}
+                        >
+                          <Cell fill={palette.c1} />
+                          <Cell fill={palette.track} />
+                        </Pie>
+                        <RechartsTooltip formatter={(v) => [int(v), 'Customers']} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className={styles.donutCenter}>
+                      <div className={styles.donutValue}>{activePct}%</div>
+                      <div className={styles.donutLabel}>active</div>
                     </div>
-                  )}
+                  </div>
+                  <div className={styles.legend}>
+                    <div className={styles.legendRow}>
+                      <span className={styles.legendDot} style={{ background: palette.c1 }} />
+                      Active <b>{int(s.active)}</b>
+                    </div>
+                    <div className={styles.legendRow}>
+                      <span className={styles.legendDot} style={{ background: palette.track, boxShadow: 'inset 0 0 0 1px var(--border-strong)' }} />
+                      Inactive <b>{int(inactive)}</b>
+                    </div>
+                  </div>
                 </>
               )}
+            </Card>
+          </div>
+
+          {/* ---- cities + leaderboards ---- */}
+          <div className={styles.triRow}>
+            <Card title="Where customers are" subtitle="Top cities by registered customers" padded>
+              {firstLoad ? (
+                <ListSkeleton />
+              ) : cities.length === 0 ? (
+                <EmptyState icon="pin" title="No cities yet" hint="Customers appear here once they pick a city." />
+              ) : (
+                <ol className={styles.meterList}>
+                  {cities.map((c: any) => (
+                    <li key={c.city} className={styles.meterRow}>
+                      <div className={styles.meterTop}>
+                        <span className={styles.meterName}>{c.city}</span>
+                        <span className={styles.meterValue}>{int(c.customers)}</span>
+                      </div>
+                      <div className={styles.meter}>
+                        <span style={{ width: `${(Number(c.customers) / maxCity) * 100}%` }} />
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+
+            <Card title="Most valuable" subtitle="By spend on completed appointments" padded>
+              {firstLoad ? (
+                <ListSkeleton />
+              ) : (s.top_customers ?? []).length === 0 ? (
+                <EmptyState icon="star" title="No completed bookings yet" />
+              ) : (
+                <ol className={styles.leaderList}>
+                  {(s.top_customers ?? []).slice(0, 5).map((c: any, idx: number) => (
+                    <li key={c.id}>
+                      <button type="button" className={styles.leaderRow} onClick={() => openDetail(c.id)}>
+                        <span className={cx(styles.rank, idx < 3 && styles[`rank${idx + 1}`])}>{idx + 1}</span>
+                        <Avatar name={c.name} size={34} />
+                        <span className={styles.leaderInfo}>
+                          <span className={styles.leaderName}>{c.name}</span>
+                          <span className={styles.leaderMeta}>{int(c.bookings)} bookings</span>
+                        </span>
+                        <span className={styles.leaderValue}>{moneyShort(c.spend)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+
+            <Card title="No-show watch" subtitle="Customers who keep missing bookings" padded>
+              {firstLoad ? (
+                <ListSkeleton />
+              ) : noShowLeaders.length === 0 ? (
+                <EmptyState icon="checkCircle" title="A clean record" hint="No no-shows recorded yet." />
+              ) : (
+                <ol className={styles.leaderList}>
+                  {noShowLeaders.slice(0, 5).map((c: any) => {
+                    const rate = c.bookings > 0 ? Math.round((c.no_shows / c.bookings) * 100) : 100;
+                    return (
+                      <li key={c.id}>
+                        <button type="button" className={styles.leaderRow} onClick={() => openDetail(c.id)}>
+                          <Avatar name={c.name} size={34} tone="danger" />
+                          <span className={styles.leaderInfo}>
+                            <span className={styles.leaderName}>{c.name}</span>
+                            <span className={styles.leaderMeta}>{int(c.no_shows)} of {int(c.bookings)} bookings missed</span>
+                          </span>
+                          <Badge tone={rate >= 50 ? 'danger' : 'warning'} dot={false}>{rate}%</Badge>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </Card>
+          </div>
+
+          {/* ---- directory ---- */}
+          <Card>
+            <div className={ui.toolbar}>
+              <div className={styles.dirTitle}>
+                <h2 className={ui.cardTitle}>Directory</h2>
+                <p className={ui.cardSubtitle}>
+                  {firstLoad ? 'Loading…' : `${int(dir.total)} customer${dir.total === 1 ? '' : 's'}${debouncedSearch ? ` matching “${debouncedSearch}”` : ''}`}
+                </p>
+              </div>
+              <SearchInput
+                className={styles.dirSearch}
+                value={search}
+                onChange={handleSearch}
+                placeholder="Search name, phone or email…"
+              />
+              <Button icon="download" onClick={exportDirectory} disabled={rows.length === 0} title="Exports the customers on this page">
+                Export page
+              </Button>
             </div>
-          </>
-        )}
-      </div>
+
+            {error && data && (
+              <div className={styles.inlineAlert}><Alert tone="error">{error}</Alert></div>
+            )}
+
+            <div className={cx(ui.tableWrap, loading && data && styles.refreshing)}>
+              <table className={ui.table}>
+                <thead>
+                  <tr>
+                    <SortHeader label="Customer" active={sortBy === 'name'} dir={sortDir} onClick={() => handleSort('name')} />
+                    <SortHeader label="Location" active={sortBy === 'city'} dir={sortDir} onClick={() => handleSort('city')} />
+                    <SortHeader label="Joined" active={sortBy === 'joined_at'} dir={sortDir} onClick={() => handleSort('joined_at')} />
+                    <SortHeader label="Bookings" active={sortBy === 'bookings'} dir={sortDir} onClick={() => handleSort('bookings')} />
+                    <SortHeader label="No-show" active={sortBy === 'no_show'} dir={sortDir} onClick={() => handleSort('no_show')} />
+                    <SortHeader label="Spend" active={sortBy === 'spend'} dir={sortDir} onClick={() => handleSort('spend')} align="right" />
+                    <SortHeader label="Status" active={sortBy === 'status'} dir={sortDir} onClick={() => handleSort('status')} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {firstLoad ? (
+                    Array.from({ length: 6 }, (_, i) => (
+                      <tr key={i}>
+                        <td><div className={ui.personCell}><Skeleton width={34} height={34} radius={11} /><Skeleton width={140} /></div></td>
+                        <td><Skeleton width={110} /></td>
+                        <td><Skeleton width={80} /></td>
+                        <td><Skeleton width={90} /></td>
+                        <td><Skeleton width={30} /></td>
+                        <td><Skeleton width={70} /></td>
+                        <td><Skeleton width={64} height={22} radius={999} /></td>
+                      </tr>
+                    ))
+                  ) : rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7}>
+                        <EmptyState
+                          icon="users"
+                          title={debouncedSearch ? 'No customers match your search' : 'No customers yet'}
+                          action={debouncedSearch ? <Button size="sm" onClick={() => handleSearch('')}>Clear search</Button> : undefined}
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((c: any) => (
+                      <tr key={c.id} {...clickableRow(() => openDetail(c.id))} aria-label={`Open ${c.name}`}>
+                        <td>
+                          <Person name={c.name} sub={[c.phone, c.email].filter(Boolean).join(' · ')} size={34} />
+                        </td>
+                        <td>
+                          <div className={ui.cellPrimary}>{c.city ?? '—'}</div>
+                          {c.sub_area && <div className={ui.cellSub}>{c.sub_area}</div>}
+                        </td>
+                        <td className={ui.num}>{fmtDate(c.joined_at)}</td>
+                        <td>
+                          <div className={cx(ui.cellPrimary, ui.num)}>{int(c.bookings)}</div>
+                          <div className={cx(ui.cellSub, ui.num)}>{int(c.completed)} done · {int(c.cancelled)} cancelled</div>
+                        </td>
+                        <td>
+                          {c.no_show > 0 ? <Badge tone="danger" dot={false}>{int(c.no_show)}</Badge> : <span className={styles.zero}>0</span>}
+                        </td>
+                        <td className={cx(ui.alignRight, ui.cellPrimary, ui.num)}>{money(c.spend)}</td>
+                        <td>
+                          <Badge tone={c.is_active ? 'success' : 'neutral'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {!firstLoad && (
+              <Pagination
+                page={dir.current_page ?? page}
+                lastPage={dir.last_page ?? 1}
+                total={dir.total}
+                noun="customers"
+                onChange={setPage}
+              />
+            )}
+          </Card>
+        </>
+      )}
 
       {/* ---- detail drawer ---- */}
-      {(detail || detailLoading) && (
-        <div className={styles.drawerBackdrop} onClick={() => setDetail(null)}>
-          <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
-            <button className={styles.drawerClose} onClick={() => setDetail(null)}>✕</button>
-            {detailLoading ? (
-              <div>
-                <div className={`${styles.skeletonCard} ${styles.skeleton}`} style={{ height: 120 }} />
-                <div className={`${styles.skeletonCard} ${styles.skeleton}`} style={{ height: 220, marginTop: 14 }} />
+      <Drawer
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={detail?.customer?.name ?? 'Customer'}
+        header={
+          detail?.customer ? (
+            <ProfileHeader c={detail.customer} />
+          ) : (
+            <div className={styles.profileHead}>
+              <Skeleton width={56} height={56} radius={16} />
+              <div style={{ flex: 1 }}>
+                <Skeleton width="60%" height={18} />
+                <div style={{ height: 8 }} />
+                <Skeleton width="80%" height={12} />
               </div>
-            ) : detail?.error ? (
-              <div className={styles.errorCard}>
-                <p className={styles.errorTitle}>Could not load customer</p>
-                <p className={styles.errorMessage}>{detail.error}</p>
-              </div>
-            ) : detail?.customer ? (
-              <DetailPanel detail={detail} onExport={() => exportCustomer(detail)} />
-            ) : null}
+            </div>
+          )
+        }
+        footer={
+          detail?.customer && (
+            <>
+              <Button icon="download" onClick={() => exportCustomer(detail)} disabled={!(detail.appointments ?? []).length}>
+                Export appointments
+              </Button>
+              <Button variant="primary" onClick={() => setDetailOpen(false)}>Done</Button>
+            </>
+          )
+        }
+      >
+        {detailLoading ? (
+          <div className={styles.drawerSkeleton}>
+            <Skeleton height={76} radius={14} />
+            <Skeleton height={220} radius={14} />
           </div>
-        </div>
-      )}
+        ) : detail?.error ? (
+          <EmptyState icon="alert" title="Could not load customer" hint={detail.error} />
+        ) : detail?.customer ? (
+          <DetailPanel detail={detail} />
+        ) : null}
+      </Drawer>
     </div>
   );
 }
@@ -487,81 +537,72 @@ export default function CustomersPage() {
 function exportCustomer(detail: any) {
   const c = detail.customer;
   downloadCSV(
-    `customer-${c.name.replace(/\s+/g, '-').toLowerCase()}.csv`,
-    ['Appointment', 'Salon', 'Status', 'Bookings', 'Date', 'Start', 'Source', 'Billed'],
+    `customer-${String(c.name || 'customer').replace(/\s+/g, '-').toLowerCase()}.csv`,
+    ['Appointment', 'Salon', 'Status', 'Date', 'Start', 'Source', 'Billed'],
     (detail.appointments ?? []).map((a: any) => [
-      a.id, a.salon ?? '—', a.status, a.booking_source, a.date, a.start, a.source, money(a.billed),
-    ])
+      a.id, a.salon ?? '—', a.status, a.date, a.start ?? '', a.source ?? a.booking_source ?? '', money(a.billed),
+    ]),
   );
 }
 
-/* ---------------------------------------------------------------- helpers */
+/* ---------------------------------------------------------------- pieces */
 
-function KPI({ label, value, sub, accent, dotColor }: { label: string; value: string; sub: string; accent?: boolean; dotColor?: string }) {
+function ListSkeleton() {
   return (
-    <div className={`${styles.kpi} ${accent ? styles.kpiAccent : ''}`}>
-      <div className={styles.kpiLabel}>
-        <span className={styles.kpiDot} style={{ background: dotColor ?? '#6b7280' }} />
-        {label}
+    <div className={styles.listSkeleton}>
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className={styles.listSkeletonRow}>
+          <Skeleton width={34} height={34} radius={11} />
+          <Skeleton height={12} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProfileHeader({ c }: { c: any }) {
+  return (
+    <div className={styles.profileHead}>
+      <Avatar name={c.name} size={56} />
+      <div className={styles.profileText}>
+        <div className={styles.profileName}>
+          {c.name}
+          {c.is_active !== undefined && <Badge tone={c.is_active ? 'success' : 'neutral'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>}
+        </div>
+        <div className={styles.profileMeta}>
+          {c.phone && <span><Icon name="phone" size={13} />{c.phone}</span>}
+          {c.email && <span><Icon name="mail" size={13} />{c.email}</span>}
+        </div>
+        <div className={styles.profileMeta}>
+          <span><Icon name="pin" size={13} />{c.city ?? 'No city'}</span>
+          <span>Joined {fmtDate(c.joined_at)}</span>
+          {c.last_seen && <span>Last seen {fmtDate(c.last_seen)}</span>}
+        </div>
       </div>
-      <div className={styles.kpiValue}>{value}</div>
-      <div className={styles.kpiSub}>{sub}</div>
     </div>
   );
 }
 
-function Chip({ color, label, value }: { color: string; label: string; value: string }) {
-  return (
-    <div className={styles.chip}>
-      <span className={styles.chipDot} style={{ background: color }} />
-      <span className={styles.chipLabel}>{label}</span>
-      <b>{value}</b>
-    </div>
-  );
-}
+const APP_TONE: Record<string, Tone> = {
+  completed: 'success',
+  cancelled: 'neutral',
+  no_show: 'danger',
+  scheduled: 'info',
+  in_progress: 'accent',
+  pending_payment: 'warning',
+  rescheduled: 'info',
+  awaiting_reschedule: 'warning',
+};
 
-function SortHeader({ label, sortKey, sortBy, sortDir, onSort, align }: {
-  label: string;
-  sortKey: string;
-  sortBy: string;
-  sortDir: string;
-  onSort: (key: string) => void;
-  align?: 'left' | 'right';
-}) {
-  const active = sortKey === sortBy;
-  return (
-    <th style={align === 'right' ? { textAlign: 'right' } : undefined}>
-      <button
-        type="button"
-        className={`${styles.sortHeader} ${active ? styles.sortHeaderActive : ''}`}
-        onClick={() => onSort(sortKey)}
-        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-      >
-        <span>{label}</span>
-        <span className={`${styles.sortIcon} ${active ? styles.sortIconShown : ''}`}>
-          {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-        </span>
-      </button>
-    </th>
-  );
-}
-
-function StatusPill({ active }: { active: boolean }) {
-  return (
-    <span className={`${styles.statusPill} ${active ? styles.sActive : styles.sInactive}`}>
-      {active ? 'Active' : 'Inactive'}
-    </span>
-  );
-}
-
-function DetailPanel({ detail, onExport }: { detail: any; onExport: () => void }) {
+function DetailPanel({ detail }: { detail: any }) {
   const c = detail.customer;
+  const [tab, setTab] = useState<'appointments' | 'reviews'>('appointments');
   const [appSort, setAppSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'date', dir: 'desc' });
 
   const appointments = useMemo(() => {
-    const rows = [...(detail.appointments ?? [])];
+    const list = [...(detail.appointments ?? [])];
     const dir = appSort.dir === 'asc' ? 1 : -1;
-    rows.sort((x: any, y: any) => {
+    list.sort((x: any, y: any) => {
       const va = x[appSort.key];
       const vb = y[appSort.key];
       if (va == null && vb == null) return 0;
@@ -570,104 +611,101 @@ function DetailPanel({ detail, onExport }: { detail: any; onExport: () => void }
       const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb));
       return cmp * dir;
     });
-    return rows;
+    return list;
   }, [detail, appSort]);
 
-  const toggleSort = (key: string) => {
-    setAppSort((p) => ({
-      key,
-      dir: key === p.key && p.dir === 'asc' ? 'desc' : 'asc',
-    }));
-  };
+  const toggleSort = (key: string) =>
+    setAppSort((p) => ({ key, dir: key === p.key && p.dir === 'asc' ? 'desc' : 'asc' }));
+
+  const reviews = detail.reviews ?? [];
+  const completion = c.bookings > 0 ? Math.round((c.completed / c.bookings) * 100) : 0;
 
   return (
-    <div>
-      <div className={styles.detailHead}>
-        <div className={styles.detailAvatar}>{initials(c.name)}</div>
-        <div>
-          <h2 className={styles.detailTitle}>{c.name}</h2>
-          <p className={styles.detailMeta}>{c.phone}{c.email ? ` · ${c.email}` : ''}</p>
-          <p className={styles.detailMeta}>
-            {c.city ?? 'No city'} · Joined {fmtDate(c.joined_at)}
-            {c.last_seen ? ` · Last seen ${fmtDate(c.last_seen)}` : ''}
-          </p>
+    <>
+      <div className={styles.profileStats}>
+        <div className={cx(styles.profileStat, styles.profileStatAccent)}>
+          <span>Lifetime value</span>
+          <b>{money(c.spend)}</b>
+        </div>
+        <div className={styles.profileStat}>
+          <span>Bookings</span>
+          <b>{int(c.bookings)}</b>
+        </div>
+        <div className={styles.profileStat}>
+          <span>Completion</span>
+          <b>{completion}%</b>
+        </div>
+        <div className={styles.profileStat}>
+          <span>No-shows</span>
+          <b className={c.no_show > 0 ? styles.danger : undefined}>{int(c.no_show)}</b>
         </div>
       </div>
 
-      <div className={styles.detailStats}>
-        <div className={styles.detailStat}><span>Total bookings</span><b>{int(c.bookings)}</b></div>
-        <div className={styles.detailStat}><span>Completed</span><b>{int(c.completed)}</b></div>
-        <div className={styles.detailStat}><span>Cancelled</span><b>{int(c.cancelled)}</b></div>
-        <div className={styles.detailStat}><span>No-show</span><b>{int(c.no_show)}</b></div>
-        <div className={`${styles.detailStat} ${styles.detailStatAccent}`}><span>Lifetime value</span><b>{money(c.spend)}</b></div>
-      </div>
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'appointments', label: `Appointments (${appointments.length})` },
+          { value: 'reviews', label: `Reviews (${reviews.length})` },
+        ]}
+      />
 
-      <h3 className={styles.detailSectionTitle}>Recent appointments</h3>
-      {appointments.length === 0 ? (
-        <p className={styles.muted}>No appointments recorded.</p>
-      ) : (
-        <div className={styles.tableScroll}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <SortHeader label="Salon" sortKey="salon" sortBy={appSort.key} sortDir={appSort.dir} onSort={toggleSort} />
-                <SortHeader label="Date" sortKey="date" sortBy={appSort.key} sortDir={appSort.dir} onSort={toggleSort} />
-                <SortHeader label="Start" sortKey="start" sortBy={appSort.key} sortDir={appSort.dir} onSort={toggleSort} />
-                <SortHeader label="Billed" sortKey="billed" sortBy={appSort.key} sortDir={appSort.dir} onSort={toggleSort} align="right" />
-                <SortHeader label="Status" sortKey="status" sortBy={appSort.key} sortDir={appSort.dir} onSort={toggleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {appointments.map((a: any) => (
-                <tr key={a.id}>
-                  <td><strong>{a.salon ?? '—'}</strong></td>
-                  <td>{a.date}</td>
-                  <td>{a.start ?? '—'}</td>
-                  <td className={styles.textRightBold}>{money(a.billed)}</td>
-                  <td><APill status={a.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className={styles.detailActions}>
-        <h3 className={styles.detailSectionTitle}>Reviews</h3>
-        <button className={styles.smallButton} onClick={onExport}>↓ CSV</button>
-      </div>
-      {(detail.reviews ?? []).length === 0 ? (
-        <p className={styles.muted}>No reviews written by this customer yet.</p>
-      ) : (
-        <div className={styles.reviewList}>
-          {(detail.reviews ?? []).map((r: any) => (
-            <div className={styles.reviewItem} key={r.id}>
-              <span className={styles.stars}>{'★'.repeat(r.rating)}<span className={styles.starsDim}>{'★'.repeat(5 - r.rating)}</span></span>
-              <span className={styles.reviewText}>{r.comment || 'No comment.'}</span>
-              <span className={styles.reviewMeta}>{r.salon ?? '—'} · {fmtDate(r.created_at)}</span>
+      <div className={styles.tabBody}>
+        {tab === 'appointments' && (
+          appointments.length === 0 ? (
+            <EmptyState icon="calendar" title="No appointments recorded" />
+          ) : (
+            <div className={cx(ui.tableWrap, styles.drawerTable)}>
+              <table className={ui.table}>
+                <thead>
+                  <tr>
+                    <SortHeader label="Salon" active={appSort.key === 'salon'} dir={appSort.dir} onClick={() => toggleSort('salon')} />
+                    <SortHeader label="When" active={appSort.key === 'date'} dir={appSort.dir} onClick={() => toggleSort('date')} />
+                    <SortHeader label="Billed" active={appSort.key === 'billed'} dir={appSort.dir} onClick={() => toggleSort('billed')} align="right" />
+                    <SortHeader label="Status" active={appSort.key === 'status'} dir={appSort.dir} onClick={() => toggleSort('status')} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map((a: any) => (
+                    <tr key={a.id}>
+                      <td className={ui.cellPrimary}>{a.salon ?? '—'}</td>
+                      <td className={ui.num}>
+                        {fmtDate(a.date)}
+                        {a.start && <div className={ui.cellSub}>{String(a.start).slice(0, 5)}</div>}
+                      </td>
+                      <td className={cx(ui.alignRight, ui.num, ui.cellPrimary)}>{money(a.billed)}</td>
+                      <td>
+                        <Badge tone={APP_TONE[a.status] ?? 'neutral'}>{String(a.status ?? 'unknown').replace(/_/g, ' ')}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+          )
+        )}
 
-const appTone: Record<string, string> = {
-  completed: styles.aCompleted,
-  cancelled: styles.aCancelled,
-  no_show: styles.aNoShow,
-  scheduled: styles.aScheduled,
-  in_progress: styles.aActive,
-  pending_payment: styles.aPending,
-  rescheduled: styles.aScheduled,
-  awaiting_reschedule: styles.aScheduled,
-};
-
-function APill({ status }: { status: string }) {
-  return (
-    <span className={`${styles.statusPill} ${appTone[status] ?? styles.aDefault}`}>
-      {(status ?? 'unknown').replace(/_/g, ' ')}
-    </span>
+        {tab === 'reviews' && (
+          reviews.length === 0 ? (
+            <EmptyState icon="star" title="No reviews yet" hint="This customer hasn't reviewed a salon." />
+          ) : (
+            <ul className={styles.reviewList}>
+              {reviews.map((r: any) => (
+                <li className={styles.reviewItem} key={r.id}>
+                  <div className={styles.reviewTop}>
+                    <span className={styles.stars} aria-label={`${r.rating} out of 5`}>
+                      {'★'.repeat(r.rating)}
+                      <span className={styles.starsDim}>{'★'.repeat(Math.max(0, 5 - r.rating))}</span>
+                    </span>
+                    <span className={styles.reviewMeta}>{r.salon ?? '—'} · {fmtDate(r.created_at)}</span>
+                  </div>
+                  <p className={styles.reviewText}>{r.comment || <em>No comment.</em>}</p>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
+      </div>
+    </>
   );
 }

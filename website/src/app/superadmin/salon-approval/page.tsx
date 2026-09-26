@@ -285,7 +285,7 @@ export default function SalonApprovalQueue() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>SuperAdmin Dashboard</h1>
+        <h1 className={styles.title}>Salon Approval Queue</h1>
         <p className={styles.subtitle}>Review new salon enquiries and approve pending onboarding salons.</p>
       </div>
 
@@ -325,7 +325,7 @@ export default function SalonApprovalQueue() {
                   <tr key={enq.id} className={`${styles.tr} ${justAssignedIds.includes(enq.id) ? styles.rowSuccess : ''}`}>
                     <td className={styles.td}>
                       <div className={styles.salonName}>{enq.salon_name}</div>
-                      <div style={{ fontSize: '0.85rem', color: '#666' }}>{enq.owner_name}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>{enq.owner_name}</div>
                     </td>
                     <td className={styles.td}>
                       {enq.sub_area_name ? (
