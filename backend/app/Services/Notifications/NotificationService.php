@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\SendPushNotificationJob;
 use App\Models\Appointment;
 use App\Models\Notification;
 use App\Models\User;
@@ -12,9 +13,14 @@ use Illuminate\Support\Facades\Log;
  * One place to reach a customer.
  *
  * Every notification lands in the in-app inbox first — that is the channel we
- * actually control — and is then mirrored to WhatsApp on a best-effort basis.
- * A WhatsApp failure must never cost the customer their in-app notice, so the
- * mirror is wrapped and only logged.
+ * actually control — and is then mirrored to WhatsApp on a best-effort basis,
+ * with a push queued for the customer's registered phones. A failure on either
+ * mirror must never cost the customer their in-app notice, so both are wrapped
+ * and only logged.
+ *
+ * Push is queued rather than sent inline because the caller is usually inside
+ * a database transaction, and a device lookup plus a provider call in the
+ * middle of one would hold a booking open for a network round trip.
  */
 class NotificationService
 {
@@ -106,7 +112,7 @@ class NotificationService
             return null;
         }
 
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $userId,
             'type' => $type,
             'title' => $title,
@@ -116,6 +122,35 @@ class NotificationService
             'related_salon_id' => $appointment?->salon_id,
             'is_read' => false,
         ]);
+
+        // Queued from here, rather than from each caller, so a new notification
+        // cannot be added without also being pushed.
+        $this->mirrorToPush($notification);
+
+        return $notification;
+    }
+
+    /**
+     * Queue the push mirror. Never throws: a notification run for a whole day of
+     * bookings must not stop because one device could not be registered.
+     *
+     * afterCommit() is stated at the call site as well as being the job's own
+     * default, because the order is load-bearing. SalonClosureService wraps
+     * itself in DB::transaction() and the customer's reschedule commits several
+     * lines after this returns; a worker that picked the job up in between
+     * would go looking for a notification row that is not committed yet, and
+     * quietly decide there is nothing to send.
+     */
+    private function mirrorToPush(Notification $notification): void
+    {
+        try {
+            SendPushNotificationJob::dispatch($notification->id)->afterCommit();
+        } catch (\Throwable $e) {
+            Log::warning('Could not queue push notification', [
+                'notification_id' => $notification->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -64,6 +64,35 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Push Notifications
+    |--------------------------------------------------------------------------
+    |
+    | PUSH_DRIVER is `log` in every environment for now. That driver writes each
+    | attempted push to the log and contacts nobody, while still running the
+    | whole pipeline — notification, queue, device lookup, delivery ledger — so
+    | the backend can be built and tested ahead of the app.
+    |
+    | The `fcm` values below are read by nothing yet. They are here so that
+    | switching drivers on day two is filling in four values rather than
+    | designing a config block while a provider is waiting. No credentials are
+    | committed, and the app must not need them: an environment with none of
+    | them set keeps working on the log driver.
+    |
+    */
+    'push' => [
+        'driver' => env('PUSH_DRIVER', 'log'),
+        'fcm' => [
+            'project_id' => env('FCM_PROJECT_ID'),
+            'client_email' => env('FCM_CLIENT_EMAIL'),
+            // Either an inline PEM service-account key, or point at the file and
+            // leave this empty. Never commit either one.
+            'private_key' => env('FCM_PRIVATE_KEY'),
+            'credentials_path' => env('FCM_CREDENTIALS_PATH'),
+        ],
+    ],
+
     'customer_app' => [
         // Used to build the free-reschedule link sent to customers.
         'deeplink_base' => env('CUSTOMER_APP_DEEPLINK_BASE', 'bookalook://customer'),

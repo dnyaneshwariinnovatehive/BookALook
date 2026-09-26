@@ -74,6 +74,10 @@ Route::prefix('customer')->group(function () {
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markAllRead']);
         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markRead']);
+
+        // Push notification devices
+        Route::post('/devices/register', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'register']);
+        Route::post('/devices/unregister', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'unregister']);
     });
 });
 

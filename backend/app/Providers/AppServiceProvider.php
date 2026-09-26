@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\DB;
 
+use App\Services\Notifications\LogPushGateway;
 use App\Services\Notifications\LogWhatsAppGateway;
 use App\Services\Notifications\MetaCloudWhatsAppGateway;
+use App\Services\Notifications\PushGateway;
 use App\Services\Notifications\WhatsAppGateway;
 use App\Services\Payments\DemoPaymentGateway;
 use App\Services\Payments\PaymentGateway;
@@ -37,6 +39,19 @@ class AppServiceProvider extends ServiceProvider
                 default => new LogWhatsAppGateway(),
             };
         });
+
+        // Push notifications. `log` is the only driver that exists in this
+        // phase, and it is the right answer in every environment right now: it
+        // records what would have gone out and contacts nobody, so the app can
+        // be built and every part of the pipeline exercised before a single
+        // customer is disturbed by a real push.
+        //
+        // A real gateway lands here, guarded on its own credentials, in exactly
+        // the shape of the WhatsApp binding above — an `fcm` branch that
+        // requires the project id and key and falls back to this one otherwise.
+        // Accepting the `fcm` value now and degrading to the log driver means
+        // flipping the env var early cannot break every booking.
+        $this->app->bind(PushGateway::class, fn () => new LogPushGateway());
 
         // Razorpay for appointment advances. Falls back to the demo gateway
         // whenever keys are missing, so a half-configured environment cannot
