@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import Icon, { type IconName } from '@/components/admin/Icon';
 import {
   Alert, Badge, Button, Card, DescriptionList, Drawer, EmptyState, Field, IconButton, Modal,
-  PageHeader, Pagination, Person, SearchInput, Segmented, Skeleton, Tabs, clickableRow, cx,
-  downloadCSV, formatINR, localISODate, ui, useDebounced, type Tone,
+  PageHeader, Pagination, Person, SearchInput, Segmented, Skeleton, SortHeader, Tabs,
+  clickableRow, cx, downloadCSV, formatINR, localISODate, ui, useDebounced, type Tone,
 } from '@/components/admin/ui';
 import styles from './page.module.css';
 
@@ -227,6 +227,8 @@ export default function GlobalAppointmentsDashboard() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounced(search);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
   const [salons, setSalons] = useState<Salon[]>([]);
 
   // Overlays
@@ -245,7 +247,7 @@ export default function GlobalAppointmentsDashboard() {
   const requestSeq = useRef(0);
 
   // Loading is derived: true until a response for the current filters lands.
-  const queryKey = [date, dateMode, status, salonId, debouncedSearch, page].join('|');
+  const queryKey = [date, dateMode, status, salonId, debouncedSearch, page, perPage, sort?.key, sort?.dir].join('|');
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const loading = loadedKey !== queryKey;
 
@@ -268,7 +270,12 @@ export default function GlobalAppointmentsDashboard() {
       if (status) queryParams.append('status', status);
       if (salonId) queryParams.append('salon_id', salonId);
       if (debouncedSearch) queryParams.append('search', debouncedSearch);
+      if (sort) {
+        queryParams.append('column', sort.key);
+        queryParams.append('direction', sort.dir);
+      }
       queryParams.append('page', page.toString());
+      queryParams.append('per_page', perPage.toString());
 
       const res = await fetch(`/api/proxy/superadmin/appointments?${queryParams.toString()}`);
 
@@ -297,7 +304,7 @@ export default function GlobalAppointmentsDashboard() {
     } finally {
       if (!isPolling && seq === requestSeq.current) setLoadedKey(queryKey);
     }
-  }, [date, dateMode, status, salonId, debouncedSearch, page, queryKey, router]);
+  }, [date, dateMode, status, salonId, debouncedSearch, page, perPage, sort, queryKey, router]);
 
   useEffect(() => {
     fetch('/api/proxy/superadmin/salons?per_page=100')
@@ -374,6 +381,16 @@ export default function GlobalAppointmentsDashboard() {
 
   const resetPage = <T,>(setter: (v: T) => void) => (v: T) => {
     setter(v);
+    setPage(1);
+  };
+
+  // asc -> desc -> unsorted, and always back to page 1.
+  const onSortColumn = (key: string) => {
+    setSort((prev) => {
+      if (prev?.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
     setPage(1);
   };
 
@@ -533,14 +550,14 @@ export default function GlobalAppointmentsDashboard() {
           <table className={ui.table}>
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Customer</th>
-                <th>Salon</th>
+                <SortHeader label="Time" active={sort?.key === 'start_time'} dir={sort?.key === 'start_time' ? sort.dir : null} onClick={() => onSortColumn('start_time')} />
+                <SortHeader label="Customer" active={sort?.key === 'customer'} dir={sort?.key === 'customer' ? sort.dir : null} onClick={() => onSortColumn('customer')} />
+                <SortHeader label="Salon" active={sort?.key === 'salon'} dir={sort?.key === 'salon' ? sort.dir : null} onClick={() => onSortColumn('salon')} />
                 <th>Staff</th>
                 <th>Services</th>
                 <th>Source</th>
-                <th>Status</th>
-                <th className={ui.alignRight}>Amount</th>
+                <SortHeader label="Status" active={sort?.key === 'status'} dir={sort?.key === 'status' ? sort.dir : null} onClick={() => onSortColumn('status')} />
+                <SortHeader label="Amount" align="right" active={sort?.key === 'amount'} dir={sort?.key === 'amount' ? sort.dir : null} onClick={() => onSortColumn('amount')} />
                 <th aria-label="Open" />
               </tr>
             </thead>
@@ -665,6 +682,9 @@ export default function GlobalAppointmentsDashboard() {
             total={meta.total}
             noun="appointments"
             onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+            disabled={loading}
           />
         )}
       </Card>

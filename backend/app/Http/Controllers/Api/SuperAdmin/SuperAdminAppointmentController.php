@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Validator;
 
 class SuperAdminAppointmentController extends Controller
 {
+    /** Columns a table header is allowed to sort on. */
+    private const SORTABLE = ['start_time', 'status', 'amount', 'salon', 'customer'];
+
     /**
      * Get global appointments list with filters.
      */
@@ -90,11 +93,36 @@ class SuperAdminAppointmentController extends Controller
             $query->where('booking_source', $request->booking_source);
         }
 
-        $appointments = $query->orderBy('appointment_date', 'desc')
-                              ->orderBy('start_time', 'desc')
-                              ->paginate($request->get('per_page', 20));
+        $request->validate([
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'column' => 'nullable|in:' . implode(',', self::SORTABLE),
+            'direction' => 'nullable|in:asc,desc',
+        ]);
 
-        return response()->json($appointments);
+        $column = $request->input('column');
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+
+        // Related names and the billed figure are not columns on `appointments`,
+        // so they sort through correlated subqueries — one query, no join fan-out.
+        $subqueries = [
+            'amount' => DB::raw('coalesce(final_billed_amount, total_amount)'),
+            'salon' => DB::table('salons')->select('name')->whereColumn('salons.id', 'appointments.salon_id')->limit(1),
+            'customer' => DB::table('users')->select('name')->whereColumn('users.id', 'appointments.customer_id')->limit(1),
+        ];
+
+        if ($column && in_array($column, ['start_time', 'status'], true)) {
+            $query->orderBy($column, $direction);
+        } elseif ($column && isset($subqueries[$column])) {
+            $query->orderBy($subqueries[$column], $direction);
+        } else {
+            // Newest first is the default: this screen is worked top-down.
+            $query->orderBy('appointment_date', 'desc')->orderBy('start_time', 'desc');
+        }
+
+        // Stable tie-break so paging never repeats or skips across equal times.
+        $query->orderBy('id', 'desc');
+
+        return response()->json($query->paginate((int) $request->get('per_page', 20)));
     }
 
     /**

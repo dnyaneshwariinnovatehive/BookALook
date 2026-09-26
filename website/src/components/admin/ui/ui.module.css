@@ -613,16 +613,38 @@ textarea.control {
   text-align: right !important;
 }
 
+.alignCenter {
+  text-align: center !important;
+}
+
+/* Sortable header: the whole cell is the hit area. */
+.sortHead {
+  cursor: pointer;
+  user-select: none;
+  padding: 0 !important;
+}
+
+.sortHead:hover {
+  color: var(--text-heading);
+  background: var(--surface-3);
+}
+
+.sortLabel {
+  display: inline;
+}
+
 .sortBtn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  width: 100%;
   border: none;
   background: none;
-  padding: 0;
+  padding: 10px 16px;
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  text-align: inherit;
   color: inherit;
   cursor: pointer;
 }
@@ -656,6 +678,42 @@ textarea.control {
 .num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.tableToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface-1);
+}
+
+.tableError {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableEmptyCell {
+  padding: 0 !important;
+}
+
+.skeletonRow td {
+  /* Stop the shimmer from strobing on every row of a long skeleton. */
+  pointer-events: none;
 }
 
 /* ---------- Avatar ---------- */
@@ -731,6 +789,57 @@ textarea.control {
 .pageGap {
   color: var(--text-light);
   padding: 0 2px;
+}
+
+.pageInfo {
+  font-variant-numeric: tabular-nums;
+}
+
+.pageInfoSep {
+  color: var(--text-light);
+}
+
+.pageSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.pageSizeLabel {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pageSizeSelect {
+  height: 32px;
+  padding: 0 26px 0 9px;
+  border-radius: 9px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.pageSizeSelect:hover:not(:disabled) {
+  background-color: var(--surface-3);
+}
+
+.pageSizeSelect:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ---------- Empty / skeleton ---------- */

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { Pagination, SortHeader, useConfirm, useDebounced, type SortDir } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 interface Salon {
@@ -39,6 +40,15 @@ interface Collaborator {
   location_label?: string | null;
   has_location?: boolean;
 }
+
+interface PageMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+const EMPTY_META: PageMeta = { current_page: 1, last_page: 1, per_page: 20, total: 0 };
 
 /**
  * How close a collaborator is to an enquiry.
@@ -102,6 +112,7 @@ function CollaboratorPicker({
         className={`${styles.picker} ${hasLocalMatch && !value ? styles.pickerSuggested : ''}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={`Collaborator for ${enquiry.salon_name}`}
       >
         <option value="">Select collaborator</option>
         {groups.map(({ key, heading }) => {
@@ -153,12 +164,16 @@ function rankFor(enquiry: Enquiry, collaborators: Collaborator[]) {
     });
 }
 
+const formatDateTime = (value: string) => {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN');
+};
+
 export default function SalonApprovalQueue() {
   const [salons, setSalons] = useState<Salon[]>([]);
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  
-  const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState('');
 
   // Assign collaborator states
@@ -166,128 +181,213 @@ export default function SalonApprovalQueue() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [justAssignedIds, setJustAssignedIds] = useState<string[]>([]);
 
-  // Pagination and search for enquiries
+  // Both lists are server-paginated now, so each keeps its own page and sort.
   const [searchEnquiries, setSearchEnquiries] = useState('');
   const [enquiriesPage, setEnquiriesPage] = useState(1);
-  const ENQUIRIES_PER_PAGE = 10;
+  const [enquiriesPerPage, setEnquiriesPerPage] = useState(20);
+  const [enquiriesSort, setEnquiriesSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const [enquiriesMeta, setEnquiriesMeta] = useState<PageMeta>(EMPTY_META);
 
-  // Pagination and search for salons
   const [searchSalons, setSearchSalons] = useState('');
   const [salonsPage, setSalonsPage] = useState(1);
-  const SALONS_PER_PAGE = 10;
+  const [salonsPerPage, setSalonsPerPage] = useState(20);
+  const [salonsSort, setSalonsSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const [salonsMeta, setSalonsMeta] = useState<PageMeta>(EMPTY_META);
+
+  const [assignError, setAssignError] = useState('');
+
+  const debouncedEnquiries = useDebounced(searchEnquiries, 400);
+  const debouncedSalons = useDebounced(searchSalons, 400);
+  const [confirm, confirmDialog] = useConfirm();
+
+  // Filtering and paging can land out of order; only the newest request renders.
+  const enquiriesSeq = useRef(0);
+  const salonsSeq = useRef(0);
+
+  // Loading is derived from "have we rendered the current query yet?" so nothing
+  // needs a synchronous setState inside the effect body.
+  const enquiriesKey = [
+    debouncedEnquiries,
+    enquiriesPage,
+    enquiriesPerPage,
+    enquiriesSort?.key ?? '',
+    enquiriesSort?.dir ?? '',
+  ].join('|');
+  const [enquiriesLoadedKey, setEnquiriesLoadedKey] = useState<string | null>(null);
+  const loading = enquiriesLoadedKey !== enquiriesKey;
+
+  const salonsKey = [
+    debouncedSalons,
+    salonsPage,
+    salonsPerPage,
+    salonsSort?.key ?? '',
+    salonsSort?.dir ?? '',
+  ].join('|');
+  const [salonsLoadedKey, setSalonsLoadedKey] = useState<string | null>(null);
+  const salonsLoading = salonsLoadedKey !== salonsKey;
 
   useEffect(() => {
-    async function fetchData() {
+    let cancelled = false;
+    (async () => {
       try {
-        const [salonsRes, enquiriesRes, collabRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/pending`),
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/enquiries`),
-          fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators`)
-        ]);
+        const res = await fetch('/api/proxy/superadmin/collaborators');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setCollaborators(json.data || []);
+      } catch {
+        // The picker falls back to "Select collaborator"; not worth an alert.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-        if (!salonsRes.ok || !enquiriesRes.ok || !collabRes.ok) {
-          throw new Error('Failed to fetch data');
+  useEffect(() => {
+    const seq = ++enquiriesSeq.current;
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          page: String(enquiriesPage),
+          per_page: String(enquiriesPerPage),
+        });
+        if (debouncedEnquiries) params.set('search', debouncedEnquiries);
+        if (enquiriesSort) {
+          params.set('column', enquiriesSort.key);
+          params.set('direction', enquiriesSort.dir);
         }
 
-        const salonsJson = await salonsRes.json();
-        const enquiriesJson = await enquiriesRes.json();
-        const collabJson = await collabRes.json();
+        const res = await fetch(`/api/proxy/superadmin/enquiries?${params}`, { cache: 'no-store' });
+        const json = await res.json();
+        if (seq !== enquiriesSeq.current) return;
+        if (!res.ok || !json.success) throw new Error(json.message || 'Could not load enquiries');
 
-        setSalons(salonsJson.data || []);
-        setEnquiries(enquiriesJson.data || []);
-        setCollaborators(collabJson.data || []);
-      } catch (err: any) {
-        setError(err.message);
+        setEnquiries(json.data || []);
+        if (json.meta) setEnquiriesMeta(json.meta);
+        setError('');
+      } catch (e) {
+        if (seq !== enquiriesSeq.current) return;
+        setError(e instanceof Error ? e.message : 'Could not load enquiries');
       } finally {
-        setLoading(false);
+        if (seq === enquiriesSeq.current) setEnquiriesLoadedKey(enquiriesKey);
       }
-    }
+    })();
 
-    fetchData();
-  }, []);
+    return () => {
+      // Marks this run stale so its result is discarded.
+      enquiriesSeq.current += 1;
+    };
+  }, [debouncedEnquiries, enquiriesPage, enquiriesPerPage, enquiriesSort, enquiriesKey]);
+
+  useEffect(() => {
+    const seq = ++salonsSeq.current;
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          page: String(salonsPage),
+          per_page: String(salonsPerPage),
+        });
+        if (debouncedSalons) params.set('search', debouncedSalons);
+        if (salonsSort) {
+          params.set('column', salonsSort.key);
+          params.set('direction', salonsSort.dir);
+        }
+
+        const res = await fetch(`/api/proxy/superadmin/salons/pending?${params}`, { cache: 'no-store' });
+        const json = await res.json();
+        if (seq !== salonsSeq.current) return;
+        if (!res.ok || !json.success) throw new Error(json.message || 'Could not load pending salons');
+
+        setSalons(json.data || []);
+        if (json.meta) setSalonsMeta(json.meta);
+      } catch {
+        // Left empty; the table's empty state covers it.
+      } finally {
+        if (seq === salonsSeq.current) setSalonsLoadedKey(salonsKey);
+      }
+    })();
+
+    return () => {
+      salonsSeq.current += 1;
+    };
+  }, [debouncedSalons, salonsPage, salonsPerPage, salonsSort, salonsKey]);
+
+  /** asc -> desc -> unsorted, and always back to page 1. */
+  const onSortEnquiries = (key: string) => {
+    setEnquiriesSort((prev) => {
+      if (prev?.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
+    setEnquiriesPage(1);
+  };
+
+  const onSortSalons = (key: string) => {
+    setSalonsSort((prev) => {
+      if (prev?.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
+    setSalonsPage(1);
+  };
 
   const handleAssign = async (enquiryId: string) => {
     const collId = selectedCollaborator[enquiryId];
+    const enquiry = enquiries.find((e) => e.id === enquiryId);
     if (!collId) {
-      alert('Please select a collaborator first.');
+      setAssignError('Pick a collaborator first.');
       return;
     }
 
-    if (!window.confirm('Are you sure you want to assign this collaborator?')) {
-      return;
-    }
+    const collaborator = collaborators.find((c) => c.id === collId);
+    const ok = await confirm({
+      title: 'Assign this enquiry?',
+      body: `${enquiry?.salon_name ?? 'This salon'} will be routed to ${collaborator?.name ?? 'the selected collaborator'}.`,
+      confirmLabel: 'Assign',
+      tone: 'accent',
+    });
+    if (!ok) return;
 
     setAssigningId(enquiryId);
+    setAssignError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/enquiries/${enquiryId}/assign`, {
+      const res = await fetch(`/api/proxy/superadmin/enquiries/${enquiryId}/assign`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ collaborator_id: collId })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collaborator_id: collId }),
       });
 
       const json = await res.json();
-      if (res.ok) {
-        // Update local state
-        setEnquiries(prev => prev.map(enq => enq.id === enquiryId ? json.data : enq));
-        
-        // Trigger animation
-        setJustAssignedIds(prev => [...prev, enquiryId]);
-        setTimeout(() => {
-          setJustAssignedIds(prev => prev.filter(id => id !== enquiryId));
-        }, 2000);
-      } else {
-        throw new Error(json.message || 'Failed to assign collaborator');
-      }
-    } catch (err: any) {
-      alert(err.message);
+      if (!res.ok || !json.success) throw new Error(json.message || 'Failed to assign collaborator');
+
+      setEnquiries((prev) => prev.map((enq) => (enq.id === enquiryId ? { ...enq, ...json.data } : enq)));
+      setJustAssignedIds((prev) => [...prev, enquiryId]);
+      setTimeout(() => {
+        setJustAssignedIds((prev) => prev.filter((id) => id !== enquiryId));
+      }, 2000);
+    } catch (e) {
+      setAssignError(e instanceof Error ? e.message : 'Failed to assign collaborator');
     } finally {
       setAssigningId(null);
     }
   };
 
-  // Filter & paginate enquiries
-  const filteredEnquiries = useMemo(() => {
-    if (!searchEnquiries) return enquiries;
-    const lower = searchEnquiries.toLowerCase();
-    return enquiries.filter(e => 
-      e.salon_name?.toLowerCase().includes(lower) || 
-      e.owner_name?.toLowerCase().includes(lower) ||
-      e.city?.toLowerCase().includes(lower)
-    );
-  }, [enquiries, searchEnquiries]);
-  
-  const paginatedEnquiries = useMemo(() => {
-    const start = (enquiriesPage - 1) * ENQUIRIES_PER_PAGE;
-    return filteredEnquiries.slice(start, start + ENQUIRIES_PER_PAGE);
-  }, [filteredEnquiries, enquiriesPage]);
-  const enquiriesTotalPages = Math.ceil(filteredEnquiries.length / ENQUIRIES_PER_PAGE);
-
-  // Filter & paginate salons
-  const filteredSalons = useMemo(() => {
-    if (!searchSalons) return salons;
-    const lower = searchSalons.toLowerCase();
-    return salons.filter(s => 
-      s.name?.toLowerCase().includes(lower) || 
-      s.admin?.name?.toLowerCase().includes(lower) ||
-      s.city?.name?.toLowerCase().includes(lower)
-    );
-  }, [salons, searchSalons]);
-
-  const paginatedSalons = useMemo(() => {
-    const start = (salonsPage - 1) * SALONS_PER_PAGE;
-    return filteredSalons.slice(start, start + SALONS_PER_PAGE);
-  }, [filteredSalons, salonsPage]);
-  const salonsTotalPages = Math.ceil(filteredSalons.length / SALONS_PER_PAGE);
-
+  const sortProps = (key: string, sort: { key: string; dir: SortDir } | null) => ({
+    active: sort?.key === key,
+    dir: sort?.key === key ? sort.dir : null,
+  });
 
   return (
     <div className={styles.container}>
+      {confirmDialog}
       <div className={styles.header}>
         <h1 className={styles.title}>Salon Approval Queue</h1>
         <p className={styles.subtitle}>Review new salon enquiries and approve pending onboarding salons.</p>
       </div>
+
+      {assignError && (
+        <div className={styles.errorBanner} role="alert">{assignError}</div>
+      )}
 
       {/* New Enquiries Section */}
       <div style={{ marginBottom: '4rem' }}>
@@ -299,29 +399,30 @@ export default function SalonApprovalQueue() {
             placeholder="Search enquiries by name or city..."
             value={searchEnquiries}
             onChange={(e) => { setSearchEnquiries(e.target.value); setEnquiriesPage(1); }}
+            aria-label="Search enquiries"
           />
         </div>
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.th}>Salon / Owner</th>
-                <th className={styles.th}>Area</th>
+                <SortHeader label="Salon / Owner" {...sortProps('salon_name', enquiriesSort)} onClick={() => onSortEnquiries('salon_name')} />
+                <SortHeader label="Area" {...sortProps('city', enquiriesSort)} onClick={() => onSortEnquiries('city')} />
                 <th className={styles.th}>Phone</th>
-                <th className={styles.th}>Status</th>
-                <th className={styles.th}>Submitted At</th>
+                <SortHeader label="Status" {...sortProps('status', enquiriesSort)} onClick={() => onSortEnquiries('status')} />
+                <SortHeader label="Submitted At" {...sortProps('created_at', enquiriesSort)} onClick={() => onSortEnquiries('created_at')} />
                 <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && enquiries.length === 0 ? (
                 <tr><td colSpan={6} className={styles.emptyState}>Loading enquiries...</td></tr>
               ) : error ? (
                 <tr><td colSpan={6} className={styles.emptyState} style={{ color: 'red' }}>{error}</td></tr>
-              ) : filteredEnquiries.length === 0 ? (
+              ) : enquiries.length === 0 ? (
                 <tr><td colSpan={6} className={styles.emptyState}>No enquiries found.</td></tr>
               ) : (
-                paginatedEnquiries.map((enq) => (
+                enquiries.map((enq) => (
                   <tr key={enq.id} className={`${styles.tr} ${justAssignedIds.includes(enq.id) ? styles.rowSuccess : ''}`}>
                     <td className={styles.td}>
                       <div className={styles.salonName}>{enq.salon_name}</div>
@@ -339,44 +440,30 @@ export default function SalonApprovalQueue() {
                     </td>
                     <td className={styles.td}>{enq.phone}</td>
                     <td className={styles.td}>
-                      <span style={{ 
-                        padding: '4px 8px', 
-                        borderRadius: '12px', 
-                        fontSize: '0.8rem',
-                        backgroundColor: enq.status === 'new' ? '#fff3cd' : '#d1e7dd',
-                        color: enq.status === 'new' ? '#856404' : '#0f5132'
-                      }}>
+                      <span className={styles.statusPill} data-status={enq.status}>
                         {enq.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className={styles.td}>{new Date(enq.created_at).toLocaleString()}</td>
+                    <td className={styles.td}>{formatDateTime(enq.created_at)}</td>
                     <td className={styles.td} style={{ textAlign: 'right' }}>
                       {enq.status === 'new' ? (
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <div className={styles.actionRow}>
                           <CollaboratorPicker
                             enquiry={enq}
                             collaborators={collaborators}
                             value={selectedCollaborator[enq.id] || ''}
-                            onChange={(id) => setSelectedCollaborator(prev => ({ ...prev, [enq.id]: id }))}
+                            onChange={(id) => setSelectedCollaborator((prev) => ({ ...prev, [enq.id]: id }))}
                           />
-                          <button 
+                          <button
+                            className={styles.assignButton}
                             onClick={() => handleAssign(enq.id)}
                             disabled={assigningId === enq.id}
-                            style={{ 
-                              padding: '6px 12px', 
-                              backgroundColor: 'var(--accent-color)', 
-                              color: 'white', 
-                              border: 'none', 
-                              borderRadius: '4px', 
-                              cursor: assigningId === enq.id ? 'not-allowed' : 'pointer',
-                              opacity: assigningId === enq.id ? 0.7 : 1
-                            }}
                           >
                             {assigningId === enq.id ? 'Assigning...' : 'Assign'}
                           </button>
                         </div>
                       ) : (
-                        <div style={{ fontSize: '0.9rem', color: 'var(--color-success)', fontWeight: 500 }}>
+                        <div className={styles.assignedFlag}>
                           ✓ Assigned to {enq.assigned_collaborator?.name || 'Unknown'}
                         </div>
                       )}
@@ -386,28 +473,17 @@ export default function SalonApprovalQueue() {
               )}
             </tbody>
           </table>
-          
-          {enquiriesTotalPages > 1 && (
-            <div className={styles.pagination}>
-              <span>Showing page {enquiriesPage} of {enquiriesTotalPages}</span>
-              <div className={styles.pageControls}>
-                <button 
-                  className={styles.pageButton} 
-                  disabled={enquiriesPage === 1}
-                  onClick={() => setEnquiriesPage(p => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <button 
-                  className={styles.pageButton} 
-                  disabled={enquiriesPage === enquiriesTotalPages}
-                  onClick={() => setEnquiriesPage(p => Math.min(enquiriesTotalPages, p + 1))}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+
+          <Pagination
+            page={enquiriesMeta.current_page}
+            lastPage={enquiriesMeta.last_page}
+            total={enquiriesMeta.total}
+            noun="enquiries"
+            onChange={setEnquiriesPage}
+            perPage={enquiriesPerPage}
+            onPerPageChange={(n) => { setEnquiriesPerPage(n); setEnquiriesPage(1); }}
+            disabled={loading}
+          />
         </div>
       </div>
 
@@ -421,39 +497,32 @@ export default function SalonApprovalQueue() {
             placeholder="Search salons by name or city..."
             value={searchSalons}
             onChange={(e) => { setSearchSalons(e.target.value); setSalonsPage(1); }}
+            aria-label="Search pending salons"
           />
         </div>
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.th}>Salon Name</th>
-                <th className={styles.th}>City</th>
+                <SortHeader label="Salon Name" {...sortProps('name', salonsSort)} onClick={() => onSortSalons('name')} />
+                <SortHeader label="City" {...sortProps('city', salonsSort)} onClick={() => onSortSalons('city')} />
                 <th className={styles.th}>Owner/Admin</th>
-                <th className={styles.th}>Submitted At</th>
+                <SortHeader label="Submitted At" {...sortProps('created_at', salonsSort)} onClick={() => onSortSalons('created_at')} />
                 <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className={styles.emptyState}>Loading salons...</td>
-                </tr>
-              ) : error ? (
-                <tr>
-                  <td colSpan={5} className={styles.emptyState} style={{ color: 'red' }}>{error}</td>
-                </tr>
-              ) : filteredSalons.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className={styles.emptyState}>No salons found.</td>
-                </tr>
+              {salonsLoading && salons.length === 0 ? (
+                <tr><td colSpan={5} className={styles.emptyState}>Loading salons...</td></tr>
+              ) : salons.length === 0 ? (
+                <tr><td colSpan={5} className={styles.emptyState}>No pending salons.</td></tr>
               ) : (
-                paginatedSalons.map((salon) => (
+                salons.map((salon) => (
                   <tr key={salon.id} className={styles.tr}>
                     <td className={`${styles.td} ${styles.salonName}`}>{salon.name}</td>
                     <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
                     <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
-                    <td className={styles.td}>{new Date(salon.created_at).toLocaleString()}</td>
+                    <td className={styles.td}>{formatDateTime(salon.created_at)}</td>
                     <td className={styles.td} style={{ textAlign: 'right' }}>
                       <Link href={`/superadmin/salon-approval/${salon.id}`} className={styles.actionButton}>
                         Review
@@ -465,27 +534,16 @@ export default function SalonApprovalQueue() {
             </tbody>
           </table>
 
-          {salonsTotalPages > 1 && (
-            <div className={styles.pagination}>
-              <span>Showing page {salonsPage} of {salonsTotalPages}</span>
-              <div className={styles.pageControls}>
-                <button 
-                  className={styles.pageButton} 
-                  disabled={salonsPage === 1}
-                  onClick={() => setSalonsPage(p => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <button 
-                  className={styles.pageButton} 
-                  disabled={salonsPage === salonsTotalPages}
-                  onClick={() => setSalonsPage(p => Math.min(salonsTotalPages, p + 1))}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            page={salonsMeta.current_page}
+            lastPage={salonsMeta.last_page}
+            total={salonsMeta.total}
+            noun="pending salons"
+            onChange={setSalonsPage}
+            perPage={salonsPerPage}
+            onPerPageChange={(n) => { setSalonsPerPage(n); setSalonsPage(1); }}
+            disabled={salonsLoading}
+          />
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ use App\Support\BillingModel;
 use App\Support\PayoutCycle;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -28,6 +29,13 @@ use Illuminate\Support\Facades\Validator;
  */
 class PayoutController extends Controller
 {
+    /** Orderings the UI may request for the payout table. */
+    private const SORTABLE = [
+        'created_at', 'status', 'salon',
+        'appointments_count', 'appointment_revenue', 'gross_amount',
+        'commission_deducted', 'net_amount',
+    ];
+
     public function __construct(private PayoutService $payouts)
     {
     }
@@ -37,22 +45,62 @@ class PayoutController extends Controller
      */
     public function index(Request $request)
     {
+        $request->validate([
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'column' => 'nullable|in:' . implode(',', self::SORTABLE),
+            'direction' => 'nullable|in:asc,desc',
+        ]);
+
         $cycleType = $this->cycleType($request);
         [$start, $end] = PayoutCycle::bounds($cycleType, $this->anchor($request));
 
-        $query = SalonPayout::with('salon:id,name')
-            ->where('cycle_type', $cycleType)
-            ->whereDate('cycle_start_date', $start->toDateString());
+        // Filters shared by the totals roll-up and the page of rows, so the
+        // sign-off figures always describe the same set the table is showing.
+        $applyFilters = function ($query) use ($request) {
+            $query->where('cycle_type', $this->cycleType($request))
+                ->whereDate('cycle_start_date', $start->toDateString());
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('billing_type')) {
+                $query->where('billing_type', BillingModel::normalise($request->billing_type));
+            }
+
+            return $query;
+        };
+
+        $column = $request->input('column');
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+
+        $rowQuery = $applyFilters(SalonPayout::with('salon:id,name'));
+
+        if ($column === 'salon') {
+            $rowQuery->orderBy(
+                DB::table('salons')->select('name')->whereColumn('salons.id', 'salon_payouts.salon_id')->limit(1),
+                $direction
+            );
+        } elseif ($column && in_array($column, self::SORTABLE, true)) {
+            $rowQuery->orderBy($column, $direction);
+        } else {
+            $rowQuery->orderBy('created_at');
         }
+        $rowQuery->orderBy('id');
 
-        if ($request->filled('billing_type')) {
-            $query->where('billing_type', BillingModel::normalise($request->billing_type));
-        }
+        // Totals are rolled up in SQL, so signing off a cycle never depends on
+        // which page of rows happens to be on screen.
+        $totals = $applyFilters(SalonPayout::query())
+            ->selectRaw('count(*) as salons')
+            ->selectRaw('coalesce(sum(appointment_revenue), 0) as appointment_revenue')
+            ->selectRaw('coalesce(sum(gross_amount), 0) as advances_held')
+            ->selectRaw('coalesce(sum(commission_deducted), 0) as commission_deducted')
+            ->selectRaw('coalesce(sum(case when status <> ? then net_amount else 0 end), 0) as net_to_distribute', [PayoutService::STATUS_DISTRIBUTED])
+            ->selectRaw('coalesce(sum(case when status = ? then net_amount else 0 end), 0) as distributed', [PayoutService::STATUS_DISTRIBUTED])
+            ->first();
 
-        $payouts = $query->orderBy('created_at')->get();
+        $perPage = (int) $request->input('per_page', 20);
+        $paged = $rowQuery->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -61,20 +109,20 @@ class PayoutController extends Controller
             'cycle_start' => $start->toDateString(),
             'cycle_end' => $end->toDateString(),
             'totals' => [
-                'salons' => $payouts->count(),
-                'appointment_revenue' => round((float) $payouts->sum('appointment_revenue'), 2),
-                'advances_held' => round((float) $payouts->sum('gross_amount'), 2),
-                'commission_deducted' => round((float) $payouts->sum('commission_deducted'), 2),
-                'net_to_distribute' => round(
-                    (float) $payouts->where('status', '!=', PayoutService::STATUS_DISTRIBUTED)->sum('net_amount'),
-                    2
-                ),
-                'distributed' => round(
-                    (float) $payouts->where('status', PayoutService::STATUS_DISTRIBUTED)->sum('net_amount'),
-                    2
-                ),
+                'salons' => (int) $totals->salons,
+                'appointment_revenue' => round((float) $totals->appointment_revenue, 2),
+                'advances_held' => round((float) $totals->advances_held, 2),
+                'commission_deducted' => round((float) $totals->commission_deducted, 2),
+                'net_to_distribute' => round((float) $totals->net_to_distribute, 2),
+                'distributed' => round((float) $totals->distributed, 2),
             ],
-            'payouts' => $payouts->map(fn (SalonPayout $p) => $this->payouts->present($p))->values(),
+            'payouts' => $paged->getCollection()->map(fn (SalonPayout $p) => $this->payouts->present($p))->values(),
+            'meta' => [
+                'current_page' => $paged->currentPage(),
+                'last_page' => $paged->lastPage(),
+                'per_page' => $paged->perPage(),
+                'total' => $paged->total(),
+            ],
         ]);
     }
 

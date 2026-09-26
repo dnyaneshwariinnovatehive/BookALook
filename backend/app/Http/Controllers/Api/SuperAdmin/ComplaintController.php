@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\DB;
  */
 class ComplaintController extends Controller
 {
+    /** Orderings the UI may request. */
+    private const SORTABLE = ['created_at', 'status', 'salon'];
+
     public function __construct(private ReviewService $reviews)
     {
     }
@@ -40,6 +43,10 @@ class ComplaintController extends Controller
         $request->validate([
             'status' => 'nullable|in:open,under_review,resolved,dismissed,outstanding',
             'salon_id' => 'nullable|uuid',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'column' => 'nullable|in:' . implode(',', self::SORTABLE),
+            'direction' => 'nullable|in:asc,desc',
         ]);
 
         $query = Complaint::with([
@@ -60,10 +67,27 @@ class ComplaintController extends Controller
             $query->where('salon_id', $request->salon_id);
         }
 
-        $complaints = $query
-            ->orderByRaw("case when status in ('open','under_review') then 0 else 1 end")
-            ->orderByDesc('created_at')
-            ->get();
+        $column = $request->input('column');
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+
+        if ($column === 'salon') {
+            $query->orderBy(
+                DB::table('salons')->select('name')->whereColumn('salons.id', 'complaints.salon_id')->limit(1),
+                $direction
+            );
+        } elseif ($column && in_array($column, ['created_at', 'status'], true)) {
+            $query->orderBy($column, $direction);
+        } else {
+            // Outstanding first, then newest: this is a queue, worked top-down.
+            $query->orderByRaw("case when status in ('open','under_review') then 0 else 1 end")
+                  ->orderByDesc('created_at');
+        }
+
+        // Stable tie-break so paging never repeats or skips a row.
+        $query->orderBy('id', 'desc');
+
+        $perPage = (int) $request->input('per_page', 20);
+        $complaints = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -73,7 +97,13 @@ class ComplaintController extends Controller
                 'resolved' => Complaint::where('status', Complaint::STATUS_RESOLVED)->count(),
                 'dismissed' => Complaint::where('status', Complaint::STATUS_DISMISSED)->count(),
             ],
-            'data' => $complaints->map(fn (Complaint $c) => $this->present($c)),
+            'data' => $complaints->getCollection()->map(fn (Complaint $c) => $this->present($c))->values(),
+            'meta' => [
+                'current_page' => $complaints->currentPage(),
+                'last_page' => $complaints->lastPage(),
+                'per_page' => $complaints->perPage(),
+                'total' => $complaints->total(),
+            ],
         ]);
     }
 

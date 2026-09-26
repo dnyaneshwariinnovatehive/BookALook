@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AsyncSelect from 'react-select/async';
 import styles from './banners.module.css';
+import BannerStudio from './BannerStudio';
 
 interface Banner {
   id: string;
@@ -391,41 +392,14 @@ export default function BannersPage() {
               
               <div className={styles.formGroup}>
                 <label className={styles.label}>Banner Image</label>
-                <input 
-                  type="file" 
-                  className={styles.input} 
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    setImageFile(file);
-                    if (file) {
-                      setImagePreviewUrl(URL.createObjectURL(file));
-                    } else if (!editingBannerId) {
-                      setImagePreviewUrl(null);
-                    }
-                  }} 
-                  required={!editingBannerId} 
+                <BannerStudio
+                  file={imageFile}
+                  previewUrl={imagePreviewUrl}
+                  savedUrl={editingBannerId && !imageFile ? imagePreviewUrl : null}
+                  title={title}
+                  onFile={setImageFile}
+                  onPreview={setImagePreviewUrl}
                 />
-                <small style={{ color: 'var(--text-body)', marginTop: '4px', display: 'block' }}>
-                  Recommended size: 800x400px (2:1 ratio) for consistent carousel appearance.
-                </small>
-                {imagePreviewUrl && (
-                  <div style={{ marginTop: '10px' }}>
-                    <p style={{ fontSize: '14px', marginBottom: '4px', color: 'var(--text-body)' }}>Preview:</p>
-                    <img 
-                      src={imagePreviewUrl} 
-                      alt="Banner Preview" 
-                      style={{ 
-                        width: '100%', 
-                        height: 'auto',
-                        maxHeight: '200px', 
-                        objectFit: 'cover', 
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)'
-                      }} 
-                    />
-                  </div>
-                )}
               </div>
 
               <div className={styles.formGroup}>

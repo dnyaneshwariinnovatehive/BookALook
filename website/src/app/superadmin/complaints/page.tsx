@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pagination } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 interface Complaint {
@@ -53,6 +54,9 @@ export default function ComplaintsPage() {
   const [filter, setFilter] = useState<string>('outstanding');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
 
   // The complaint currently open for a decision, with the context needed to
   // make one.
@@ -63,27 +67,36 @@ export default function ComplaintsPage() {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
 
+  // Paging can land out of order; only the newest request may render.
+  const requestId = useRef(0);
+
   const load = useCallback(async () => {
+    const id = ++requestId.current;
     setLoading(true);
     try {
-      const res = await fetch(`/api/proxy/superadmin/complaints?status=${filter}`, {
+      const params = new URLSearchParams({ status: filter, page: String(page), per_page: String(perPage) });
+      const res = await fetch(`/api/proxy/superadmin/complaints?${params}`, {
         cache: 'no-store',
       });
       const json = await res.json();
+      if (id !== requestId.current) return;
       if (!json.success) throw new Error(json.message || 'Could not load complaints');
       setComplaints(json.data || []);
       setCounts(json.counts || counts);
+      if (json.meta) setMeta(json.meta);
       setError('');
     } catch (e) {
+      if (id !== requestId.current) return;
       setError(e instanceof Error ? e.message : 'Could not load complaints');
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+  }, [filter, page, perPage]);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   const openComplaint = async (complaint: Complaint) => {
@@ -183,7 +196,7 @@ export default function ComplaintsPage() {
           <button
             key={tab.key}
             className={`${styles.filterChip} ${filter === tab.key ? styles.filterChipActive : ''}`}
-            onClick={() => setFilter(tab.key)}
+            onClick={() => { setFilter(tab.key); setPage(1); }}
           >
             {tab.label}
           </button>
@@ -248,6 +261,21 @@ export default function ComplaintsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {meta.last_page > 0 && (
+        <div className={styles.pager}>
+          <Pagination
+            page={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            noun={filter === 'outstanding' ? 'outstanding' : 'complaints'}
+            onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+            disabled={loading}
+          />
         </div>
       )}
 

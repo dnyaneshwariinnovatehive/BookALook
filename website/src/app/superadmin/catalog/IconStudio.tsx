@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './page.module.css';
+import IconCropper, { type CropSource } from './IconCropper';
 
 /**
  * Category icons, made consistent before they are uploaded.
@@ -17,6 +18,11 @@ import styles from './page.module.css';
  * whatever comes back, so the *geometry* matches. The server cannot do the
  * second part — this deployment has neither GD nor Imagick — and the browser
  * can, instantly, with the file already in hand.
+ *
+ * The automatic pass only ever centres what it finds, which is right when the
+ * subject is dead centre and wrong when it is not. `IconCropper` is the manual
+ * half for those cases: it chooses what is in frame, and the same pass then
+ * runs over the result, so cropping never costs an icon its place in the set.
  */
 
 /** Every icon is delivered at this size. */
@@ -27,6 +33,40 @@ const CONTENT = 0.74;
 
 /** Alpha below this counts as empty space when trimming. */
 const EMPTY = 12;
+
+/**
+ * The tints the customer app cycles its category tiles through, in order.
+ *
+ * Copied from `CategoryGrid._tints` in the Flutter app. The app assigns them
+ * by position rather than by category, so no single colour belongs to an icon —
+ * which is why all six are shown rather than one guess.
+ */
+const APP_TINTS = [
+  { name: 'Lavender', background: '#F3EBFE', foreground: '#9C54F2' },
+  { name: 'Peach', background: '#FFF1E6', foreground: '#EF6C00' },
+  { name: 'Mint', background: '#E6F6EF', foreground: '#2E7D32' },
+  { name: 'Rose', background: '#FDE8EF', foreground: '#D81B60' },
+  { name: 'Sky', background: '#E7F0FD', foreground: '#1565C0' },
+  { name: 'Honey', background: '#FFF6DA', foreground: '#F59E0B' },
+];
+
+/** A stand-in for the glyph the app draws when an icon is missing or fails. */
+const FallbackGlyph = ({ color }: { color: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="26"
+    height="26"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+);
 
 export interface NormalisedIcon {
   file: File;
@@ -54,7 +94,7 @@ export function buildIconPrompt(categoryName: string): string {
   ].join('\n');
 }
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+function loadImage(file: File | Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new Image();
@@ -188,6 +228,80 @@ export async function normaliseIcon(file: File): Promise<NormalisedIcon> {
   };
 }
 
+/**
+ * The category row as the app actually paints it, reproduced rather than
+ * approximated: one tile at the width a phone really gives it, the real
+ * corner radius and padding, the real label weight and line height, and every
+ * tint it will cycle through. Judging an icon against a bare thumbnail hides
+ * exactly the things that go wrong — an off-centre subject, a subject that is
+ * too small inside the tile, a label that wraps to three lines.
+ */
+function CustomerAppPreview({ iconUrl, name }: { iconUrl: string; name: string }) {
+  // The URL that failed to load, rather than a plain flag, so replacing the
+  // icon with a different one clears the failure without an effect to reset it.
+  const [broken, setBroken] = useState<string | null>(null);
+
+  const shows = Boolean(iconUrl) && broken !== iconUrl;
+  const label = name.trim() || 'Category';
+
+  return (
+    <div className={styles.appPreview}>
+      <div className={styles.appPreviewScreen}>
+        <p className={styles.appScreenHeading}>What would you like to book?</p>
+
+        <div className={styles.appRow}>
+          <div className={styles.appTile}>
+            <div className={styles.appTileArt} style={{ background: APP_TINTS[0].background }}>
+              {shows ? (
+                <img
+                  src={iconUrl}
+                  alt=""
+                  className={styles.appTileImage}
+                  onError={() => setBroken(iconUrl)}
+                />
+              ) : (
+                <FallbackGlyph color={APP_TINTS[0].foreground} />
+              )}
+            </div>
+            <span className={styles.appTileLabel}>{label}</span>
+          </div>
+        </div>
+
+        <p className={styles.appScreenFootnote}>
+          Four of these fit across a phone and slide slowly left to right, so the icon is seen
+          small, next to a name, in a tinted square.
+        </p>
+
+        <div className={styles.appTints}>
+          {APP_TINTS.map((tint) => (
+            <div
+              key={tint.name}
+              className={styles.appTint}
+              style={{ background: tint.background }}
+              title={tint.name}
+            >
+              {shows ? (
+                <img
+                  src={iconUrl}
+                  alt=""
+                  className={styles.appTintImage}
+                  onError={() => setBroken(iconUrl)}
+                />
+              ) : (
+                <FallbackGlyph color={tint.foreground} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p className={styles.appPreviewNote}>
+          Every category takes the tints in turn, so the icon has to hold up on all of them.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function IconStudio({
   categoryName,
   existingUrl,
@@ -202,6 +316,7 @@ export default function IconStudio({
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cropSource, setCropSource] = useState<CropSource | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const prompt = useMemo(() => buildIconPrompt(categoryName), [categoryName]);
@@ -212,15 +327,35 @@ export default function IconStudio({
     return () => clearTimeout(timer);
   }, [copied]);
 
+  /** Runs the geometry pass and hands the result up to the form. */
+  const settle = useCallback(
+    async (file: File, prefix?: string) => {
+      const normalised = await normaliseIcon(file);
+
+      const result = prefix
+        ? { ...normalised, note: `${prefix}, then ${normalised.note}` }
+        : normalised;
+
+      setIcon(result);
+      onIcon(result);
+
+      return result;
+    },
+    [onIcon],
+  );
+
   const take = useCallback(
     async (file: File) => {
       setError(null);
       setBusy(true);
 
       try {
-        const normalised = await normaliseIcon(file);
-        setIcon(normalised);
-        onIcon(normalised);
+        // Kept so the cropper can be reopened on the original, and cancelled
+        // back to it, without the operator having to find the file again.
+        const image = await loadImage(file);
+        setCropSource({ file, image, label: 'the file you just added' });
+
+        await settle(file);
       } catch (e) {
         setIcon(null);
         onIcon(null);
@@ -229,8 +364,81 @@ export default function IconStudio({
         setBusy(false);
       }
     },
-    [onIcon],
+    [onIcon, settle],
   );
+
+  const applyCrop = useCallback(
+    async (cropped: File, detail: string) => {
+      setCropSource(null);
+      setError(null);
+      setBusy(true);
+
+      try {
+        await settle(cropped, detail);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not use that crop.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [settle],
+  );
+
+  /**
+   * Crop something already chosen. Prefers the file in hand, and otherwise
+   * reaches for the icon already on the record, so an operator tidying up an
+   * existing category does not have to go and re-download anything.
+   */
+  const adjust = useCallback(async () => {
+    setError(null);
+
+    if (cropSource) {
+      setCropSource({ ...cropSource, label: 'your last pick' });
+      return;
+    }
+
+    if (!existingUrl) return;
+
+    setBusy(true);
+
+    try {
+      const response = await fetch(existingUrl);
+
+      if (!response.ok) throw new Error('unreachable');
+
+      const blob = await response.blob();
+      const file = new File([blob], 'category-icon', {
+        type: blob.type || 'image/png',
+      });
+
+      setCropSource({ file, image: await loadImage(file), label: 'the saved icon' });
+    } catch {
+      setError(
+        'The saved icon could not be read back from the server, so it cannot be cropped here. ' +
+          'Drop the file in again and it will be.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [cropSource, existingUrl]);
+
+  /** Drops back to the uncropped original, which is the escape hatch. */
+  const undoCrop = useCallback(async () => {
+    if (!cropSource) return;
+
+    setError(null);
+    setBusy(true);
+
+    try {
+      await settle(cropSource.file);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read that image.');
+    } finally {
+      setBusy(false);
+    }
+  }, [cropSource, settle]);
+
+  const closeCropper = useCallback(() => setCropSource(null), []);
 
   const copyPrompt = async () => {
     try {
@@ -325,6 +533,34 @@ export default function IconStudio({
             </div>
           </div>
 
+          {/* Cropping is offered, never required: the file already on the form
+              is a finished icon before this row appears. */}
+          {shown && (
+            <div className={styles.studioActions}>
+              <button
+                type="button"
+                className={styles.studioSecondaryBtn}
+                onClick={adjust}
+                disabled={busy}
+              >
+                Crop &amp; adjust
+              </button>
+              {icon && cropSource && (
+                <button
+                  type="button"
+                  className={styles.studioGhostBtn}
+                  onClick={undoCrop}
+                  disabled={busy}
+                >
+                  Undo crop
+                </button>
+              )}
+              <span className={styles.studioActionsHint}>
+                The subject sits off-centre or too small? Crop it before saving.
+              </span>
+            </div>
+          )}
+
           {icon && (
             <p className={styles.studioNote}>
               {icon.note}
@@ -341,6 +577,26 @@ export default function IconStudio({
           {error && <p className={styles.studioError}>{error}</p>}
         </div>
       </div>
+
+      <div className={styles.studioStep}>
+        <span className={styles.studioStepNumber}>3</span>
+        <div className={styles.studioStepBody}>
+          <p className={styles.studioStepTitle}>Check it in the app</p>
+          <p className={styles.studioStepHelp}>
+            The same icon in the tile the customer sees, on every tint the app cycles through.
+          </p>
+
+          <CustomerAppPreview iconUrl={shown} name={categoryName} />
+        </div>
+      </div>
+
+      {cropSource && (
+        <IconCropper
+          source={cropSource}
+          onApply={applyCrop}
+          onCancel={closeCropper}
+        />
+      )}
     </div>
   );
 }

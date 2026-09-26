@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pagination, SortHeader } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 type CycleType = 'weekly' | 'monthly';
@@ -126,6 +127,14 @@ export default function PayoutsPage() {
   const [distributeTarget, setDistributeTarget] = useState<Payout | null>(null);
   const [distributeReference, setDistributeReference] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 20, total: 0 });
+
+  // Paging and header clicks can land out of order; only the newest request renders.
+  const listSeq = useRef(0);
+
   const authHeaders = (): Record<string, string> => {
     return {
       'Content-Type': 'application/json',
@@ -133,14 +142,25 @@ export default function PayoutsPage() {
   };
 
   const fetchPayouts = useCallback(async () => {
+    const seq = ++listSeq.current;
     setIsLoading(true);
     setError('');
     try {
-      const query = new URLSearchParams({ cycle_type: cycleType, cycle_start: cycleStart });
+      const query = new URLSearchParams({
+        cycle_type: cycleType,
+        cycle_start: cycleStart,
+        page: String(page),
+        per_page: String(perPage),
+      });
       if (statusFilter) query.append('status', statusFilter);
+      if (sort) {
+        query.append('column', sort.key);
+        query.append('direction', sort.dir);
+      }
 
       const res = await fetch(`/api/proxy/superadmin/payouts?${query}`, { headers: authHeaders() });
       const data = await res.json();
+      if (seq !== listSeq.current) return;
 
       if (!res.ok || !data.success) throw new Error(data.message || 'Could not load payouts.');
 
@@ -148,16 +168,29 @@ export default function PayoutsPage() {
       setTotals(data.totals);
       setCycleEnd(data.cycle_end);
       setCycleLabel(data.cycle_label);
-    } catch (e: any) {
-      setError(e.message);
+      if (data.meta) setMeta(data.meta);
+    } catch (e: unknown) {
+      if (seq !== listSeq.current) return;
+      setError(e instanceof Error ? e.message : 'Could not load payouts.');
     } finally {
-      setIsLoading(false);
+      if (seq === listSeq.current) setIsLoading(false);
     }
-  }, [cycleType, cycleStart, statusFilter]);
+  }, [cycleType, cycleStart, statusFilter, page, perPage, sort]);
 
   useEffect(() => {
-    fetchPayouts();
+    const timer = setTimeout(fetchPayouts, 0);
+    return () => clearTimeout(timer);
   }, [fetchPayouts]);
+
+  /** asc -> desc -> unsorted, and always back to page 1. */
+  const onSortColumn = (key: string) => {
+    setSort((prev) => {
+      if (prev?.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
+    setPage(1);
+  };
 
   /* Recalculates the cycle from its completed appointments. */
   const generate = async () => {
@@ -171,9 +204,11 @@ export default function PayoutsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not calculate the cycle.');
+      // The new cycle can be shorter than the page we were on.
+      setPage(1);
       await fetchPayouts();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not calculate the cycle.');
     } finally {
       setBusyId(null);
     }
@@ -214,8 +249,8 @@ export default function PayoutsPage() {
       if (action === 'distribute') {
         setDistributeTarget(null);
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'That did not work.');
     } finally {
       setBusyId(null);
     }
@@ -252,6 +287,7 @@ export default function PayoutsPage() {
               // The same date sits in a different cycle depending on the
               // rhythm, so the anchor moves with it.
               setCycleStart(startOfCycle(next, new Date(cycleStart)));
+              setPage(1);
             }}
           >
             <option value="weekly">Weekly &middot; Subscription Plan</option>
@@ -266,7 +302,7 @@ export default function PayoutsPage() {
           <select
             id="cycle-start"
             value={cycleStart}
-            onChange={(e) => setCycleStart(e.target.value)}
+            onChange={(e) => { setCycleStart(e.target.value); setPage(1); }}
           >
             {getCycleOptions(cycleType).map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -276,7 +312,11 @@ export default function PayoutsPage() {
 
         <div className={styles.field}>
           <label htmlFor="status">Status</label>
-          <select id="status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select
+            id="status"
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          >
             <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
@@ -346,15 +386,15 @@ export default function PayoutsPage() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Salon</th>
+              <SortHeader label="Salon" active={sort?.key === 'salon'} dir={sort?.key === 'salon' ? sort.dir : null} onClick={() => onSortColumn('salon')} />
               <th>Billing</th>
-              <th>Appts</th>
-              <th>Billed</th>
-              <th>Advances held</th>
-              <th>Commission earned</th>
+              <SortHeader label="Appts" align="right" active={sort?.key === 'appointments_count'} dir={sort?.key === 'appointments_count' ? sort.dir : null} onClick={() => onSortColumn('appointments_count')} />
+              <SortHeader label="Billed" align="right" active={sort?.key === 'appointment_revenue'} dir={sort?.key === 'appointment_revenue' ? sort.dir : null} onClick={() => onSortColumn('appointment_revenue')} />
+              <SortHeader label="Advances held" align="right" active={sort?.key === 'gross_amount'} dir={sort?.key === 'gross_amount' ? sort.dir : null} onClick={() => onSortColumn('gross_amount')} />
+              <SortHeader label="Commission earned" align="right" active={sort?.key === 'commission_deducted'} dir={sort?.key === 'commission_deducted' ? sort.dir : null} onClick={() => onSortColumn('commission_deducted')} />
               <th>Adjustments</th>
-              <th>Net payable</th>
-              <th>Status</th>
+              <SortHeader label="Net payable" align="right" active={sort?.key === 'net_amount'} dir={sort?.key === 'net_amount' ? sort.dir : null} onClick={() => onSortColumn('net_amount')} />
+              <SortHeader label="Status" active={sort?.key === 'status'} dir={sort?.key === 'status' ? sort.dir : null} onClick={() => onSortColumn('status')} />
               <th style={{ textAlign: 'right' }}>Action</th>
             </tr>
           </thead>
@@ -435,6 +475,21 @@ export default function PayoutsPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {payouts.length > 0 && (
+        <div className={styles.pager}>
+          <Pagination
+            page={meta.current_page}
+            lastPage={meta.last_page}
+            total={meta.total}
+            noun="payouts"
+            onChange={setPage}
+            perPage={perPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+            disabled={isLoading}
+          />
+        </div>
       )}
     
       {distributeTarget && (

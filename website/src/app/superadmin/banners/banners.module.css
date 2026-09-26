@@ -243,5 +243,249 @@
 }
 
 .toggleButton:hover {
-  background-color: var(--bg-color);
+  background: var(--bg-color);
 }
+
+/* ---------- Banner studio ----------
+   A banner is cropped to fit the app's box rather than fitted inside it, so the
+   geometry here is the app's and not a thumbnail's. The numbers behind it come
+   from `BannerCarousel`: 160 tall, 20px page padding, a 1px card margin, radius
+   26, `cover`, a bottom gradient and the title over the top. */
+.studio {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-color);
+  padding: 0.9rem;
+}
+
+.studioToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.studioFilename {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.studioButtons {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.studioSecondaryBtn {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studioSecondaryBtn:hover:not(:disabled) {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.studioGhostBtn {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studioGhostBtn:hover:not(:disabled) {
+  border-color: var(--text-light);
+  color: var(--text-heading);
+}
+
+.studioSecondaryBtn:disabled,
+.studioGhostBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.studioDevices {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.studioDevicesLabel {
+  font-size: 0.74rem;
+  color: var(--text-body);
+  margin-right: 0.2rem;
+}
+
+.studioDeviceBtn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 9999px;
+  background: var(--surface-color);
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studioDeviceBtn:hover {
+  border-color: var(--text-light);
+  color: var(--text-heading);
+}
+
+.studioDeviceBtnActive {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--accent-color);
+}
+
+.studioDeviceWidth {
+  font-size: 0.66rem;
+  font-weight: 500;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The card, at the size the app gives it on the chosen phone. */
+.appPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.appPreviewScreen {
+  background: var(--surface-color);
+  border-radius: 14px;
+  padding: 12px 0;
+  box-shadow: inset 0 0 0 1px var(--border-color);
+  max-width: 100%;
+}
+
+.appCard {
+  position: relative;
+  overflow: hidden;
+}
+
+.appCardImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Transparent to 20% black, top to bottom — the app's own overlay, which
+   darkens the bottom fifth and leaves the title area completely alone. */
+.appCardScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.appCardTitle {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.appPreviewMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.appPreviewSize {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.appPreviewNote {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+
+.dropZone {
+  min-height: 7rem;
+  border: 2px dashed var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 1rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dropZone:hover,
+.dropZoneActive {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+}
+
+.dropTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.dropHint {
+  font-size: 0.74rem;
+  color: var(--text-body);
+  max-width: 34ch;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.studioError {
+  margin: 0.7rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.78rem;
+}
+

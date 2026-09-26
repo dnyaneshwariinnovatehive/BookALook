@@ -8,6 +8,7 @@ use App\Services\AuditLogger;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use App\Models\Salon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SalonApprovalController extends Controller
@@ -15,16 +16,56 @@ class SalonApprovalController extends Controller
     /**
      * Display a listing of pending salons.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $salons = Salon::with(['admin', 'city'])
-            ->where('status', 'pending_approval')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $request->validate([
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'search' => 'nullable|string|max:100',
+            'column' => 'nullable|in:created_at,name,city,status',
+            'direction' => 'nullable|in:asc,desc',
+        ]);
+
+        $query = Salon::with(['admin', 'city'])
+            ->where('status', 'pending_approval');
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhereHas('city', fn ($qc) => $qc->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        $column = $request->input('column');
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+
+        if ($column === 'city') {
+            $query->orderBy(
+                DB::table('cities')->select('name')->whereColumn('cities.id', 'salons.city_id')->limit(1),
+                $direction
+            );
+        } elseif ($column && in_array($column, ['created_at', 'name', 'status'], true)) {
+            $query->orderBy($column, $direction);
+        } else {
+            // Newest first, matching the enquiries queue above.
+            $query->orderBy('created_at', 'desc');
+        }
+        $query->orderBy('id');
+
+        $perPage = (int) $request->input('per_page', 20);
+        $salons = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $salons
+            // `data` stays a plain list of salons; the meta block is additive.
+            'data' => $salons->items(),
+            'meta' => [
+                'current_page' => $salons->currentPage(),
+                'last_page' => $salons->lastPage(),
+                'per_page' => $salons->perPage(),
+                'total' => $salons->total(),
+            ],
         ]);
     }
 

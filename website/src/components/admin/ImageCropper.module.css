@@ -1,0 +1,264 @@
+/* ---------- Shared crop box ----------
+   Sits above the form's own modal rather than inside it, so the form's layout
+   is untouched and the frame gets the room a drag needs. Used by both the
+   category icon studio and the banner studio. */
+.cropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background-color: rgba(0, 0, 0, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.cropPanel {
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-medium);
+  padding: 20px;
+  width: 100%;
+  max-width: 720px;
+  margin: auto;
+}
+
+.cropHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cropTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.cropHelp {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-body);
+  max-width: 44ch;
+}
+
+.cropBadge {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: var(--accent-soft);
+  color: var(--accent-color);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cropBody {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.cropStage {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.cropFrame {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+
+/* Grey rather than white, so it never reads as part of the artwork and the
+   operator can see at a glance whether a PNG actually has alpha. */
+.cropChecker {
+  position: absolute;
+  inset: 0;
+  background-color: #8f8a99;
+  background-image: linear-gradient(45deg, #6d6878 25%, transparent 25%),
+    linear-gradient(-45deg, #6d6878 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #6d6878 75%),
+    linear-gradient(-45deg, transparent 75%, #6d6878 75%);
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+}
+
+.cropCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  outline-offset: -3px;
+}
+
+.cropCanvas:active {
+  cursor: grabbing;
+}
+
+.cropCanvas:focus-visible {
+  outline: 2px solid var(--accent-color);
+}
+
+.cropThirds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  background-image: linear-gradient(
+      to right,
+      transparent 33.33%,
+      rgba(255, 255, 255, 0.26) 33.33%,
+      rgba(255, 255, 255, 0.26) 33.6%,
+      transparent 33.6%,
+      transparent 66.4%,
+      rgba(255, 255, 255, 0.26) 66.4%,
+      rgba(255, 255, 255, 0.26) 66.66%,
+      transparent 66.66%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 33.33%,
+      rgba(255, 255, 255, 0.26) 33.33%,
+      rgba(255, 255, 255, 0.26) 33.6%,
+      transparent 33.6%,
+      transparent 66.4%,
+      rgba(255, 255, 255, 0.26) 66.4%,
+      rgba(255, 255, 255, 0.26) 66.66%,
+      transparent 66.66%
+    );
+}
+
+/* The region that still shows on the narrowest screen the app supports. */
+.cropGuide {
+  position: absolute;
+  pointer-events: none;
+  border: 1px dashed rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.cropControls {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cropReadout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cropReadoutLabel {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-body);
+}
+
+.cropReadoutValue {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.cropSlider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cropSlider input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.cropHint {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+
+.cropError {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.78rem;
+}
+
+.cropActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.6rem;
+}
+
+.cropSecondaryBtn {
+  padding: 0.45rem 0.9rem;
+  background: transparent;
+  color: var(--text-body);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cropSecondaryBtn:hover {
+  border-color: var(--text-light);
+  color: var(--text-heading);
+}
+
+.cropPrimaryBtn {
+  padding: 0.45rem 1rem;
+  background: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cropPrimaryBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.cropPrimaryBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .cropBody {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cropStage {
+    width: 100%;
+    margin: 0 auto;
+  }
+}

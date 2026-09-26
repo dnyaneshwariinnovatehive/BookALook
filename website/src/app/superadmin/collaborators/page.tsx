@@ -33,7 +33,7 @@ export default function CollaboratorManagement() {
   const [loadingAreas, setLoadingAreas] = useState(false);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities`, { headers: { Accept: 'application/json' } })
+    fetch('/api/proxy/cities', { headers: { Accept: 'application/json' } })
       .then((r) => r.json())
       .then((list) => Array.isArray(list) && setCities(list))
       .catch(() => setCities([]));
@@ -45,7 +45,7 @@ export default function CollaboratorManagement() {
       return;
     }
     setLoadingAreas(true);
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/cities/${formData.city_id}/sub-areas`, {
+    fetch(`/api/proxy/cities/${formData.city_id}/sub-areas`, {
       headers: { Accept: 'application/json' },
     })
       .then((r) => r.json())
@@ -58,12 +58,12 @@ export default function CollaboratorManagement() {
 
   const fetchCollaborators = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators/stats`);
+      const res = await fetch('/api/proxy/superadmin/collaborators/stats');
       if (!res.ok) throw new Error('Failed to fetch collaborators');
       const json = await res.json();
       setCollaborators(json.data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch collaborators');
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export default function CollaboratorManagement() {
     setSubmitError('');
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/collaborators`, {
+      const res = await fetch('/api/proxy/superadmin/collaborators', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

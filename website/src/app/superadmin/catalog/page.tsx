@@ -469,7 +469,7 @@ export default function CatalogPage() {
       {/* Add/Edit Category Modal */}
       {showCatModal && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
+          <div className={`${styles.modal} ${styles.modalWide}`}>
             <h2 className={styles.modalTitle}>{editingCategory ? 'Edit Category' : 'Add Standard Category'}</h2>
             <form onSubmit={handleSaveCategory}>
               <div className={styles.formGroup}>

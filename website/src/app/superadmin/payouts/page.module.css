@@ -265,3 +265,10 @@
   color: var(--color-success);
   font-weight: 600;
 }
+
+.pager {
+  margin-top: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+}

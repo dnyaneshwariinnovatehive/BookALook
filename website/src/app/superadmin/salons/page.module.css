@@ -212,3 +212,57 @@
 .rowSuccess {
   animation: flashSuccess 1.5s ease-out;
 }
+
+/* ---------- table bits ---------- */
+
+.tableShell {
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.searchField {
+  flex: 1 1 240px;
+  max-width: 400px;
+  min-width: 200px;
+}
+
+.collaboratorCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cellSelect {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-body);
+  background: var(--bg-color);
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.cellSelect:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.savedFlag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-success, #16a34a);
+  white-space: nowrap;
+}
+
+.dateCell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-body);
+  opacity: 0.85;
+}

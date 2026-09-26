@@ -15,19 +15,48 @@ class SuperAdminEnquiryController extends Controller
      * Enquiries waiting to be handed to somebody, each carrying the place it
      * came from so the page can put the right collaborator in front of it.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $enquiries = SalonEnquiry::with([
+        $request->validate([
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'search' => 'nullable|string|max:100',
+            'column' => 'nullable|in:created_at,salon_name,owner_name,city,status',
+            'direction' => 'nullable|in:asc,desc',
+        ]);
+
+        $query = SalonEnquiry::with([
             'assignedCollaborator:id,name,city_id,sub_area_id',
             'cityRecord:id,name,state',
             'subArea:id,name',
-        ])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        ]);
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('salon_name', 'like', "%{$search}%")
+                  ->orWhere('owner_name', 'like', "%{$search}%")
+                  ->orWhere('city', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        $column = $request->input('column');
+        $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
+
+        if ($column && in_array($column, ['created_at', 'salon_name', 'owner_name', 'city', 'status'], true)) {
+            $query->orderBy($column, $direction);
+        } else {
+            $query->orderByDesc('created_at');
+        }
+        $query->orderBy('id');
+
+        $perPage = (int) $request->input('per_page', 20);
+        $paged = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $enquiries->map(fn (SalonEnquiry $enquiry) => $enquiry->toArray() + [
+            'data' => $paged->getCollection()->map(fn (SalonEnquiry $enquiry) => $enquiry->toArray() + [
                 // A resolved city wins; the typed string is the fallback for
                 // the older rows that predate city_id.
                 'city_name' => $enquiry->cityRecord->name ?? $enquiry->city,
@@ -37,7 +66,13 @@ class SuperAdminEnquiryController extends Controller
                     $enquiry->subArea->name ?? null,
                     $enquiry->cityRecord->name ?? $enquiry->city
                 ),
-            ]),
+            ])->values(),
+            'meta' => [
+                'current_page' => $paged->currentPage(),
+                'last_page' => $paged->lastPage(),
+                'per_page' => $paged->perPage(),
+                'total' => $paged->total(),
+            ],
         ]);
     }
 

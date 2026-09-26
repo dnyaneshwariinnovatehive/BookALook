@@ -71,6 +71,12 @@
   align-items: center;
 }
 
+.searchField {
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+}
+
 .searchInput {
   padding: 0.7rem 1rem;
   border: 1px solid var(--border-color);

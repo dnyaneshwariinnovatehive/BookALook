@@ -272,6 +272,13 @@
   flex-shrink: 0;
 }
 
+/* The category form carries the icon studio and the app preview, which need
+   more room than the plain fields. The crop box opens over the top of this
+   rather than inside it, so the form itself keeps its own layout. */
+.modalWide {
+  max-width: 580px;
+}
+
 .modalTitle {
   font-size: 18px;
   font-weight: 600;
@@ -550,6 +557,167 @@
   background: var(--color-danger-bg);
   color: var(--color-danger);
   font-size: 0.78rem;
+}
+
+/* Cropping is an option, not a step in the pipeline: the icon on the form is
+   already finished before this row appears, so nothing here is load-bearing. */
+.studioActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.studioSecondaryBtn {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.studioSecondaryBtn:hover:not(:disabled) {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.studioSecondaryBtn:disabled,
+.studioGhostBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.studioGhostBtn {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-body);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.studioGhostBtn:hover:not(:disabled) {
+  border-color: var(--text-light);
+  color: var(--text-heading);
+}
+
+.studioActionsHint {
+  font-size: 0.72rem;
+  color: var(--text-light);
+}
+
+/* ---------- Customer app preview ----------
+   A reproduction rather than an approximation. The tile is the width a phone
+   actually gives it, the corner radius, padding and label typography are the
+   app's own, and the tints are the six the app cycles through. The frame
+   around them follows the dashboard theme; the tile colours do not, because
+   those are fixed in the app and shown here as literals. */
+.appPreview {
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--surface-color);
+  padding: 1rem;
+}
+
+.appPreviewScreen {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 0.9rem 0.9rem 1rem;
+}
+
+.appScreenHeading {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.appRow {
+  display: flex;
+  gap: 12px;
+}
+
+.appTile {
+  /* (390 - 3 gaps) / 4: the width one tile gets on a typical phone. */
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.appTileArt {
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appTileImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.appTileLabel {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--text-heading);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.appScreenFootnote {
+  margin: 0.9rem 0 0.7rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.appTints {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.appTint {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  padding: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appTintImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.appPreviewNote {
+  margin: 0.7rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-light);
 }
 
 @media (max-width: 560px) {

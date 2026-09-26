@@ -28,11 +28,24 @@ class PlatformReviewController extends Controller
     {
     }
 
+    /**
+     * Columns SuperAdmin is allowed to sort on. Ratings are aggregated, so this
+     * cannot become an ORDER BY on the salons table — it is applied to the
+     * shaped rows instead.
+     */
+    private const SORTABLE = ['name', 'average', 'review_count', 'status'];
+
     public function index(Request $request)
     {
         $request->validate([
+            // Curated, business-meaningful orderings.
             'sort' => 'nullable|in:worst,best,most_rated,recent',
+            // Raw column sort, driven by clicking a table header.
+            'column' => 'nullable|in:' . implode(',', self::SORTABLE),
+            'direction' => 'nullable|in:asc,desc',
             'search' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
         $sort = $request->input('sort', 'worst');
@@ -54,29 +67,52 @@ class PlatformReviewController extends Controller
                 'is_credible' => $salon->reviews_count >= self::CREDIBLE_AT,
             ]);
 
-        $sorted = match ($sort) {
-            'best' => $salons->sortByDesc('average'),
-            'most_rated' => $salons->sortByDesc('review_count'),
-            // Credible salons first within the worst list, so a salon with two
-            // one-star ratings does not bury one with thirty.
-            'worst' => $salons->sortBy([
-                fn ($a, $b) => ($b['is_credible'] ? 1 : 0) <=> ($a['is_credible'] ? 1 : 0),
-                fn ($a, $b) => $a['average'] <=> $b['average'],
-            ]),
-            default => $salons->sortByDesc('review_count'),
-        };
+        $column = $request->input('column');
+        $descending = $request->input('direction') !== 'asc';
+
+        if ($column && in_array($column, self::SORTABLE, true)) {
+            // An explicit header click wins over the curated preset.
+            $sorted = $descending
+                ? $salons->sortByDesc($column, SORT_NATURAL)
+                : $salons->sortBy($column, SORT_NATURAL);
+        } else {
+            $sorted = match ($sort) {
+                'best' => $salons->sortByDesc('average'),
+                'most_rated' => $salons->sortByDesc('review_count'),
+                // Credible salons first within the worst list, so a salon with two
+                // one-star ratings does not bury one with thirty.
+                'worst' => $salons->sortBy([
+                    fn ($a, $b) => ($b['is_credible'] ? 1 : 0) <=> ($a['is_credible'] ? 1 : 0),
+                    fn ($a, $b) => $a['average'] <=> $b['average'],
+                ]),
+                default => $salons->sortByDesc('review_count'),
+            };
+        }
 
         $all = Review::selectRaw('count(*) as total, avg(rating) as average')->first();
+
+        // Ratings are aggregated in PHP, so pagination happens after ordering.
+        // The platform stats below still describe every rated salon, not the page.
+        $perPage = (int) ($request->input('per_page') ?? 20);
+        $total = $sorted->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, (int) ($request->input('page') ?? 1)), $lastPage);
 
         return response()->json([
             'success' => true,
             'platform' => [
                 'total_reviews' => (int) $all->total,
                 'average' => $all->total > 0 ? round((float) $all->average, 2) : 0,
-                'rated_salons' => $salons->count(),
+                'rated_salons' => $total,
                 'salons_below_three' => $salons->where('is_credible', true)->where('average', '<', 3)->count(),
             ],
-            'data' => $sorted->values(),
+            'data' => $sorted->slice(($page - 1) * $perPage, $perPage)->values(),
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
         ]);
     }
 
