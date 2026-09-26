@@ -1,0 +1,2432 @@
+﻿diff --git a/Customer App/lib/main.dart b/Customer App/lib/main.dart
+index 3eae0b9..ebabbbb 100644
+--- a/Customer App/lib/main.dart	
++++ b/Customer App/lib/main.dart	
+@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
+ import 'screens/splash_screen.dart';
+ import 'services/deep_link_service.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
++import 'services/push_notification_service.dart';
+ import 'theme/app_theme.dart';
+ 
+ // Global notifier for theme mode
+@@ -24,6 +25,10 @@ Future<void> main() async {
+   // Started before the first frame so a QR scan that launched the app is
+   // already waiting to be routed rather than arriving too late to matter.
+   await DeepLinkService.instance.start();
++
++  // Initialize push notification foundation
++  await PushNotificationService().init();
++
+   runApp(MyApp());
+ }
+ 
+diff --git a/Customer App/lib/screens/tabs/profile_tab.dart b/Customer App/lib/screens/tabs/profile_tab.dart
+index b897ef7..fa22809 100644
+--- a/Customer App/lib/screens/tabs/profile_tab.dart	
++++ b/Customer App/lib/screens/tabs/profile_tab.dart	
+@@ -65,10 +65,29 @@ class _ProfileTabState extends State<ProfileTab> {
+     final prefs = await SharedPreferences.getInstance();
+     if (mounted) {
+       setState(() {
+-        _pushNotifications = prefs.getBool('push_notifications') ?? true;
+         _locationAccess = prefs.getBool('location_access') ?? true;
+       });
+     }
++    
++    // Load Push notification preference from backend if not guest
++    if (!widget.isGuest) {
++      try {
++        final prefsData = await _profileService.getNotificationPreferences();
++        if (mounted) {
++          setState(() {
++            _pushNotifications = prefsData['push_enabled'] ?? true;
++          });
++        }
++      } catch (e) {
++        debugPrint('Error loading notification preferences: $e');
++      }
++    } else {
++      if (mounted) {
++        setState(() {
++          _pushNotifications = prefs.getBool('push_notifications') ?? true;
++        });
++      }
++    }
+   }
+ 
+   Future<void> _toggleSetting(String key, bool value) async {
+@@ -292,7 +311,11 @@ class _ProfileTabState extends State<ProfileTab> {
+                       value: _pushNotifications,
+                       onChanged: (val) {
+                         setState(() => _pushNotifications = val);
+-                        _toggleSetting('push_notifications', val);
++                        if (!widget.isGuest) {
++                          _profileService.updateNotificationPreferences({'push_enabled': val});
++                        } else {
++                          _toggleSetting('push_notifications', val);
++                        }
+                       },
+                       headingColor: headingColor,
+                     ),
+diff --git a/Customer App/lib/services/auth_service.dart b/Customer App/lib/services/auth_service.dart
+index 244c488..42050c4 100644
+--- a/Customer App/lib/services/auth_service.dart	
++++ b/Customer App/lib/services/auth_service.dart	
+@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
+ import 'package:shared_preferences/shared_preferences.dart';
+ import 'location_service.dart';
+ import 'package:flutter_dotenv/flutter_dotenv.dart';
++import 'push_notification_service.dart';
+ 
+ class AuthService {
+   static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
+@@ -45,6 +46,7 @@ class AuthService {
+         final data = jsonDecode(response.body);
+         if (data.containsKey('access_token')) {
+           await _saveToken(data['access_token']);
++          PushNotificationService().registerDevice();
+           return true; // Authenticated
+         } else if (data['requires_registration'] == true) {
+           return 'requires_registration';
+@@ -94,6 +96,7 @@ class AuthService {
+         final data = jsonDecode(response.body);
+         if (data.containsKey('access_token')) {
+           await _saveToken(data['access_token']);
++          PushNotificationService().registerDevice();
+           return true;
+         }
+       }
+@@ -110,6 +113,7 @@ class AuthService {
+     final token = await getToken();
+     if (token != null) {
+       try {
++        await PushNotificationService().unregisterDevice();
+         await http.post(
+           Uri.parse('$baseUrl/logout'),
+           headers: {
+diff --git a/Customer App/lib/services/profile_service.dart b/Customer App/lib/services/profile_service.dart
+index c4f6712..d9b58a9 100644
+--- a/Customer App/lib/services/profile_service.dart	
++++ b/Customer App/lib/services/profile_service.dart	
+@@ -24,4 +24,41 @@ class ProfileService {
+       throw Exception('Failed to load profile');
+     }
+   }
++
++  Future<Map<String, dynamic>> getNotificationPreferences() async {
++    final prefs = await SharedPreferences.getInstance();
++    final token = prefs.getString('auth_token');
++    
++    if (token == null) return {};
++
++    final response = await http.get(
++      Uri.parse('$baseUrl/customer/notifications/preferences'),
++      headers: {
++        'Authorization': 'Bearer $token',
++        'Accept': 'application/json',
++      },
++    );
++
++    if (response.statusCode == 200) {
++      return jsonDecode(response.body)['preferences'] ?? {};
++    }
++    return {};
++  }
++
++  Future<void> updateNotificationPreferences(Map<String, dynamic> data) async {
++    final prefs = await SharedPreferences.getInstance();
++    final token = prefs.getString('auth_token');
++    
++    if (token == null) return;
++
++    await http.put(
++      Uri.parse('$baseUrl/customer/notifications/preferences'),
++      headers: {
++        'Authorization': 'Bearer $token',
++        'Accept': 'application/json',
++        'Content-Type': 'application/json',
++      },
++      body: jsonEncode(data),
++    );
++  }
+ }
+diff --git a/Customer App/pubspec.lock b/Customer App/pubspec.lock
+index 1aee4f8..38f7f62 100644
+--- a/Customer App/pubspec.lock	
++++ b/Customer App/pubspec.lock	
+@@ -1,6 +1,14 @@
+ # Generated by pub
+ # See https://dart.dev/tools/pub/glossary#lockfile
+ packages:
++  _flutterfire_internals:
++    dependency: transitive
++    description:
++      name: _flutterfire_internals
++      sha256: f6966125633a34f82d9be2ee895b755cff3554087b1d00a9eb884e5947f4bca9
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.3.77"
+   app_links:
+     dependency: "direct main"
+     description:
+@@ -105,6 +113,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.0.9"
++  dbus:
++    dependency: transitive
++    description:
++      name: dbus
++      sha256: a48d5da28e89bd02196e80d81ed8d7954923d00a0f4a68cc20b575038f023383
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.7.15"
+   eventify:
+     dependency: transitive
+     description:
+@@ -137,6 +153,54 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "7.0.1"
++  firebase_core:
++    dependency: "direct main"
++    description:
++      name: firebase_core
++      sha256: "5fbbaa2aeb08a52feee559f92a62f5a6b04c9bdff81c8f608636771cf0d7b680"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.15.0"
++  firebase_core_platform_interface:
++    dependency: transitive
++    description:
++      name: firebase_core_platform_interface
++      sha256: "9bfbc85faca09346471ac56fbcee00757ebcfd85887c6f602764eff0001902d8"
++      url: "https://pub.dev"
++    source: hosted
++    version: "8.1.1"
++  firebase_core_web:
++    dependency: transitive
++    description:
++      name: firebase_core_web
++      sha256: "8ed84f5001dbd7a0390e2818d46bc858ceebb970edededdfc8d6552c76fc2f6e"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.12.0"
++  firebase_messaging:
++    dependency: "direct main"
++    description:
++      name: firebase_messaging
++      sha256: "47a8142a0b897783103b01018ad69f123b819b0120483847bde30d1b2fa89b36"
++      url: "https://pub.dev"
++    source: hosted
++    version: "16.7.0"
++  firebase_messaging_platform_interface:
++    dependency: transitive
++    description:
++      name: firebase_messaging_platform_interface
++      sha256: f9707e185b8ce1155d58e7e29348245072d99981f899fa8d3214abb2652c4ccb
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.10.0"
++  firebase_messaging_web:
++    dependency: transitive
++    description:
++      name: firebase_messaging_web
++      sha256: "311b16c75fc645c7a70c9ade38908abb12310dfce449fc3d3cee1771f196351e"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.2.5"
+   fixnum:
+     dependency: transitive
+     description:
+@@ -166,6 +230,46 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "6.0.0"
++  flutter_local_notifications:
++    dependency: "direct main"
++    description:
++      name: flutter_local_notifications
++      sha256: "357be7ff996dc272e2037c69c1bdd5d1bd21172219d55f8bd2e11aeea602e6d3"
++      url: "https://pub.dev"
++    source: hosted
++    version: "22.3.1"
++  flutter_local_notifications_linux:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_linux
++      sha256: "9ca97e63776f29ab1b955725c09999fc2c150523269db150c39274f2a43c5a8b"
++      url: "https://pub.dev"
++    source: hosted
++    version: "8.0.1"
++  flutter_local_notifications_platform_interface:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_platform_interface
++      sha256: "43c3761d916c9bd3d5c7ebbc44d82f4990329840c0c5d62ad5260cc1b5d399bd"
++      url: "https://pub.dev"
++    source: hosted
++    version: "12.2.0"
++  flutter_local_notifications_web:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_web
++      sha256: "516afaf97a2d1e67a036c6617321b00d205d72f7a67b6eccf936cd565f985878"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.0"
++  flutter_local_notifications_windows:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_windows
++      sha256: "6f43bdd03b171b7a90f22647506fea33e2bb12294b7c7c7a3d690e960a382945"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.1.1"
+   flutter_test:
+     dependency: "direct dev"
+     description: flutter
+@@ -432,6 +536,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "2.3.0"
++  petitparser:
++    dependency: transitive
++    description:
++      name: petitparser
++      sha256: "91bd59303e9f769f108f8df05e371341b15d59e995e6806aefab827b58336675"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.2"
+   platform:
+     dependency: transitive
+     description:
+@@ -597,6 +709,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "0.7.11"
++  timezone:
++    dependency: transitive
++    description:
++      name: timezone
++      sha256: "981d1020d6ef8fe1e7b3de5054e5b25579ae7c403d7734adc508ffc47668e9cb"
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.11.1"
+   typed_data:
+     dependency: transitive
+     description:
+@@ -709,6 +829,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.0"
++  xml:
++    dependency: transitive
++    description:
++      name: xml
++      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.1"
+   yaml:
+     dependency: transitive
+     description:
+diff --git a/Customer App/pubspec.yaml b/Customer App/pubspec.yaml
+index c7a3691..4a37f20 100644
+--- a/Customer App/pubspec.yaml	
++++ b/Customer App/pubspec.yaml	
+@@ -48,6 +48,9 @@ dependencies:
+   geolocator: ^13.0.2
+   # Opens the app straight at a salon when someone scans its printed QR code.
+   app_links: ^6.3.2
++  firebase_core: ^4.15.0
++  firebase_messaging: ^16.7.0
++  flutter_local_notifications: ^22.3.1
+ 
+ dev_dependencies:
+   flutter_test:
+diff --git a/Partner App/lib/main.dart b/Partner App/lib/main.dart
+index cea9801..9130630 100644
+--- a/Partner App/lib/main.dart	
++++ b/Partner App/lib/main.dart	
+@@ -3,10 +3,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ import 'package:partner_app/theme/app_theme.dart';
+ import 'screens/splash_screen.dart';
++import 'services/push_notification_service.dart';
+ 
+ // Global notifier for theme mode
+ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+ 
++// Global navigator key for routing from background/terminated states
++final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
++
+ Future<void> _loadThemeMode() async {
+   final prefs = await SharedPreferences.getInstance();
+   final isDark = prefs.getBool('isDarkMode') ?? false;
+@@ -17,6 +21,7 @@ Future<void> main() async {
+   WidgetsFlutterBinding.ensureInitialized();
+   await dotenv.load(fileName: ".env");
+   await _loadThemeMode();
++  await PushNotificationService().init();
+   runApp(const PartnerApp());
+ }
+ 
+@@ -29,6 +34,7 @@ class PartnerApp extends StatelessWidget {
+       valueListenable: themeNotifier,
+       builder: (context, currentMode, child) {
+         return MaterialApp(
++          navigatorKey: navigatorKey,
+           title: 'BookALook Partner',
+           theme: AppTheme.lightTheme,
+           darkTheme: AppTheme.darkTheme,
+diff --git a/Partner App/lib/screens/dashboard/collaborator_tabs/collaborator_profile_tab.dart b/Partner App/lib/screens/dashboard/collaborator_tabs/collaborator_profile_tab.dart
+index ffc0509..3dc7b5c 100644
+--- a/Partner App/lib/screens/dashboard/collaborator_tabs/collaborator_profile_tab.dart	
++++ b/Partner App/lib/screens/dashboard/collaborator_tabs/collaborator_profile_tab.dart	
+@@ -6,6 +6,8 @@ import '../../../services/collaborator_api.dart';
+ import '../../../theme/app_theme.dart';
+ import '../../phone_screen.dart';
+ import 'edit_collaborator_profile_sheet.dart';
++import '../../../services/push_notification_service.dart';
++import '../../../widgets/push_notification_toggle.dart';
+ 
+ /// The collaborator's own page: who they are, what they have done, and out.
+ ///
+@@ -86,6 +88,7 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
+ 
+     if (confirmed != true) return;
+ 
++    await PushNotificationService().unregisterDevice();
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.clear();
+ 
+@@ -114,6 +117,8 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
+             _buildDetailsCard(),
+           ],
+           const SizedBox(height: 24),
++          const PushNotificationToggle(),
++          const SizedBox(height: 24),
+           _buildLogoutButton(),
+           const SizedBox(height: 20),
+         ],
+diff --git a/Partner App/lib/screens/dashboard/salon_selection_screen.dart b/Partner App/lib/screens/dashboard/salon_selection_screen.dart
+index 2ba2539..961394f 100644
+--- a/Partner App/lib/screens/dashboard/salon_selection_screen.dart	
++++ b/Partner App/lib/screens/dashboard/salon_selection_screen.dart	
+@@ -5,6 +5,7 @@ import 'dashboard_screen.dart';
+ import '../registration/admin_registration_screen.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ import '../phone_screen.dart';
++import '../../services/push_notification_service.dart';
+ 
+ class SalonSelectionScreen extends StatelessWidget {
+   final List<dynamic> salons;
+@@ -60,6 +61,7 @@ class SalonSelectionScreen extends StatelessWidget {
+   }
+ 
+   void _logout(BuildContext context) async {
++    await PushNotificationService().unregisterDevice();
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.clear();
+     if (context.mounted) {
+diff --git a/Partner App/lib/screens/dashboard/tabs/more_tab.dart b/Partner App/lib/screens/dashboard/tabs/more_tab.dart
+index f158819..ab57d2c 100644
+--- a/Partner App/lib/screens/dashboard/tabs/more_tab.dart	
++++ b/Partner App/lib/screens/dashboard/tabs/more_tab.dart	
+@@ -16,12 +16,16 @@ import 'package:partner_app/theme/app_theme.dart';
+ import '../../notifications_screen.dart';
+ import '../../../widgets/wallet_coin_pill.dart';
+ import '../more/edit_salon_profile_screen.dart';
++import '../../../services/push_notification_service.dart';
++import '../../../widgets/push_notification_toggle.dart';
++import '../../../services/push_notification_service.dart';
+ 
+ class MoreTab extends StatelessWidget {
+   final Map<String, dynamic> salonData;
+   const MoreTab({super.key, required this.salonData});
+ 
+   void _logout(BuildContext context) async {
++    await PushNotificationService().unregisterDevice();
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.clear();
+     if (context.mounted) {
+@@ -297,6 +301,8 @@ class MoreTab extends StatelessWidget {
+                     onTap: () {},
+                   ),
+                   Divider(height: 1, indent: 56),
++                  const PushNotificationToggle(),
++                  Divider(height: 1, indent: 56),
+                   ValueListenableBuilder<ThemeMode>(
+                     valueListenable: themeNotifier,
+                     builder: (context, currentMode, _) {
+diff --git a/Partner App/lib/screens/dashboard/tabs/provider_profile_tab.dart b/Partner App/lib/screens/dashboard/tabs/provider_profile_tab.dart
+index 781f0a6..74b1846 100644
+--- a/Partner App/lib/screens/dashboard/tabs/provider_profile_tab.dart	
++++ b/Partner App/lib/screens/dashboard/tabs/provider_profile_tab.dart	
+@@ -7,6 +7,8 @@ import '../../../main.dart';
+ import '../more/my_salary_screen.dart';
+ import '../more/provider_leaves_screen.dart';
+ import '../../../services/staff_api.dart';
++import '../../../services/push_notification_service.dart';
++import '../../../widgets/push_notification_toggle.dart';
+ 
+ class ProviderProfileTab extends StatefulWidget {
+   final Map<String, dynamic> salon;
+@@ -55,6 +57,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
+ 
+     if (confirmed != true) return;
+ 
++    await PushNotificationService().unregisterDevice();
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.clear();
+ 
+@@ -670,6 +673,18 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
+                   ),
+                 ),
+ 
++                ),
++
++                const SizedBox(height: 16),
++                
++                Container(
++                  decoration: BoxDecoration(
++                    border: Border.all(color: Theme.of(context).dividerColor),
++                    borderRadius: BorderRadius.circular(12),
++                  ),
++                  child: const PushNotificationToggle(),
++                ),
++
+                 const SizedBox(height: 16),
+                 
+                 // Dark Mode Toggle
+diff --git a/Partner App/lib/screens/otp_screen.dart b/Partner App/lib/screens/otp_screen.dart
+index 77c1b60..545d92a 100644
+--- a/Partner App/lib/screens/otp_screen.dart	
++++ b/Partner App/lib/screens/otp_screen.dart	
+@@ -10,6 +10,7 @@ import 'registration/admin_registration_screen.dart';
+ import 'dashboard/salon_selection_screen.dart';
+ import 'dashboard/service_provider_dashboard.dart';
+ import 'dashboard/collaborator_dashboard.dart';
++import '../services/push_notification_service.dart';
+ 
+ class OtpScreen extends StatefulWidget {
+   final String phone;
+@@ -73,6 +74,8 @@ class _OtpScreenState extends State<OtpScreen> {
+         final prefs = await SharedPreferences.getInstance();
+         await prefs.setString('auth_token', response['token'] ?? '');
+         await prefs.setString('role', response['role'] ?? '');
++        
++        PushNotificationService().registerDevice();
+ 
+         if (!mounted) return;
+ 
+diff --git a/Partner App/lib/screens/subscription_locked_screen.dart b/Partner App/lib/screens/subscription_locked_screen.dart
+index af545ec..5d17827 100644
+--- a/Partner App/lib/screens/subscription_locked_screen.dart	
++++ b/Partner App/lib/screens/subscription_locked_screen.dart	
+@@ -7,6 +7,7 @@ import '../services/salon_access_api.dart';
+ import '../theme/app_theme.dart';
+ import 'dashboard/more/upgrade_plan_screen.dart';
+ import 'phone_screen.dart';
++import '../services/push_notification_service.dart';
+ 
+ /// Shown in place of the whole app when the salon has no usable plan.
+ ///
+@@ -52,6 +53,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
+   }
+ 
+   Future<void> _logout(BuildContext context) async {
++    await PushNotificationService().unregisterDevice();
+     final prefs = await SharedPreferences.getInstance();
+     await prefs.clear();
+ 
+diff --git a/Partner App/lib/services/notification_service.dart b/Partner App/lib/services/notification_service.dart
+index 254afb3..41d05f2 100644
+--- a/Partner App/lib/services/notification_service.dart	
++++ b/Partner App/lib/services/notification_service.dart	
+@@ -49,4 +49,26 @@ class PartnerNotificationService {
+       headers: await _getHeaders(),
+     );
+   }
++
++  static Future<Map<String, dynamic>> getPreferences() async {
++    final response = await http.get(
++      Uri.parse('$baseUrl/notifications/preferences'),
++      headers: await _getHeaders(),
++    );
++
++    if (response.statusCode == 200) {
++      return jsonDecode(response.body) as Map<String, dynamic>;
++    }
++    throw Exception('Failed to load notification preferences');
++  }
++
++  static Future<bool> updatePreferences(Map<String, dynamic> preferences) async {
++    final response = await http.put(
++      Uri.parse('$baseUrl/notifications/preferences'),
++      headers: await _getHeaders(),
++      body: jsonEncode(preferences),
++    );
++
++    return response.statusCode == 200;
++  }
+ }
+\ No newline at end of file
+diff --git a/Partner App/macos/Flutter/GeneratedPluginRegistrant.swift b/Partner App/macos/Flutter/GeneratedPluginRegistrant.swift
+index 6cd2939..522d6bf 100644
+--- a/Partner App/macos/Flutter/GeneratedPluginRegistrant.swift	
++++ b/Partner App/macos/Flutter/GeneratedPluginRegistrant.swift	
+@@ -6,6 +6,9 @@ import FlutterMacOS
+ import Foundation
+ 
+ import file_selector_macos
++import firebase_core
++import firebase_messaging
++import flutter_local_notifications
+ import geolocator_apple
+ import mobile_scanner
+ import share_plus
+@@ -14,6 +17,9 @@ import url_launcher_macos
+ 
+ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+   FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
++  FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
++  FLTFirebaseMessagingPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseMessagingPlugin"))
++  FlutterLocalNotificationsPlugin.register(with: registry.registrar(forPlugin: "FlutterLocalNotificationsPlugin"))
+   GeolocatorPlugin.register(with: registry.registrar(forPlugin: "GeolocatorPlugin"))
+   MobileScannerPlugin.register(with: registry.registrar(forPlugin: "MobileScannerPlugin"))
+   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))
+diff --git a/Partner App/pubspec.lock b/Partner App/pubspec.lock
+index 71d07a0..601f8d5 100644
+--- a/Partner App/pubspec.lock	
++++ b/Partner App/pubspec.lock	
+@@ -1,6 +1,14 @@
+ # Generated by pub
+ # See https://dart.dev/tools/pub/glossary#lockfile
+ packages:
++  _flutterfire_internals:
++    dependency: transitive
++    description:
++      name: _flutterfire_internals
++      sha256: f6966125633a34f82d9be2ee895b755cff3554087b1d00a9eb884e5947f4bca9
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.3.77"
+   args:
+     dependency: transitive
+     description:
+@@ -81,6 +89,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.0.9"
++  dbus:
++    dependency: transitive
++    description:
++      name: dbus
++      sha256: a48d5da28e89bd02196e80d81ed8d7954923d00a0f4a68cc20b575038f023383
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.7.15"
+   fake_async:
+     dependency: transitive
+     description:
+@@ -137,6 +153,54 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "0.9.3+6"
++  firebase_core:
++    dependency: "direct main"
++    description:
++      name: firebase_core
++      sha256: "5fbbaa2aeb08a52feee559f92a62f5a6b04c9bdff81c8f608636771cf0d7b680"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.15.0"
++  firebase_core_platform_interface:
++    dependency: transitive
++    description:
++      name: firebase_core_platform_interface
++      sha256: "9bfbc85faca09346471ac56fbcee00757ebcfd85887c6f602764eff0001902d8"
++      url: "https://pub.dev"
++    source: hosted
++    version: "8.1.1"
++  firebase_core_web:
++    dependency: transitive
++    description:
++      name: firebase_core_web
++      sha256: "8ed84f5001dbd7a0390e2818d46bc858ceebb970edededdfc8d6552c76fc2f6e"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.12.0"
++  firebase_messaging:
++    dependency: "direct main"
++    description:
++      name: firebase_messaging
++      sha256: "47a8142a0b897783103b01018ad69f123b819b0120483847bde30d1b2fa89b36"
++      url: "https://pub.dev"
++    source: hosted
++    version: "16.7.0"
++  firebase_messaging_platform_interface:
++    dependency: transitive
++    description:
++      name: firebase_messaging_platform_interface
++      sha256: f9707e185b8ce1155d58e7e29348245072d99981f899fa8d3214abb2652c4ccb
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.10.0"
++  firebase_messaging_web:
++    dependency: transitive
++    description:
++      name: firebase_messaging_web
++      sha256: "311b16c75fc645c7a70c9ade38908abb12310dfce449fc3d3cee1771f196351e"
++      url: "https://pub.dev"
++    source: hosted
++    version: "4.2.5"
+   fixnum:
+     dependency: transitive
+     description:
+@@ -166,6 +230,46 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "6.0.0"
++  flutter_local_notifications:
++    dependency: "direct main"
++    description:
++      name: flutter_local_notifications
++      sha256: "357be7ff996dc272e2037c69c1bdd5d1bd21172219d55f8bd2e11aeea602e6d3"
++      url: "https://pub.dev"
++    source: hosted
++    version: "22.3.1"
++  flutter_local_notifications_linux:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_linux
++      sha256: "9ca97e63776f29ab1b955725c09999fc2c150523269db150c39274f2a43c5a8b"
++      url: "https://pub.dev"
++    source: hosted
++    version: "8.0.1"
++  flutter_local_notifications_platform_interface:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_platform_interface
++      sha256: "43c3761d916c9bd3d5c7ebbc44d82f4990329840c0c5d62ad5260cc1b5d399bd"
++      url: "https://pub.dev"
++    source: hosted
++    version: "12.2.0"
++  flutter_local_notifications_web:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_web
++      sha256: "516afaf97a2d1e67a036c6617321b00d205d72f7a67b6eccf936cd565f985878"
++      url: "https://pub.dev"
++    source: hosted
++    version: "1.0.0"
++  flutter_local_notifications_windows:
++    dependency: transitive
++    description:
++      name: flutter_local_notifications_windows
++      sha256: "6f43bdd03b171b7a90f22647506fea33e2bb12294b7c7c7a3d690e960a382945"
++      url: "https://pub.dev"
++    source: hosted
++    version: "3.1.1"
+   flutter_plugin_android_lifecycle:
+     dependency: transitive
+     description:
+@@ -512,6 +616,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "2.3.0"
++  petitparser:
++    dependency: transitive
++    description:
++      name: petitparser
++      sha256: "91bd59303e9f769f108f8df05e371341b15d59e995e6806aefab827b58336675"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.2"
+   platform:
+     dependency: transitive
+     description:
+@@ -685,6 +797,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "0.7.11"
++  timezone:
++    dependency: transitive
++    description:
++      name: timezone
++      sha256: "981d1020d6ef8fe1e7b3de5054e5b25579ae7c403d7734adc508ffc47668e9cb"
++      url: "https://pub.dev"
++    source: hosted
++    version: "0.11.1"
+   typed_data:
+     dependency: transitive
+     description:
+@@ -805,6 +925,14 @@ packages:
+       url: "https://pub.dev"
+     source: hosted
+     version: "1.1.0"
++  xml:
++    dependency: transitive
++    description:
++      name: xml
++      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
++      url: "https://pub.dev"
++    source: hosted
++    version: "7.0.1"
+   yaml:
+     dependency: transitive
+     description:
+diff --git a/Partner App/pubspec.yaml b/Partner App/pubspec.yaml
+index 88dbe45..878c645 100644
+--- a/Partner App/pubspec.yaml	
++++ b/Partner App/pubspec.yaml	
+@@ -51,6 +51,9 @@ dependencies:
+   # Hands the finished PNG to WhatsApp, a printer, or the gallery.
+   share_plus: ^10.1.4
+   path_provider: ^2.1.5
++  firebase_core: ^4.15.0
++  firebase_messaging: ^16.7.0
++  flutter_local_notifications: ^22.3.1
+ 
+ dev_dependencies:
+   flutter_test:
+diff --git a/Partner App/windows/flutter/generated_plugin_registrant.cc b/Partner App/windows/flutter/generated_plugin_registrant.cc
+index 58f82d3..8eb163f 100644
+--- a/Partner App/windows/flutter/generated_plugin_registrant.cc	
++++ b/Partner App/windows/flutter/generated_plugin_registrant.cc	
+@@ -7,6 +7,7 @@
+ #include "generated_plugin_registrant.h"
+ 
+ #include <file_selector_windows/file_selector_windows.h>
++#include <firebase_core/firebase_core_plugin_c_api.h>
+ #include <geolocator_windows/geolocator_windows.h>
+ #include <share_plus/share_plus_windows_plugin_c_api.h>
+ #include <url_launcher_windows/url_launcher_windows.h>
+@@ -14,6 +15,8 @@
+ void RegisterPlugins(flutter::PluginRegistry* registry) {
+   FileSelectorWindowsRegisterWithRegistrar(
+       registry->GetRegistrarForPlugin("FileSelectorWindows"));
++  FirebaseCorePluginCApiRegisterWithRegistrar(
++      registry->GetRegistrarForPlugin("FirebaseCorePluginCApi"));
+   GeolocatorWindowsRegisterWithRegistrar(
+       registry->GetRegistrarForPlugin("GeolocatorWindows"));
+   SharePlusWindowsPluginCApiRegisterWithRegistrar(
+diff --git a/Partner App/windows/flutter/generated_plugins.cmake b/Partner App/windows/flutter/generated_plugins.cmake
+index c11c1ff..5116c6f 100644
+--- a/Partner App/windows/flutter/generated_plugins.cmake	
++++ b/Partner App/windows/flutter/generated_plugins.cmake	
+@@ -4,12 +4,14 @@
+ 
+ list(APPEND FLUTTER_PLUGIN_LIST
+   file_selector_windows
++  firebase_core
+   geolocator_windows
+   share_plus
+   url_launcher_windows
+ )
+ 
+ list(APPEND FLUTTER_FFI_PLUGIN_LIST
++  flutter_local_notifications_windows
+   jni
+ )
+ 
+diff --git a/backend/.env.example b/backend/.env.example
+index d56ae1c..d8c2451 100644
+--- a/backend/.env.example
++++ b/backend/.env.example
+@@ -39,10 +39,31 @@ FILESYSTEM_DISK=local
+ QUEUE_CONNECTION=database
+ 
+ # Push notifications. `log` records every attempted push and contacts nobody;
+-# it is the driver for every environment until FCM is configured. The FCM_*
+-# values are intentionally absent ΓÇö add them to .env only once a service
+-# account exists, and never commit that file.
++# it is the driver for every environment until FCM is configured.
++#
++# To switch to real delivery:
++#   PUSH_DRIVER=fcm
++#   FCM_PROJECT_ID=your-firebase-project-id
++#   FCM_CLIENT_EMAIL=firebase-adminsdk-...@your-project-id.iam.gserviceaccount.com
++#   FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
++# ...or point at a service-account JSON that lives on the server and is never
++# committed, which is the better option:
++#   FCM_CREDENTIALS_PATH=/etc/bookalook/firebase-service-account.json
++#
++# Unlike the payment drivers, `fcm` does not fall back to `log` when it is
++# unconfigured: it fails loudly and names the variables that are missing, so a
++# misconfigured server cannot report every delivery as sent.
++#
++# The FCM_* values are intentionally absent ΓÇö add them to .env only once a
++# service account exists, and never commit that file.
+ PUSH_DRIVER=log
++# Android channel the notification is posted to. The apps create this channel at
++# startup; FCM silently drops a notification whose channel does not exist.
++FCM_CHANNEL_ID=bookalook_notifications
++# Reminder lead time, in hours. How early the scheduler tells a customer their
++# appointment is coming. Set to 0 to switch reminders off without removing the
++# schedule.
++APPOINTMENT_REMINDER_LEAD_HOURS=3
+ 
+ CACHE_STORE=database
+ CACHE_PREFIX=
+diff --git a/backend/.gitignore b/backend/.gitignore
+index 631059a..9fa6752 100644
+--- a/backend/.gitignore
++++ b/backend/.gitignore
+@@ -24,3 +24,10 @@ yarn-error.log
+ 
+ database/database.sqlite
+ storage/dev/database.backup.sqlite
++
++# The SQLite file the test suite connects to (DB_DATABASE=testing in
++# phpunit.xml). It is a working copy of database/database.sqlite rather than
++# something built by `migrate`, because a fresh migrate cannot run on SQLite ΓÇö
++# an old raw-SQL migration in this repository's history is MySQL/Postgres only.
++# Tests run inside transactions and roll back, so the copy is never modified.
++/testing
+diff --git a/backend/app/Console/Commands/MarkNoShowAppointments.php b/backend/app/Console/Commands/MarkNoShowAppointments.php
+index f9a2dcf..e083101 100644
+--- a/backend/app/Console/Commands/MarkNoShowAppointments.php
++++ b/backend/app/Console/Commands/MarkNoShowAppointments.php
+@@ -2,10 +2,24 @@
+ 
+ namespace App\Console\Commands;
+ 
+-use Illuminate\Console\Command;
+ use App\Models\Appointment;
++use App\Services\Notifications\NotificationService;
+ use Carbon\Carbon;
++use Illuminate\Console\Command;
++use Illuminate\Support\Facades\Log;
+ 
++/**
++ * Marks yesterday's untouched appointments as no-shows, and tells the customer.
++ *
++ * The bulk `update()` this used to be is what makes the notification awkward:
++ * it can flip a thousand rows without ever loading one, so there is nothing to
++ * attach a notice to. The appointments are now fetched first ΓÇö a day's worth,
++ * which is a page of a salon, not a table ΓÇö because "you were marked as missed"
++ * is a thing that happens to a person and has to be said to them.
++ *
++ * Skipped entirely for walk-ins, who have no account to notify. Their row still
++ * moves to no_show; there is simply nowhere to send the news.
++ */
+ class MarkNoShowAppointments extends Command
+ {
+     /**
+@@ -25,15 +39,75 @@ class MarkNoShowAppointments extends Command
+     /**
+      * Execute the console command.
+      */
+-    public function handle()
++    public function handle(NotificationService $notifications)
+     {
+-        $count = Appointment::where('status', 'scheduled')
+-            ->whereDate('appointment_date', '<', Carbon::today())
+-            ->update([
+-                'status' => 'no_show',
+-                'no_show_at' => now(),
+-            ]);
+-
+-        $this->info("Marked {$count} appointments as no-show.");
++        $yesterday = Carbon::yesterday();
++
++        // Collect the ids first, then update by them.
++        //
++        // The obvious version of this ΓÇö update, then re-query for `no_show` ΓÇö
++        // is wrong in a way that only shows up days later: it cannot tell an
++        // appointment swept a minute ago from one marked last month, so every
++        // run would go back over the entire history. The dedupe key would stop
++        // the duplicates, but the command would still do a full table scan
++        // forever and would notify about old visits on its very first run.
++        $sweptIds = Appointment::query()
++            ->where('status', 'scheduled')
++            ->whereDate('appointment_date', '<', $yesterday)
++            ->pluck('id');
++
++        if ($sweptIds->isEmpty()) {
++            $this->info('No appointments to mark as no-show.');
++
++            return self::SUCCESS;
++        }
++
++        $swept = Appointment::whereIn('id', $sweptIds)->update([
++            'status' => 'no_show',
++            'no_show_at' => now(),
++        ]);
++
++        // Read back the same rows, now carrying the new status, so the set that
++        // gets notified about and the set that got swept are the same set by
++        // construction rather than by a query that happens to agree.
++        $sweptAppointments = Appointment::with(['salon', 'customer'])
++            ->whereIn('id', $sweptIds)
++            ->whereNotNull('customer_id')
++            ->whereHas('customer')
++            ->get();
++
++        $notified = 0;
++
++        foreach ($sweptAppointments as $appointment) {
++            // Keyed on the appointment, because this command is scheduled daily
++            // and a day where it runs twice ΓÇö a deploy mid-sweep, a manual retry
++            // after a failure ΓÇö must not tell a customer they missed a visit they
++            // are already being told about.
++            $dedupeKey = 'appointment_no_show:'.$appointment->id;
++
++            try {
++                $notification = $notifications->appointmentMarkedNoShow(
++                    $appointment,
++                    $appointment->salon?->name ?? 'the salon',
++                    $dedupeKey,
++                );
++
++                if ($notification) {
++                    $notified++;
++                }
++            } catch (\Throwable $e) {
++                // One unreachable customer must not stop the sweep. The row is
++                // already marked; a missing notification is a much smaller
++                // problem than a sweep that dies half way through.
++                Log::warning('Could not send a no-show notification', [
++                    'appointment_id' => $appointment->id,
++                    'error' => $e->getMessage(),
++                ]);
++            }
++        }
++
++        $this->info("Marked {$swept} appointments as no-show, and notified {$notified} customers.");
++
++        return self::SUCCESS;
+     }
+ }
+diff --git a/backend/app/Http/Controllers/Api/Customer/AppointmentController.php b/backend/app/Http/Controllers/Api/Customer/AppointmentController.php
+index f344259..7c176d7 100644
+--- a/backend/app/Http/Controllers/Api/Customer/AppointmentController.php
++++ b/backend/app/Http/Controllers/Api/Customer/AppointmentController.php
+@@ -273,6 +273,15 @@ public function book(Request $request, $salon_id)
+             ]);
+         }
+ 
++        // The slot is held but the money has not moved. Saying so is the only
++        // sign the customer gets that the booking exists at all, and without it
++        // the app has to be reopened to find out.
++        $this->notifications->bookingAwaitingPayment(
++            $appointment,
++            $appointment->salon?->name ?? 'the salon',
++            (float) $payableNow,
++        );
++
+         // The gateway call is deliberately outside the transaction: it is a
+         // network round trip, and a slow provider must not hold a write lock.
+         try {
+@@ -409,6 +418,11 @@ private function settlePayment(Request $request, Appointment $appointment, strin
+ 
+     /**
+      * Turn a paid hold into a confirmed booking and retire the cart behind it.
++     *
++     * The single place a booking becomes real, and therefore the single place the
++     * "you are booked" notices come from. Both confirm paths ΓÇö a free booking and
++     * a paid one ΓÇö land here, so there is no way for one of them to confirm
++     * silently.
+      */
+     private function settleBooking(Appointment $appointment, ?Cart $cart): void
+     {
+@@ -424,6 +438,16 @@ private function settleBooking(Appointment $appointment, ?Cart $cart): void
+                 $cart->save();
+             }
+         });
++
++        $salonName = $appointment->salon?->name ?? 'the salon';
++        $dateLabel = $this->dateTimeLabel($appointment);
++
++        $this->notifications->bookingConfirmed($appointment, $salonName, $dateLabel);
++
++        // The salon side of the same event. The provider is told the slot is
++        // theirs; the owner is told the salon has a booking, because otherwise
++        // they find out by opening the app.
++        $this->notifications->notifySalonOfNewBooking($appointment, $salonName, $dateLabel);
+     }
+ 
+     /**
+@@ -623,6 +647,16 @@ public function cancel(Request $request, $id)
+ 
+         $date = Carbon::parse($appointment->appointment_date)->format('Y-m-d');
+ 
++        // After the commit, so the notification describes a booking that exists.
++        // The customer gets the cancellation in their inbox; the provider whose
++        // slot just freed up is told separately, because they are the one who
++        // will want to sell that time again.
++        $this->notifications->bookingCancelled(
++            $appointment,
++            $appointment->salon?->name ?? 'the salon',
++            $this->dateTimeLabel($appointment),
++        );
++
+         return response()->json([
+             'message' => 'Appointment cancelled successfully.',
+             'refund' => $refund,
+@@ -808,6 +842,16 @@ public function reschedule(Request $request, $id)
+             return response()->json(['message' => 'Failed to reschedule appointment.', 'error' => $e->getMessage()], 500);
+         }
+ 
++        // The provider notice went out inside the transaction above (the job's
++        // afterCommit handles the ordering). The customer's does not, because
++        // it has to describe the *replacement* row, and that row only exists once
++        // this has committed.
++        $this->notifications->bookingRescheduled(
++            $replacement,
++            $replacement->salon?->name ?? 'the salon',
++            $this->dateTimeLabel($replacement),
++        );
++
+         return response()->json([
+             'message' => $window['free_reschedule']
+                 ? 'Appointment rescheduled free of cost.'
+@@ -815,7 +859,6 @@ public function reschedule(Request $request, $id)
+             'appointment' => $this->presentBooking($replacement->fresh($this->bookingRelations())),
+         ]);
+     }
+-
+     /**
+      * Generate QR code for same-day appointment.
+      */
+@@ -1042,6 +1085,23 @@ private function raiseRefund(Appointment $appointment, float $amount, string $re
+         }
+     }
+ 
++    /**
++     * "Sep 26, 2026 at 4:30 PM".
++     *
++     * One place, because a confirmation, a cancellation and a reschedule all
++     * quote the same booking and a customer who reads two of them in a week
++     * should not see two formats. The service has the same helper; this copy
++     * exists so the controller can label an appointment it is only responding
++     * to, without the service having to expose a formatting method for every
++     * caller that wants to print something.
++     */
++    private function dateTimeLabel(Appointment $appointment): string
++    {
++        return Carbon::parse($appointment->appointment_date)->format('M d, Y')
++            .' at '
++            .Carbon::parse($appointment->start_time)->format('h:i A');
++    }
++
+     /**
+      * Move successful payments of the original appointment onto the new one,
+      * so a reschedule never looks like a refund plus a fresh charge.
+diff --git a/backend/app/Http/Controllers/Api/Customer/DeviceController.php b/backend/app/Http/Controllers/Api/Customer/DeviceController.php
+index dc3206d..93251e1 100644
+--- a/backend/app/Http/Controllers/Api/Customer/DeviceController.php
++++ b/backend/app/Http/Controllers/Api/Customer/DeviceController.php
+@@ -4,9 +4,9 @@
+ 
+ use App\Http\Controllers\Controller;
+ use App\Models\UserDevice;
++use App\Services\Notifications\DeviceService;
+ use Illuminate\Http\JsonResponse;
+ use Illuminate\Http\Request;
+-use Illuminate\Support\Facades\DB;
+ use Illuminate\Validation\Rule;
+ 
+ /**
+@@ -16,9 +16,17 @@
+  * token, then calls unregister on sign-out. Both are best-effort housekeeping
+  * on the app's side: a failure here is logged and retried by the app on the
+  * next launch, and never blocks a booking.
++ *
++ * A customer may only ever manage their own devices. The owner is taken from
++ * the Sanctum token and never from the request body, so there is no field here
++ * that could be tampered with to point a device at another account.
+  */
+ class DeviceController extends Controller
+ {
++    public function __construct(private DeviceService $devices)
++    {
++    }
++
+     public function register(Request $request): JsonResponse
+     {
+         $data = $request->validate([
+@@ -32,62 +40,11 @@ public function register(Request $request): JsonResponse
+             'os_version' => ['nullable', 'string', 'max:20'],
+         ]);
+ 
+-        $user = $request->user();
+-
+-        $device = DB::transaction(function () use ($data, $user) {
+-            // A push token belongs to a handset, not to an account. The same
+-            // person signs out and somebody else signs in on a shared phone, or
+-            // a customer is created for a booking made on a number that already
+-            // had the app installed. If the previous owner keeps the row active
+-            // then their next notification lands on a screen showing somebody
+-            // else's name, so the token is handed over rather than duplicated.
+-            //
+-            // Deactivated, not deleted: the delivery ledger points at these
+-            // rows, and a phone that comes back should not take its delivery
+-            // history down with it.
+-            UserDevice::query()
+-                ->where('push_token', $data['push_token'])
+-                ->where('user_id', '!=', $user->id)
+-                ->lockForUpdate()
+-                ->get()
+-                ->each(fn (UserDevice $previous) => $previous->forceFill([
+-                    'is_active' => false,
+-                    'last_active_at' => now(),
+-                ])->save());
+-
+-            // Keyed on the user as well as the token: the unique index on those
+-            // two columns is what stops one account registering the same
+-            // install twice and quietly pushing to itself.
+-            return UserDevice::updateOrCreate(
+-                ['user_id' => $user->id, 'push_token' => $data['push_token']],
+-                [
+-                    'app_type' => $data['app_type'],
+-                    'platform' => $data['platform'],
+-                    'app_version' => $data['app_version'],
+-                    'device_model' => $data['device_model'] ?? null,
+-                    'os_version' => $data['os_version'] ?? null,
+-                    'is_active' => true,
+-                    'last_active_at' => now(),
+-                ],
+-            );
+-        });
++        $device = $this->devices->register($request->user(), $data);
+ 
+         return response()->json([
+             'message' => 'Device registered for push notifications.',
+-            'device' => [
+-                'id' => $device->id,
+-                'app_type' => $device->app_type,
+-                'platform' => $device->platform,
+-                'app_version' => $device->app_version,
+-                'device_model' => $device->device_model,
+-                'os_version' => $device->os_version,
+-                // Masked on the way out too. The app already knows its own
+-                // token, so echoing it back achieves nothing and puts it in
+-                // another log on the way there.
+-                'push_token' => $device->maskedToken(),
+-                'is_active' => (bool) $device->is_active,
+-                'last_active_at' => $device->last_active_at,
+-            ],
++            'device' => $this->present($device),
+         ], $device->wasRecentlyCreated ? 201 : 200);
+     }
+ 
+@@ -100,10 +57,7 @@ public function unregister(Request $request): JsonResponse
+         // Scoped to the signed-in user, so a token can only ever be released by
+         // the account that holds it. Sign-out should not be able to quietly
+         // disable a notification for whoever registered that phone next.
+-        $released = UserDevice::query()
+-            ->where('user_id', $request->user()->id)
+-            ->where('push_token', $data['push_token'])
+-            ->update(['is_active' => false]);
++        $released = $this->devices->unregister($request->user(), $data['push_token']);
+ 
+         return response()->json([
+             'message' => $released
+@@ -111,4 +65,53 @@ public function unregister(Request $request): JsonResponse
+                 : 'That device was not registered for push notifications.',
+         ]);
+     }
++
++    /**
++     * A cheap "I am still here" the app can call on open. Keeps
++     * `last_active_at` meaningful without re-sending the whole token.
++     */
++    public function activity(Request $request): JsonResponse
++    {
++        $data = $request->validate([
++            'push_token' => ['nullable', 'string', 'max:255'],
++        ]);
++
++        $this->devices->touch($request->user(), $data['push_token'] ?? null);
++
++        return response()->json(['message' => 'Device activity recorded.']);
++    }
++
++    /**
++     * What this account has registered, so a user can spot a phone they do not
++     * recognise and remove it.
++     */
++    public function index(Request $request): JsonResponse
++    {
++        $devices = $this->devices->listFor($request->user(), UserDevice::APP_TYPE_CUSTOMER);
++
++        return response()->json([
++            'devices' => $devices->map(fn (UserDevice $device) => $this->present($device))->values(),
++        ]);
++    }
++
++    /**
++     * @return array<string, mixed>
++     */
++    private function present(UserDevice $device): array
++    {
++        return [
++            'id' => $device->id,
++            'app_type' => $device->app_type,
++            'platform' => $device->platform,
++            'app_version' => $device->app_version,
++            'device_model' => $device->device_model,
++            'os_version' => $device->os_version,
++            // Masked on the way out too. The app already knows its own
++            // token, so echoing it back achieves nothing and puts it in
++            // another log on the way there.
++            'push_token' => $device->maskedToken(),
++            'is_active' => (bool) $device->is_active,
++            'last_active_at' => $device->last_active_at,
++        ];
++    }
+ }
+diff --git a/backend/app/Jobs/SendPushNotificationJob.php b/backend/app/Jobs/SendPushNotificationJob.php
+index 44938c3..9d1acd7 100644
+--- a/backend/app/Jobs/SendPushNotificationJob.php
++++ b/backend/app/Jobs/SendPushNotificationJob.php
+@@ -4,10 +4,12 @@
+ 
+ use App\Models\Notification;
+ use App\Models\NotificationDelivery;
++use App\Models\NotificationPreference;
+ use App\Models\UserDevice;
+ use App\Services\Notifications\PushGateway;
+ use App\Services\Notifications\PushPayload;
+ use App\Services\Notifications\PushResult;
++use App\Support\Notifications\NotificationType;
+ use Illuminate\Bus\Queueable;
+ use Illuminate\Contracts\Queue\ShouldQueue;
+ use Illuminate\Foundation\Bus\Dispatchable;
+@@ -79,10 +81,22 @@ public function handle(PushGateway $gateway): void
+             return;
+         }
+ 
+-        $devices = UserDevice::query()
+-            ->where('user_id', $notification->user_id)
+-            ->pushable()
+-            ->get();
++        // The inbox row is the record of what happened and is never withdrawn.
++        // The push is the mirror, and a user who asked not to be pushed has
++        // asked for exactly that. Transactional notices are exempt inside
++        // NotificationPreference::allows().
++        if (! NotificationPreference::forUser($notification->user_id, $this->appTypeFor($notification))
++            ->allows((string) $notification->type)) {
++            Log::info('Recipient has push switched off for this kind of notification', [
++                'notification_id' => $notification->id,
++                'user_id' => $notification->user_id,
++                'type' => $notification->type,
++            ]);
++
++            return;
++        }
++
++        $devices = $this->devicesFor($notification);
+ 
+         if ($devices->isEmpty()) {
+             Log::info('No active device for this notification; it stays in the inbox only', [
+@@ -102,10 +116,39 @@ public function handle(PushGateway $gateway): void
+         $results = $gateway->send($devices, $payload);
+ 
+         foreach ($devices as $device) {
+-            $this->record($device, $payload, $results[$device->id] ?? null);
++            $delivery = $this->record($device, $payload, $results[$device->id] ?? null);
++
++            // `pending` is not a conclusion, it is a note to come back. Without
++            // this the row would sit at pending forever and the retries property
++            // on PushResult would be a lie: a rate-limited push would be
++            // reported as retried when in fact nobody ever tried it again.
++            if ($delivery && $delivery->status === NotificationDelivery::STATUS_PENDING) {
++                RetryPendingPushDeliveryJob::dispatch($delivery->id);
++            }
+         }
+     }
+ 
++    /**
++     * Which app the recipient will be reading this in, and therefore whose
++     * preferences apply and which install to address.
++     */
++    private function appTypeFor(Notification $notification): string
++    {
++        return NotificationType::audienceAppFor((string) $notification->type) ?? UserDevice::APP_TYPE_CUSTOMER;
++    }
++
++    /**
++     * @return \Illuminate\Database\Eloquent\Collection<int, UserDevice>
++     */
++    private function devicesFor(Notification $notification)
++    {
++        return UserDevice::query()
++            ->where('user_id', $notification->user_id)
++            ->forAppType(NotificationType::audienceAppFor((string) $notification->type))
++            ->pushable()
++            ->get();
++    }
++
+     /**
+      * The retries are spent. Write down what never went out, so a support
+      * question about a missing push has an answer waiting in the ledger instead
+@@ -128,10 +171,7 @@ public function failed(?\Throwable $exception): void
+             'error' => $reason,
+         ]);
+ 
+-        $devices = UserDevice::query()
+-            ->where('user_id', $notification->user_id)
+-            ->pushable()
+-            ->get();
++        $devices = $this->devicesFor($notification);
+ 
+         foreach ($devices as $device) {
+             // An earlier attempt may have reached this device before a later
+@@ -153,23 +193,40 @@ public function failed(?\Throwable $exception): void
+ 
+     /**
+      * One row in the ledger per device, whatever the outcome.
++     *
++     * Three outcomes, three meanings. `sent` is a provider that accepted the
++     * push. `failed` is a definitive no ΓÇö the token is dead, or the request will
++     * keep being rejected the same way. `pending` is a maybe: a rate limit or a
++     * provider outage, where nothing about this device is wrong and the push
++     * simply has not gone out yet. Collapsing the last two into `failed` would
++     * mean a support answer of "we tried and it failed" for something that was
++     * never actually tried properly.
+      */
+-    private function record(UserDevice $device, PushPayload $payload, ?PushResult $result): void
++    private function record(UserDevice $device, PushPayload $payload, ?PushResult $result): NotificationDelivery
+     {
+         $accepted = (bool) $result?->accepted;
++        $retryable = (bool) ($result?->retryable ?? false);
++
++        $status = match (true) {
++            $accepted => NotificationDelivery::STATUS_SENT,
++            $retryable => NotificationDelivery::STATUS_PENDING,
++            default => NotificationDelivery::STATUS_FAILED,
++        };
+ 
+-        NotificationDelivery::create([
++        $delivery = NotificationDelivery::create([
+             'notification_id' => $payload->notificationId,
+             'user_device_id' => $device->id,
+             'channel' => NotificationDelivery::CHANNEL_PUSH,
+-            'status' => $accepted ? NotificationDelivery::STATUS_SENT : NotificationDelivery::STATUS_FAILED,
++            'status' => $status,
+             'provider' => $result?->provider ?? 'unknown',
+             'destination' => $device->maskedToken() ?? 'unknown',
+             'provider_message_id' => $result?->messageId,
+             'attempt_count' => max(1, $this->attempts()),
+-            'failure_reason' => $accepted ? null : ($result?->failureReason ?? 'The push gateway returned no result for this device.'),
++            'failure_reason' => $accepted
++                ? null
++                : ($result?->failureReason ?? 'The push gateway returned no result for this device.'),
+             'sent_at' => $accepted ? now() : null,
+-            'failed_at' => $accepted ? null : now(),
++            'failed_at' => ($status === NotificationDelivery::STATUS_FAILED) ? now() : null,
+         ]);
+ 
+         // A provider that recognises a dead token is handing back an answer
+@@ -184,5 +241,7 @@ private function record(UserDevice $device, PushPayload $payload, ?PushResult $r
+                 'user_id' => $device->user_id,
+             ]);
+         }
++
++        return $delivery;
+     }
+ }
+diff --git a/backend/app/Models/Notification.php b/backend/app/Models/Notification.php
+index fd43842..8ca0eef 100644
+--- a/backend/app/Models/Notification.php
++++ b/backend/app/Models/Notification.php
+@@ -2,8 +2,11 @@
+ 
+ namespace App\Models;
+ 
+-use Illuminate\Database\Eloquent\Model;
++use App\Support\Notifications\NotificationAction;
++use App\Support\Notifications\NotificationType;
+ use Illuminate\Database\Eloquent\Concerns\HasUuids;
++use Illuminate\Database\Eloquent\Model;
++use Illuminate\Database\UniqueConstraintViolationException;
+ 
+ class Notification extends Model
+ {
+@@ -28,4 +31,63 @@ public function appointment()
+     {
+         return $this->belongsTo(Appointment::class, 'related_appointment_id');
+     }
++
++    public function deliveries()
++    {
++        return $this->hasMany(NotificationDelivery::class);
++    }
++
++    public function getCategoryAttribute(): string
++    {
++        return NotificationType::categoryOf((string) $this->type);
++    }
++
++    /**
++     * The action the app should route on, which is the one the payload asked
++     * for and otherwise the type's default.
++     *
++     * Stored actions win. A notification that says "reschedule this one
++     * appointment" must not be silently rewritten to "open the salon" by a
++     * default that happens to match its type.
++     */
++    public function getActionAttribute(): ?string
++    {
++        $data = is_array($this->data) ? $this->data : [];
++
++        if (isset($data['action']) && NotificationAction::isKnown((string) $data['action'])) {
++            return (string) $data['action'];
++        }
++
++        return NotificationType::defaultActionFor((string) $this->type);
++    }
++
++    public function getLabelAttribute(): string
++    {
++        return NotificationType::labelFor((string) $this->type);
++    }
++
++    /**
++     * Write a notification that is not allowed to happen twice.
++     *
++     * Returns null when the key has already been used, which is the answer the
++     * scheduled commands want: "somebody else already sent this, carry on".
++     * The unique index does the deciding, so two scheduler passes racing each
++     * other still produce one notification.
++     */
++    public static function createOnce(array $attributes, ?string $dedupeKey = null): ?self
++    {
++        if ($dedupeKey !== null) {
++            $attributes['dedupe_key'] = $dedupeKey;
++        }
++
++        try {
++            return static::create($attributes);
++        } catch (UniqueConstraintViolationException $e) {
++            if ($dedupeKey === null) {
++                throw $e;
++            }
++
++            return null;
++        }
++    }
+ }
+diff --git a/backend/app/Models/NotificationDelivery.php b/backend/app/Models/NotificationDelivery.php
+index d1c30d9..4c05fb9 100644
+--- a/backend/app/Models/NotificationDelivery.php
++++ b/backend/app/Models/NotificationDelivery.php
+@@ -52,4 +52,19 @@ public function scopeFailed($query)
+     {
+         return $query->where('status', self::STATUS_FAILED);
+     }
++
++    /**
++     * The attempt count after one more try, without clobbering the attempts
++     * already recorded.
++     *
++     * Shared by the first send and every retry so the number means the same
++     * thing in both places. A device that was rate-limited on the original send
++     * and then on two retries should read 3, not 1: the field exists to answer
++     * "how hard did we try", and a retry that overwrote it with 1 would make a
++     * repeated failure look like a first one.
++     */
++    public function countAttempt(int $times = 1): int
++    {
++        return max(1, (int) $this->attempt_count) + max(1, $times);
++    }
+ }
+diff --git a/backend/app/Models/UserDevice.php b/backend/app/Models/UserDevice.php
+index ff6886c..c86a78d 100644
+--- a/backend/app/Models/UserDevice.php
++++ b/backend/app/Models/UserDevice.php
+@@ -90,4 +90,20 @@ public function maskedToken(): ?string
+ 
+         return mb_substr($token, 0, 8).'...'.mb_substr($token, -4);
+     }
++
++    /**
++     * Only the installs of one app.
++     *
++     * A salon owner has both apps on one handset and a device row for each, so
++     * "every device this user has" is the wrong set for any notification that
++     * knows which app the recipient will be reading.
++     */
++    public function scopeForAppType($query, ?string $appType)
++    {
++        if ($appType === null) {
++            return $query;
++        }
++
++        return $query->where('app_type', $appType);
++    }
+ }
+diff --git a/backend/app/Providers/AppServiceProvider.php b/backend/app/Providers/AppServiceProvider.php
+index d65d597..e9d4b32 100644
+--- a/backend/app/Providers/AppServiceProvider.php
++++ b/backend/app/Providers/AppServiceProvider.php
+@@ -4,6 +4,9 @@
+ 
+ use Illuminate\Support\Facades\DB;
+ 
++use App\Services\Notifications\FcmAccessTokenProvider;
++use App\Services\Notifications\FcmCredentials;
++use App\Services\Notifications\FcmPushGateway;
+ use App\Services\Notifications\LogPushGateway;
+ use App\Services\Notifications\LogWhatsAppGateway;
+ use App\Services\Notifications\MetaCloudWhatsAppGateway;
+@@ -40,18 +43,29 @@ public function register(): void
+             };
+         });
+ 
+-        // Push notifications. `log` is the only driver that exists in this
+-        // phase, and it is the right answer in every environment right now: it
+-        // records what would have gone out and contacts nobody, so the app can
+-        // be built and every part of the pipeline exercised before a single
++        // Push notifications. `log` is the driver for every environment until a
++        // Firebase project exists: it records what would have gone out and
++        // contacts nobody, so the whole pipeline can be exercised before a single
+         // customer is disturbed by a real push.
+         //
+-        // A real gateway lands here, guarded on its own credentials, in exactly
+-        // the shape of the WhatsApp binding above ΓÇö an `fcm` branch that
+-        // requires the project id and key and falls back to this one otherwise.
+-        // Accepting the `fcm` value now and degrading to the log driver means
+-        // flipping the env var early cannot break every booking.
+-        $this->app->bind(PushGateway::class, fn () => new LogPushGateway());
++        // `fcm` is the real one, and unlike the payment gateways it does NOT
++        // fall back. Selecting a driver means the operator asked for a working
++        // send, so a missing service account is reported loudly ΓÇö by name, once,
++        // at the point the driver is resolved ΓÇö rather than silently downgrading
++        // to a log driver that reports every delivery as `sent` and so hides the
++        // misconfiguration behind a green ledger. `MissingFcmCredentials` names
++        // the variables that are absent and nothing else.
++        $this->app->bind(PushGateway::class, function () {
++            $driver = (string) config('services.push.driver', 'log');
++
++            if ($driver !== 'fcm') {
++                return new LogPushGateway();
++            }
++
++            $credentials = FcmCredentials::fromConfig();
++
++            return new FcmPushGateway($credentials, new FcmAccessTokenProvider($credentials));
++        });
+ 
+         // Razorpay for appointment advances. Falls back to the demo gateway
+         // whenever keys are missing, so a half-configured environment cannot
+diff --git a/backend/app/Services/AppointmentCheckInService.php b/backend/app/Services/AppointmentCheckInService.php
+index 30dc8be..1467352 100644
+--- a/backend/app/Services/AppointmentCheckInService.php
++++ b/backend/app/Services/AppointmentCheckInService.php
+@@ -8,6 +8,7 @@
+ use App\Models\Service;
+ use App\Models\ServiceProvider;
+ use App\Models\User;
++use App\Services\Notifications\NotificationService;
+ use Carbon\Carbon;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Str;
+@@ -34,6 +35,10 @@ class AppointmentCheckInService
+     /** Used when a service template has no duration recorded. */
+     public const SLOT_FALLBACK_MINUTES = 30;
+ 
++    public function __construct(private NotificationService $notifications)
++    {
++    }
++
+     /**
+      * Find the appointment behind a scanned QR token.
+      *
+@@ -320,7 +325,7 @@ public function collectPaymentAndComplete(
+         User $actor,
+         ?string $note = null
+     ): array {
+-        return DB::transaction(function () use ($appointment, $mode, $actor, $note) {
++        $result = DB::transaction(function () use ($appointment, $mode, $actor, $note) {
+             $bill = $this->bill($appointment);
+ 
+             if ($bill['balance_due'] > 0) {
+@@ -367,6 +372,18 @@ public function collectPaymentAndComplete(
+                 'new_balance' => $wallet['new_balance'],
+             ];
+         });
++
++        // After the commit, never inside it: the rating prompt goes out to a
++        // customer whose visit is really over, and a push queued against a
++        // transaction that later rolls back would be a lie. Keyed on the
++        // appointment so a re-tap on "collect" cannot produce a second prompt.
++        $this->notifications->appointmentCompleted(
++            $result['appointment'],
++            $result['appointment']->salon?->name ?? 'the salon',
++            'appointment_completed:'.$appointment->id,
++        );
++
++        return $result;
+     }
+ 
+     /**
+diff --git a/backend/app/Services/Notifications/NotificationService.php b/backend/app/Services/Notifications/NotificationService.php
+index aa75863..0eae825 100644
+--- a/backend/app/Services/Notifications/NotificationService.php
++++ b/backend/app/Services/Notifications/NotificationService.php
+@@ -5,31 +5,108 @@
+ use App\Jobs\SendPushNotificationJob;
+ use App\Models\Appointment;
+ use App\Models\Notification;
++use App\Models\Salon;
+ use App\Models\User;
+ use App\Models\WhatsAppMessage;
++use App\Support\Notifications\NotificationAction;
++use App\Support\Notifications\NotificationType;
+ use Illuminate\Support\Facades\Log;
+ 
+ /**
+  * One place to reach a customer.
+  *
+  * Every notification lands in the in-app inbox first ΓÇö that is the channel we
+- * actually control ΓÇö and is then mirrored to WhatsApp on a best-effort basis,
+- * with a push queued for the customer's registered phones. A failure on either
+- * mirror must never cost the customer their in-app notice, so both are wrapped
+- * and only logged.
++ * actually control ΓÇö and is then mirrored to WhatsApp and to the recipient's
++ * registered phones. A failure on either mirror must never cost the customer
++ * their in-app notice, so both are wrapped and only logged.
+  *
+  * Push is queued rather than sent inline because the caller is usually inside
+  * a database transaction, and a device lookup plus a provider call in the
+  * middle of one would hold a booking open for a network round trip.
++ *
++ * `send()` is the only way a notification gets written. Business methods below
++ * it exist so that the wording of a given event lives with the event, and so
++ * that a second call site for the same event cannot invent a second phrasing for
++ * it. Anything reaching for `Notification::create()` directly is bypassing this
++ * and will not get a push.
+  */
+ class NotificationService
+ {
+-    public const TYPE_SALON_CLOSED = 'salon_closure';
++    public const TYPE_SALON_CLOSED = NotificationType::SALON_CLOSURE;
+ 
+     public function __construct(private WhatsAppGateway $whatsapp)
+     {
+     }
+ 
++    /**
++     * The single entry point. Writes the inbox row and schedules the push.
++     *
++     * Returns null ΓÇö not an exception ΓÇö when there is nobody to notify. A
++     * walk-in booking has no customer account, and a cancellation of somebody
++     * else's appointment must not be able to take down the controller that
++     * happened to trigger it.
++     *
++     * @param  array<string, mixed>  $data  Structured payload. Stays small: this
++     *                                       is what ends up in the FCM data block.
++     * @param  string|null  $dedupeKey  Makes the write idempotent. A second
++     *                                  attempt with the same key returns null.
++     */
++    public function send(
++        User|string|null $recipient,
++        string $type,
++        string $title,
++        string $message,
++        array $data = [],
++        ?Appointment $appointment = null,
++        ?Salon $salon = null,
++        ?string $dedupeKey = null
++    ): ?Notification {
++        $userId = $recipient instanceof User ? $recipient->id : $recipient;
++
++        if (! $userId) {
++            return null;
++        }
++
++        // A payload that arrives without an action still routes sensibly: the
++        // type knows what it would normally open.
++        if (! isset($data['action'])) {
++            $default = NotificationType::defaultActionFor($type);
++
++            if ($default !== null) {
++                $data['action'] = $default;
++            }
++        }
++
++        $notification = Notification::createOnce([
++            'user_id' => $userId,
++            'type' => $type,
++            'title' => $title,
++            'message' => $message,
++            'data' => $data,
++            'related_appointment_id' => $appointment?->id,
++            'related_salon_id' => $salon?->id ?? $appointment?->salon_id,
++            'is_read' => false,
++        ], $dedupeKey);
++
++        // A dedupe collision is not a failure ΓÇö it means this exact notice has
++        // already gone out, which is the outcome the caller wanted.
++        if (! $notification) {
++            return null;
++        }
++
++        // Queued from here, rather than from each caller, so a new notification
++        // cannot be added without also being pushed.
++        $this->mirrorToPush($notification);
++
++        return $notification;
++    }
++
++    /*
++    |---------------------------------------------------------------------------
++    | Customer events
++    |---------------------------------------------------------------------------
++    */
++
+     /**
+      * Tell a customer their booking lost its day and they can move it for free.
+      */
+@@ -38,23 +115,23 @@ public function appointmentNeedsReschedule(
+         string $salonName,
+         string $dateLabel,
+         ?string $reason
+-    ): Notification {
++    ): ?Notification {
+         $because = $reason ? " ({$reason})" : '';
+ 
+-        $notification = $this->record(
+-            userId: $appointment->customer_id,
+-            type: self::TYPE_SALON_CLOSED,
++        $notification = $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::SALON_CLOSURE,
+             title: 'Your appointment needs a new time',
+             message: "{$salonName} is closed on {$dateLabel}{$because}. "
+                 . 'Your booking has been released and you can pick a new slot free of charge ΓÇö '
+                 . 'the amount you already paid carries over.',
+-            appointment: $appointment,
+             data: [
+-                'action' => 'reschedule_appointment',
++                'action' => NotificationAction::RESCHEDULE_APPOINTMENT,
+                 'appointment_id' => $appointment->id,
+                 'free_reschedule' => true,
+                 'deeplink' => $this->rescheduleDeeplink($appointment->id),
+-            ]
++            ],
++            appointment: $appointment,
+         );
+ 
+         if ($notification) {
+@@ -66,70 +143,245 @@ public function appointmentNeedsReschedule(
+             ]);
+         }
+ 
+-        return $notification ?? new Notification();
++        return $notification;
++    }
++
++    /**
++     * The booking exists but the advance has not landed yet.
++     *
++     * Worth a push on its own: without it the customer's only sign the booking
++     * took is a screen they have to remember to go back to.
++     */
++    public function bookingAwaitingPayment(Appointment $appointment, string $salonName, float $advanceDue): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::BOOKING_CREATED,
++            title: 'Booking created ΓÇö complete the payment',
++            message: "Your booking at {$salonName} is held. Pay ".config('app.currency_symbol', 'Γé╣')
++                .number_format($advanceDue, 2).' to confirm it.',
++            data: [
++                'action' => NotificationAction::PAY_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'advance_due' => $advanceDue,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++        );
++    }
++
++    /**
++     * The advance cleared, so the salon has a confirmed booking.
++     */
++    public function bookingConfirmed(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::BOOKING_CONFIRMED,
++            title: 'Booking confirmed',
++            message: "Your booking at {$salonName} on {$dateLabel} is confirmed.",
++            data: [
++                'action' => NotificationAction::VIEW_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++        );
++    }
++
++    /**
++     * The customer cancelled their own appointment.
++     */
++    public function bookingCancelled(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::BOOKING_CANCELLED,
++            title: 'Booking cancelled',
++            message: "Your booking at {$salonName} on {$dateLabel} has been cancelled.",
++            data: [
++                'action' => NotificationAction::VIEW_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++        );
++    }
++
++    /**
++     * The customer moved their own appointment. The counterpart to the salon
++     * closing a day: the booking still stands, at a new time.
++     */
++    public function bookingRescheduled(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::BOOKING_RESCHEDULED,
++            title: 'Booking rescheduled',
++            message: "Your booking at {$salonName} has moved to {$dateLabel}.",
++            data: [
++                'action' => NotificationAction::VIEW_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++        );
++    }
++
++    /**
++     * A reminder ahead of an appointment.
++     *
++     * Idempotent by construction: the caller passes a dedupe key built from the
++     * appointment and the reminder window, so a scheduler that runs twice, or
++     * two workers that race, still produce exactly one reminder.
++     */
++    public function appointmentReminder(
++        Appointment $appointment,
++        string $salonName,
++        string $dateLabel,
++        string $dedupeKey
++    ): ?Notification {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::APPOINTMENT_REMINDER,
++            title: 'Reminder: your appointment is coming up',
++            message: "You are booked at {$salonName} on {$dateLabel}.",
++            data: [
++                'action' => NotificationAction::VIEW_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++            dedupeKey: $dedupeKey,
++        );
+     }
+ 
++    /**
++     * An appointment passed its window untouched and was swept to no-show.
++     *
++     * Idempotent, because the sweep is a scheduled command and a day where it
++     * runs twice must not tell a customer they missed two visits.
++     */
++    public function appointmentMarkedNoShow(Appointment $appointment, string $salonName, ?string $dedupeKey = null): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::APPOINTMENT_NO_SHOW,
++            title: 'Your appointment was missed',
++            message: "The booking at {$salonName} was marked as missed because nobody checked in.",
++            data: [
++                'action' => NotificationAction::VIEW_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++            dedupeKey: $dedupeKey,
++        );
++    }
++
++    /**
++     * The salon finished the appointment. The prompt for a rating follows.
++     *
++     * Takes a dedupe key because "collect payment and complete" is reachable
++     * twice for one visit: a provider taps it, the network drops, they tap again.
++     * Without the key the customer is asked to rate the same visit twice, which
++     * reads as a bug in the salon rather than in the network.
++     */
++    public function appointmentCompleted(Appointment $appointment, string $salonName, ?string $dedupeKey = null): ?Notification
++    {
++        return $this->send(
++            recipient: $appointment->customer_id,
++            type: NotificationType::APPOINTMENT_COMPLETED,
++            title: 'How was your visit?',
++            message: "Your appointment at {$salonName} is complete. Rate your experience.",
++            data: [
++                'action' => NotificationAction::RATE_APPOINTMENT,
++                'appointment_id' => $appointment->id,
++                'deeplink' => $this->appointmentDeeplink($appointment->id),
++            ],
++            appointment: $appointment,
++            dedupeKey: $dedupeKey,
++        );
++    }
++
++    /*
++    |---------------------------------------------------------------------------
++    | Partner events
++    |---------------------------------------------------------------------------
++    */
++
+     /**
+      * Alert a service provider that a customer rescheduled their appointment,
+      * freeing up this slot.
+      */
+-    public function providerAppointmentRescheduled(Appointment $appointment): Notification
++    public function providerAppointmentRescheduled(Appointment $appointment): ?Notification
+     {
+         $provider = $appointment->appointedProvider;
++
+         if (! $provider || ! $provider->user_id) {
+-            return new Notification();
++            return null;
+         }
+ 
+-        $customerName = $appointment->customer ? $appointment->customer->name : $appointment->walk_in_customer_name;
+-        $dateLabel = \Carbon\Carbon::parse($appointment->appointment_date)->format('M d, Y') . ' at ' . \Carbon\Carbon::parse($appointment->start_time)->format('h:i A');
++        $customerName = $appointment->customer?->name ?? $appointment->walk_in_customer_name;
++        $dateLabel = $this->dateTimeLabel($appointment);
+ 
+-        return $this->record(
+-            userId: $provider->user_id,
+-            type: 'general', // Using 'general' as a fallback, or could use 'cancellation'
++        return $this->send(
++            recipient: $provider->user_id,
++            type: NotificationType::PROVIDER_APPOINTMENT_RESCHEDULED,
+             title: 'Appointment Rescheduled',
+             message: "Your appointment with {$customerName} on {$dateLabel} has been rescheduled by the customer.",
+-            appointment: $appointment,
+             data: [
+-                'action' => 'appointment_rescheduled',
++                'action' => NotificationAction::VIEW_APPOINTMENT,
+                 'appointment_id' => $appointment->id,
+-            ]
+-        ) ?? new Notification();
++            ],
++            appointment: $appointment,
++        );
+     }
+ 
+     /**
+-     * Write an in-app notification. Walk-in bookings have no customer account,
+-     * so there is nobody to notify ΓÇö those are the salon's phone call to make.
++     * A customer booked with this salon. Addressed to the provider who will
++     * serve it where one was chosen, and to the salon owner otherwise ΓÇö the
++     * person who would otherwise find out by opening the app.
+      */
+-    private function record(
+-        ?string $userId,
+-        string $type,
+-        string $title,
+-        string $message,
+-        ?Appointment $appointment = null,
+-        array $data = []
+-    ): ?Notification {
+-        if (! $userId) {
+-            return null;
++    public function notifySalonOfNewBooking(Appointment $appointment, string $salonName, string $dateLabel): void
++    {
++        $recipients = [];
++
++        $providerId = $appointment->appointedProvider?->user_id;
++
++        if ($providerId) {
++            $recipients[] = $providerId;
+         }
+ 
+-        $notification = Notification::create([
+-            'user_id' => $userId,
+-            'type' => $type,
+-            'title' => $title,
+-            'message' => $message,
+-            'data' => $data,
+-            'related_appointment_id' => $appointment?->id,
+-            'related_salon_id' => $appointment?->salon_id,
+-            'is_read' => false,
+-        ]);
++        $adminId = $appointment->salon?->admin_id;
+ 
+-        // Queued from here, rather than from each caller, so a new notification
+-        // cannot be added without also being pushed.
+-        $this->mirrorToPush($notification);
++        if ($adminId && ! in_array($adminId, $recipients, true)) {
++            $recipients[] = $adminId;
++        }
+ 
+-        return $notification;
++        $customerName = $appointment->customer?->name ?? $appointment->walk_in_customer_name;
++
++        foreach (array_unique($recipients) as $recipientId) {
++            $this->send(
++                recipient: $recipientId,
++                type: NotificationType::NEW_BOOKING,
++                title: 'New booking',
++                message: "{$customerName} booked {$dateLabel} at {$salonName}.",
++                data: [
++                    'action' => NotificationAction::VIEW_APPOINTMENT,
++                    'appointment_id' => $appointment->id,
++                ],
++                appointment: $appointment,
++            );
++        }
+     }
+ 
++    /*
++    |---------------------------------------------------------------------------
++    | Mirrors
++    |---------------------------------------------------------------------------
++    */
++
+     /**
+      * Queue the push mirror. Never throws: a notification run for a whole day of
+      * bookings must not stop because one device could not be registered.
+@@ -185,10 +437,17 @@ private function mirrorToWhatsApp(Appointment $appointment, array $payload): voi
+         }
+     }
+ 
++    /*
++    |---------------------------------------------------------------------------
++    | Helpers
++    |---------------------------------------------------------------------------
++    */
++
+     private function phoneFor(Appointment $appointment): ?string
+     {
+         if ($appointment->customer_id) {
+             $phone = User::whereKey($appointment->customer_id)->value('phone');
++
+             if ($phone) {
+                 return $phone;
+             }
+@@ -201,9 +460,31 @@ private function phoneFor(Appointment $appointment): ?string
+      * The "free reschedule link" a customer taps from WhatsApp or the inbox.
+      */
+     private function rescheduleDeeplink(string $appointmentId): string
++    {
++        return $this->deeplink('appointments/'.$appointmentId.'/reschedule');
++    }
++
++    private function appointmentDeeplink(string $appointmentId): string
++    {
++        return $this->deeplink('appointments/'.$appointmentId);
++    }
++
++    private function deeplink(string $path): string
+     {
+         $base = rtrim((string) config('services.customer_app.deeplink_base'), '/');
+ 
+-        return "{$base}/appointments/{$appointmentId}/reschedule";
++        return $base.'/'.$path;
++    }
++
++    /**
++     * "Sep 26, 2026 at 4:30 PM", in one place, because six of the messages
++     * above need it and a customer reading two of them in a week should not see
++     * two different formats.
++     */
++    private function dateTimeLabel(Appointment $appointment): string
++    {
++        return \Carbon\Carbon::parse($appointment->appointment_date)->format('M d, Y')
++            .' at '
++            .\Carbon\Carbon::parse($appointment->start_time)->format('h:i A');
+     }
+ }
+diff --git a/backend/app/Services/Notifications/PushPayload.php b/backend/app/Services/Notifications/PushPayload.php
+index 33d3e7d..c5a2c03 100644
+--- a/backend/app/Services/Notifications/PushPayload.php
++++ b/backend/app/Services/Notifications/PushPayload.php
+@@ -2,6 +2,8 @@
+ 
+ namespace App\Services\Notifications;
+ 
++use App\Support\Notifications\NotificationAction;
++
+ /**
+  * Everything a gateway needs to build a push, and nothing that belongs to a
+  * particular provider.
+@@ -23,6 +25,7 @@ public function __construct(
+         public readonly ?string $action = null,
+         public readonly ?string $appointmentId = null,
+         public readonly ?string $salonId = null,
++        public readonly ?string $imageUrl = null,
+     ) {
+     }
+ 
+@@ -36,9 +39,10 @@ public static function fromNotification(\App\Models\Notification $notification):
+             title: (string) $notification->title,
+             message: (string) $notification->message,
+             data: $data,
+-            action: isset($data['action']) ? (string) $data['action'] : null,
++            action: $notification->action,
+             appointmentId: $notification->related_appointment_id,
+             salonId: $notification->related_salon_id,
++            imageUrl: isset($data['image_url']) ? (string) $data['image_url'] : null,
+         );
+     }
+ 
+@@ -55,10 +59,16 @@ public function deeplink(): ?string
+      */
+     public function toNotificationArray(): array
+     {
+-        return [
++        $block = [
+             'title' => $this->title,
+             'body' => $this->message,
+         ];
++
++        if ($this->imageUrl !== null && $this->imageUrl !== '') {
++            $block['image'] = $this->imageUrl;
++        }
++
++        return $block;
+     }
+ 
+     /**
+@@ -92,9 +102,71 @@ public function toDataArray(): array
+             }
+         }
+ 
++        // The generic pair the app's action router reads, so routing is one
++        // lookup on `action` rather than a field-name guess per action type.
++        // Populated from the action's declared entity, and skipped entirely when
++        // the action points at nothing.
++        $entityType = $this->entityType();
++        $entityId = $this->entityId();
++
++        if ($entityType !== null) {
++            $data['entity_type'] = $entityType;
++        }
++
++        if ($entityId !== null) {
++            $data['entity_id'] = $entityId;
++        }
++
+         return $data;
+     }
+ 
++    /**
++     * How large this payload is, in bytes, once encoded.
++     *
++     * Measured here because the rule belongs to the provider but the arithmetic
++     * belongs to the payload. Bytes rather than characters, because the limit is
++     * in bytes and a message of emoji and Indian names can pass a character count
++     * and still be rejected.
++     */
++    public function byteSize(): int
++    {
++        return strlen((string) json_encode([
++            'notification' => $this->toNotificationArray(),
++            'data' => $this->toDataArray(),
++        ]));
++    }
++
++    public function entityType(): ?string
++    {
++        return NotificationAction::entityTypeFor($this->action);
++    }
++
++    public function entityId(): ?string
++    {
++        $key = NotificationAction::entityKeyFor($this->action);
++
++        if ($key === null) {
++            return null;
++        }
++
++        // The explicit top-level property wins over anything sitting in `data`,
++        // because it came from a real column rather than from a payload.
++        $candidates = [
++            'appointment_id' => $this->appointmentId,
++            'salon_id' => $this->salonId,
++        ];
++
++        if (isset($candidates[$key]) && $candidates[$key] !== null) {
++            return (string) $candidates[$key];
++        }
++
++        if (isset($this->data[$key]) && $this->data[$key] !== null && $this->data[$key] !== '') {
++            return $this->stringify($this->data[$key]);
++        }
++
++        return null;
++    }
++
+     private function stringify(mixed $value): string
+     {
+         if (is_bool($value)) {
+diff --git a/backend/app/Services/Notifications/PushResult.php b/backend/app/Services/Notifications/PushResult.php
+index 84ba896..6ebf1ec 100644
+--- a/backend/app/Services/Notifications/PushResult.php
++++ b/backend/app/Services/Notifications/PushResult.php
+@@ -14,6 +14,11 @@
+  * error, and a gateway that swallowed that would leave the app pushing into a
+  * void forever. A gateway that knows, it says so here, and the job signs the
+  * device off instead of guessing.
++ *
++ * `retryable` draws the line the retry policy runs on. A device that was merely
++ * unreachable is left `pending` in the ledger, so a support question has an
++ * accurate answer. A device whose token the provider no longer recognises is
++ * left `failed` and signed off, because asking again will not change it.
+  */
+ final class PushResult
+ {
+@@ -23,6 +28,7 @@ public function __construct(
+         public readonly ?string $messageId = null,
+         public readonly ?string $failureReason = null,
+         public readonly bool $deactivateDevice = false,
++        public readonly bool $retryable = false,
+     ) {
+     }
+ 
+@@ -35,13 +41,24 @@ public static function accepted(string $provider, ?string $messageId = null): se
+         );
+     }
+ 
+-    public static function failed(string $provider, string $failureReason, bool $deactivateDevice = false): self
+-    {
++    /**
++     * The provider answered, and the answer was no.
++     *
++     * @param  bool  $deactivateDevice  The token is dead; stop using it.
++     * @param  bool  $retryable  The failure was circumstantial, not the token's fault.
++     */
++    public static function failed(
++        string $provider,
++        string $failureReason,
++        bool $deactivateDevice = false,
++        bool $retryable = false,
++    ): self {
+         return new self(
+             accepted: false,
+             provider: $provider,
+             failureReason: $failureReason,
+             deactivateDevice: $deactivateDevice,
++            retryable: $retryable,
+         );
+     }
+ }
+diff --git a/backend/config/services.php b/backend/config/services.php
+index 1b3bfa5..4d379f8 100644
+--- a/backend/config/services.php
++++ b/backend/config/services.php
+@@ -74,11 +74,20 @@
+     | whole pipeline ΓÇö notification, queue, device lookup, delivery ledger ΓÇö so
+     | the backend can be built and tested ahead of the app.
+     |
+-    | The `fcm` values below are read by nothing yet. They are here so that
+-    | switching drivers on day two is filling in four values rather than
+-    | designing a config block while a provider is waiting. No credentials are
+-    | committed, and the app must not need them: an environment with none of
+-    | them set keeps working on the log driver.
++    | Set it to `fcm` once a Firebase project exists. Unlike the payment and
++    | WhatsApp drivers, `fcm` does not fall back to the log driver when it is
++    | unconfigured: it raises MissingFcmCredentials naming the variables that
++    | are missing. Quietly degrading would report every delivery as `sent` and
++    | make a broken server look like a working one.
++    |
++    | Credentials come from either an inline PEM (FCM_PRIVATE_KEY, whose newlines
++    | arrive as literal \n and are normalised on read) or a service-account JSON
++    | file that lives on the server and never in the repository
++    | (FCM_CREDENTIALS_PATH ΓÇö project id and client email are read from the same
++    | file, so a server configures one path rather than four agreeing values).
++    |
++    | No credentials are committed, and the app must not need them: an
++    | environment with none of them set keeps working on the log driver.
+     |
+     */
+     'push' => [
+@@ -90,7 +99,15 @@
+             // leave this empty. Never commit either one.
+             'private_key' => env('FCM_PRIVATE_KEY'),
+             'credentials_path' => env('FCM_CREDENTIALS_PATH'),
++            // Must exist as a channel on the Android app or FCM drops the
++            // notification instead of displaying it. The apps create it at
++            // startup from the same id.
++            'channel_id' => env('FCM_CHANNEL_ID', 'bookalook_notifications'),
+         ],
++
++        // How early, in hours, the scheduler tells a customer their appointment
++        // is coming. 0 switches reminders off without touching the schedule.
++        'appointment_reminder_lead_hours' => env('APPOINTMENT_REMINDER_LEAD_HOURS', 3),
+     ],
+ 
+     'customer_app' => [
+diff --git a/backend/routes/api.php b/backend/routes/api.php
+index 555421e..fc05f1d 100644
+--- a/backend/routes/api.php
++++ b/backend/routes/api.php
+@@ -75,9 +75,19 @@
+         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markAllRead']);
+         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markRead']);
+ 
+-        // Push notification devices
++        // Push notification devices. register/unregister are the two the app
++        // calls on launch and sign-out; activity is the cheap "still here" on
++        // open, and the index is for a settings screen that shows what this
++        // account has registered.
++        Route::get('/devices', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'index']);
+         Route::post('/devices/register', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'register']);
+         Route::post('/devices/unregister', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'unregister']);
++        Route::post('/devices/activity', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'activity']);
++
++        // Per-user notification preferences. This is what the app's existing
++        // Push Notifications switch now talks to instead of SharedPreferences.
++        Route::get('/notifications/preferences', [\App\Http\Controllers\Api\Customer\NotificationPreferenceController::class, 'show']);
++        Route::put('/notifications/preferences', [\App\Http\Controllers\Api\Customer\NotificationPreferenceController::class, 'update']);
+     });
+ });
+ 
+@@ -241,6 +251,17 @@
+         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markAllRead']);
+         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markRead']);
+ 
++        // Push notification devices, and the preferences behind them. The Partner
++        // App gets its own set of paths rather than sharing the customer's, so
++        // the two apps can evolve separately and so a partner's device list is
++        // never served from a customer endpoint.
++        Route::get('/devices', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'index']);
++        Route::post('/devices/register', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'register']);
++        Route::post('/devices/unregister', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'unregister']);
++        Route::post('/devices/activity', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'activity']);
++        Route::get('/notifications/preferences', [\App\Http\Controllers\Api\Partner\NotificationPreferenceController::class, 'show']);
++        Route::put('/notifications/preferences', [\App\Http\Controllers\Api\Partner\NotificationPreferenceController::class, 'update']);
++
+         // Renewal and the wallet that pays for it.
+         Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
+         Route::get('/salons/{salon_id}/subscription', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getSubscription']);
+diff --git a/backend/routes/console.php b/backend/routes/console.php
+index d39bff7..9a7a796 100644
+--- a/backend/routes/console.php
++++ b/backend/routes/console.php
+@@ -25,3 +25,11 @@
+ // Shortly after midnight, transition any untouched appointments from the previous
+ // day into a no-show state.
+ Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();
++
++// Appointment reminders. Every fifteen minutes, not once an hour: the command
++// recomputes its own window from the data on each pass, so it does not care
++// when it runs, and running it often is what makes a missed tick cost nothing.
++// It is idempotent through a dedupe key, so running it twice costs nothing
++// either. withoutOverlapping because two passes at once would be two schedulers
++// racing over the same window.
++Schedule::command('app:send-appointment-reminders')->everyFifteenMinutes()->withoutOverlapping();
