@@ -1443,6 +1443,159 @@ html {
   padding: 0 1.25rem 1.2rem;
 }
 
+/* ---------- Reviews (three horizontal marquee lanes) ---------- */
+.blk-reviews {
+  background: #F5EFE3;
+  padding: 5rem 0 5.5rem;
+  overflow: hidden;
+}
+.blk-reviews__stage {
+  margin-top: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+/* A lane is the clipping window; padding leaves room for the card hover lift. */
+.blk-reviews__lane {
+  overflow: hidden;
+  padding: 0.85rem 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  animation: blk-lane-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.blk-reviews__track {
+  display: flex;
+  width: max-content;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.blk-reviews__track--right {
+  animation-name: blk-drift-right;
+}
+.blk-reviews__track--left {
+  animation-name: blk-drift-left;
+}
+
+/* Trailing padding closes the gap between the last card of a set and the first
+   card of its duplicate, so -50% lands exactly on the set boundary. */
+.blk-reviews__set {
+  display: flex;
+  gap: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.blk-reviews__card {
+  width: 340px;
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border-radius: 18px;
+  padding: 1.5rem 1.4rem 1.35rem;
+  border: 1px solid rgba(201, 166, 75, 0.25);
+  box-shadow: 0 10px 26px rgba(60, 19, 97, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.blk-reviews__lane:hover .blk-reviews__card {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 40px rgba(60, 19, 97, 0.13);
+}
+.blk-reviews__role {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: #A8842E;
+}
+.blk-reviews__stars {
+  display: block;
+  margin: 0.55rem 0 0.8rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  color: rgba(60, 19, 97, 0.18);
+}
+.blk-reviews__stars .is-on {
+  color: #E8A824;
+}
+.blk-reviews__text {
+  flex: 1;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #4B3A5E;
+}
+.blk-reviews__by {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(201, 166, 75, 0.2);
+}
+.blk-reviews__avatar {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3C1361, #5B2588);
+  color: #FFF9E8;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.blk-reviews__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.blk-reviews__name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 0.93rem;
+  color: #3C1361;
+}
+.blk-reviews__meta {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.8rem;
+  color: #7C7290;
+}
+
+@keyframes blk-drift-right {
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes blk-drift-left {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+@keyframes blk-lane-in {
+  from { opacity: 0; transform: translate3d(0, 26px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Reduced motion: drop the drift, let each lane scroll by hand instead. */
+@media (prefers-reduced-motion: reduce) {
+  .blk-reviews__lane {
+    overflow-x: auto;
+    animation: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .blk-reviews__track {
+    animation: none;
+    transform: none;
+  }
+  .blk-reviews__set[aria-hidden='true'] {
+    display: none;
+  }
+}
+
 /* ---------- Footer ---------- */
 .blk-footer {
   background: #1C1C1C;
@@ -1610,8 +1763,26 @@ html {
   .blk-salons,
   .blk-partnership,
   .blk-why,
-  .blk-faq {
+  .blk-faq,
+  .blk-reviews {
     padding: 4rem 0;
+  }
+  .blk-reviews__stage {
+    margin-top: 2.4rem;
+    gap: 1.1rem;
+  }
+  .blk-reviews__card {
+    width: 278px;
+    flex: 0 0 278px;
+    padding: 1.3rem 1.2rem 1.2rem;
+  }
+  .blk-reviews__set {
+    gap: 1rem;
+    padding-right: 1rem;
+  }
+  .blk-reviews__lane {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
   }
 
   /* Customer journey: horizontal row → vertical stack */
@@ -1716,7 +1887,8 @@ html {
 .blk-salons,
 .blk-partnership,
 .blk-why,
-.blk-faq {
+.blk-faq,
+.blk-reviews {
   scroll-margin-top: 96px;
 }
 .enquiry-section {
@@ -1731,6 +1903,7 @@ html {
   .blk-partnership,
   .blk-why,
   .blk-faq,
+  .blk-reviews,
   .enquiry-section {
     scroll-margin-top: 120px;
   }
