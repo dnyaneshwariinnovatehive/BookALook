@@ -52,4 +52,19 @@ class NotificationDelivery extends Model
     {
         return $query->where('status', self::STATUS_FAILED);
     }
+
+    /**
+     * The attempt count after one more try, without clobbering the attempts
+     * already recorded.
+     *
+     * Shared by the first send and every retry so the number means the same
+     * thing in both places. A device that was rate-limited on the original send
+     * and then on two retries should read 3, not 1: the field exists to answer
+     * "how hard did we try", and a retry that overwrote it with 1 would make a
+     * repeated failure look like a first one.
+     */
+    public function countAttempt(int $times = 1): int
+    {
+        return max(1, (int) $this->attempt_count) + max(1, $times);
+    }
 }

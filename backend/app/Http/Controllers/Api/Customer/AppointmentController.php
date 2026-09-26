@@ -273,6 +273,15 @@ class AppointmentController extends Controller
             ]);
         }
 
+        // The slot is held but the money has not moved. Saying so is the only
+        // sign the customer gets that the booking exists at all, and without it
+        // the app has to be reopened to find out.
+        $this->notifications->bookingAwaitingPayment(
+            $appointment,
+            $appointment->salon?->name ?? 'the salon',
+            (float) $payableNow,
+        );
+
         // The gateway call is deliberately outside the transaction: it is a
         // network round trip, and a slow provider must not hold a write lock.
         try {
@@ -409,6 +418,11 @@ class AppointmentController extends Controller
 
     /**
      * Turn a paid hold into a confirmed booking and retire the cart behind it.
+     *
+     * The single place a booking becomes real, and therefore the single place the
+     * "you are booked" notices come from. Both confirm paths — a free booking and
+     * a paid one — land here, so there is no way for one of them to confirm
+     * silently.
      */
     private function settleBooking(Appointment $appointment, ?Cart $cart): void
     {
@@ -424,6 +438,16 @@ class AppointmentController extends Controller
                 $cart->save();
             }
         });
+
+        $salonName = $appointment->salon?->name ?? 'the salon';
+        $dateLabel = $this->dateTimeLabel($appointment);
+
+        $this->notifications->bookingConfirmed($appointment, $salonName, $dateLabel);
+
+        // The salon side of the same event. The provider is told the slot is
+        // theirs; the owner is told the salon has a booking, because otherwise
+        // they find out by opening the app.
+        $this->notifications->notifySalonOfNewBooking($appointment, $salonName, $dateLabel);
     }
 
     /**
@@ -623,6 +647,16 @@ class AppointmentController extends Controller
 
         $date = Carbon::parse($appointment->appointment_date)->format('Y-m-d');
 
+        // After the commit, so the notification describes a booking that exists.
+        // The customer gets the cancellation in their inbox; the provider whose
+        // slot just freed up is told separately, because they are the one who
+        // will want to sell that time again.
+        $this->notifications->bookingCancelled(
+            $appointment,
+            $appointment->salon?->name ?? 'the salon',
+            $this->dateTimeLabel($appointment),
+        );
+
         return response()->json([
             'message' => 'Appointment cancelled successfully.',
             'refund' => $refund,
@@ -808,6 +842,16 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Failed to reschedule appointment.', 'error' => $e->getMessage()], 500);
         }
 
+        // The provider notice went out inside the transaction above (the job's
+        // afterCommit handles the ordering). The customer's does not, because
+        // it has to describe the *replacement* row, and that row only exists once
+        // this has committed.
+        $this->notifications->bookingRescheduled(
+            $replacement,
+            $replacement->salon?->name ?? 'the salon',
+            $this->dateTimeLabel($replacement),
+        );
+
         return response()->json([
             'message' => $window['free_reschedule']
                 ? 'Appointment rescheduled free of cost.'
@@ -815,7 +859,6 @@ class AppointmentController extends Controller
             'appointment' => $this->presentBooking($replacement->fresh($this->bookingRelations())),
         ]);
     }
-
     /**
      * Generate QR code for same-day appointment.
      */
@@ -1040,6 +1083,23 @@ class AppointmentController extends Controller
 
             $remaining -= $slice;
         }
+    }
+
+    /**
+     * "Sep 26, 2026 at 4:30 PM".
+     *
+     * One place, because a confirmation, a cancellation and a reschedule all
+     * quote the same booking and a customer who reads two of them in a week
+     * should not see two formats. The service has the same helper; this copy
+     * exists so the controller can label an appointment it is only responding
+     * to, without the service having to expose a formatting method for every
+     * caller that wants to print something.
+     */
+    private function dateTimeLabel(Appointment $appointment): string
+    {
+        return Carbon::parse($appointment->appointment_date)->format('M d, Y')
+            .' at '
+            .Carbon::parse($appointment->start_time)->format('h:i A');
     }
 
     /**

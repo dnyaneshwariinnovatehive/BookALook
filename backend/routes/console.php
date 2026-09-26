@@ -25,3 +25,11 @@ Schedule::command('app:generate-payouts')->dailyAt('04:00')->withoutOverlapping(
 // Shortly after midnight, transition any untouched appointments from the previous
 // day into a no-show state.
 Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();
+
+// Appointment reminders. Every fifteen minutes, not once an hour: the command
+// recomputes its own window from the data on each pass, so it does not care
+// when it runs, and running it often is what makes a missed tick cost nothing.
+// It is idempotent through a dedupe key, so running it twice costs nothing
+// either. withoutOverlapping because two passes at once would be two schedulers
+// racing over the same window.
+Schedule::command('app:send-appointment-reminders')->everyFifteenMinutes()->withoutOverlapping();

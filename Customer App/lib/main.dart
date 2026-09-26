@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/splash_screen.dart';
 import 'services/deep_link_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 
 // Global notifier for theme mode
@@ -24,6 +25,10 @@ Future<void> main() async {
   // Started before the first frame so a QR scan that launched the app is
   // already waiting to be routed rather than arriving too late to matter.
   await DeepLinkService.instance.start();
+
+  // Initialize push notification foundation
+  await PushNotificationService().init();
+
   runApp(MyApp());
 }
 

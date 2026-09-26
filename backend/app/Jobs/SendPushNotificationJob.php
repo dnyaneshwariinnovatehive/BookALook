@@ -4,10 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Notification;
 use App\Models\NotificationDelivery;
+use App\Models\NotificationPreference;
 use App\Models\UserDevice;
 use App\Services\Notifications\PushGateway;
 use App\Services\Notifications\PushPayload;
 use App\Services\Notifications\PushResult;
+use App\Support\Notifications\NotificationType;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -79,10 +81,22 @@ class SendPushNotificationJob implements ShouldQueue
             return;
         }
 
-        $devices = UserDevice::query()
-            ->where('user_id', $notification->user_id)
-            ->pushable()
-            ->get();
+        // The inbox row is the record of what happened and is never withdrawn.
+        // The push is the mirror, and a user who asked not to be pushed has
+        // asked for exactly that. Transactional notices are exempt inside
+        // NotificationPreference::allows().
+        if (! NotificationPreference::forUser($notification->user_id, $this->appTypeFor($notification))
+            ->allows((string) $notification->type)) {
+            Log::info('Recipient has push switched off for this kind of notification', [
+                'notification_id' => $notification->id,
+                'user_id' => $notification->user_id,
+                'type' => $notification->type,
+            ]);
+
+            return;
+        }
+
+        $devices = $this->devicesFor($notification);
 
         if ($devices->isEmpty()) {
             Log::info('No active device for this notification; it stays in the inbox only', [
@@ -102,8 +116,37 @@ class SendPushNotificationJob implements ShouldQueue
         $results = $gateway->send($devices, $payload);
 
         foreach ($devices as $device) {
-            $this->record($device, $payload, $results[$device->id] ?? null);
+            $delivery = $this->record($device, $payload, $results[$device->id] ?? null);
+
+            // `pending` is not a conclusion, it is a note to come back. Without
+            // this the row would sit at pending forever and the retries property
+            // on PushResult would be a lie: a rate-limited push would be
+            // reported as retried when in fact nobody ever tried it again.
+            if ($delivery && $delivery->status === NotificationDelivery::STATUS_PENDING) {
+                RetryPendingPushDeliveryJob::dispatch($delivery->id);
+            }
         }
+    }
+
+    /**
+     * Which app the recipient will be reading this in, and therefore whose
+     * preferences apply and which install to address.
+     */
+    private function appTypeFor(Notification $notification): string
+    {
+        return NotificationType::audienceAppFor((string) $notification->type) ?? UserDevice::APP_TYPE_CUSTOMER;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, UserDevice>
+     */
+    private function devicesFor(Notification $notification)
+    {
+        return UserDevice::query()
+            ->where('user_id', $notification->user_id)
+            ->forAppType(NotificationType::audienceAppFor((string) $notification->type))
+            ->pushable()
+            ->get();
     }
 
     /**
@@ -128,10 +171,7 @@ class SendPushNotificationJob implements ShouldQueue
             'error' => $reason,
         ]);
 
-        $devices = UserDevice::query()
-            ->where('user_id', $notification->user_id)
-            ->pushable()
-            ->get();
+        $devices = $this->devicesFor($notification);
 
         foreach ($devices as $device) {
             // An earlier attempt may have reached this device before a later
@@ -153,23 +193,40 @@ class SendPushNotificationJob implements ShouldQueue
 
     /**
      * One row in the ledger per device, whatever the outcome.
+     *
+     * Three outcomes, three meanings. `sent` is a provider that accepted the
+     * push. `failed` is a definitive no — the token is dead, or the request will
+     * keep being rejected the same way. `pending` is a maybe: a rate limit or a
+     * provider outage, where nothing about this device is wrong and the push
+     * simply has not gone out yet. Collapsing the last two into `failed` would
+     * mean a support answer of "we tried and it failed" for something that was
+     * never actually tried properly.
      */
-    private function record(UserDevice $device, PushPayload $payload, ?PushResult $result): void
+    private function record(UserDevice $device, PushPayload $payload, ?PushResult $result): NotificationDelivery
     {
         $accepted = (bool) $result?->accepted;
+        $retryable = (bool) ($result?->retryable ?? false);
 
-        NotificationDelivery::create([
+        $status = match (true) {
+            $accepted => NotificationDelivery::STATUS_SENT,
+            $retryable => NotificationDelivery::STATUS_PENDING,
+            default => NotificationDelivery::STATUS_FAILED,
+        };
+
+        $delivery = NotificationDelivery::create([
             'notification_id' => $payload->notificationId,
             'user_device_id' => $device->id,
             'channel' => NotificationDelivery::CHANNEL_PUSH,
-            'status' => $accepted ? NotificationDelivery::STATUS_SENT : NotificationDelivery::STATUS_FAILED,
+            'status' => $status,
             'provider' => $result?->provider ?? 'unknown',
             'destination' => $device->maskedToken() ?? 'unknown',
             'provider_message_id' => $result?->messageId,
             'attempt_count' => max(1, $this->attempts()),
-            'failure_reason' => $accepted ? null : ($result?->failureReason ?? 'The push gateway returned no result for this device.'),
+            'failure_reason' => $accepted
+                ? null
+                : ($result?->failureReason ?? 'The push gateway returned no result for this device.'),
             'sent_at' => $accepted ? now() : null,
-            'failed_at' => $accepted ? null : now(),
+            'failed_at' => ($status === NotificationDelivery::STATUS_FAILED) ? now() : null,
         ]);
 
         // A provider that recognises a dead token is handing back an answer
@@ -184,5 +241,7 @@ class SendPushNotificationJob implements ShouldQueue
                 'user_id' => $device->user_id,
             ]);
         }
+
+        return $delivery;
     }
 }

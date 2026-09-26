@@ -7,6 +7,7 @@ import '../services/salon_access_api.dart';
 import '../theme/app_theme.dart';
 import 'dashboard/more/upgrade_plan_screen.dart';
 import 'phone_screen.dart';
+import '../services/push_notification_service.dart';
 
 /// Shown in place of the whole app when the salon has no usable plan.
 ///
@@ -52,6 +53,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
+    await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 

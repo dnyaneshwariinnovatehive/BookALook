@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'location_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'push_notification_service.dart';
 
 class AuthService {
   static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
@@ -45,6 +46,7 @@ class AuthService {
         final data = jsonDecode(response.body);
         if (data.containsKey('access_token')) {
           await _saveToken(data['access_token']);
+          PushNotificationService().registerDevice();
           return true; // Authenticated
         } else if (data['requires_registration'] == true) {
           return 'requires_registration';
@@ -94,6 +96,7 @@ class AuthService {
         final data = jsonDecode(response.body);
         if (data.containsKey('access_token')) {
           await _saveToken(data['access_token']);
+          PushNotificationService().registerDevice();
           return true;
         }
       }
@@ -110,6 +113,7 @@ class AuthService {
     final token = await getToken();
     if (token != null) {
       try {
+        await PushNotificationService().unregisterDevice();
         await http.post(
           Uri.parse('$baseUrl/logout'),
           headers: {

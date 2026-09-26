@@ -5,6 +5,7 @@ import 'dashboard_screen.dart';
 import '../registration/admin_registration_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
+import '../../services/push_notification_service.dart';
 
 class SalonSelectionScreen extends StatelessWidget {
   final List<dynamic> salons;
@@ -60,6 +61,7 @@ class SalonSelectionScreen extends StatelessWidget {
   }
 
   void _logout(BuildContext context) async {
+    await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     if (context.mounted) {

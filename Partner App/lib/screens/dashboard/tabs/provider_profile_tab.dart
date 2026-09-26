@@ -7,6 +7,8 @@ import '../../../main.dart';
 import '../more/my_salary_screen.dart';
 import '../more/provider_leaves_screen.dart';
 import '../../../services/staff_api.dart';
+import '../../../services/push_notification_service.dart';
+import '../../../widgets/push_notification_toggle.dart';
 
 class ProviderProfileTab extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -55,6 +57,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
 
     if (confirmed != true) return;
 
+    await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
@@ -668,6 +671,18 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
+                ),
+
+                ),
+
+                const SizedBox(height: 16),
+                
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const PushNotificationToggle(),
                 ),
 
                 const SizedBox(height: 16),

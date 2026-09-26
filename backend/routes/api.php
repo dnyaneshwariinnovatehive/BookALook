@@ -75,9 +75,19 @@ Route::prefix('customer')->group(function () {
         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markAllRead']);
         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markRead']);
 
-        // Push notification devices
+        // Push notification devices. register/unregister are the two the app
+        // calls on launch and sign-out; activity is the cheap "still here" on
+        // open, and the index is for a settings screen that shows what this
+        // account has registered.
+        Route::get('/devices', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'index']);
         Route::post('/devices/register', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'register']);
         Route::post('/devices/unregister', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'unregister']);
+        Route::post('/devices/activity', [\App\Http\Controllers\Api\Customer\DeviceController::class, 'activity']);
+
+        // Per-user notification preferences. This is what the app's existing
+        // Push Notifications switch now talks to instead of SharedPreferences.
+        Route::get('/notifications/preferences', [\App\Http\Controllers\Api\Customer\NotificationPreferenceController::class, 'show']);
+        Route::put('/notifications/preferences', [\App\Http\Controllers\Api\Customer\NotificationPreferenceController::class, 'update']);
     });
 });
 
@@ -240,6 +250,17 @@ Route::prefix('partner')->group(function () {
         Route::get('/notifications', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'index']);
         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markAllRead']);
         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markRead']);
+
+        // Push notification devices, and the preferences behind them. The Partner
+        // App gets its own set of paths rather than sharing the customer's, so
+        // the two apps can evolve separately and so a partner's device list is
+        // never served from a customer endpoint.
+        Route::get('/devices', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'index']);
+        Route::post('/devices/register', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'register']);
+        Route::post('/devices/unregister', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'unregister']);
+        Route::post('/devices/activity', [\App\Http\Controllers\Api\Partner\DeviceController::class, 'activity']);
+        Route::get('/notifications/preferences', [\App\Http\Controllers\Api\Partner\NotificationPreferenceController::class, 'show']);
+        Route::put('/notifications/preferences', [\App\Http\Controllers\Api\Partner\NotificationPreferenceController::class, 'update']);
 
         // Renewal and the wallet that pays for it.
         Route::get('/subscription/plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);

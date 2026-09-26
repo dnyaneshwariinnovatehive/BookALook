@@ -6,6 +6,8 @@ import '../../../services/collaborator_api.dart';
 import '../../../theme/app_theme.dart';
 import '../../phone_screen.dart';
 import 'edit_collaborator_profile_sheet.dart';
+import '../../../services/push_notification_service.dart';
+import '../../../widgets/push_notification_toggle.dart';
 
 /// The collaborator's own page: who they are, what they have done, and out.
 ///
@@ -86,6 +88,7 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
 
     if (confirmed != true) return;
 
+    await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
@@ -113,6 +116,8 @@ class _CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
             const SizedBox(height: 18),
             _buildDetailsCard(),
           ],
+          const SizedBox(height: 24),
+          const PushNotificationToggle(),
           const SizedBox(height: 24),
           _buildLogoutButton(),
           const SizedBox(height: 20),

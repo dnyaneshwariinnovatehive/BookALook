@@ -3,9 +3,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'services/push_notification_service.dart';
 
 // Global notifier for theme mode
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
+// Global navigator key for routing from background/terminated states
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> _loadThemeMode() async {
   final prefs = await SharedPreferences.getInstance();
@@ -17,6 +21,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   await _loadThemeMode();
+  await PushNotificationService().init();
   runApp(const PartnerApp());
 }
 
@@ -29,6 +34,7 @@ class PartnerApp extends StatelessWidget {
       valueListenable: themeNotifier,
       builder: (context, currentMode, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'BookALook Partner',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

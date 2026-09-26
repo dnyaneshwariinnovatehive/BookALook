@@ -74,11 +74,20 @@ return [
     | whole pipeline — notification, queue, device lookup, delivery ledger — so
     | the backend can be built and tested ahead of the app.
     |
-    | The `fcm` values below are read by nothing yet. They are here so that
-    | switching drivers on day two is filling in four values rather than
-    | designing a config block while a provider is waiting. No credentials are
-    | committed, and the app must not need them: an environment with none of
-    | them set keeps working on the log driver.
+    | Set it to `fcm` once a Firebase project exists. Unlike the payment and
+    | WhatsApp drivers, `fcm` does not fall back to the log driver when it is
+    | unconfigured: it raises MissingFcmCredentials naming the variables that
+    | are missing. Quietly degrading would report every delivery as `sent` and
+    | make a broken server look like a working one.
+    |
+    | Credentials come from either an inline PEM (FCM_PRIVATE_KEY, whose newlines
+    | arrive as literal \n and are normalised on read) or a service-account JSON
+    | file that lives on the server and never in the repository
+    | (FCM_CREDENTIALS_PATH — project id and client email are read from the same
+    | file, so a server configures one path rather than four agreeing values).
+    |
+    | No credentials are committed, and the app must not need them: an
+    | environment with none of them set keeps working on the log driver.
     |
     */
     'push' => [
@@ -90,7 +99,15 @@ return [
             // leave this empty. Never commit either one.
             'private_key' => env('FCM_PRIVATE_KEY'),
             'credentials_path' => env('FCM_CREDENTIALS_PATH'),
+            // Must exist as a channel on the Android app or FCM drops the
+            // notification instead of displaying it. The apps create it at
+            // startup from the same id.
+            'channel_id' => env('FCM_CHANNEL_ID', 'bookalook_notifications'),
         ],
+
+        // How early, in hours, the scheduler tells a customer their appointment
+        // is coming. 0 switches reminders off without touching the schedule.
+        'appointment_reminder_lead_hours' => env('APPOINTMENT_REMINDER_LEAD_HOURS', 3),
     ],
 
     'customer_app' => [

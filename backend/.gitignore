@@ -24,3 +24,10 @@ yarn-error.log
 
 database/database.sqlite
 storage/dev/database.backup.sqlite
+
+# The SQLite file the test suite connects to (DB_DATABASE=testing in
+# phpunit.xml). It is a working copy of database/database.sqlite rather than
+# something built by `migrate`, because a fresh migrate cannot run on SQLite —
+# an old raw-SQL migration in this repository's history is MySQL/Postgres only.
+# Tests run inside transactions and roll back, so the copy is never modified.
+/testing

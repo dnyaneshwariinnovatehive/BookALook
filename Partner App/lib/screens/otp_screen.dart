@@ -10,6 +10,7 @@ import 'registration/admin_registration_screen.dart';
 import 'dashboard/salon_selection_screen.dart';
 import 'dashboard/service_provider_dashboard.dart';
 import 'dashboard/collaborator_dashboard.dart';
+import '../services/push_notification_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -73,6 +74,9 @@ class _OtpScreenState extends State<OtpScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', response['token'] ?? '');
         await prefs.setString('role', response['role'] ?? '');
+        await prefs.setString('auth_state', jsonEncode(response));
+        
+        PushNotificationService().registerDevice();
 
         if (!mounted) return;
 

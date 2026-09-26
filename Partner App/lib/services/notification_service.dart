@@ -49,4 +49,26 @@ class PartnerNotificationService {
       headers: await _getHeaders(),
     );
   }
+
+  static Future<Map<String, dynamic>> getPreferences() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/preferences'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load notification preferences');
+  }
+
+  static Future<bool> updatePreferences(Map<String, dynamic> preferences) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/notifications/preferences'),
+      headers: await _getHeaders(),
+      body: jsonEncode(preferences),
+    );
+
+    return response.statusCode == 200;
+  }
 }

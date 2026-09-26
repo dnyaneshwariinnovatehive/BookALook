@@ -8,6 +8,7 @@ use App\Models\PlatformPolicySetting;
 use App\Models\Service;
 use App\Models\ServiceProvider;
 use App\Models\User;
+use App\Services\Notifications\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -33,6 +34,10 @@ class AppointmentCheckInService
 
     /** Used when a service template has no duration recorded. */
     public const SLOT_FALLBACK_MINUTES = 30;
+
+    public function __construct(private NotificationService $notifications)
+    {
+    }
 
     /**
      * Find the appointment behind a scanned QR token.
@@ -320,7 +325,7 @@ class AppointmentCheckInService
         User $actor,
         ?string $note = null
     ): array {
-        return DB::transaction(function () use ($appointment, $mode, $actor, $note) {
+        $result = DB::transaction(function () use ($appointment, $mode, $actor, $note) {
             $bill = $this->bill($appointment);
 
             if ($bill['balance_due'] > 0) {
@@ -367,6 +372,18 @@ class AppointmentCheckInService
                 'new_balance' => $wallet['new_balance'],
             ];
         });
+
+        // After the commit, never inside it: the rating prompt goes out to a
+        // customer whose visit is really over, and a push queued against a
+        // transaction that later rolls back would be a lie. Keyed on the
+        // appointment so a re-tap on "collect" cannot produce a second prompt.
+        $this->notifications->appointmentCompleted(
+            $result['appointment'],
+            $result['appointment']->salon?->name ?? 'the salon',
+            'appointment_completed:'.$appointment->id,
+        );
+
+        return $result;
     }
 
     /**

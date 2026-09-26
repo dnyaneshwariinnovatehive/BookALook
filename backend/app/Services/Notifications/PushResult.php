@@ -14,6 +14,11 @@ namespace App\Services\Notifications;
  * error, and a gateway that swallowed that would leave the app pushing into a
  * void forever. A gateway that knows, it says so here, and the job signs the
  * device off instead of guessing.
+ *
+ * `retryable` draws the line the retry policy runs on. A device that was merely
+ * unreachable is left `pending` in the ledger, so a support question has an
+ * accurate answer. A device whose token the provider no longer recognises is
+ * left `failed` and signed off, because asking again will not change it.
  */
 final class PushResult
 {
@@ -23,6 +28,7 @@ final class PushResult
         public readonly ?string $messageId = null,
         public readonly ?string $failureReason = null,
         public readonly bool $deactivateDevice = false,
+        public readonly bool $retryable = false,
     ) {
     }
 
@@ -35,13 +41,24 @@ final class PushResult
         );
     }
 
-    public static function failed(string $provider, string $failureReason, bool $deactivateDevice = false): self
-    {
+    /**
+     * The provider answered, and the answer was no.
+     *
+     * @param  bool  $deactivateDevice  The token is dead; stop using it.
+     * @param  bool  $retryable  The failure was circumstantial, not the token's fault.
+     */
+    public static function failed(
+        string $provider,
+        string $failureReason,
+        bool $deactivateDevice = false,
+        bool $retryable = false,
+    ): self {
         return new self(
             accepted: false,
             provider: $provider,
             failureReason: $failureReason,
             deactivateDevice: $deactivateDevice,
+            retryable: $retryable,
         );
     }
 }

@@ -16,12 +16,16 @@ import 'package:partner_app/theme/app_theme.dart';
 import '../../notifications_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
+import '../../../services/push_notification_service.dart';
+import '../../../widgets/push_notification_toggle.dart';
+import '../../../services/push_notification_service.dart';
 
 class MoreTab extends StatelessWidget {
   final Map<String, dynamic> salonData;
   const MoreTab({super.key, required this.salonData});
 
   void _logout(BuildContext context) async {
+    await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     if (context.mounted) {
@@ -296,6 +300,8 @@ class MoreTab extends StatelessWidget {
                     title: 'Help & Support',
                     onTap: () {},
                   ),
+                  Divider(height: 1, indent: 56),
+                  const PushNotificationToggle(),
                   Divider(height: 1, indent: 56),
                   ValueListenableBuilder<ThemeMode>(
                     valueListenable: themeNotifier,

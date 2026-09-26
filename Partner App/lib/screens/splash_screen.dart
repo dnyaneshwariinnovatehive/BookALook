@@ -1,7 +1,12 @@
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'phone_screen.dart';
 import '../theme/app_theme.dart';
+import 'dashboard/salon_selection_screen.dart';
+import 'dashboard/service_provider_dashboard.dart';
+import 'dashboard/collaborator_dashboard.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,12 +42,48 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   void _navigateToNext() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    final authStateStr = prefs.getString('auth_state');
+
     await Future.delayed(const Duration(seconds: 3));
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const PhoneScreen()),
-      );
+      if (token != null && token.isNotEmpty && authStateStr != null) {
+        final response = jsonDecode(authStateStr);
+        if (response['role'] == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SalonSelectionScreen(salons: response['salons'] ?? []),
+            ),
+          );
+        } else if (response['role'] == 'service_provider') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ServiceProviderDashboard(
+                salon: response['salon'] ?? {},
+                provider: response['provider'] ?? {},
+                user: response['user'] ?? {},
+              ),
+            ),
+          );
+        } else if (response['role'] == 'collaborator') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CollaboratorDashboardScreen(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PhoneScreen()));
+        }
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PhoneScreen()),
+        );
+      }
     }
   }
 

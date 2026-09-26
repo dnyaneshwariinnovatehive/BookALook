@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
+import 'package:customer_app/services/http_client.dart' as http;
 
 import '../screens/salon_detail_screen.dart';
 

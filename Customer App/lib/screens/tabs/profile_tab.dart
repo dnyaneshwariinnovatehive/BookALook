@@ -65,9 +65,28 @@ class _ProfileTabState extends State<ProfileTab> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _pushNotifications = prefs.getBool('push_notifications') ?? true;
         _locationAccess = prefs.getBool('location_access') ?? true;
       });
+    }
+    
+    // Load Push notification preference from backend if not guest
+    if (!widget.isGuest) {
+      try {
+        final prefsData = await _profileService.getNotificationPreferences();
+        if (mounted) {
+          setState(() {
+            _pushNotifications = prefsData['push_enabled'] ?? true;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading notification preferences: $e');
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _pushNotifications = prefs.getBool('push_notifications') ?? true;
+        });
+      }
     }
   }
 
@@ -292,7 +311,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       value: _pushNotifications,
                       onChanged: (val) {
                         setState(() => _pushNotifications = val);
-                        _toggleSetting('push_notifications', val);
+                        if (!widget.isGuest) {
+                          _profileService.updateNotificationPreferences({'push_enabled': val});
+                        } else {
+                          _toggleSetting('push_notifications', val);
+                        }
                       },
                       headingColor: headingColor,
                     ),

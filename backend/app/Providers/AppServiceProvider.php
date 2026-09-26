@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\DB;
 
+use App\Services\Notifications\FcmAccessTokenProvider;
+use App\Services\Notifications\FcmCredentials;
+use App\Services\Notifications\FcmPushGateway;
 use App\Services\Notifications\LogPushGateway;
 use App\Services\Notifications\LogWhatsAppGateway;
 use App\Services\Notifications\MetaCloudWhatsAppGateway;
@@ -40,18 +43,29 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
-        // Push notifications. `log` is the only driver that exists in this
-        // phase, and it is the right answer in every environment right now: it
-        // records what would have gone out and contacts nobody, so the app can
-        // be built and every part of the pipeline exercised before a single
+        // Push notifications. `log` is the driver for every environment until a
+        // Firebase project exists: it records what would have gone out and
+        // contacts nobody, so the whole pipeline can be exercised before a single
         // customer is disturbed by a real push.
         //
-        // A real gateway lands here, guarded on its own credentials, in exactly
-        // the shape of the WhatsApp binding above — an `fcm` branch that
-        // requires the project id and key and falls back to this one otherwise.
-        // Accepting the `fcm` value now and degrading to the log driver means
-        // flipping the env var early cannot break every booking.
-        $this->app->bind(PushGateway::class, fn () => new LogPushGateway());
+        // `fcm` is the real one, and unlike the payment gateways it does NOT
+        // fall back. Selecting a driver means the operator asked for a working
+        // send, so a missing service account is reported loudly — by name, once,
+        // at the point the driver is resolved — rather than silently downgrading
+        // to a log driver that reports every delivery as `sent` and so hides the
+        // misconfiguration behind a green ledger. `MissingFcmCredentials` names
+        // the variables that are absent and nothing else.
+        $this->app->bind(PushGateway::class, function () {
+            $driver = (string) config('services.push.driver', 'log');
+
+            if ($driver !== 'fcm') {
+                return new LogPushGateway();
+            }
+
+            $credentials = FcmCredentials::fromConfig();
+
+            return new FcmPushGateway($credentials, new FcmAccessTokenProvider($credentials));
+        });
 
         // Razorpay for appointment advances. Falls back to the demo gateway
         // whenever keys are missing, so a half-configured environment cannot

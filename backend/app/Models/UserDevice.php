@@ -90,4 +90,20 @@ class UserDevice extends Model
 
         return mb_substr($token, 0, 8).'...'.mb_substr($token, -4);
     }
+
+    /**
+     * Only the installs of one app.
+     *
+     * A salon owner has both apps on one handset and a device row for each, so
+     * "every device this user has" is the wrong set for any notification that
+     * knows which app the recipient will be reading.
+     */
+    public function scopeForAppType($query, ?string $appType)
+    {
+        if ($appType === null) {
+            return $query;
+        }
+
+        return $query->where('app_type', $appType);
+    }
 }
