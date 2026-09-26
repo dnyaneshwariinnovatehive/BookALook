@@ -673,8 +673,6 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                   ),
                 ),
 
-                ),
-
                 const SizedBox(height: 16),
                 
                 Container(

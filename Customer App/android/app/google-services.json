@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "618606255653",
+    "project_id": "salon-notification-19fb5",
+    "storage_bucket": "salon-notification-19fb5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618606255653:android:f68272f7cda0d3f09d69cc",
+        "android_client_info": {
+          "package_name": "com.bookalook.customer_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFagLW0WxVk7q89wgKrhFKz6l75smYeh4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

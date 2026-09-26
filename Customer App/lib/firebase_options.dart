@@ -43,11 +43,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'mock-api-key',
-    appId: '1:1234567890:android:mockappid',
-    messagingSenderId: '1234567890',
-    projectId: 'mock-project-id',
-    storageBucket: 'mock-project-id.appspot.com',
+    apiKey: 'AIzaSyAFagLW0WxVk7q89wgKrhFKz6l75smYeh4',
+    appId: '1:618606255653:android:f68272f7cda0d3f09d69cc',
+    messagingSenderId: '618606255653',
+    projectId: 'salon-notification-19fb5',
+    storageBucket: 'salon-notification-19fb5.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
