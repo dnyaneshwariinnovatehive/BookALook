@@ -1,0 +1,155 @@
+/* Sun <-> moon morph for the theme toggle.
+ *
+ * Transitions rather than keyframes: [data-glyph] picks the resting state and a
+ * transition re-runs on every change of it, so both directions animate with no
+ * remounting and no chance of the two halves drifting out of step.
+ *
+ * The durations below are sized to --theme-wipe-dur in globals.css, so the
+ * glyph lands as the colour wipe does rather than trailing behind it.
+ */
+
+.glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+
+.sun,
+.moon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Gated on an attribute applyThemeClass sets only for a deliberate swap. The
+   theme is already resolved by the inline pre-paint script, so without this
+   the sun or moon would fly in on first paint, when useSyncExternalStore
+   re-renders from its light server snapshot to the real theme.
+   Duration, not the `transition` shorthand: a shorthand would also clear
+   transition-property, and the doubled attribute selector is what lets this
+   outrank the per-element rules below. */
+.glyph[data-glyph] * {
+  transition-duration: 0s;
+}
+
+:global(html[data-theme-flip]) .sun,
+:global(html[data-theme-flip]) .moon,
+:global(html[data-theme-flip]) .sunCore,
+:global(html[data-theme-flip]) .sunRay,
+:global(html[data-theme-flip]) .moonCrater {
+  transition-duration: 470ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The moon is the last thing to settle, so it keeps its overshooting easing
+   even when the flip gate is overriding the shared timing. */
+:global(html[data-theme-flip]) .moon {
+  transition-timing-function: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+/* Sun powering down: quarter turn on the way out, core shrinking, rays
+   scattering. The short, decelerating curve gets it off screen before the wipe
+   has finished, leaving the moon to settle into the space it leaves. */
+.sun {
+  transition-property: opacity, transform;
+  transition-duration: 385ms;
+  transition-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+
+.sunCore {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition-property: transform;
+  transition-duration: 385ms;
+  transition-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+
+.sunRay {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  transition-property: opacity, transform;
+  transition-duration: 330ms;
+  transition-timing-function: cubic-bezier(0.3, 0, 0.8, 0.4);
+  transition-delay: calc(var(--ray-index) * 11ms);
+}
+
+/* Moon arriving last, so the easing has a y value past 1: it overshoots its
+   size and settles back rather than snapping into place. */
+.moon {
+  transition-property: opacity, transform;
+  transition-duration: 470ms;
+  transition-timing-function: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+.moonCrater {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition-property: opacity, transform;
+  transition-duration: 320ms;
+  transition-timing-function: ease-out;
+  transition-delay: 250ms;
+}
+
+/* ---- resting light: sun up, moon away ---- */
+.glyph[data-glyph='sun'] .sun {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.glyph[data-glyph='sun'] .sunCore {
+  transform: scale(1);
+}
+
+.glyph[data-glyph='sun'] .sunRay {
+  opacity: 1;
+  transform: rotate(var(--ray-angle)) scale(1);
+}
+
+.glyph[data-glyph='sun'] .moon {
+  opacity: 0;
+  transform: translateY(4px) rotate(-34deg) scale(0.55);
+}
+
+.glyph[data-glyph='sun'] .moonCrater {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+/* ---- resting dark: moon up, sun away ---- */
+.glyph[data-glyph='moon'] .moon {
+  opacity: 1;
+  transform: translateY(0) rotate(0deg) scale(1);
+}
+
+.glyph[data-glyph='moon'] .moonCrater {
+  opacity: 0.42;
+  transform: scale(1);
+}
+
+.glyph[data-glyph='moon'] .sun {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.15);
+}
+
+.glyph[data-glyph='moon'] .sunCore {
+  transform: scale(0.1);
+}
+
+.glyph[data-glyph='moon'] .sunRay {
+  opacity: 0;
+  transform: rotate(var(--ray-angle)) scale(1.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyph[data-glyph] *,
+  :global(html[data-theme-flip]) .glyph[data-glyph] * {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

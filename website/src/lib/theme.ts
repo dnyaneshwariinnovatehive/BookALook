@@ -23,13 +23,95 @@ export const resolveIsDark = (path: string) => {
   return pref ? pref === 'dark' : systemPrefersDark();
 };
 
+/**
+ * Present only while a swap is actually running. The glyph uses it to skip the
+ * morph on hydration, where <html> already carries the right class before React
+ * ever renders and the sun or moon would otherwise fly in on page load.
+ */
+const THEME_FLIP_ATTR = 'data-theme-flip';
+
+/** Long enough for the slowest part of the swap: 700ms wipe, 635ms glyph. */
+const FALLBACK_MS = 700;
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+type Point = { x: number; y: number };
+
+/**
+ * The wipe grows out of the control that was pressed. Reading it from the
+ * button itself is what makes the swap feel aimed rather than arbitrary, and
+ * it keeps the origin correct when the button sits in a different place on
+ * mobile than on desktop.
+ */
+const originFromControl = (): Point => {
+  const centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  const el = document.querySelector<HTMLElement>('[data-theme-origin]');
+  if (!el) return centre;
+  const r = el.getBoundingClientRect();
+  if (!r.width && !r.height) return centre;
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+};
+
+const setWipeOrigin = ({ x, y }: Point) => {
+  const root = document.documentElement;
+  // Big enough to reach the furthest corner from that point, so the circle
+  // always closes past the edge of the viewport.
+  const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+  root.style.setProperty('--theme-wipe-x', `${x}px`);
+  root.style.setProperty('--theme-wipe-y', `${y}px`);
+  root.style.setProperty('--theme-wipe-r', `${r}px`);
+};
+
+const clearWipeOrigin = () => {
+  const root = document.documentElement;
+  root.style.removeProperty('--theme-wipe-x');
+  root.style.removeProperty('--theme-wipe-y');
+  root.style.removeProperty('--theme-wipe-r');
+  root.removeAttribute(THEME_FLIP_ATTR);
+};
+
+/**
+ * A swap in flight owns the root; a second click finishes the first one
+ * immediately rather than queueing behind it, so hammering the button stays
+ * responsive instead of lagging a frame per click.
+ */
+let inFlight: ViewTransition | null = null;
+
 export const applyThemeClass = (dark: boolean, animate = false) => {
   const root = document.documentElement;
-  if (animate) {
-    root.classList.add('theme-transition');
-    window.setTimeout(() => root.classList.remove('theme-transition'), 320);
+  const commit = () => {
+    root.classList.toggle('dark', dark);
+    root.setAttribute(THEME_FLIP_ATTR, '');
+  };
+
+  // Without the View Transition API the swap is a plain cross-fade, so the
+  // flag would outlive the only animation that reads it.
+  const canWipe = animate && typeof document.startViewTransition === 'function' && !prefersReducedMotion();
+
+  if (!canWipe) {
+    if (animate) {
+      root.classList.add('theme-transition');
+      window.setTimeout(() => root.classList.remove('theme-transition'), FALLBACK_MS);
+      // The glyph has no wipe to sit inside, so it morphs on its own clock.
+      root.setAttribute(THEME_FLIP_ATTR, '');
+      window.setTimeout(() => root.removeAttribute(THEME_FLIP_ATTR), 640);
+    }
+    commit();
+    return;
   }
-  root.classList.toggle('dark', dark);
+
+  inFlight?.skipTransition();
+  setWipeOrigin(originFromControl());
+
+  const transition = document.startViewTransition(commit);
+  inFlight = transition;
+  const settle = () => {
+    if (inFlight !== transition) return;
+    inFlight = null;
+    clearWipeOrigin();
+  };
+  transition.finished.then(settle, settle);
 };
 
 /**
@@ -71,6 +153,8 @@ export function useTheme() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
+  // The origin of the wipe is read from the [data-theme-origin] control, so
+  // this works identically whether it was clicked or run from the palette.
   const toggle = useCallback(() => {
     const next = !document.documentElement.classList.contains('dark');
     try {

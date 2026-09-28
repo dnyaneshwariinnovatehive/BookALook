@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Icon from '@/components/admin/Icon';
 import CommandPalette from '@/components/admin/CommandPalette';
+import ThemeGlyph from '@/components/admin/ThemeGlyph';
 import { useRootAttribute, useTheme } from '@/lib/theme';
 import { matchNav, navGroups } from './nav';
 import styles from './layout.module.css';
@@ -193,11 +194,12 @@ export default function SuperAdminLayout({
               type="button"
               onClick={toggleTheme}
               className={styles.themeToggleBtn}
+              data-theme-origin=""
               aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
               title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+              aria-pressed={isDark}
             >
-              <span className={`${styles.themeIcon} ${isDark ? styles.themeIconHidden : ''}`}><Icon name="moon" /></span>
-              <span className={`${styles.themeIcon} ${isDark ? '' : styles.themeIconHidden}`}><Icon name="sun" /></span>
+              <ThemeGlyph isDark={isDark} />
             </button>
           </div>
         </header>
