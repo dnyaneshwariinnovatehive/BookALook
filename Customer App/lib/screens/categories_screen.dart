@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/category.dart';
 import '../services/category_service.dart';
-import '../services/explore_request_bus.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_grid.dart';
+import 'discovery_screen.dart';
 
 /// Every category the platform has, as a grid.
 ///
@@ -46,13 +46,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     });
   }
 
-  /// Leave this page first so the shell is visible, then let the shell switch
-  /// to Explore and apply the filter.
+  /// Leave this page first so the shell is visible, then push the discovery
+  /// page for whichever catalogue item was picked.
   void _openInExplore(ServiceCategory category) {
     Navigator.of(context).pop();
-    ExploreRequestBus.instance.showCategory(
-      categoryId: category.id,
-      categoryLabel: category.name,
+    if (category.id == CategoryGrid.comboSentinelId) {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ComboDiscoveryScreen()),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CategoryDiscoveryScreen(category: category)),
     );
   }
 

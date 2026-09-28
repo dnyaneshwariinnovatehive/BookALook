@@ -21,12 +21,16 @@ class SalonService {
     String? search,
     String? gender,
     String? categoryId,
+    String? serviceId,
+    String? combo,
     String? cityId,
   }) async {
     final Map<String, dynamic> queryParams = {};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
     if (gender != null && gender.isNotEmpty && gender != 'All') queryParams['gender'] = gender;
     if (categoryId != null && categoryId.isNotEmpty) queryParams['category_id'] = categoryId;
+    if (serviceId != null && serviceId.isNotEmpty) queryParams['service_id'] = serviceId;
+    if (combo != null && combo.isNotEmpty) queryParams['combo'] = combo;
 
     final city = cityId ?? LocationService.instance.city?.id;
     if (city != null && city.isNotEmpty) queryParams['city_id'] = city;

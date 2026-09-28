@@ -400,6 +400,25 @@ class SalonController extends Controller
             $query->providingCategory($request->category_id);
         }
 
+        // The discovery drill-down narrows to one exact offering: `service_id`
+        // is a catalogue template, `combo` is a combo package name. Both work
+        // off the same relationships the category filter uses, so the salon
+        // list always matches the horizontal scroller above it.
+        if ($request->filled('service_id')) {
+            $query->whereHas('services', function ($q) use ($request) {
+                $q->where('template_id', $request->service_id)
+                    ->where('is_active', true);
+            });
+        }
+
+        if ($request->filled('combo')) {
+            $comboName = trim($request->combo);
+            $query->whereHas('combos', function ($q) use ($comboName) {
+                $q->where('name', $comboName)
+                    ->where('is_active', true);
+            });
+        }
+
         // Distance decides the order when the app knows where the customer is.
         // Within one city that is the only ordering that means anything — a
         // salon three streets away and one an hour across town are not
@@ -424,10 +443,11 @@ class SalonController extends Controller
         // to what else is in this city, and a city with nothing in it falls back
         // to the nearest market that does.
         //
-        // Browsing a category is the one case that does not get a fallback: the
-        // customer asked for salons offering *this*, so showing salons that do
-        // not is worse than showing none. That empty list is the answer.
-        if ($rows->isEmpty() && ! $request->filled('category_id')) {
+        // Browsing a category names the offering the customer actually asked
+        // for, so showing salons that do not offer it would be a lie. The same
+        // goes for the discovery drill-downs. An empty list is the answer.
+        if ($rows->isEmpty() && ! $request->filled('category_id')
+            && ! $request->filled('service_id') && ! $request->filled('combo')) {
             if ($request->filled('search')) {
                 $suggestedRows = $this->present(
                     Salon::with(['currentSubscription'])

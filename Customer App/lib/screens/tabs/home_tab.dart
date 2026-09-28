@@ -19,9 +19,9 @@ import '../my_bookings_screen.dart';
 import '../qr_code_screen.dart';
 import '../../widgets/category_grid.dart';
 import '../categories_screen.dart';
-import '../../services/explore_request_bus.dart';
 import '../../utils/app_haptics.dart';
 import '../search_screen.dart';
+import '../discovery_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -327,13 +327,22 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// Hand a category to the shell, which switches to the Explore tab and lets
-  /// it do the filtering. Home has no way to change the tab index itself.
+  /// Open the discovery page for a category. The combo sentinel gets the combo
+  /// flow; every real category gets its own service-discovery screen. Both are
+  /// new pages pushed over the shell — Explore and its filtering stay as they
+  /// were, they are simply no longer what home hands a category to.
   void _openCategoryInExplore(ServiceCategory category) {
     AppHaptics.selectionClick();
-    ExploreRequestBus.instance.showCategory(
-      categoryId: category.id,
-      categoryLabel: category.name,
+    if (category.id == CategoryGrid.comboSentinelId) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ComboDiscoveryScreen()),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CategoryDiscoveryScreen(category: category)),
     );
   }
 

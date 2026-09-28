@@ -13,6 +13,11 @@ Route::prefix('customer')->group(function () {
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
     Route::get('/categories', [\App\Http\Controllers\Api\Customer\CategoryController::class, 'index']);
+    // The discovery catalogue: which services a category really offers in this
+    // city, and which combo packages exist. Public like /search, so a guest
+    // deciding whether to install can browse before signing up.
+    Route::get('/categories/{categoryId}/services', [\App\Http\Controllers\Api\Customer\DiscoveryController::class, 'servicesByCategory']);
+    Route::get('/combos', [\App\Http\Controllers\Api\Customer\DiscoveryController::class, 'combos']);
     // Services and salons in one query, typo-tolerant. Public: someone
     // deciding whether to install the app should be able to look for a
     // haircut before signing up.
