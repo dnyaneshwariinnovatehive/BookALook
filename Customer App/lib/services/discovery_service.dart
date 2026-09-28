@@ -77,6 +77,7 @@ class DiscoveryServiceItem {
   final int durationMinutes;
   final double minPrice;
   final int salonCount;
+  final double? rating;
 
   DiscoveryServiceItem({
     required this.serviceId,
@@ -84,6 +85,7 @@ class DiscoveryServiceItem {
     required this.durationMinutes,
     required this.minPrice,
     required this.salonCount,
+    this.rating,
   });
 
   factory DiscoveryServiceItem.fromJson(Map<String, dynamic> json) {
@@ -93,6 +95,7 @@ class DiscoveryServiceItem {
       durationMinutes: (json['duration_minutes'] as num?)?.toInt() ?? 0,
       minPrice: (json['min_price'] as num?)?.toDouble() ?? 0,
       salonCount: (json['salon_count'] as num?)?.toInt() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble(),
     );
   }
 }
@@ -102,11 +105,13 @@ class DiscoveryComboItem {
   final String name;
   final int salonCount;
   final double startingPrice;
+  final double? rating;
 
   DiscoveryComboItem({
     required this.name,
     required this.salonCount,
     required this.startingPrice,
+    this.rating,
   });
 
   factory DiscoveryComboItem.fromJson(Map<String, dynamic> json) {
@@ -114,6 +119,7 @@ class DiscoveryComboItem {
       name: json['name'] as String,
       salonCount: (json['salon_count'] as num?)?.toInt() ?? 0,
       startingPrice: (json['starting_price'] as num?)?.toDouble() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble(),
     );
   }
 }

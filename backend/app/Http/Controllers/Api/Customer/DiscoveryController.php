@@ -49,6 +49,7 @@ class DiscoveryController extends Controller
             ->selectRaw('t.name')
             ->selectRaw('t.estimated_duration_minutes as duration_minutes')
             ->selectRaw('MIN(sv.price) as min_price')
+            ->selectRaw('MAX(s.avg_rating) as rating')
             ->selectRaw('COUNT(DISTINCT s.id) as salon_count')
             ->groupBy('t.id', 't.name', 't.estimated_duration_minutes')
             ->orderBy('t.name')
@@ -61,6 +62,7 @@ class DiscoveryController extends Controller
                 'duration_minutes' => (int) $row->duration_minutes,
                 'min_price' => round((float) $row->min_price, 2),
                 'salon_count' => (int) $row->salon_count,
+                'rating' => $row->rating !== null ? round((float) $row->rating, 1) : null,
             ])->values(),
             'city' => $this->cityPayload($city),
         ]);
@@ -74,7 +76,7 @@ class DiscoveryController extends Controller
     {
         $city = $this->resolveCity($request);
 
-        $rows = Combo::with('services:id,price')
+        $rows = Combo::with(['services:id,price', 'salon:id,avg_rating'])
             ->where('is_active', true)
             ->whereHas('salon', function ($q) use ($city) {
                 $q->where('status', 'active');
@@ -90,6 +92,7 @@ class DiscoveryController extends Controller
             'price' => (float) $combo->services->sum(function (Service $service) {
                 return (float) ($service->pivot->combo_special_price ?? $service->price);
             }),
+            'rating' => $combo->salon?->avg_rating,
         ]);
 
         $grouped = $priced->groupBy('name')
@@ -97,6 +100,7 @@ class DiscoveryController extends Controller
                 'name' => $name,
                 'salon_count' => (int) $items->count(),
                 'starting_price' => round((float) $items->min('price'), 2),
+                'rating' => $this->bestSalonRating($items),
             ])
             ->sortBy('name')
             ->values();
@@ -151,5 +155,19 @@ class DiscoveryController extends Controller
             'name' => $city->name,
             'state' => $city->state,
         ] : null;
+    }
+
+    /**
+     * The highest salon rating earned by any salon offering this combo name,
+     * so the top-rated scroller ranks real market packages by their best host.
+     */
+    private function bestSalonRating(Collection $items): ?float
+    {
+        $rating = $items
+            ->map(fn (array $item) => $item['rating'])
+            ->filter()
+            ->max();
+
+        return $rating === null ? null : round((float) $rating, 1);
     }
 }

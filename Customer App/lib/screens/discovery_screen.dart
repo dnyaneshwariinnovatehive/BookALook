@@ -41,8 +41,9 @@ class _Option {
   final String name;
   final int salonCount;
   final String? subtitle;
+  final double? rating;
 
-  const _Option({this.key, required this.name, this.salonCount = 0, this.subtitle});
+  const _Option({this.key, required this.name, this.salonCount = 0, this.subtitle, this.rating});
 }
 
 /// The shared Zomato-style discovery layout: hero header, a search field that
@@ -220,6 +221,7 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
             key: c.name,
             name: c.name,
             salonCount: c.salonCount,
+            rating: c.rating,
             subtitle: c.startingPrice > 0 ? 'from ₹${c.startingPrice.toStringAsFixed(0)}' : null,
           ),
         ),
@@ -232,6 +234,7 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
           key: s.serviceId,
           name: s.name,
           salonCount: s.salonCount,
+          rating: s.rating,
           subtitle: [
             '₹${s.minPrice.toStringAsFixed(0)}',
             if (s.durationMinutes > 0) '${s.durationMinutes} min',
@@ -244,6 +247,17 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
   bool get _hasNoOptions {
     if (_salons == null) return false;
     return _isCombo ? _combos.isEmpty : _services.isEmpty;
+  }
+
+  /// Rated offerings, best first, for the top-rated horizontal cards. The
+  /// rating is the best any salon in the city earns for that offering, so the
+  /// order is honest — not a templated popularity guess.
+  List<_Option> get _topRatedOptions {
+    final rated = _options
+        .where((o) => o.key != null && (o.rating ?? 0) > 0)
+        .toList()
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    return rated.take(8).toList();
   }
 
   String get _heading => _isCombo ? 'Combos' : (widget.category?.name ?? '');
@@ -360,7 +374,7 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
           _buildSearchField(isDark, bodyColor),
           const SizedBox(height: 12),
           _buildCapsules(isDark, headingColor, bodyColor),
-          const SizedBox(height: 8),
+          _buildTopRatedSection(isDark, headingColor, bodyColor),
         ],
       ),
     );
@@ -465,6 +479,116 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
             ),
           );
         },
+),
+        );
+  }
+
+  Widget _buildTopRatedSection(bool isDark, Color headingColor, Color bodyColor) {
+    final top = _topRatedOptions;
+    if (top.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 16, color: AppTheme.accentColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _isCombo ? 'Top rated combos' : 'Top rated services',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: headingColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 128,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: top.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => _buildTopRatedCard(top[index]),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  /// One top-rated card: the offering name is the highlight and the rating is
+  /// the badge. No salon name — this ranks the service, not a host.
+  Widget _buildTopRatedCard(_Option option) {
+    final rating = option.rating ?? 0;
+
+    return GestureDetector(
+      onTap: () {
+        AppHaptics.selectionClick();
+        setState(() => _selectedKey = option.key);
+        _fetchSalons();
+      },
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.accentColor,
+              Color.lerp(AppTheme.accentColor, Colors.black, 0.25)!,
+            ],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, size: 15, color: Colors.amber),
+                const SizedBox(width: 3),
+                Text(
+                  rating.toStringAsFixed(1),
+                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+                const Spacer(),
+                Text(
+                  '${option.salonCount} salons',
+                  style: GoogleFonts.outfit(fontSize: 11, color: Colors.white70),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              option.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (option.subtitle != null)
+              Text(
+                option.subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70),
+              ),
+          ],
+        ),
       ),
     );
   }
