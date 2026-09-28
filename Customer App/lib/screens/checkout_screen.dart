@@ -188,12 +188,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _fetchSlots();
   }
 
+  /// Midnight today, so date comparisons are not skewed by the clock.
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  /// "yyyy-MM-dd" for a date — the key both the chips and the API use.
+  String _dateKey(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
+
+  void _selectDate(DateTime date) {
+    AppHaptics.selectionClick();
+    setState(() => _selectedDate = date);
+    _fetchSlots();
+  }
+
   Future<void> _pickDate() async {
+    final first = _today();
+    final last = first.add(const Duration(days: 30));
+    // showDatePicker asserts initialDate is inside the range.
+    var initial = _selectedDate;
+    if (initial.isBefore(first)) initial = first;
+    if (initial.isAfter(last)) initial = last;
+
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 30)),
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -205,9 +227,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
 
     if (date != null) {
-      AppHaptics.selectionClick();
-      setState(() => _selectedDate = date);
-      _fetchSlots();
+      _selectDate(date);
     }
   }
 
@@ -400,7 +420,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
             _sectionTitle('2. Select Date'),
             SizedBox(height: 12),
-            _buildDateField(),
+            _buildDatePicker(),
 
             SizedBox(height: 32),
 
@@ -539,28 +559,133 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildDateField() {
+  /// Step 2 offers one-tap "Today" and "Tomorrow", plus a calendar button that
+  /// still opens the full 30-day picker.
+  Widget _buildDatePicker() {
     final enabled = _selectedProviderKey != null;
+    final today = _today();
+    final tomorrow = today.add(const Duration(days: 1));
+    final selected = _dateKey(_selectedDate);
+    final isCustom = selected != _dateKey(today) && selected != _dateKey(tomorrow);
+
+    void guard(void Function() action) {
+      if (!enabled) {
+        AppHaptics.error();
+        _showMessage('Choose a service provider first.');
+        return;
+      }
+      action();
+    }
 
     return Opacity(
       opacity: enabled ? 1.0 : 0.5,
-      child: InkWell(
-        onTap: enabled ? _pickDate : () => _showMessage('Choose a service provider first.'),
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-          decoration: BoxDecoration(
-            color: AppTheme.lightSurface,
-            border: Border.all(color: AppTheme.lightBorder),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text(DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
-                  style: GoogleFonts.outfit(fontSize: 16)),
-              Icon(Icons.calendar_today, color: AppTheme.accentColor),
+              Expanded(
+                child: _dateTile(
+                  label: 'Today',
+                  date: today,
+                  isSelected: selected == _dateKey(today),
+                  onTap: () => guard(() => _selectDate(today)),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: _dateTile(
+                  label: 'Tomorrow',
+                  date: tomorrow,
+                  isSelected: selected == _dateKey(tomorrow),
+                  onTap: () => guard(() => _selectDate(tomorrow)),
+                ),
+              ),
+              SizedBox(width: 12),
+              _calendarButton(
+                isActive: isCustom,
+                onTap: () => guard(_pickDate),
+              ),
             ],
           ),
+          SizedBox(height: 10),
+          Text(
+            isCustom
+                ? 'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)}'
+                : 'Pick Today or Tomorrow, or tap the calendar to choose any other date.',
+            style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dateTile({
+    required String label,
+    required DateTime date,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+          border: Border.all(
+            color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppTheme.accentColor : AppTheme.lightTextHeading,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    DateFormat('EEE, MMM d').format(date),
+                    style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected) Icon(Icons.check_circle, color: AppTheme.accentColor, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _calendarButton({required bool isActive, required VoidCallback onTap}) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        width: 52,
+        padding: EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+          border: Border.all(
+            color: isActive ? AppTheme.accentColor : AppTheme.lightBorder,
+            width: isActive ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Center(
+          child: Icon(Icons.calendar_today, size: 20, color: AppTheme.accentColor),
         ),
       ),
     );

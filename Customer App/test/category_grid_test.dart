@@ -7,16 +7,18 @@ import 'package:customer_app/widgets/category_grid.dart';
 void main() {
   const viewportWidth = 390.0;
 
-  List<ServiceCategory> categories({bool withCombo = false}) => [
-        if (withCombo) ServiceCategory(id: '9', name: 'Combo'),
-        ServiceCategory(id: '1', name: 'Haircut'),
-        ServiceCategory(id: '2', name: 'Facial'),
-        ServiceCategory(id: '3', name: 'Manicure'),
+  List<ServiceCategory> categories() => [
+        ServiceCategory(id: '1', name: 'Hair'),
+        ServiceCategory(id: '2', name: 'Skin'),
+        ServiceCategory(id: '3', name: 'Nails'),
+        ServiceCategory(id: '4', name: 'Spa'),
+        ServiceCategory(id: '5', name: 'Grooming'),
       ];
 
   Widget harness(
     List<ServiceCategory> cats, {
     void Function(ServiceCategory)? onTap,
+    VoidCallback? onViewMore,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -26,6 +28,7 @@ void main() {
             child: CategoryGrid(
               categories: cats,
               onTap: onTap ?? (_) {},
+              onViewMore: onViewMore ?? () {},
             ),
           ),
         ),
@@ -33,107 +36,137 @@ void main() {
     );
   }
 
-  /// How many categories the strip shows, after the synthesized 'Combo' is
-  /// accounted for. Every test case here has three API categories.
-  const distinctTiles = 4;
-
-  /// Left edge of every tile in the first copy, relative to the strip, paired
-  /// with the label that tile is showing.
-  List<(String, double)> tiles(WidgetTester tester) {
-    // The icon box is square and sits flush with the left of its tile, so it
-    // measures the tile's position exactly.
+  /// Left edge of every card, relative to the row, paired with its label.
+  List<(String, double)> cards(WidgetTester tester) {
     final boxes = tester
         .renderObjectList<RenderBox>(find.byType(AspectRatio))
         .toList();
     final origin = boxes.first.localToGlobal(Offset.zero).dx;
-    final grid = find.descendant(
-      of: find.byType(CategoryGrid),
-      matching: find.byType(InkWell),
-    );
 
     return [
-      for (var i = 0; i < distinctTiles; i++)
+      for (var i = 0; i < boxes.length; i++)
         (
           tester
               .widget<Text>(find.descendant(
-                of: grid.at(i),
+                of: find.byType(CategoryGrid).at(0),
                 matching: find.byType(Text),
-              ))
+              ).at(i))
               .data!,
           boxes[i].localToGlobal(Offset.zero).dx - origin,
         ),
     ];
   }
 
-  testWidgets('still shows four tiles across the screen', (tester) async {
+  List<String> labels(WidgetTester tester) => tester
+      .widgetList<Text>(find.descendant(
+        of: find.byType(CategoryGrid),
+        matching: find.byType(Text),
+      ))
+      .map((t) => t.data!)
+      .toList();
+
+  testWidgets('shows exactly four fixed cards, in order', (tester) async {
     await tester.pumpWidget(harness(categories()));
 
-    final laidOut = tiles(tester);
-    expect(laidOut.map((t) => t.$1).toList(),
-        ['Combo', 'Haircut', 'Facial', 'Manicure']);
-    expect(laidOut.map((t) => t.$2).toList(), [0, 100.5, 201, 301.5]);
-    // The fourth tile starts inside the screen and reaches its right edge.
+    expect(labels(tester), ['Combo', 'Hair', 'Grooming', 'View More']);
+  });
+
+  testWidgets('the four cards fill the row edge to edge and never move',
+      (tester) async {
+    await tester.pumpWidget(harness(categories()));
+
+    final laidOut = cards(tester);
+    expect(laidOut.map((c) => c.$2).toList(), [0, 100.5, 201, 301.5]);
     expect(laidOut.last.$2 + 88.5, closeTo(viewportWidth, 0.01));
+
+    // Half a second is several whole marquee loops in the old implementation.
+    // Nothing may have moved.
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(cards(tester).map((c) => c.$2).toList(),
+        [0, 100.5, 201, 301.5]);
   });
 
-  testWidgets('puts Combo first even when the API did not send it', (tester) async {
-    await tester.pumpWidget(harness(categories()));
+  testWidgets('Combo carries the sentinel id rather than a category uuid',
+      (tester) async {
+    final tapped = <String>[];
+    await tester.pumpWidget(harness(
+      categories(),
+      onTap: (c) => tapped.add(c.id),
+    ));
 
-    expect(tiles(tester).first.$1, 'Combo');
-    expect(tiles(tester).first.$2, 0);
+    await tester.tap(find.text('Combo'));
+    await tester.pump();
+
+    expect(tapped, [CategoryGrid.comboSentinelId]);
   });
 
-  testWidgets('keeps Combo first when the API does send it', (tester) async {
-    await tester.pumpWidget(harness(categories(withCombo: true)));
-
-    final laidOut = tiles(tester);
-    expect(laidOut.map((t) => t.$1).toList(),
-        ['Combo', 'Haircut', 'Facial', 'Manicure']);
-    // Two copies of four, not a fifth synthesized entry.
-    expect(
-      tester.renderObjectList<RenderBox>(find.byType(AspectRatio)).length,
-      8,
-    );
-  });
-
-  testWidgets('tapping a tile reports that category', (tester) async {
+  testWidgets('Hair and Grooming resolve to their catalogue ids', (tester) async {
     final tapped = <String>[];
     await tester.pumpWidget(harness(
       categories(),
       onTap: (c) => tapped.add('${c.id}:${c.name}'),
     ));
 
-    await tester.tap(find.text('Facial').first);
+    await tester.tap(find.text('Hair'));
+    await tester.pump();
+    await tester.tap(find.text('Grooming'));
     await tester.pump();
 
-    expect(tapped, ['2:Facial']);
+    expect(tapped, ['1:Hair', '5:Grooming']);
   });
 
-  testWidgets('tapping still works while the row is moving', (tester) async {
+  testWidgets('a renamed category still lands on the right card',
+      (tester) async {
     final tapped = <String>[];
     await tester.pumpWidget(harness(
-      categories(),
-      onTap: (c) => tapped.add(c.name),
+      [
+        ServiceCategory(id: '7', name: 'Hair Services'),
+        ServiceCategory(id: '8', name: 'Beard & Moustache'),
+      ],
+      onTap: (c) => tapped.add(c.id),
     ));
 
-    // A third of the way through the loop the tiles have slid, so a tap has to
-    // travel through the moving transform to land on the right one.
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(tapped, isEmpty, reason: 'nothing is tapped yet');
+    expect(labels(tester), ['Combo', 'Hair', 'Grooming', 'View More']);
 
-    await tester.tapAt(tester.getCenter(find.text('Manicure').first));
+    await tester.tap(find.text('Hair'));
+    await tester.pump();
+    await tester.tap(find.text('Grooming'));
     await tester.pump();
 
-    expect(tapped, ['Manicure']);
+    expect(tapped, ['7', '8']);
+  });
+
+  testWidgets('View More opens the category list, not a salon filter',
+      (tester) async {
+    var viewMoreTaps = 0;
+    final tapped = <String>[];
+
+    await tester.pumpWidget(harness(
+      // No Hair row at all, so the fixed card has no category behind it.
+      [ServiceCategory(id: '2', name: 'Skin')],
+      onTap: (c) => tapped.add(c.id),
+      onViewMore: () => viewMoreTaps++,
+    ));
+
+    await tester.tap(find.text('View More'));
+    await tester.pump();
+    expect(viewMoreTaps, 1);
+
+    // With no catalogue row to filter by, the card hands over to the same page
+    // rather than sending a filter that would match nothing.
+    await tester.tap(find.text('Hair'));
+    await tester.pump();
+    expect(viewMoreTaps, 2);
+    expect(tapped, isEmpty);
   });
 
   testWidgets('shows a label-less fallback icon when a category has no image',
       (tester) async {
     await tester.pumpWidget(harness([
-      ServiceCategory(id: '7', name: 'Bridal Makeup'),
+      ServiceCategory(id: '9', name: 'Bridal Makeup'),
     ]));
 
-    expect(find.byIcon(Icons.brush_rounded), findsWidgets);
+    expect(find.byType(CategoryGrid), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/review_service.dart';
+import '../services/explore_request_bus.dart';
 import '../theme/app_theme.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../widgets/tab_navigator.dart';
@@ -35,6 +36,10 @@ class _MainScreenState extends State<MainScreen> {
   final GlobalKey<FavouritesTabState> _favouritesKey = GlobalKey<FavouritesTabState>();
   final GlobalKey<MyBookingsScreenState> _bookingsKey = GlobalKey<MyBookingsScreenState>();
 
+  /// Explore is filtered from outside its own tab — a category picked on the
+  /// home tab lands here — so the shell needs a handle to apply it.
+  final GlobalKey<ExploreTabState> _exploreKey = GlobalKey<ExploreTabState>();
+
   /// Visits waiting to be rated, asked about one at a time.
   ///
   /// The prompt belongs here rather than on the home tab because it should
@@ -55,11 +60,43 @@ class _MainScreenState extends State<MainScreen> {
 
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
-      ExploreTab(),
+      ExploreTab(key: _exploreKey),
       BookingsTab(bookingsKey: _bookingsKey, isGuest: widget.isGuest),
       FavouritesTab(key: _favouritesKey, isGuest: widget.isGuest),
       ProfileTab(isGuest: widget.isGuest),
     ];
+
+    ExploreRequestBus.instance.addListener(_onExploreRequested);
+  }
+
+  @override
+  void dispose() {
+    ExploreRequestBus.instance.removeListener(_onExploreRequested);
+    super.dispose();
+  }
+
+  /// A category was picked somewhere else in the app — the home screen's fixed
+  /// cards, or the all-categories page.
+  ///
+  /// The shell is the only thing that knows the tab index exists, so it is the
+  /// shell that moves. The request is consumed here, which is what keeps a
+  /// later rebuild from re-applying the same filter.
+  void _onExploreRequested() {
+    final request = ExploreRequestBus.instance.take();
+    if (request == null) return;
+
+    // Each tab keeps its own stack, so anything the customer pushed on Explore
+    // has to go back to the directory or the filtered list is hidden behind it.
+    _navigatorKeys[1].currentState?.popUntil((route) => route.isFirst);
+
+    _exploreKey.currentState?.applyCategoryFilter(
+      categoryId: request.categoryId,
+      categoryLabel: request.categoryLabel,
+    );
+
+    if (_currentIndex != 1) {
+      setState(() => _currentIndex = 1);
+    }
   }
 
   void _onTabTapped(int index) {
@@ -69,6 +106,13 @@ class _MainScreenState extends State<MainScreen> {
     }
     if (index == 3 && !widget.isGuest) {
       _favouritesKey.currentState?.loadFavourites();
+    }
+    if (index == 1) {
+      // Reaching Explore by tapping the bar means "show me the directory", not
+      // "keep showing whichever category I filtered by last". The request
+      // listener above switches tabs itself, so it never passes through here
+      // and cannot undo its own filter.
+      _exploreKey.currentState?.clearCategoryFilter();
     }
     
     if (index == _currentIndex) {

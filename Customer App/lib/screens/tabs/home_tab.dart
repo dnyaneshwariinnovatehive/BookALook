@@ -18,6 +18,9 @@ import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
 import '../qr_code_screen.dart';
 import '../../widgets/category_grid.dart';
+import '../categories_screen.dart';
+import '../../services/explore_request_bus.dart';
+import '../../utils/app_haptics.dart';
 import '../search_screen.dart';
 
 class HomeTab extends StatefulWidget {
@@ -312,6 +315,25 @@ class _HomeTabState extends State<HomeTab> {
       MaterialPageRoute(
         builder: (context) => SearchScreen(initialQuery: _searchController.text),
       ),
+    );
+  }
+
+  /// Every category on its own page, reached from the View More card.
+  void _openCategoriesPage() {
+    AppHaptics.selectionClick();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CategoriesScreen()),
+    );
+  }
+
+  /// Hand a category to the shell, which switches to the Explore tab and lets
+  /// it do the filtering. Home has no way to change the tab index itself.
+  void _openCategoryInExplore(ServiceCategory category) {
+    AppHaptics.selectionClick();
+    ExploreRequestBus.instance.showCategory(
+      categoryId: category.id,
+      categoryLabel: category.name,
     );
   }
 
@@ -744,10 +766,10 @@ class _HomeTabState extends State<HomeTab> {
                   color: headingColor,
                 ),
               ),
-              // Was plain text with nothing behind it. It now does what it
-              // says — browse every salon, unfiltered.
+              // It opens the full category list, not the salon directory —
+              // "browse all" of a list of categories means the categories.
               GestureDetector(
-                onTap: () => _navigateToSearch(),
+                onTap: _openCategoriesPage,
                 behavior: HitTestBehavior.opaque,
                 child: Row(
                   children: [
@@ -802,8 +824,8 @@ class _HomeTabState extends State<HomeTab> {
         else
           CategoryGrid(
             categories: _categories,
-            onTap: (category) =>
-                _navigateToSearch(categoryId: category.id.toString()),
+            onTap: _openCategoryInExplore,
+            onViewMore: _openCategoriesPage,
           ),
       ],
     );

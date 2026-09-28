@@ -21,6 +21,15 @@ class SalonController extends Controller
 {
     private const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+    /**
+     * `category_id` value that means "salons offering a combo package".
+     *
+     * Combos are built by a salon from its own services rather than listed
+     * against a catalogue category, so the app sends this instead of a category
+     * uuid. It is compared lowercased, so `Combo` works as well as `combo`.
+     */
+    public const COMBO_CATEGORY_SENTINEL = 'combo';
+
     public function show(Request $request, $id)
     {
         $salon = Salon::with(['city:id,name,state', 'currentSubscription'])->find($id);
@@ -389,9 +398,23 @@ class SalonController extends Controller
 
         if ($request->filled('category_id')) {
             $categoryId = $request->category_id;
-            $query->whereHas('services.template', function ($q) use ($categoryId) {
-                $q->where('category_id', $categoryId);
-            });
+
+            // "Combo" is not a catalogue category — it is a package a salon
+            // builds out of its own services. The app sends the sentinel below
+            // so the combo card can mean "salons that offer a package" rather
+            // than matching a category row that does not exist.
+            if (strtolower($categoryId) === self::COMBO_CATEGORY_SENTINEL) {
+                // Only live packages, same as the cart prices them, or a salon
+                // that has switched all of its packages off would still be
+                // listed as offering one.
+                $query->whereHas('combos', function ($q) {
+                    $q->where('is_active', true);
+                });
+            } else {
+                $query->whereHas('services.template', function ($q) use ($categoryId) {
+                    $q->where('category_id', $categoryId);
+                });
+            }
         }
 
         // Distance decides the order when the app knows where the customer is.

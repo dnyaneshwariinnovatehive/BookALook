@@ -9,13 +9,19 @@ import '../../services/location_service.dart';
 import '../../widgets/city_picker_sheet.dart';
 import '../cart_screen.dart';
 import '../search_screen.dart';
+import '../../utils/app_haptics.dart';
+import '../../widgets/category_grid.dart';
 
 class ExploreTab extends StatefulWidget {
+  const ExploreTab({super.key});
+
   @override
-  _ExploreTabState createState() => _ExploreTabState();
+  ExploreTabState createState() => ExploreTabState();
 }
 
-class _ExploreTabState extends State<ExploreTab> {
+/// Public because the bottom-nav shell holds a handle to it: a category picked
+/// on the home tab is applied here, and the shell needs to reach in to do it.
+class ExploreTabState extends State<ExploreTab> {
   final SalonService _salonService = SalonService();
   final AppointmentService _appointmentService = AppointmentService();
   List<dynamic> _salons = [];
@@ -26,6 +32,11 @@ class _ExploreTabState extends State<ExploreTab> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'All Salons';
   bool _isCardView = true;
+
+  /// Set when the directory is narrowed to one category — from a card on the
+  /// home screen or from the all-categories page. Null is the whole directory.
+  String? _categoryId;
+  String? _categoryLabel;
 
   final CartService _cartService = CartService();
   Map<String, dynamic>? _globalCart;
@@ -62,9 +73,51 @@ class _ExploreTabState extends State<ExploreTab> {
 
   Future<void> _pickCity() async => showCityPicker(context);
 
+  /// Narrow the directory to one category and reload.
+  ///
+  /// Called by the shell when a category is picked elsewhere in the app. The
+  /// typed search and the rating chips are reset because they belong to the
+  /// unfiltered directory and would otherwise leave the customer staring at an
+  /// empty list with no obvious way back.
+  void applyCategoryFilter({String? categoryId, String? categoryLabel}) {
+    if (categoryId == null || categoryId.isEmpty) {
+      clearCategoryFilter();
+      return;
+    }
+
+    AppHaptics.selectionClick();
+
+    _searchController.clear();
+    setState(() {
+      _categoryId = categoryId;
+      _categoryLabel = categoryLabel;
+      _selectedFilter = 'All Salons';
+      _isLoading = true;
+      _error = '';
+    });
+
+    _loadSalons();
+  }
+
+  /// Back to the whole directory.
+  ///
+  /// A no-op when nothing is filtered, so tapping the Explore tab in the bottom
+  /// bar does not refetch a list that is already correct.
+  void clearCategoryFilter() {
+    if (_categoryId == null) return;
+
+    setState(() {
+      _categoryId = null;
+      _categoryLabel = null;
+      _isLoading = true;
+    });
+
+    _loadSalons();
+  }
+
   Future<void> _loadSalons() async {
     try {
-      final response = await _salonService.fetchSalons();
+      final response = await _salonService.fetchSalons(categoryId: _categoryId);
       final salons = response['salons'] ?? [];
       final globalCart = await _cartService.getGlobalCart();
       
@@ -163,6 +216,10 @@ class _ExploreTabState extends State<ExploreTab> {
             children: [
               SizedBox(height: 16),
               _buildHeader(),
+              if (_categoryId != null) ...[
+                SizedBox(height: 16),
+                _buildCategoryFilterBanner(),
+              ],
               SizedBox(height: 20),
               _buildFilters(),
               
@@ -399,6 +456,91 @@ class _ExploreTabState extends State<ExploreTab> {
     );
   }
 
+  /// Tells the customer the list below is not the whole directory, and gives
+  /// them one tap back to it.
+  Widget _buildCategoryFilterBanner() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    final label = _categoryLabel ?? 'this category';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                CategoryGrid.fallbackIcon(label),
+                size: 18,
+                color: AppTheme.accentColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Showing $label salons',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: headingColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Salons in this city that offer $label',
+                    maxLines: 2,
+                    style: GoogleFonts.outfit(fontSize: 12, color: bodyColor),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                AppHaptics.lightImpact();
+                clearCategoryFilter();
+              },
+              child: Text(
+                'Clear',
+                style: GoogleFonts.outfit(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title, String? subtitle) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
@@ -543,7 +685,16 @@ class _ExploreTabState extends State<ExploreTab> {
           Expanded(
             child: Row(
               children: [
-                Text('All Salons near you', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor)),
+                Flexible(
+                  child: Text(
+                    _categoryId == null
+                        ? 'All Salons near you'
+                        : '${_categoryLabel ?? 'Filtered'} salons near you',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: headingColor),
+                  ),
+                ),
                 SizedBox(width: 6),
                 Text('($count)', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: bodyColor)),
               ],
@@ -906,13 +1057,26 @@ class _ExploreTabState extends State<ExploreTab> {
     final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
     final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
+    // A category with no salons in this city is a different problem from a
+    // city with no salons at all, and the way out differs too.
+    final isFiltered = _categoryId != null;
+    final label = _categoryLabel ?? 'this category';
+
     return Column(
       children: [
         SizedBox(height: 40),
-        Icon(Icons.storefront_outlined, size: 56, color: isDark ? Colors.grey.shade700 : Colors.grey.shade400),
+        Icon(
+          isFiltered ? Icons.search_off_rounded : Icons.storefront_outlined,
+          size: 56,
+          color: isDark ? Colors.grey.shade700 : Colors.grey.shade400,
+        ),
         const SizedBox(height: 16),
         Text(
-          cityName == null ? 'No salons found' : 'No salons in $cityName yet',
+          isFiltered
+              ? 'No $label salons in ${cityName ?? 'this city'} yet'
+              : cityName == null
+                  ? 'No salons found'
+                  : 'No salons in $cityName yet',
           textAlign: TextAlign.center,
           style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: headingColor),
         ),
@@ -920,18 +1084,31 @@ class _ExploreTabState extends State<ExploreTab> {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 40),
           child: Text(
-            'We are adding salons all the time. Try another city in the meantime.',
+            isFiltered
+                ? 'Try another category, show every salon, or check a nearby city.'
+                : 'We are adding salons all the time. Try another city in the meantime.',
             textAlign: TextAlign.center,
             style: GoogleFonts.outfit(color: bodyColor, fontSize: 13),
           ),
         ),
         const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: _pickCity,
-          icon: const Icon(Icons.location_on, size: 18),
-          label: const Text('Change city'),
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor, foregroundColor: Colors.white),
-        ),
+        if (isFiltered)
+          FilledButton.icon(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              clearCategoryFilter();
+            },
+            icon: const Icon(Icons.grid_view_rounded, size: 18),
+            label: const Text('Show all salons'),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor, foregroundColor: Colors.white),
+          )
+        else
+          FilledButton.icon(
+            onPressed: _pickCity,
+            icon: const Icon(Icons.location_on, size: 18),
+            label: const Text('Change city'),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor, foregroundColor: Colors.white),
+          ),
         
         if (_suggested.isNotEmpty) ...[
           const SizedBox(height: 40),

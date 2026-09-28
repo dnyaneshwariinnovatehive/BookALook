@@ -2,21 +2,32 @@ import 'package:flutter/material.dart';
 
 import '../models/category.dart';
 import '../theme/app_theme.dart';
-import 'logo_marquee.dart';
 
 /// The category picker on the home screen.
 ///
-/// A single row of categories that drifts right to left and loops seamlessly,
-/// showing 4 tiles at a time, and guarantees that the 'Combo' category appears
-/// first.
+/// Four fixed, motionless cards: Combo, Hair, Grooming, and View More. The row
+/// used to be an endless marquee, but a strip that slides under the finger
+/// cannot be aimed at, and a customer hunting for "Hair" should not have to
+/// wait for it to come round.
 ///
-/// The motion lives in [InfiniteLogoMarquee]; this widget owns which categories
-/// are shown, how big they are, and what each one looks like.
+/// Combo is not a catalogue category — it is a package a salon builds out of
+/// its own services — so it always carries [comboSentinelId] and the directory
+/// resolves it to "salons offering a combo". Hair and Grooming are looked up in
+/// the categories the API sent.
 class CategoryGrid extends StatelessWidget {
   final List<ServiceCategory> categories;
   final void Function(ServiceCategory category) onTap;
+  final VoidCallback onViewMore;
 
-  const CategoryGrid({super.key, required this.categories, required this.onTap});
+  const CategoryGrid({
+    super.key,
+    required this.categories,
+    required this.onTap,
+    required this.onViewMore,
+  });
+
+  /// `category_id` the directory reads as "salons with a combo package".
+  static const String comboSentinelId = 'combo';
 
   /// A sensible picture when a category has no icon yet.
   static IconData fallbackIcon(String name) {
@@ -40,33 +51,60 @@ class CategoryGrid extends StatelessWidget {
     (Color(0xFFFFF1E6), Color(0xFFEF6C00)), // peach
     (Color(0xFFE6F6EF), Color(0xFF2E7D32)), // mint
     (Color(0xFFFDE8EF), Color(0xFFD81B60)), // rose
-    (Color(0xFFE7F0FD), Color(0xFF1565C0)), // sky
-    (Color(0xFFFFF6DA), Color(0xFFF59E0B)), // honey
   ];
 
   /// How many tiles fit across the screen at once.
   static const int _visibleTiles = 4;
   static const double _gap = 12;
 
-  List<ServiceCategory> _getProcessedCategories() {
-    List<ServiceCategory> cats = List.from(categories);
-    int comboIndex = cats.indexWhere((c) => c.name.toLowerCase() == 'combo');
-    if (comboIndex != -1) {
-      final combo = cats.removeAt(comboIndex);
-      cats.insert(0, combo);
-    } else {
-      // Create a synthesized 'Combo' category if not present
-      cats.insert(0, ServiceCategory(id: 'combo', name: 'Combo'));
+  /// The catalogue row behind one of the fixed cards.
+  ///
+  /// Matched on the exact name first and only then on a substring, so a
+  /// SuperAdmin renaming "Hair" to "Hair Services" keeps the card working while
+  /// a "Braids & Hair Colour" row cannot hijack it.
+  ServiceCategory? _match(List<String> needles) {
+    for (final needle in needles) {
+      for (final category in categories) {
+        if (category.name.toLowerCase() == needle) return category;
+      }
     }
-    return cats;
+    for (final needle in needles) {
+      for (final category in categories) {
+        if (category.name.toLowerCase().contains(needle)) return category;
+      }
+    }
+    return null;
+  }
+
+  /// The three filterable cards, in the order they are shown.
+  List<_FeaturedSlot> _featured() => [
+        _FeaturedSlot(
+          label: 'Combo',
+          category: ServiceCategory(id: comboSentinelId, name: 'Combo'),
+        ),
+        _FeaturedSlot(label: 'Hair', category: _match(const ['hair'])),
+        _FeaturedSlot(
+          label: 'Grooming',
+          category: _match(const ['groom', 'beard', 'shave']),
+        ),
+      ];
+
+  void _handleFeaturedTap(_FeaturedSlot slot) {
+    final category = slot.category;
+
+    // No catalogue row behind this card, so there is nothing to filter the
+    // directory by. The full category list is the honest place to send them.
+    if (category == null) {
+      onViewMore();
+      return;
+    }
+
+    onTap(category);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final allCats = _getProcessedCategories();
-
-    if (allCats.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -79,16 +117,41 @@ class CategoryGrid extends StatelessWidget {
             (viewportWidth - _gap * (_visibleTiles - 1)) / _visibleTiles;
         final tileHeight = tileWidth + 7 + 32;
 
-        return InfiniteLogoMarquee(
-          itemCount: allCats.length,
-          itemExtent: tileWidth,
-          gap: _gap,
+        final featured = _featured();
+
+        return SizedBox(
           height: tileHeight,
-          itemBuilder: (context, index) => _CategoryTile(
-            category: allCats[index],
-            tint: _tints[index % _tints.length],
-            isDark: isDark,
-            onTap: () => onTap(allCats[index]),
+          child: Row(
+            children: [
+              for (var i = 0; i < featured.length; i++) ...[
+                if (i > 0) const SizedBox(width: _gap),
+                // The square icon box needs a known width to size itself from,
+                // so each card is pinned rather than left to the Row.
+                SizedBox(
+                  width: tileWidth,
+                  child: _CategoryTile(
+                    // The label is fixed so the three cards always read
+                    // "Combo, Hair, Grooming". The catalogue row behind the
+                    // card only supplies the id to filter on and the artwork —
+                    // a row renamed to "Hair Services" must not rename the card
+                    // out from under the customer.
+                    label: featured[i].label,
+                    iconUrl: featured[i].category?.iconUrl,
+                    tint: _tints[i % _tints.length],
+                    isDark: isDark,
+                    onTap: () => _handleFeaturedTap(featured[i]),
+                  ),
+                ),
+              ],
+              const SizedBox(width: _gap),
+              SizedBox(
+                width: tileWidth,
+                child: _ViewMoreTile(
+                  isDark: isDark,
+                  onTap: onViewMore,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -96,14 +159,24 @@ class CategoryGrid extends StatelessWidget {
   }
 }
 
+/// One of the three fixed category cards.
+class _FeaturedSlot {
+  final String label;
+  final ServiceCategory? category;
+
+  const _FeaturedSlot({required this.label, required this.category});
+}
+
 class _CategoryTile extends StatelessWidget {
-  final ServiceCategory category;
+  final String label;
+  final String? iconUrl;
   final (Color, Color) tint;
   final bool isDark;
   final VoidCallback onTap;
 
   const _CategoryTile({
-    required this.category,
+    required this.label,
+    required this.iconUrl,
     required this.tint,
     required this.isDark,
     required this.onTap,
@@ -112,7 +185,7 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (background, foreground) = tint;
-    final hasIcon = category.iconUrl != null && category.iconUrl!.isNotEmpty;
+    final hasIcon = iconUrl != null && iconUrl!.isNotEmpty;
 
     return InkWell(
       onTap: onTap,
@@ -131,24 +204,24 @@ class _CategoryTile extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               child: hasIcon
                   ? Image.network(
-                      category.iconUrl!,
+                      iconUrl!,
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stack) => Icon(
-                        CategoryGrid.fallbackIcon(category.name),
+                        CategoryGrid.fallbackIcon(label),
                         color: foreground,
                         size: 26,
                       ),
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;
                         return Icon(
-                          CategoryGrid.fallbackIcon(category.name),
+                          CategoryGrid.fallbackIcon(label),
                           color: foreground.withOpacity(0.35),
                           size: 26,
                         );
                       },
                     )
                   : Icon(
-                      CategoryGrid.fallbackIcon(category.name),
+                      CategoryGrid.fallbackIcon(label),
                       color: foreground,
                       size: 26,
                     ),
@@ -156,7 +229,53 @@ class _CategoryTile extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            category.name,
+            label,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The fourth card: every category the platform has, on its own page.
+class _ViewMoreTile extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ViewMoreTile({required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppTheme.accentColor;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? accent.withOpacity(0.16) : AppTheme.lightAccentSoft,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(Icons.grid_view_rounded, color: accent, size: 26),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'View More',
             maxLines: 2,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
