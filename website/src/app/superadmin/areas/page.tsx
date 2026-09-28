@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
+import { useConfirm } from '@/components/admin/ui';
 import { readSpreadsheet, templateCsv } from './spreadsheet';
 
 interface SubArea {
@@ -99,6 +100,7 @@ export default function SubAreasPage() {
   // about attached salons can be read next to the thing it is warning about.
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   /**
    * Everything at once.
@@ -289,6 +291,18 @@ export default function SubAreasPage() {
   };
 
   const toggleActive = async (area: SubArea) => {
+    if (area.is_active) {
+      // Hiding pulls the sub-area out of every booking, salon and service
+      // dropdown at once, which is worth stating before the click lands.
+      const ok = await confirm({
+        title: `Hide ${area.name}?`,
+        body: 'It disappears from the booking, salon and service dropdowns straight away. Salons already serving it keep their setup, and you can bring it back any time.',
+        confirmLabel: 'Hide sub-area',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+
     setBusyId(area.id);
     try {
       const res = await fetch(`/api/proxy/superadmin/sub-areas/${area.id}`, {
@@ -571,6 +585,8 @@ export default function SubAreasPage() {
           </section>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

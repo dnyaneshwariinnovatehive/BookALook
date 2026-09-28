@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pagination } from '@/components/admin/ui';
+import { Pagination, useConfirm } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 interface Complaint {
@@ -57,6 +57,8 @@ export default function ComplaintsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
+  const [notice, setNotice] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
 
   // The complaint currently open for a decision, with the context needed to
   // make one.
@@ -158,7 +160,14 @@ export default function ComplaintsPage() {
   };
 
   const reinstate = async (complaint: Complaint) => {
-    if (!confirm(`Put ${complaint.salon_name} back online?`)) return;
+    const ok = await confirm({
+      title: `Put ${complaint.salon_name} back online?`,
+      body: complaint.action_taken
+        ? `It comes down off the platform immediately and the owner can take bookings again. The ${ACTION_LABELS[complaint.action_taken]?.toLowerCase() ?? complaint.action_taken} on this complaint stays on the record.`
+        : 'It comes down off the platform immediately and the owner can take bookings again.',
+      confirmLabel: 'Put back online',
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/proxy/superadmin/salons/${complaint.salon_id}/reinstate`, {
@@ -167,15 +176,22 @@ export default function ComplaintsPage() {
         body: '{}',
       });
       const json = await res.json();
-      alert(json.message || 'Done');
+      if (!res.ok) throw new Error(json.message || 'Could not reinstate the salon.');
+      setNotice(`${complaint.salon_name} is back online.`);
       await load();
-    } catch {
-      alert('Could not reinstate the salon.');
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not reinstate the salon.');
     }
   };
 
   return (
     <div className={styles.container}>
+      {notice && (
+        <p role="status" style={{ color: 'var(--text-body)', marginBottom: '1rem' }}>
+          {notice}
+        </p>
+      )}
+
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Complaints</h1>
@@ -395,6 +411,8 @@ export default function ComplaintsPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

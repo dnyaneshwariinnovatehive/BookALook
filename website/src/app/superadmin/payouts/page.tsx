@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pagination, SortHeader } from '@/components/admin/ui';
+import { Pagination, SortHeader, useConfirm } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 type CycleType = 'weekly' | 'monthly';
@@ -126,6 +126,7 @@ export default function PayoutsPage() {
   const [error, setError] = useState('');
   const [distributeTarget, setDistributeTarget] = useState<Payout | null>(null);
   const [distributeReference, setDistributeReference] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
 
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
@@ -214,19 +215,38 @@ export default function PayoutsPage() {
     }
   };
 
-  // Recalculate automatically whenever the cycle (type or start date) changes,
-  // so the table stays in sync without having to press "Calculate" each time.
-  // Skipped on first render — only reacts to an actual filter change.
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    generate();
-    // generate intentionally left out — it is recreated every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cycleType, cycleStart]);
+  // Recalculation is never automatic. It used to fire from a useEffect whenever
+  // the cycle type or start date changed, so simply opening a different month
+  // in the dropdown rewrote every salon's settlement figures with no preview
+  // and no way to see what had changed. It is now only ever run by pressing
+  // "Calculate", and that press asks first.
+
+  /** Human name of the cycle currently selected, without waiting on the API. */
+  const selectedCycleLabel = () => {
+    const match = getCycleOptions(cycleType).find(o => o.value === cycleStart);
+    if (match) return match.label;
+    return cycleType === 'monthly' ? 'that month' : 'that week';
+  };
+
+  const confirmGenerate = async () => {
+    const ok = await confirm({
+      title: `Rebuild the ${selectedCycleLabel()} cycle?`,
+      body: 'This recalculates every salon’s figures for this cycle from their completed appointments, overwriting whatever is already calculated. Nothing is paid out by this, but the numbers you approve and distribute afterwards will be these.',
+      confirmLabel: 'Recalculate cycle',
+    });
+    if (!ok) return;
+    await generate();
+  };
+
+  const confirmApprove = async (payout: Payout) => {
+    const ok = await confirm({
+      title: `Approve ${money(payout.net_amount)} for ${payout.salon_name ?? 'this salon'}?`,
+      body: 'Approving releases this payout for distribution. It locks in the commission and the salon’s access for this cycle.',
+      confirmLabel: 'Approve payout',
+    });
+    if (!ok) return;
+    await act(payout, 'approve');
+  };
 
   const confirmDistribute = (payout: Payout) => {
     setDistributeTarget(payout);
@@ -324,7 +344,7 @@ export default function PayoutsPage() {
           </select>
         </div>
 
-        <button className={styles.button} onClick={generate} disabled={busyId === 'generate'}>
+        <button className={styles.button} onClick={confirmGenerate} disabled={busyId === 'generate'}>
           {busyId === 'generate'
             ? 'Calculating…'
             : cycleType === 'monthly'
@@ -450,7 +470,7 @@ export default function PayoutsPage() {
                       <button
                         className={styles.smallButton}
                         disabled={busyId === p.id}
-                        onClick={() => act(p, 'approve')}
+                        onClick={() => confirmApprove(p)}
                       >
                         Approve
                       </button>
@@ -523,7 +543,7 @@ export default function PayoutsPage() {
               <button 
                 onClick={() => act(distributeTarget, 'distribute', distributeReference)}
                 disabled={busyId === distributeTarget.id}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--accent-gradient, #4F46E5)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-danger-solid)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
               >
                 {busyId === distributeTarget.id ? 'Confirming...' : 'Confirm Distribution'}
               </button>
@@ -532,6 +552,7 @@ export default function PayoutsPage() {
         </div>
       )}
 
+      {confirmDialog}
     </div>
   );
 }

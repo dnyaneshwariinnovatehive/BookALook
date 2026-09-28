@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useConfirm } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 interface Tier {
@@ -40,6 +41,7 @@ export default function WalletSchemesPage() {
   /* Purely cosmetic feedback so the page never feels unresponsive. */
   const [coinValueSaved, setCoinValueSaved] = useState(false);
   const [coinValueError, setCoinValueError] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -99,6 +101,27 @@ export default function WalletSchemesPage() {
   };
 
   const saveCoinValue = async () => {
+    const next = Number(coinValueInput);
+    if (!Number.isFinite(next) || next < 0) {
+      setCoinValueError('Enter a coin value of zero or more.');
+      return;
+    }
+
+    // This single field re-prices every coin balance already sitting in every
+    // customer's wallet, so the new rate and what it does to those balances
+    // is spelled out rather than applied on a bare Save.
+    const changing = next !== coinValue;
+    if (changing) {
+      const direction = next > coinValue ? 'more' : 'less';
+      const ok = await confirm({
+        title: `Re-price every coin to ₹${next}?`,
+        body: `Coins are currently worth ₹${coinValue}. A customer's existing balance keeps the same number of coins, so this makes every unspent balance ${direction} valuable overnight. Redemptions already made keep the rate they were made at.`,
+        confirmLabel: 'Re-price coins',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+
     setSavingCoinValue(true);
     setCoinValueError('');
     setCoinValueSaved(false);
@@ -246,18 +269,32 @@ export default function WalletSchemesPage() {
   };
 
   const handleDelete = async (scheme: Scheme) => {
-    if (!confirm(`Retire "${scheme.name}"?`)) return;
+    // The endpoint may only deactivate the scheme when it is still in use, so
+    // the prompt describes the end state rather than promising a hard delete.
+    const ok = await confirm({
+      title: `Retire “${scheme.name}”?`,
+      body: scheme.is_active
+        ? 'No new appointment will earn this reward once it is retired. Coins already awarded under it are kept, and the scheme can be brought back.'
+        : 'This scheme is already inactive, so retiring it only removes it from the list.',
+      confirmLabel: 'Retire scheme',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     setDeletingId(scheme.id);
+    setError('');
     try {
       const res = await fetch(`/api/proxy/superadmin/wallet-schemes/${scheme.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
       });
-      const data = await res.json();
-
-      if (data.deactivated) alert(data.message);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || 'Could not retire the scheme.');
+      }
       fetchData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not retire the scheme.');
     } finally {
       setDeletingId(null);
     }
@@ -695,6 +732,8 @@ export default function WalletSchemesPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

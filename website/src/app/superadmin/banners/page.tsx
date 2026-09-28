@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AsyncSelect from 'react-select/async';
+import { useConfirm } from '@/components/admin/ui';
 import styles from './banners.module.css';
 import BannerStudio from './BannerStudio';
 
@@ -25,6 +26,8 @@ export default function BannersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
   
   // Filter & Pagination state
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -197,26 +200,55 @@ export default function BannersPage() {
     setIsSubmitting(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
-    
+  /** What a banner is actually shown to, so the prompt can name the audience. */
+  const scopeLabel = (banner: Banner) => {
+    if (banner.target_scope === 'platform') return 'every customer on the platform';
+    if (banner.target_scope === 'city') return `customers in ${banner.target_city ?? 'that city'}`;
+    return 'that one salon';
+  };
+
+  const handleDelete = async (banner: Banner) => {
+    const ok = await confirm({
+      title: `Delete “${banner.title}”?`,
+      body: `This removes the banner and its image for good. It was shown to ${scopeLabel(banner)}.`,
+      confirmLabel: 'Delete banner',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    setNotice('');
     try {
-      const res = await fetch(`/api/superadmin/banners/${id}`, {
+      const res = await fetch(`/api/superadmin/banners/${banner.id}`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json'
         }
       });
-      
-      if (res.ok) {
-        fetchBanners();
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || 'Could not delete the banner.');
       }
+      setNotice(`Deleted “${banner.title}”.`);
+      fetchBanners();
     } catch (error) {
-      console.error(error);
+      setNotice(error instanceof Error ? error.message : 'Could not delete the banner.');
     }
   };
 
-  const toggleActive = async (banner: Banner) => {
+  /** A banner is live customer-facing art, so taking one down is a decision. */
+  const confirmToggleActive = async (banner: Banner) => {
+    const hiding = banner.is_active;
+    const ok = await confirm({
+      title: hiding ? `Hide “${banner.title}”?` : `Show “${banner.title}”?`,
+      body: hiding
+        ? `It disappears from ${scopeLabel(banner)} straight away. The banner and its image are kept, so you can bring it back.`
+        : `It starts showing again in ${scopeLabel(banner)} from today.`,
+      confirmLabel: hiding ? 'Hide banner' : 'Show banner',
+    });
+    if (!ok) return;
+
+    setNotice('');
     try {
       const res = await fetch(`/api/superadmin/banners/${banner.id}`, {
         method: 'PUT',
@@ -226,12 +258,15 @@ export default function BannersPage() {
         },
         body: JSON.stringify({ is_active: !banner.is_active })
       });
-      
-      if (res.ok) {
-        fetchBanners();
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || 'Could not update the banner.');
       }
+      setNotice(`“${banner.title}” is now ${hiding ? 'hidden' : 'showing'}.`);
+      fetchBanners();
     } catch (error) {
-      console.error(error);
+      setNotice(error instanceof Error ? error.message : 'Could not update the banner.');
     }
   };
 
@@ -313,6 +348,15 @@ export default function BannersPage() {
         </div>
       </div>
 
+      {notice && (
+        <p
+          role="status"
+          style={{ color: 'var(--text-body)', marginBottom: '1rem' }}
+        >
+          {notice}
+        </p>
+      )}
+
       <div className={styles.bannersGrid}>
         {banners.map(banner => (
           <div key={banner.id} className={styles.bannerCard}>
@@ -335,13 +379,13 @@ export default function BannersPage() {
               </button>
               <button 
                 className={`${styles.actionButton} ${styles.toggleButton}`}
-                onClick={() => toggleActive(banner)}
+                onClick={() => confirmToggleActive(banner)}
               >
                 {banner.is_active ? 'Deactivate' : 'Activate'}
               </button>
               <button 
                 className={`${styles.actionButton} ${styles.deleteButton}`}
-                onClick={() => handleDelete(banner.id)}
+                onClick={() => handleDelete(banner)}
               >
                 Delete
               </button>
@@ -516,6 +560,8 @@ export default function BannersPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }

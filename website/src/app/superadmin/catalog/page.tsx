@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useConfirm } from '@/components/admin/ui';
 import styles from './page.module.css';
 import IconStudio from './IconStudio';
 
@@ -45,6 +46,8 @@ export default function CatalogPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
 
   // Modals state
   const [showCatModal, setShowCatModal] = useState(false);
@@ -151,24 +154,35 @@ export default function CatalogPage() {
     }
   };
 
-  const handleDeleteCategory = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteCategory = async (cat: Category, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    const templateCount = cat.templates?.length ?? 0;
+    const ok = await confirm({
+      title: `Delete “${cat.name}”?`,
+      body: templateCount > 0
+        ? `Its ${templateCount} service${templateCount === 1 ? '' : 's'} go with it, and any salon still offering them loses them from its catalog. This cannot be undone.`
+        : 'This category is shared across the platform and disappears for every salon. This cannot be undone.',
+      confirmLabel: 'Delete category',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setNotice('');
     try {
-      const res = await fetch(`/api/proxy/superadmin/catalog/categories/${id}`, {
+      const res = await fetch(`/api/proxy/superadmin/catalog/categories/${cat.id}`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json'
         }
       });
       if (res.ok) {
+        setNotice(`Deleted “${cat.name}”.`);
         fetchCatalog();
       } else {
         const data = await res.json();
-        alert(data.message || 'Failed to delete category');
+        setNotice(data.message || 'Failed to delete category');
       }
-    } catch (err) {
-      alert('Error deleting category');
+    } catch {
+      setNotice('Error deleting category');
     }
   };
 
@@ -213,58 +227,86 @@ export default function CatalogPage() {
     }
   };
 
-  const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteTemplate = async (tpl: Template, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this template?')) return;
+    const ok = await confirm({
+      title: `Delete “${tpl.name}”?`,
+      body: 'Salons currently offering this service lose it from their catalog. This cannot be undone.',
+      confirmLabel: 'Delete service',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setNotice('');
     try {
-      const res = await fetch(`/api/proxy/superadmin/catalog/templates/${id}`, {
+      const res = await fetch(`/api/proxy/superadmin/catalog/templates/${tpl.id}`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json'
         }
       });
       if (res.ok) {
+        setNotice(`Deleted “${tpl.name}”.`);
         fetchCatalog();
       } else {
-        alert('Failed to delete template');
+        setNotice('Failed to delete template');
       }
-    } catch (err) {
-      alert('Error deleting template');
+    } catch {
+      setNotice('Error deleting template');
     }
   };
 
-  const handlePromoteCategory = async (id: string, e: React.MouseEvent) => {
+  const handlePromoteCategory = async (cat: Category, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to promote this category? It will become visible to all salons.')) return;
+    const ok = await confirm({
+      title: `Make “${cat.name}” a standard category?`,
+      body: 'It stops being one salon’s custom category and becomes visible to every salon on the platform, where it can then be edited from here.',
+      confirmLabel: 'Make standard',
+    });
+    if (!ok) return;
+    setNotice('');
     try {
-      const res = await fetch(`/api/proxy/superadmin/catalog/categories/${id}/promote`, {
+      const res = await fetch(`/api/proxy/superadmin/catalog/categories/${cat.id}/promote`, {
         method: 'PUT',
         headers: {
           'Accept': 'application/json'
         }
       });
       if (res.ok) {
+        setNotice(`“${cat.name}” is now a standard category.`);
         fetchCatalog();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setNotice(data?.message || 'Failed to promote category');
       }
-    } catch (err) {
-      alert('Error promoting category');
+    } catch {
+      setNotice('Error promoting category');
     }
   };
 
-  const handlePromoteTemplate = async (id: string) => {
-    if (!confirm('Are you sure you want to promote this template? It will become visible to all salons.')) return;
+  const handlePromoteTemplate = async (tpl: Template) => {
+    const ok = await confirm({
+      title: `Make “${tpl.name}” a standard service?`,
+      body: 'It stops being one salon’s custom service and becomes visible to every salon on the platform, where it can then be edited from here.',
+      confirmLabel: 'Make standard',
+    });
+    if (!ok) return;
+    setNotice('');
     try {
-      const res = await fetch(`/api/proxy/superadmin/catalog/templates/${id}/promote`, {
+      const res = await fetch(`/api/proxy/superadmin/catalog/templates/${tpl.id}/promote`, {
         method: 'PUT',
         headers: {
           'Accept': 'application/json'
         }
       });
       if (res.ok) {
+        setNotice(`“${tpl.name}” is now a standard service.`);
         fetchCatalog();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setNotice(data?.message || 'Failed to promote template');
       }
-    } catch (err) {
-      alert('Error promoting template');
+    } catch {
+      setNotice('Error promoting template');
     }
   };
 
@@ -368,7 +410,7 @@ export default function CatalogPage() {
                   <button 
                     className={`${styles.iconBtn} ${styles.promoteBtn}`} 
                     title="Promote to Standard"
-                    onClick={(e) => handlePromoteCategory(cat.id, e)}
+                    onClick={(e) => handlePromoteCategory(cat, e)}
                   >
                     <PromoteIcon />
                   </button>
@@ -383,7 +425,7 @@ export default function CatalogPage() {
                 <button 
                   className={`${styles.iconBtn} ${styles.deleteBtn}`} 
                   title="Delete Category"
-                  onClick={(e) => handleDeleteCategory(cat.id, e)}
+                  onClick={(e) => handleDeleteCategory(cat, e)}
                 >
                   <TrashIcon />
                 </button>
@@ -432,7 +474,7 @@ export default function CatalogPage() {
                         <button 
                           className={`${styles.iconBtn} ${styles.promoteBtn}`} 
                           title="Promote to Standard"
-                          onClick={() => handlePromoteTemplate(tpl.id)}
+                          onClick={() => handlePromoteTemplate(tpl)}
                         >
                           <PromoteIcon />
                         </button>
@@ -447,7 +489,7 @@ export default function CatalogPage() {
                       <button 
                         className={`${styles.iconBtn} ${styles.deleteBtn}`} 
                         title="Delete Template"
-                        onClick={(e) => handleDeleteTemplate(tpl.id, e)}
+                        onClick={(e) => handleDeleteTemplate(tpl, e)}
                       >
                         <TrashIcon />
                       </button>
@@ -564,6 +606,14 @@ export default function CatalogPage() {
           </div>
         </div>
       )}
+
+      {notice && (
+        <p role="status" style={{ color: 'var(--text-body)', marginTop: '1rem' }}>
+          {notice}
+        </p>
+      )}
+
+      {confirmDialog}
     </div>
   );
 }

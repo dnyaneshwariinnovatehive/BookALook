@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useConfirm } from '@/components/admin/ui';
 import StaffDetailsModal from './StaffDetailsModal';
 import styles from './page.module.css';
 
@@ -60,6 +61,7 @@ export default function SalonDirectoryDetail() {
   const [selectedCollaborator, setSelectedCollaborator] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignNote, setAssignNote] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
 
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('Overview');
@@ -96,6 +98,24 @@ export default function SalonDirectoryDetail() {
   }, [id]);
 
   const handleAssignCollaborator = async () => {
+    // The same button writes both directions. Assigning is routine, but picking
+    // "No collaborator" posts a null and silently detaches whoever is on the
+    // salon right now, so that direction is the one worth a prompt.
+    const currentId = salon?.assigned_collaborator_id;
+    const current = currentId
+      ? collaborators.find((c) => c.id === currentId) ?? salon?.assigned_collaborator
+      : null;
+
+    if (!selectedCollaborator && current) {
+      const ok = await confirm({
+        title: `Detach ${current.name}?`,
+        body: `${current.name} stops handling ${salon?.name ?? 'this salon'} and loses access to its bookings, staff and payouts. The salon keeps running with no collaborator.`,
+        confirmLabel: 'Detach collaborator',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+
     setAssigning(true);
     setAssignNote('');
 
@@ -386,6 +406,8 @@ export default function SalonDirectoryDetail() {
           onClose={() => setSelectedStaffId(null)}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 }

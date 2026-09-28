@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useConfirm } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 interface Salon {
@@ -30,6 +31,8 @@ export default function SalonReviewPage() {
   
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [notice, setNotice] = useState('');
+  const [confirm, confirmDialog] = useConfirm();
 
   useEffect(() => {
     async function fetchSalon() {
@@ -52,21 +55,27 @@ export default function SalonReviewPage() {
   }, [id]);
 
   const handleApprove = async () => {
-    if (!confirm('Are you sure you want to approve this salon?')) return;
+    if (!salon) return;
+    const ok = await confirm({
+      title: `Publish ${salon.name}?`,
+      body: 'This salon goes live on the platform and its owner can start taking bookings and paying through BookALook. The decision applies to the whole customer app, not just this queue.',
+      confirmLabel: 'Approve salon',
+    });
+    if (!ok) return;
     setActionLoading(true);
+    setNotice('');
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}/approve`, {
         method: 'POST',
       });
       const json = await res.json();
       if (json.success) {
-        alert(json.message);
         router.push('/superadmin/salon-approval');
       } else {
-        alert(json.message || 'Approval failed');
+        setNotice(json.message || 'Approval failed');
       }
-    } catch (err) {
-      alert('Network error while approving');
+    } catch {
+      setNotice('Network error while approving');
     } finally {
       setActionLoading(false);
     }
@@ -74,9 +83,19 @@ export default function SalonReviewPage() {
 
   const handleReject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectReason.trim()) return;
+    if (!rejectReason.trim() || !salon) return;
+
+    const ok = await confirm({
+      title: `Reject ${salon.name}?`,
+      body: `The owner is told: “${rejectReason.trim()}”. This closes the enquiry and the salon stays unpublished.`,
+      confirmLabel: 'Reject salon',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
     setActionLoading(true);
-    
+    setNotice('');
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/superadmin/salons/${id}/reject`, {
         method: 'POST',
@@ -85,16 +104,15 @@ export default function SalonReviewPage() {
       });
       const json = await res.json();
       if (json.success) {
-        alert(json.message);
         router.push('/superadmin/salon-approval');
       } else {
-        alert(json.message || 'Rejection failed');
+        // Leave the form open so the reason is not lost on a failure.
+        setNotice(json.message || 'Rejection failed');
       }
-    } catch (err) {
-      alert('Network error while rejecting');
+    } catch {
+      setNotice('Network error while rejecting');
     } finally {
       setActionLoading(false);
-      setShowRejectModal(false);
     }
   };
 
@@ -179,9 +197,13 @@ export default function SalonReviewPage() {
           </div>
         </div>
 
+        {notice && (
+          <p style={{ color: 'var(--color-danger)', marginTop: 16 }}>{notice}</p>
+        )}
+
         <div className={styles.actions}>
-          <button 
-            className={styles.approveBtn} 
+          <button
+            className={styles.approveBtn}
             onClick={handleApprove}
             disabled={actionLoading}
           >
@@ -228,6 +250,8 @@ export default function SalonReviewPage() {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 }
