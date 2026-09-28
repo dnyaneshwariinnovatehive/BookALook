@@ -102,6 +102,123 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
     });
   }
 
+  /// The audience segment this send is aimed at, by name. Used only to spell
+  /// the blast out in the confirmation.
+  String get _segmentName {
+    for (final segment in widget.options.segments) {
+      if (segment.key == _segment) return segment.name;
+    }
+    return 'your customers';
+  }
+
+  /// A campaign cannot be recalled once it has gone out, so the final step asks
+  /// first and names exactly who is about to be messaged.
+  Future<void> _confirmSend() async {
+    final template = _template;
+    if (template == null) return;
+
+    final preview = _preview;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final count = preview?.willSend ?? 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Send to $count customers?',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Campaign', style: TextStyle(fontSize: 14, color: body)),
+                Flexible(
+                  child: Text(_name.text.trim().isEmpty ? template.name : _name.text.trim(),
+                      textAlign: TextAlign.right,
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Audience', style: TextStyle(fontSize: 14, color: body)),
+                Flexible(
+                  child: Text(_segmentName,
+                      textAlign: TextAlign.right,
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Channel', style: TextStyle(fontSize: 14, color: body)),
+                Text('WhatsApp',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: dangerBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'This message goes out to real customers. Once delivered it cannot be recalled or edited.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: danger),
+              ),
+            ),
+            if ((preview?.beyondAllowance ?? 0) > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${preview!.beyondAllowance} more customers matched this group but sit beyond this month\'s allowance, so they will not be messaged.',
+                style: TextStyle(fontSize: 12, height: 1.4, color: textLight),
+              ),
+            ],
+            if (preview?.skipExplanation != null) ...[
+              const SizedBox(height: 6),
+              Text(preview!.skipExplanation!,
+                  style: TextStyle(fontSize: 12, height: 1.4, color: textLight)),
+            ],
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Keep editing', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Send now',
+                style: TextStyle(color: danger, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _send();
+  }
+
   Future<void> _send() async {
     final template = _template;
     if (template == null) return;
@@ -518,7 +635,7 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
                     if (_step < 2) {
                       setState(() => _step++);
                     } else {
-                      _send();
+                      _confirmSend();
                     }
                   },
             style: ElevatedButton.styleFrom(

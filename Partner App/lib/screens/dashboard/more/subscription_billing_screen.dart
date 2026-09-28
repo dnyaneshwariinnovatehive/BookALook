@@ -85,6 +85,81 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
     }
   }
 
+  /// Renewing commits the salon to another billing period, so the plan and
+  /// the run-out date it replaces are both named first. This sits next to
+  /// `_requestCommissionModel`, which already gates itself the same way.
+  Future<void> _confirmRenewal() async {
+    final planName = _subscription?['plan']?['name']?.toString() ?? 'your plan';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final accent = AppTheme.accentColor;
+    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Renew $planName?',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Plan', style: TextStyle(fontSize: 14, color: body)),
+                Text('$planName Plan',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Runs out in', style: TextStyle(fontSize: 14, color: body)),
+                Text('$_daysRemaining days',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: softBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Renewing starts a fresh billing period from today and commits you to it. It cannot be cancelled from the app.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: body),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Not now', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Renew',
+                style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _renewSubscription();
+  }
+
   Future<void> _renewSubscription() async {
     setState(() => _isLoading = true);
     try {
@@ -315,7 +390,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 )
               else
                 ElevatedButton.icon(
-                  onPressed: _canRenew ? _renewSubscription : null,
+                  onPressed: _canRenew ? _confirmRenewal : null,
                   icon: const Icon(Icons.autorenew),
                   label: const Text('Renew Subscription (Mock)'),
                   style: ElevatedButton.styleFrom(

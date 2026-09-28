@@ -24,7 +24,54 @@ class MoreTab extends StatelessWidget {
   final Map<String, dynamic> salonData;
   const MoreTab({super.key, required this.salonData});
 
-  void _logout(BuildContext context) async {
+  /// `Switch Salon` and `Switch Account` are still standing in for this one
+  /// method, so the dialog says plainly what the tap actually does instead of
+  /// guessing at an intent the code does not implement yet.
+  Future<void> _logout(BuildContext context, {required String action}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final salonName = (salonData['name'] ?? 'this salon').toString();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Log out of $salonName?',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$action ends your session and returns you to the sign-in screen.',
+                style: TextStyle(fontSize: 14, color: body, height: 1.4)),
+            const SizedBox(height: 10),
+            Text('Your bookings, staff and payouts for $salonName stay exactly as they are.',
+                style: TextStyle(fontSize: 13, color: body, height: 1.4)),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Stay signed in', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Log out',
+                style: TextStyle(color: danger, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -138,7 +185,7 @@ class MoreTab extends StatelessWidget {
                     icon: Icons.storefront,
                     iconColor: Colors.purple,
                     title: 'Switch Salon',
-                    onTap: () => _logout(context), // Using logout as placeholder per old logic
+                    onTap: () => _logout(context, action: 'Switch Salon'), // Using logout as placeholder per old logic
                   ),
                   Divider(height: 1, indent: 56),
                   _buildOptionTile(context, 
@@ -291,7 +338,7 @@ class MoreTab extends StatelessWidget {
                     icon: Icons.manage_accounts,
                     iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkInfo : AppTheme.lightInfo),
                     title: 'Switch Account',
-                    onTap: () => _logout(context),
+                    onTap: () => _logout(context, action: 'Switch Account'),
                   ),
                   Divider(height: 1, indent: 56),
                   _buildOptionTile(context, 
@@ -331,7 +378,7 @@ class MoreTab extends StatelessWidget {
             
             // Logout Button
             GestureDetector(
-              onTap: () => _logout(context),
+              onTap: () => _logout(context, action: 'Logging out'),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(

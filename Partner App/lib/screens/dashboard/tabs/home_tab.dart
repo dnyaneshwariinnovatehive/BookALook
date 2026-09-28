@@ -191,6 +191,134 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  /// Whoever asked. The staff tab reads the name out of `provider.user.name`
+  /// while this one reads `provider.name`, so both shapes are tried.
+  String _leaveProviderName(ProviderLeave leave) {
+    final provider = leave.provider;
+    if (provider != null) {
+      final user = provider['user'];
+      if (user is Map && user['name'] != null) return '${user['name']}';
+      if (provider['name'] != null) return '${provider['name']}';
+    }
+    return 'This staff member';
+  }
+
+  /// Approving or rejecting is a permanent write on a staff record, and a
+  /// rejection is what payroll picks up as unpaid leave, so the decision and
+  /// its pay consequence are named before it is written.
+  Future<void> _decideLeave(ProviderLeave leave, String status) async {
+    final approving = status == 'approved';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final success = isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
+    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final name = _leaveProviderName(leave);
+    final isUnpaid = leave.leaveType == 'unpaid';
+    final when = leave.isFullDay
+        ? '${DateFormat('dd MMM yyyy').format(DateTime.parse(leave.leaveDate))} • Full Day'
+        : '${DateFormat('dd MMM yyyy').format(DateTime.parse(leave.leaveDate))} • ${leave.startTime} - ${leave.endTime}';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          approving ? 'Approve this leave?' : 'Reject this leave?',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: heading)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('When', style: TextStyle(fontSize: 14, color: body)),
+                Flexible(
+                  child: Text(when,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Leave type', style: TextStyle(fontSize: 14, color: body)),
+                Text(isUnpaid ? 'Unpaid' : 'Paid',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: body)),
+              ],
+            ),
+            if (leave.reason != null && leave.reason!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Reason', style: TextStyle(fontSize: 14, color: body)),
+                  Flexible(
+                    child: Text(leave.reason!,
+                        textAlign: TextAlign.right,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: body)),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: approving ? softBg : dangerBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                approving
+                    ? '$name is marked away for this period. Any bookings on it still need rescheduling.'
+                    : isUnpaid
+                        ? 'Rejected unpaid leave is deducted from $name\'s next salary.'
+                        : '$name is marked as working this period, so any bookings on it stay as they are.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: approving ? body : danger),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text('This cannot be changed from the app afterwards.',
+                style: TextStyle(fontSize: 12, color: textLight)),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Go back', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              approving ? 'Approve leave' : 'Reject leave',
+              style: TextStyle(color: approving ? success : danger, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _updateLeaveStatus(leave, status);
+  }
+
   Future<void> _updateLeaveStatus(ProviderLeave leave, String newStatus) async {
     try {
       await StaffApi.updateLeaveStatus(widget.salonId, leave.id, newStatus);
@@ -670,7 +798,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () => _updateLeaveStatus(leave, 'approved'),
+                  onPressed: () => _decideLeave(leave, 'approved'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
@@ -683,7 +811,7 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: () => _updateLeaveStatus(leave, 'rejected'),
+                  onPressed: () => _decideLeave(leave, 'rejected'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
                     foregroundColor: Colors.white,

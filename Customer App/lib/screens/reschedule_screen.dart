@@ -141,8 +141,165 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     }
   }
 
+  /// Who the customer has picked, in words rather than as an id.
+  String get _selectedProviderName {
+    if (_selectedProviderKey == null || _selectedProviderKey == _kAnyProvider) {
+      return 'Any available staff';
+    }
+    for (final provider in _providers) {
+      if (provider['id'].toString() == _selectedProviderKey) {
+        return (provider['name'] ?? 'Staff').toString();
+      }
+    }
+    return 'Assigned staff';
+  }
+
+  /// "14:30" or "14:30:00" as "2:30 PM", so the old and new slots read the
+  /// same way in the confirmation.
+  String _prettyTime(String? time) {
+    if (time == null || time.isEmpty) return '—';
+    final parts = time.split(':');
+    if (parts.length < 2) return time;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return time;
+    final suffix = hour < 12 ? 'AM' : 'PM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+    return '$displayHour:${minute.toString().padLeft(2, '0')} $suffix';
+  }
+
+  /// The move is committed server-side as soon as it is pressed, so the
+  /// customer is shown the old slot, the new slot and what happens to their
+  /// money before it happens.
+  Future<bool> _confirmReschedule() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final accent = AppTheme.accentColor;
+    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final fromDate = _currentDate == null
+        ? '—'
+        : DateFormat('EEE, MMM d').format(DateTime.parse(_currentDate!));
+    final toDate = _selectedDate == null
+        ? '—'
+        : DateFormat('EEE, MMM d').format(_selectedDate!);
+
+    final sameSlot = _currentDate == DateFormat('yyyy-MM-dd').format(_selectedDate!) &&
+        _currentTime == _selectedTime;
+
+    AppHaptics.lightImpact();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: surface,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        title: Text('Reschedule this booking?',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20, color: textHeading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _slotRow('From', '$fromDate · ${_prettyTime(_currentTime)}',
+                isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, textBody, textLight, !sameSlot),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Icon(Icons.arrow_downward, size: 16, color: textLight),
+            ),
+            _slotRow('To', '$toDate · ${_prettyTime(_selectedTime)}', accent, accent, textLight, false),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: softBg, borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('With $_selectedProviderName',
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: textHeading)),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.freeReschedule
+                        ? 'Free reschedule — the salon closed your original date, so your advance carries over untouched.'
+                        : 'Your advance already paid carries over to the new slot. There is nothing more to pay.',
+                    style: GoogleFonts.outfit(fontSize: 12, color: textBody),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              sameSlot
+                  ? 'This is the slot you are already booked for, so nothing will change.'
+                  : 'Your original slot is released. This cannot be undone from here.',
+              style: GoogleFonts.outfit(fontSize: 12, color: textLight),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
+            child: Text('Go back', style: GoogleFonts.outfit(color: textBody)),
+          ),
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, true);
+            },
+            child: Text(sameSlot ? 'Confirm' : 'Confirm new slot',
+                style: GoogleFonts.outfit(color: accent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed == true;
+  }
+
+  Widget _slotRow(
+    String label,
+    String value,
+    Color valueColor,
+    Color labelColor,
+    Color textLight,
+    bool muted,
+  ) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 48,
+            child: Text(label,
+                style: GoogleFonts.outfit(
+                    fontSize: 13, fontWeight: FontWeight.w600, color: labelColor)),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: valueColor,
+                decoration: muted ? TextDecoration.lineThrough : TextDecoration.none,
+                decorationColor: textLight,
+              ),
+            ),
+          ),
+        ],
+      );
+
   Future<void> _confirm() async {
     if (_selectedTime == null || _selectedDate == null) return;
+
+    if (!await _confirmReschedule()) return;
 
     setState(() => _isSaving = true);
 

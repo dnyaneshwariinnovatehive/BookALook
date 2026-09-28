@@ -7,6 +7,7 @@ import '../../widgets/guest_restricted_view.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../phone_screen.dart';
+import '../../utils/app_haptics.dart';
 import '../../main.dart'; // To access themeNotifier
 
 class ProfileTab extends StatefulWidget {
@@ -95,10 +96,79 @@ class _ProfileTabState extends State<ProfileTab> {
     await prefs.setBool(key, value);
   }
 
-  void _logout(BuildContext context) async {
+  /// Signing out ends the session and clears the token on this device, so the
+  /// account being signed out of is named before it happens.
+  Future<void> _logout(BuildContext context) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final surface = isDark ? AppTheme.darkSurface : Colors.white;
+
+    final name = (_userProfile?['name'] ?? '').toString().trim();
+    final phone = (_userProfile?['phone'] ?? '').toString().trim();
+    final email = (_userProfile?['email'] ?? '').toString().trim();
+    final contact = phone.isNotEmpty ? phone : (email.isNotEmpty ? email : '');
+
+    AppHaptics.lightImpact();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: surface,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        title: Text('Log out of BookALook?',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20, color: textHeading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (name.isNotEmpty)
+              Text(name, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: textHeading)),
+            if (contact.isNotEmpty) ...[
+              if (name.isNotEmpty) const SizedBox(height: 2),
+              Text(contact, style: GoogleFonts.outfit(fontSize: 14, color: textBody)),
+            ],
+            const SizedBox(height: 14),
+            Text(
+              contact.isNotEmpty
+                  ? 'You will need to sign in again with $contact to reach your bookings, wallet and profile on this device.'
+                  : 'You will need to sign in again to reach your bookings, wallet and profile on this device.',
+              style: GoogleFonts.outfit(fontSize: 14, color: textBody),
+            ),
+            const SizedBox(height: 12),
+            Text('Your bookings and cart stay saved to your account.',
+                style: GoogleFonts.outfit(fontSize: 12, color: textLight)),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
+            child: Text('Stay signed in', style: GoogleFonts.outfit(color: textBody)),
+          ),
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, true);
+            },
+            child: Text('Log out', style: GoogleFonts.outfit(color: danger, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     final authService = AuthService();
     await authService.logout();
-    
+
+    if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => PhoneScreen()),
       (route) => false,

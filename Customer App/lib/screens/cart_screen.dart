@@ -94,9 +94,114 @@ class _CartScreenState extends State<CartScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _removeItem(String itemId) async {
+  /// Label on the left, figure on the right — the same row style the booking
+  /// dialogs use, so every confirmation in the app reads the same.
+  Widget _dialogRow(String label, String value, Color valueColor) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+          Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
+        ],
+      );
+
+  /// One tap here hard-deletes the line and re-prices the whole cart, so the
+  /// customer is told what is going and what it costs them before it happens.
+  Future<void> _removeItem(
+    String itemId, {
+    required String title,
+    required double lineTotal,
+    required bool isCombo,
+  }) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final summary = _cart?['summary'] as Map<String, dynamic>?;
+    final saving = double.tryParse('${summary?['saving'] ?? 0}') ?? 0.0;
+    final hasOffers = ((_cart?['applied_combos'] as List?) ?? const []).isNotEmpty || saving > 0;
+
+    AppHaptics.lightImpact();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: surface,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        title: Text('Remove this item?',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20, color: textHeading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: textHeading)),
+            SizedBox(height: 12),
+            _dialogRow('Item price', '₹${lineTotal.toStringAsFixed(0)}', textHeading),
+            if (isCombo) ...[
+              SizedBox(height: 6),
+              _dialogRow('Type', 'Package', textBody),
+            ],
+            if (hasOffers) ...[
+              SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: dangerBg, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: danger),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        saving > 0
+                            ? 'You save ₹${saving.toStringAsFixed(0)} on this cart. Removing an item can change which offers apply, and your total will be recalculated.'
+                            : 'This item is part of an applied offer. Removing it can change which offers apply, and your total will be recalculated.',
+                        style: GoogleFonts.outfit(fontSize: 12, color: danger),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            SizedBox(height: 14),
+            Text(
+              isCombo
+                  ? 'The whole package comes out of your cart, including every service in it.'
+                  : 'This only takes it out of your cart. You can add it again from the salon.',
+              style: GoogleFonts.outfit(fontSize: 12, color: textLight),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
+            child: Text('Keep it', style: GoogleFonts.outfit(color: textBody)),
+          ),
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, true);
+            },
+            child: Text('Remove item',
+                style: GoogleFonts.outfit(color: danger, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
-      AppHaptics.lightImpact();
       await _cartService.removeItem(itemId);
       AppHaptics.mediumImpact();
       _loadCart(); // Reload cart after removing item
@@ -281,7 +386,13 @@ class _CartScreenState extends State<CartScreen> {
               ),
               IconButton(
                 icon: Icon(Icons.delete_outline, color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger),
-                onPressed: () => _removeItem(item['id'].toString()),
+                tooltip: 'Remove from cart',
+                onPressed: () => _removeItem(
+                  item['id'].toString(),
+                  title: title,
+                  lineTotal: _lineTotal(item),
+                  isCombo: isCombo,
+                ),
               )
             ],
           ),

@@ -83,6 +83,119 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     }
   }
 
+  /// Whoever asked. The two screens that render leaves read the name out of
+  /// different shapes of the same payload, so both are tried.
+  String _leaveProviderName(ProviderLeave leave) {
+    final provider = leave.provider;
+    if (provider != null) {
+      final user = provider['user'];
+      if (user is Map && user['name'] != null) return '${user['name']}';
+      if (provider['name'] != null) return '${provider['name']}';
+    }
+    return 'This staff member';
+  }
+
+  /// Label on the left, value on the right — the same row style the other
+  /// confirmation dialogs in this app use.
+  Widget _dialogRow(String label, String value, Color valueColor) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+          Text(value,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
+        ],
+      );
+
+  /// Approving or rejecting is a permanent write on a staff record, and a
+  /// rejection is what payroll picks up as unpaid leave, so the decision and
+  /// its pay consequence are named before it is written.
+  Future<void> _decideLeave(ProviderLeave leave, String status) async {
+    final approving = status == 'approved';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final success = isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess;
+    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
+    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final name = _leaveProviderName(leave);
+    final isUnpaid = leave.leaveType == 'unpaid';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          approving ? 'Approve this leave?' : 'Reject this leave?',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name,
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: heading)),
+            const SizedBox(height: 12),
+            _dialogRow('When', _formatLeaveTime(leave), heading),
+            const SizedBox(height: 6),
+            _dialogRow('Leave type', isUnpaid ? 'Unpaid' : 'Paid', body),
+            if (leave.reason != null && leave.reason!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _dialogRow('Reason', leave.reason!, body),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: approving ? softBg : dangerBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                approving
+                    ? '$name is marked away for this period. Any bookings on it still need rescheduling.'
+                    : isUnpaid
+                        ? 'Rejected unpaid leave is deducted from $name\'s next salary.'
+                        : '$name is marked as working this period, so any bookings on it stay as they are.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: approving ? body : danger,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text('This cannot be changed from the app afterwards.',
+                style: TextStyle(fontSize: 12, color: textLight)),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Go back', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              approving ? 'Approve leave' : 'Reject leave',
+              style: TextStyle(color: approving ? success : danger, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _updateLeaveStatus(leave.id, status);
+  }
+
   Future<void> _updateLeaveStatus(String leaveId, String status) async {
     try {
       await StaffApi.updateLeaveStatus(widget.salonId, leaveId, status);
@@ -369,7 +482,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                 Row(
                   children: [
                     InkWell(
-                      onTap: () => _updateLeaveStatus(leave.id, 'approved'),
+                      onTap: () => _decideLeave(leave, 'approved'),
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -381,7 +494,7 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () => _updateLeaveStatus(leave.id, 'rejected'),
+                      onTap: () => _decideLeave(leave, 'rejected'),
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(

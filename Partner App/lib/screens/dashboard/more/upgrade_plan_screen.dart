@@ -121,6 +121,121 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool get _fullyPaidByCoins =>
       _selectedPlanPrice > 0 && _coinsApplied * _coinValue >= _selectedPlanPrice;
 
+  /// Name of the plan currently picked, for the confirmation to name.
+  String get _selectedPlanName {
+    final plan = _plans.firstWhere(
+      (p) => p['id'].toString() == _selectedPlanId,
+      orElse: () => null,
+    );
+    return plan?['name']?.toString() ?? 'this plan';
+  }
+
+  /// A plan purchase spends wallet coins and, usually, real money, and the
+  /// coins are gone the moment the request goes out. The button shows the
+  /// summary already; this is the point of no return.
+  Future<void> _confirmUpgrade() async {
+    if (_selectedPlanId == null) return;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final accent = AppTheme.accentColor;
+    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+
+    final coins = _coinsApplied;
+    final price = _selectedPlanPrice;
+    final discount = coins * _coinValue;
+    final remaining = (price - discount).clamp(0, price);
+    final coveredByCoins = _fullyPaidByCoins;
+
+    Widget row(String label, String value, Color valueColor) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(fontSize: 14, color: body)),
+            Flexible(
+              child: Text(value,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
+            ),
+          ],
+        );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(coveredByCoins ? 'Activate $_selectedPlanName?' : 'Confirm your $_selectedPlanName payment?',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            row('Plan', _selectedPlanName, heading),
+            const SizedBox(height: 6),
+            row('Plan price', '₹${price.toStringAsFixed(0)}', heading),
+            if (coins > 0)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Coins applied', style: TextStyle(fontSize: 14, color: body)),
+                  Flexible(
+                    child: Text('$coins coins (−₹${discount.toStringAsFixed(0)})',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: accent)),
+                  ),
+                ],
+              ),
+            if (coins > 0) const SizedBox(height: 6),
+            row(
+              coveredByCoins ? 'Still to pay' : 'Paying now',
+              coveredByCoins ? '₹0 — fully covered' : '₹${remaining.toStringAsFixed(0)}',
+              coveredByCoins ? body : heading,
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: softBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                coveredByCoins
+                    ? 'Your $coins coins are spent the moment this is activated, and coins cannot be refunded.'
+                    : 'Your $coins coins are spent as soon as this request is sent, and coins cannot be refunded. BookALook verifies the proof before the plan goes live.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: body),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text('Check the plan name and amount before continuing.',
+                style: TextStyle(fontSize: 12, color: textLight)),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Go back', style: TextStyle(color: body)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              coveredByCoins ? 'Activate plan' : 'Submit payment proof',
+              style: TextStyle(color: accent, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _processUpgrade();
+  }
+
   Future<void> _processUpgrade() async {
     if (_selectedPlanId == null) return;
 
@@ -324,7 +439,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
 
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: _isProcessing ? null : _processUpgrade,
+              onPressed: _isProcessing ? null : _confirmUpgrade,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
