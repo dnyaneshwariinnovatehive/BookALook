@@ -9,16 +9,21 @@ import 'location_service.dart';
 ///
 /// Scoped to the chosen city, because a haircut two cities away is not a
 /// result — it is a dead end the customer has to work out for themselves.
+///
+/// Also scoped to the category being browsed, for the same reason: someone
+/// inside Hair who types "facial" wants a facial, and the category on screen is
+/// the promise that this search is still answering that question.
 class CustomerSearchService {
   static String get _baseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
 
-  static Future<SearchResults> search(String query) async {
+  static Future<SearchResults> search(String query, {String? categoryId}) async {
     final cityId = LocationService.instance.city?.id;
 
     final uri = Uri.parse('$_baseUrl/customer/search').replace(queryParameters: {
       'q': query,
       if (cityId != null) 'city_id': cityId,
+      if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
     });
 
     final response = await http.get(uri, headers: {'Accept': 'application/json'});

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Combo;
 use App\Models\Salon;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
@@ -123,7 +124,7 @@ class SearchService
      *
      * @return array<string, mixed>
      */
-    public function search(string $query, ?string $cityId, int $limit = 20): array
+    public function search(string $query, ?string $cityId, int $limit = 20, ?string $categoryId = null): array
     {
         $query = trim($query);
 
@@ -135,8 +136,8 @@ class SearchService
         $categories = $this->matchCategories($query);
 
         return [
-            'services' => $this->servicesFor($templates, $cityId, $limit),
-            'salons' => $this->matchSalons($query, $cityId, $limit),
+            'services' => $this->servicesFor($templates, $cityId, $limit, $categoryId),
+            'salons' => $this->matchSalons($query, $cityId, $limit, $categoryId),
             'categories' => $categories,
             // Only offered when nothing matched cleanly — a correction shown
             // above results the customer can already see is just noise.
@@ -196,7 +197,7 @@ class SearchService
      * @param  array<string, int>  $templates
      * @return array<int, array<string, mixed>>
      */
-    private function servicesFor(array $templates, ?string $cityId, int $limit): array
+    private function servicesFor(array $templates, ?string $cityId, int $limit, ?string $categoryId = null): array
     {
         if ($templates === []) {
             return [];
@@ -213,6 +214,10 @@ class SearchService
             ->where('s.status', 'active')
             ->whereNull('s.deleted_at')
             ->when($cityId, fn ($q) => $q->where('s.city_id', $cityId))
+            ->when(
+                $categoryId && ! $this->isSentinel($categoryId),
+                fn ($q) => $q->where('t.category_id', $categoryId)
+            )
             ->select([
                 'sv.id as service_id',
                 'sv.price',
@@ -258,11 +263,12 @@ class SearchService
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function matchSalons(string $query, ?string $cityId, int $limit): array
+    private function matchSalons(string $query, ?string $cityId, int $limit, ?string $categoryId = null): array
     {
         $salons = Salon::query()
             ->where('status', 'active')
             ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
+            ->when($categoryId, fn ($q) => $q->providingCategory($categoryId))
             ->with('subArea:id,name')
             ->get(['id', 'name', 'slug', 'address', 'avg_rating', 'review_count', 'sub_area_id']);
 
@@ -323,6 +329,19 @@ class SearchService
         $name = ServiceTemplate::whereKey(array_key_first($templates))->value('name');
 
         return $name && $this->normalise($name) !== $this->normalise($query) ? $name : null;
+    }
+
+    /**
+     * Whether this "category" is really the combo sentinel.
+     *
+     * Combos are packages rather than catalogue categories, so there is no
+     * service template to match a category against — asking the templates for
+     * one would simply return nothing. The salon side is answered from the
+     * combos instead, and service results stay as they are.
+     */
+    private function isSentinel(?string $categoryId): bool
+    {
+        return $categoryId !== null && strtolower($categoryId) === Combo::CATEGORY_SENTINEL;
     }
 
     /**

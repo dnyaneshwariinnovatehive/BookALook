@@ -172,7 +172,11 @@ class ExploreTabState extends State<ExploreTab> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SearchScreen(initialQuery: _searchController.text),
+        builder: (context) => SearchScreen(
+          initialQuery: _searchController.text,
+          categoryId: _categoryId,
+          categoryLabel: _categoryLabel,
+        ),
       ),
     );
   }

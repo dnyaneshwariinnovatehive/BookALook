@@ -9,6 +9,8 @@ class Combo extends Model
 {
     use HasUuids;
 
+    public const CATEGORY_SENTINEL = 'combo';
+
     public $timestamps = false;
 
     protected $fillable = [

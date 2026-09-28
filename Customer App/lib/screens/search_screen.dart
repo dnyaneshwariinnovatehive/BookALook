@@ -21,7 +21,18 @@ import 'salon_list_screen.dart';
 class SearchScreen extends StatefulWidget {
   final String initialQuery;
 
-  const SearchScreen({super.key, this.initialQuery = ''});
+  /// Set when the customer arrives from a category in Explore, so the search
+  /// keeps answering the question that category is asking. Null for a search
+  /// started from Home or the sidebar, which is deliberately unrestricted.
+  final String? categoryId;
+  final String? categoryLabel;
+
+  const SearchScreen({
+    super.key,
+    this.initialQuery = '',
+    this.categoryId,
+    this.categoryLabel,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -84,7 +95,10 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final results = await CustomerSearchService.search(trimmed);
+      final results = await CustomerSearchService.search(
+        trimmed,
+        categoryId: widget.categoryId,
+      );
 
       // A slow response for a query the customer has already typed past must
       // not overwrite the results for what they are looking at now.
@@ -131,7 +145,44 @@ class _SearchScreenState extends State<SearchScreen> {
         titleSpacing: 0,
         title: _searchField(isDark),
       ),
-      body: _body(isDark),
+      body: widget.categoryId == null
+          ? _body(isDark)
+          : Column(
+              children: [
+                _scopeStrip(isDark),
+                Expanded(child: _body(isDark)),
+              ],
+            ),
+    );
+  }
+
+  /// Says the search is narrowed, because a customer who typed "facial" while
+  /// inside Hair deserves to know why nothing came back rather than guessing.
+  Widget _scopeStrip(bool isDark) {
+    final label = widget.categoryLabel;
+
+    if (label == null || label.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final muted = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+
+    return Container(
+      width: double.infinity,
+      color: isDark ? AppTheme.darkSurface : Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Row(
+        children: [
+          Icon(Icons.filter_alt_outlined, size: 15, color: muted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Searching within $label',
+              style: TextStyle(fontSize: 13, color: muted),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

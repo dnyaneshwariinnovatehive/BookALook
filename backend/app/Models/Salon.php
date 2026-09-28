@@ -91,6 +91,32 @@ class Salon extends Model
         return $this->hasMany(Combo::class);
     }
 
+    /**
+     * Salons that can actually be booked for a given catalogue category.
+     *
+     * The offer is a *service* the salon has switched on, not a category that
+     * happens to exist somewhere in its templates — a switched-off service is
+     * not something a customer can book, so listing the salon is a dead end.
+     *
+     * Also accepts the combo sentinel, which is not a catalogue category at all
+     * but means "offers a package", so it is answered from the combos instead.
+     */
+    public function scopeProvidingCategory($query, string $categoryId)
+    {
+        if (strtolower($categoryId) === Combo::CATEGORY_SENTINEL) {
+            return $query->whereHas('combos', function ($combos) {
+                $combos->where('is_active', true);
+            });
+        }
+
+        return $query->whereHas('services', function ($services) use ($categoryId) {
+            $services->where('is_active', true)
+                ->whereHas('template', function ($template) use ($categoryId) {
+                    $template->where('category_id', $categoryId);
+                });
+        });
+    }
+
     public function subscriptions()
     {
         return $this->hasMany(SalonSubscription::class);

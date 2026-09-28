@@ -28,7 +28,7 @@ class SalonController extends Controller
      * against a catalogue category, so the app sends this instead of a category
      * uuid. It is compared lowercased, so `Combo` works as well as `combo`.
      */
-    public const COMBO_CATEGORY_SENTINEL = 'combo';
+    public const COMBO_CATEGORY_SENTINEL = Combo::CATEGORY_SENTINEL;
 
     public function show(Request $request, $id)
     {
@@ -397,24 +397,7 @@ class SalonController extends Controller
         }
 
         if ($request->filled('category_id')) {
-            $categoryId = $request->category_id;
-
-            // "Combo" is not a catalogue category — it is a package a salon
-            // builds out of its own services. The app sends the sentinel below
-            // so the combo card can mean "salons that offer a package" rather
-            // than matching a category row that does not exist.
-            if (strtolower($categoryId) === self::COMBO_CATEGORY_SENTINEL) {
-                // Only live packages, same as the cart prices them, or a salon
-                // that has switched all of its packages off would still be
-                // listed as offering one.
-                $query->whereHas('combos', function ($q) {
-                    $q->where('is_active', true);
-                });
-            } else {
-                $query->whereHas('services.template', function ($q) use ($categoryId) {
-                    $q->where('category_id', $categoryId);
-                });
-            }
+            $query->providingCategory($request->category_id);
         }
 
         // Distance decides the order when the app knows where the customer is.
@@ -437,11 +420,15 @@ class SalonController extends Controller
         $suggestedRows = collect();
         $alternativeCity = null;
 
-        // An empty list is a dead end, so it never ships on its own. A failed
-        // search falls back to what else is in this city; a city with nothing
-        // in it at all falls back to the nearest market that does.
-        if ($rows->isEmpty()) {
-            if ($request->filled('search') || $request->filled('category_id')) {
+        // An empty list is a dead end, so a search that found nothing falls back
+        // to what else is in this city, and a city with nothing in it falls back
+        // to the nearest market that does.
+        //
+        // Browsing a category is the one case that does not get a fallback: the
+        // customer asked for salons offering *this*, so showing salons that do
+        // not is worse than showing none. That empty list is the answer.
+        if ($rows->isEmpty() && ! $request->filled('category_id')) {
+            if ($request->filled('search')) {
                 $suggestedRows = $this->present(
                     Salon::with(['currentSubscription'])
                         ->where('status', 'active')

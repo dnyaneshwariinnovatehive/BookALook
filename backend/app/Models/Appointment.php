@@ -44,6 +44,18 @@ class Appointment extends Model
         return $this->hasMany(AppointmentServiceAddition::class);
     }
 
+    /**
+     * The invoice for this booking, when one has been raised.
+     *
+     * At most one — the invoices table holds a unique key on appointment_id —
+     * and not always present: an invoice is raised on demand, and a booking
+     * whose basket has nothing to charge has no document to show.
+     */
+    public function invoice()
+    {
+        return $this->hasOne(Invoice::class);
+    }
+
     public function cancelledByUser()
     {
         return $this->belongsTo(User::class, 'cancelled_by_user_id');
