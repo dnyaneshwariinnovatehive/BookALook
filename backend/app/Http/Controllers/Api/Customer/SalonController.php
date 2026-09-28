@@ -115,6 +115,7 @@ class SalonController extends Controller
 
         return $rows->map(fn (Service $service) => [
             'id' => $service->id,
+            'template_id' => $service->template_id,
             'name' => $service->template->name ?? 'Service',
             'description' => $service->description,
             'price' => (float) $service->price,

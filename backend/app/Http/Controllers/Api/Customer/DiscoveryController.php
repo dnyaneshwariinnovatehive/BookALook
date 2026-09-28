@@ -23,6 +23,12 @@ class DiscoveryController extends Controller
     /**
      * Distinct catalogue services actually on offer for a category, with real
      * prices, so the horizontal scroller is honest before anyone opens a salon.
+     *
+     * Each service also carries the exact salon that best represents it — the
+     * highest-rated active salon in the city offering that service — together
+     * with that salon's own offer id, price and rating. The app uses those to
+     * put a named salon on every top-rated card and to add that exact
+     * salon + service to the cart in one tap, without ever inventing a host.
      */
     public function servicesByCategory(Request $request, string $categoryId)
     {
@@ -45,25 +51,45 @@ class DiscoveryController extends Controller
             ->where('s.status', 'active')
             ->whereNull('s.deleted_at')
             ->when($city, fn ($q) => $q->where('s.city_id', $city->id))
-            ->selectRaw('t.id as service_id')
+            ->selectRaw('sv.id as offer_id')
+            ->selectRaw('sv.template_id as service_id')
             ->selectRaw('t.name')
             ->selectRaw('t.estimated_duration_minutes as duration_minutes')
-            ->selectRaw('MIN(sv.price) as min_price')
-            ->selectRaw('MAX(s.avg_rating) as rating')
-            ->selectRaw('COUNT(DISTINCT s.id) as salon_count')
-            ->groupBy('t.id', 't.name', 't.estimated_duration_minutes')
-            ->orderBy('t.name')
+            ->selectRaw('sv.price')
+            ->selectRaw('s.id as salon_id')
+            ->selectRaw('s.name as salon_name')
+            ->selectRaw('s.cover_photo_url as salon_cover_url')
+            ->selectRaw('s.avg_rating as rating')
+            // Highest-rated host first (unrated salons last), cheapest price a
+            // tie-breaker, then a stable id so "top" is deterministic.
+            ->orderBy('sv.template_id')
+            ->orderByRaw('ISNULL(s.avg_rating), s.avg_rating DESC, sv.price ASC, sv.id ASC')
             ->get();
 
+        $services = $rows
+            ->groupBy('service_id')
+            ->map(function (Collection $offers) {
+                $top = $offers->first();
+
+                return [
+                    'service_id' => $top->service_id,
+                    'name' => $top->name,
+                    'duration_minutes' => (int) $top->duration_minutes,
+                    'min_price' => round((float) $offers->min('price'), 2),
+                    'price' => round((float) $top->price, 2),
+                    'offer_id' => $top->offer_id,
+                    'salon_id' => $top->salon_id,
+                    'salon_name' => $top->salon_name,
+                    'salon_cover_url' => $top->salon_cover_url,
+                    'salon_count' => (int) $offers->unique('salon_id')->count(),
+                    'rating' => $top->rating !== null ? round((float) $top->rating, 1) : null,
+                ];
+            })
+            ->sortBy('name')
+            ->values();
+
         return response()->json([
-            'services' => $rows->map(fn ($row) => [
-                'service_id' => $row->service_id,
-                'name' => $row->name,
-                'duration_minutes' => (int) $row->duration_minutes,
-                'min_price' => round((float) $row->min_price, 2),
-                'salon_count' => (int) $row->salon_count,
-                'rating' => $row->rating !== null ? round((float) $row->rating, 1) : null,
-            ])->values(),
+            'services' => $services,
             'city' => $this->cityPayload($city),
         ]);
     }

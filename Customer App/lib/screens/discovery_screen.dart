@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/category.dart';
 import '../services/auth_service.dart';
+import '../services/cart_service.dart';
 import '../services/discovery_service.dart';
 import '../services/location_service.dart';
 import '../services/salon_service.dart';
@@ -13,6 +14,8 @@ import '../utils/app_haptics.dart';
 import '../widgets/category_grid.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../widgets/discovery_salon_card.dart';
+import 'cart_screen.dart';
+import 'phone_screen.dart';
 
 enum _DiscoveryMode { category, combo }
 
@@ -43,7 +46,28 @@ class _Option {
   final String? subtitle;
   final double? rating;
 
-  const _Option({this.key, required this.name, this.salonCount = 0, this.subtitle, this.rating});
+  /// The exact salon backing this offering — populated from the discovery
+  /// catalogue so a top-rated card always names (and adds) a real salon.
+  final String? offerId;
+  final String? salonId;
+  final String? salonName;
+  final String? salonCoverUrl;
+  final double price;
+  final int durationMinutes;
+
+  const _Option({
+    this.key,
+    required this.name,
+    this.salonCount = 0,
+    this.subtitle,
+    this.rating,
+    this.offerId,
+    this.salonId,
+    this.salonName,
+    this.salonCoverUrl,
+    this.price = 0,
+    this.durationMinutes = 0,
+  });
 }
 
 /// The shared Zomato-style discovery layout: hero header, a search field that
@@ -235,6 +259,12 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
           name: s.name,
           salonCount: s.salonCount,
           rating: s.rating,
+          offerId: s.offerId,
+          salonId: s.salonId,
+          salonName: s.salonName,
+          salonCoverUrl: s.salonCoverUrl,
+          price: s.price,
+          durationMinutes: s.durationMinutes,
           subtitle: [
             '₹${s.minPrice.toStringAsFixed(0)}',
             if (s.durationMinutes > 0) '${s.durationMinutes} min',
@@ -511,7 +541,7 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 128,
+          height: 140,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: top.length,
@@ -524,19 +554,24 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
     );
   }
 
-  /// One top-rated card: the offering name is the highlight and the rating is
-  /// the badge. No salon name — this ranks the service, not a host.
+  /// One top-rated card: the offering name with the exact salon that hosts it
+  /// and that salon's real price and rating. Tapping adds that precise
+  /// salon + service to the existing cart and then hands over to the normal
+  /// cart/booking procedure.
   Widget _buildTopRatedCard(_Option option) {
     final rating = option.rating ?? 0;
+    final price = option.price > 0 ? option.price : 0;
+    final hasSalon = option.salonId != null && option.offerId != null;
 
     return GestureDetector(
-      onTap: () {
-        AppHaptics.selectionClick();
-        setState(() => _selectedKey = option.key);
-        _fetchSalons();
-      },
+      onTap: hasSalon
+          ? () {
+              AppHaptics.lightImpact();
+              _addTopRatedToCart(option);
+            }
+          : null,
       child: Container(
-        width: 150,
+        width: 176,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
@@ -561,10 +596,13 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
                   style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 const Spacer(),
-                Text(
-                  '${option.salonCount} salons',
-                  style: GoogleFonts.outfit(fontSize: 11, color: Colors.white70),
-                ),
+                if (hasSalon)
+                  _salonThumb(option.salonCoverUrl)
+                else
+                  Text(
+                    '${option.salonCount} salons',
+                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.white70),
+                  ),
               ],
             ),
             const Spacer(),
@@ -579,8 +617,40 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
                 height: 1.15,
               ),
             ),
-            const SizedBox(height: 4),
-            if (option.subtitle != null)
+            const SizedBox(height: 5),
+            if (hasSalon) ...[
+              // The host salon is the whole point: this visible name is a real
+              // salon offering exactly this service.
+              Row(
+                children: [
+                  const Icon(Icons.storefront, size: 12, color: Colors.white70),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      option.salonName ?? 'Salon',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+              if (option.durationMinutes > 0) const SizedBox(height: 2),
+              if (option.durationMinutes > 0)
+                Text(
+                  '₹${price.toStringAsFixed(0)} · ${option.durationMinutes} min',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                )
+              else
+                Text(
+                  '₹${price.toStringAsFixed(0)} · Add',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+            ] else if (option.subtitle != null)
               Text(
                 option.subtitle!,
                 maxLines: 1,
@@ -591,6 +661,118 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
         ),
       ),
     );
+  }
+
+  Widget _salonThumb(String? coverUrl) {
+    if (coverUrl == null || coverUrl.isEmpty) {
+      return const SizedBox(
+        width: 26,
+        height: 26,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white12,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.storefront, size: 14, color: Colors.white70),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        width: 26,
+        height: 26,
+        child: Image.network(
+          coverUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const DecoratedBox(
+            decoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
+            child: Icon(Icons.storefront, size: 14, color: Colors.white70),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Adds the exact salon + service a top-rated card represents to the
+  /// existing global cart — the same pipeline the salon detail page uses — so
+  /// the salon context is never lost on its way to the booking flow.
+  Future<void> _addTopRatedToCart(_Option option) async {
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      final loggedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+      );
+      if (loggedIn != true) return;
+    }
+
+    final salonId = option.salonId;
+    final offerId = option.offerId;
+    if (salonId == null || offerId == null) return;
+
+    final cartService = CartService();
+    try {
+      await cartService.addItem(salonId, offerId);
+      if (!mounted) return;
+      AppHaptics.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${option.name} added · ${option.salonName ?? 'your salon'}'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'View cart',
+            textColor: AppTheme.accentColor,
+            onPressed: _openCart,
+          ),
+        ),
+      );
+    } on CartConflictException catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
+      final confirmed = await _confirmReplaceCart(e.otherSalonName);
+      if (confirmed == true && mounted) {
+        await cartService.clearGlobalCart();
+        await _addTopRatedToCart(option);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<bool?> _confirmReplaceCart(String otherSalonName) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Replace cart items?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(
+          'Your cart contains items from $otherSalonName. Do you want to discard that selection and add items from this salon?',
+          style: GoogleFonts.outfit(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
+            child: Text('Replace', style: GoogleFonts.outfit(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openCart() {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen()));
   }
 
   Widget _buildBody(bool isDark, Color headingColor, Color bodyColor) {
@@ -625,6 +807,12 @@ class _DiscoveryScaffoldState extends State<_DiscoveryScaffold> {
           salon: salon,
           isFavourited: _favouritedIds.contains(id),
           showFavourite: _signedIn,
+          // The salon opens inside the same category (and, when a capsule is
+          // picked, the same sub-service) the customer was browsing, so the
+          // salon page starts on those services instead of every service.
+          categoryId: _isCombo ? null : widget.category?.id,
+          categoryName: _isCombo ? null : widget.category?.name,
+          serviceId: _isCombo ? null : _selectedKey,
           onToggleFavourite: () => _toggleFavourite(id),
         );
       },

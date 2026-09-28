@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
+import '../services/review_service.dart';
 import 'phone_screen.dart';
 import 'cart_screen.dart';
 import 'salon_reviews_screen.dart';
@@ -11,9 +12,29 @@ import '../widgets/cart_offers.dart';
 import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
 
+/// Which reviews the inline Ratings & reviews preview is showing.
+enum _ReviewFilter { topRated, five, fourPlus, threePlus }
+
 class SalonDetailScreen extends StatefulWidget {
   final String salonId;
-  const SalonDetailScreen({Key? key, required this.salonId}) : super(key: key);
+
+  /// Optional discovery context. When a customer lands here from a category
+  /// (e.g. Nails → a salon), the page opens on that category's services so the
+  /// salon never immediately shows unrelated categories. [serviceId] is the
+  /// catalogue service template that was picked, used to highlight and reveal
+  /// the exact service card (when the salon offers it); a template name match
+  /// is never used — only the real template_id carried by each service row.
+  final String? categoryId;
+  final String? categoryName;
+  final String? serviceId;
+
+  const SalonDetailScreen({
+    Key? key,
+    required this.salonId,
+    this.categoryId,
+    this.categoryName,
+    this.serviceId,
+  }) : super(key: key);
 
   @override
   State<SalonDetailScreen> createState() => _SalonDetailScreenState();
@@ -23,6 +44,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   final SalonService _salonService = SalonService();
   final CartService _cartService = CartService();
   final PageController _galleryController = PageController();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _reviewsKey = GlobalKey();
 
   Map<String, dynamic>? _salon;
   Map<String, dynamic>? _cart;
@@ -36,17 +59,128 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   int _galleryPage = 0;
   bool _hoursExpanded = false;
 
+  /// The exact template a discovery sub-service pick points at, so its card (if
+  /// this salon offers it) can be visibly highlighted. Matched against the
+  /// real `template_id` on each service row — never by name.
+  String? _highlightServiceId;
+  final GlobalKey _highlightServiceKey = GlobalKey();
+
+  /// The real review list for the inline filters, loaded through the same
+  /// existing /salons/{id}/reviews pipeline the full review page uses. The
+  /// salon detail payload only carries a 3-review preview.
+  final List<dynamic> _allReviews = [];
+  _ReviewFilter _reviewFilter = _ReviewFilter.topRated;
+
+  static const int _maxInlineReviews = 5;
+
   @override
   void initState() {
     super.initState();
     _loadSalonDetails();
     _loadCart();
+    _loadAllReviews();
   }
 
   @override
   void dispose() {
     _galleryController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Pages through the existing review endpoint until every real review is
+  /// in hand, so the star capsules filter the complete dataset, not a preview.
+  Future<void> _loadAllReviews() async {
+    final collected = <dynamic>[];
+    try {
+      var page = 1;
+      while (page <= 50) {
+        final body = await ReviewService.forSalon(widget.salonId, page: page);
+        if (body == null) break;
+        collected.addAll(body['reviews'] as List? ?? const []);
+        final meta = body['meta'] as Map?;
+        if (meta?['has_more'] != true) break;
+        page++;
+      }
+    } catch (_) {
+      // The preview still renders below if this cannot load.
+    }
+    if (!mounted) return;
+    setState(() {
+      _allReviews
+        ..clear()
+        ..addAll(collected);
+    });
+  }
+
+  /// The reviews the active capsule selects, from the real data only.
+  List<dynamic> get _filteredReviews {
+    final all = _allReviews;
+    switch (_reviewFilter) {
+      case _ReviewFilter.five:
+        return all.where((r) => (r['rating'] as num?)?.toInt() == 5).toList();
+      case _ReviewFilter.fourPlus:
+        return all.where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 4).toList();
+      case _ReviewFilter.threePlus:
+        return all.where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 3).toList();
+      case _ReviewFilter.topRated:
+        final rated = all.where((r) => (r['rating'] as num?) != null).toList();
+        rated.sort((a, b) => (b['rating'] as num).compareTo(a['rating'] as num));
+        return rated;
+    }
+  }
+
+  /// Smoothly brings the Ratings & reviews section into view, past the pinned
+  /// app bar. The reviews sliver is lazy, so if it is not built yet we first
+  /// take the scroll to the bottom to force its layout before aligning.
+  Future<void> _scrollToReviews() async {
+    if (!_scrollController.hasClients) return;
+    try {
+      if (_reviewsKey.currentContext == null) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      final ctx = _reviewsKey.currentContext;
+      if (ctx == null) return;
+      final viewport = _scrollController.position.viewportDimension;
+      final toolbar = MediaQuery.of(context).padding.top + kToolbarHeight;
+      final alignment = (toolbar / viewport).clamp(0.0, 0.5).toDouble();
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
+        alignment: alignment,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _revealHighlightedService() async {
+    if (!_scrollController.hasClients || _highlightServiceId == null) return;
+    try {
+      // The service list is a lazy sliver, so the highlighted card may not be
+      // built yet. Nudge forward a screen until its key materialises, then
+      // bring it into view just below the pinned app bar (best effort).
+      for (var attempt = 0; attempt < 6; attempt++) {
+        final ctx = _highlightServiceKey.currentContext;
+        if (ctx != null) {
+          final viewport = _scrollController.position.viewportDimension;
+          final toolbar = MediaQuery.of(context).padding.top + kToolbarHeight;
+          final alignment = (toolbar / viewport).clamp(0.0, 0.5).toDouble();
+          await Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+            alignment: alignment,
+          );
+          return;
+        }
+        _scrollController.jumpTo(
+          (_scrollController.offset + 600)
+              .clamp(0.0, _scrollController.position.maxScrollExtent),
+        );
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadSalonDetails() async {
@@ -57,8 +191,15 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       setState(() {
         _salon = data;
         _isFavourited = data['is_favourited'] == true;
+        // Land on the category the customer came in through, so unrelated
+        // categories stay out of the way until they switch tabs themselves.
+        _selectedCategoryId = widget.categoryId;
+        _highlightServiceId = widget.serviceId;
         _isLoading = false;
       });
+      if (widget.serviceId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _revealHighlightedService());
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -359,6 +500,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           await _loadCart();
         },
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             _buildAppBar(),
             SliverToBoxAdapter(child: _buildHeaderCard()),
@@ -368,7 +510,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             SliverToBoxAdapter(child: _buildCategoryTabs()),
             _buildServiceSliver(),
             SliverToBoxAdapter(child: _buildTeam()),
-            SliverToBoxAdapter(child: _buildReviews()),
+            SliverToBoxAdapter(key: _reviewsKey, child: _buildReviews()),
             SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
@@ -538,22 +680,30 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final count = (rating['count'] ?? 0) as int;
     final average = _toDouble(rating['average']);
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: count > 0 ? AppTheme.lightSuccess : Colors.black.withOpacity(0.45),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.star_rounded, color: Colors.white, size: 15),
-          SizedBox(width: 4),
-          Text(
-            count > 0 ? '${average.toStringAsFixed(1)} ($count)' : 'New',
-            style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-        ],
+    return GestureDetector(
+      onTap: count > 0 ? _scrollToReviews : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: count > 0 ? AppTheme.lightSuccess : Colors.black.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.star_rounded, color: Colors.white, size: 15),
+            SizedBox(width: 4),
+            Text(
+              count > 0 ? '${average.toStringAsFixed(1)} ($count)' : 'New',
+              style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            if (count > 0) ...[
+              SizedBox(width: 3),
+              Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 15),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1011,14 +1161,47 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final description = (service['description'] ?? '').toString();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Highlight came-from-category service: matched on the real template_id so
+    // the salon + service relationship stays exact, never a name guess.
+    final isHighlighted = _highlightServiceId != null &&
+        service['template_id']?.toString() == _highlightServiceId;
+
     return Opacity(
       opacity: canAdd ? 1.0 : 0.6,
       child: Container(
+        key: isHighlighted ? _highlightServiceKey : null,
         padding: EdgeInsets.all(20),
-        decoration: _cardDecoration(),
+        decoration: _cardDecoration(
+          accentBorder: isHighlighted,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isHighlighted)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppTheme.accentColor.withOpacity(0.35)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.touch_app, size: 13, color: AppTheme.accentColor),
+                    const SizedBox(width: 5),
+                    Text(
+                      widget.categoryName ?? 'From category',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1202,6 +1385,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final count = (rating['count'] as num?)?.toInt() ?? 0;
     final recent = (rating['recent'] as List?) ?? const [];
 
+    // The complete real list is loaded through the existing reviews endpoint
+    // so the capsules can filter the full dataset. Until it loads (or if it
+    // fails), the original newest-three preview is what the page shows — the
+    // section never becomes empty or fake.
+    final hasFullList = _allReviews.isNotEmpty;
+    final filtered = hasFullList ? _filteredReviews : const <dynamic>[];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1211,9 +1401,34 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: RatingSummaryCard(summary: rating),
         ),
 
+        if (hasFullList) ...[
+          SizedBox(height: 14),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: _buildReviewFilterCapsules(),
+          ),
+        ],
+
         // A preview only. The full list is its own page — a salon page should
         // not carry four hundred reviews to show the newest three.
-        if (recent.isNotEmpty) ...[
+        if (hasFullList && filtered.isEmpty) ...[
+          SizedBox(height: 12),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: _buildNoFilteredReviews(),
+          ),
+        ] else if (hasFullList) ...[
+          SizedBox(height: 12),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (final review in filtered.take(_maxInlineReviews))
+                  ReviewTile(review: Map<String, dynamic>.from(review as Map)),
+              ],
+            ),
+          ),
+        ] else if (recent.isNotEmpty) ...[
           SizedBox(height: 12),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1257,6 +1472,78 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildReviewFilterCapsules() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final idleBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final idleText = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    Widget pill(_ReviewFilter filter, String label) {
+      final selected = _reviewFilter == filter;
+      return GestureDetector(
+        onTap: () {
+          AppHaptics.selectionClick();
+          setState(() => _reviewFilter = filter);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.accentColor : idleBg,
+            borderRadius: BorderRadius.circular(999),
+            border: selected ? null : Border.all(color: borderColor, width: 1.2),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : idleText,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: 4,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => switch (index) {
+          0 => pill(_ReviewFilter.topRated, 'Top Rated'),
+          1 => pill(_ReviewFilter.five, '5 ★'),
+          2 => pill(_ReviewFilter.fourPlus, '4+ ★'),
+          _ => pill(_ReviewFilter.threePlus, '3+ ★'),
+        },
+      ),
+    );
+  }
+
+  Widget _buildNoFilteredReviews() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      ),
+      child: Text(
+        'No reviews found',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.outfit(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+          color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+        ),
+      ),
     );
   }
 
@@ -1401,15 +1688,25 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         ),
       );
 
-  BoxDecoration _cardDecoration() {
+  BoxDecoration _cardDecoration({bool accentBorder = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
       color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
       borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-      boxShadow: [
-        BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 16, offset: Offset(0, 4)),
-      ],
+      border: accentBorder
+          ? Border.all(color: AppTheme.accentColor, width: 1.8)
+          : Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      boxShadow: accentBorder
+          ? [
+              BoxShadow(
+                color: AppTheme.accentColor.withOpacity(0.18),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : [
+              BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 16, offset: Offset(0, 4)),
+            ],
     );
   }
 }

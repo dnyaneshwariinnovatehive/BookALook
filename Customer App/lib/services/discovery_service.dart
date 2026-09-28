@@ -79,6 +79,15 @@ class DiscoveryServiceItem {
   final int salonCount;
   final double? rating;
 
+  /// The exact salon that best represents this service in the city (its
+  /// highest-rated host) and that salon's own real offer — the ids the cart
+  /// and booking pipeline need so a tap never becomes a generic service.
+  final String? offerId;
+  final String? salonId;
+  final String? salonName;
+  final String? salonCoverUrl;
+  final double price;
+
   DiscoveryServiceItem({
     required this.serviceId,
     required this.name,
@@ -86,6 +95,11 @@ class DiscoveryServiceItem {
     required this.minPrice,
     required this.salonCount,
     this.rating,
+    this.offerId,
+    this.salonId,
+    this.salonName,
+    this.salonCoverUrl,
+    this.price = 0,
   });
 
   factory DiscoveryServiceItem.fromJson(Map<String, dynamic> json) {
@@ -96,6 +110,11 @@ class DiscoveryServiceItem {
       minPrice: (json['min_price'] as num?)?.toDouble() ?? 0,
       salonCount: (json['salon_count'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble(),
+      offerId: json['offer_id']?.toString(),
+      salonId: json['salon_id']?.toString(),
+      salonName: json['salon_name']?.toString(),
+      salonCoverUrl: json['salon_cover_url']?.toString(),
+      price: (json['price'] as num?)?.toDouble() ?? 0,
     );
   }
 }

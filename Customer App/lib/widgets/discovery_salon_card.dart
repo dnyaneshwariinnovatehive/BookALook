@@ -10,12 +10,22 @@ class DiscoverySalonCard extends StatelessWidget {
   final bool showFavourite;
   final VoidCallback onToggleFavourite;
 
+  /// Category/sub-service context from a discovery screen. When set, the salon
+  /// page opens on that category's services so browsing a category leads to
+  /// that category inside the salon, not every service the salon lists.
+  final String? categoryId;
+  final String? categoryName;
+  final String? serviceId;
+
   const DiscoverySalonCard({
     super.key,
     required this.salon,
     this.isFavourited = false,
     this.showFavourite = false,
     required this.onToggleFavourite,
+    this.categoryId,
+    this.categoryName,
+    this.serviceId,
   });
 
   @override
@@ -38,7 +48,14 @@ class DiscoverySalonCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => SalonDetailScreen(salonId: id)),
+            MaterialPageRoute(
+              builder: (_) => SalonDetailScreen(
+                salonId: id,
+                categoryId: categoryId,
+                categoryName: categoryName,
+                serviceId: serviceId,
+              ),
+            ),
           );
         },
         child: Opacity(
