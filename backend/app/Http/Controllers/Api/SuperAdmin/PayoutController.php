@@ -56,7 +56,7 @@ class PayoutController extends Controller
 
         // Filters shared by the totals roll-up and the page of rows, so the
         // sign-off figures always describe the same set the table is showing.
-        $applyFilters = function ($query) use ($request) {
+        $applyFilters = function ($query) use ($request, $start) {
             $query->where('cycle_type', $this->cycleType($request))
                 ->whereDate('cycle_start_date', $start->toDateString());
 
