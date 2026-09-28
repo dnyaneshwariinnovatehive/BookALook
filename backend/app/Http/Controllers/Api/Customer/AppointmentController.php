@@ -7,12 +7,14 @@ use App\Models\Appointment;
 use App\Models\AppointmentService;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\Invoice;
 use App\Models\PlatformPolicySetting;
 use App\Models\ServiceProvider;
 use App\Models\Salon;
 use App\Services\AvailabilityService;
 use App\Services\BookingPaymentService;
 use App\Services\BookingPolicyService;
+use App\Services\InvoiceService;
 use App\Services\Notifications\NotificationService;
 use App\Services\Payments\PaymentGatewayException;
 use Illuminate\Http\Request;
@@ -28,6 +30,7 @@ class AppointmentController extends Controller
         private BookingPolicyService $policy,
         private BookingPaymentService $payments,
         private NotificationService $notifications,
+        private InvoiceService $invoices,
     ) {
     }
 
@@ -448,6 +451,21 @@ class AppointmentController extends Controller
         // theirs; the owner is told the salon has a booking, because otherwise
         // they find out by opening the app.
         $this->notifications->notifySalonOfNewBooking($appointment, $salonName, $dateLabel);
+
+        // The customer's receipt for the advance they just paid.
+        //
+        // Issued here, after the booking is committed, because this is the one
+        // place a booking becomes real — so a receipt cannot exist for a hold
+        // that was abandoned. And wrapped, deliberately: the booking is already
+        // saved and the money is already taken, so a receipt that fails to draw
+        // is an operational problem to be reported and re-run, never a reason to
+        // fail a confirmed appointment and leave the customer unsure whether
+        // they are booked.
+        try {
+            $this->invoices->issueFor($appointment);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -910,6 +928,34 @@ class AppointmentController extends Controller
             // folded into the booked lines.
             'serviceAdditions.service.template:id,name,estimated_duration_minutes',
             'serviceAdditions.provider.user:id,name',
+            // So the bookings list can offer the receipt without a query per
+            // card.
+            'invoice:id,appointment_id,invoice_number,issued_at',
+        ];
+    }
+
+    /**
+     * The receipt for this visit, or null when none was issued.
+     *
+     * The URL is signed rather than authenticated because the app opens it in a
+     * WebView, which cannot carry a bearer token — see Invoice::temporaryUrl.
+     * Regenerated on read, so a link the customer sat on for weeks still works
+     * instead of having expired on them.
+     */
+    private function invoiceState(Appointment $appointment): ?array
+    {
+        $invoice = $appointment->relationLoaded('invoice')
+            ? $appointment->invoice
+            : Invoice::where('appointment_id', $appointment->id)->first();
+
+        if (! $invoice) {
+            return null;
+        }
+
+        return [
+            'number' => $invoice->invoice_number,
+            'issued_at' => $invoice->issued_at?->toIso8601String(),
+            'url' => $invoice->temporaryUrl(),
         ];
     }
 
@@ -979,6 +1025,7 @@ class AppointmentController extends Controller
                 ? (float) $appointment->final_billed_amount
                 : null,
             'payment_option' => $appointment->payment_option,
+            'invoice' => $this->invoiceState($appointment),
             'cancellation_reason' => $appointment->cancellation_reason,
             'rescheduled_from_id' => $appointment->rescheduled_from_id,
 

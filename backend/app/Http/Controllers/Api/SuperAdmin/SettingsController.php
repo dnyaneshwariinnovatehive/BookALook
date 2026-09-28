@@ -7,6 +7,8 @@ use App\Models\AuditLog;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Models\PlatformPolicySetting;
+use App\Models\Invoice;
+use App\Models\InvoiceSetting;
 use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
@@ -197,5 +199,173 @@ class SettingsController extends Controller
             'success' => true,
             'message' => 'Policy settings updated successfully'
         ]);
+    }
+
+    /**
+     * Everything the invoice format page needs: current values, the schema of
+     * each field, and whether an invoice has ever been issued.
+     *
+     * The schema travels with the values on purpose. The page then renders
+     * itself from what the server says is editable, so adding a printable
+     * section is a change to InvoiceSetting::DEFAULTS and this endpoint — not a
+     * coordinated edit across a PHP model and a TypeScript form.
+     */
+    public function getInvoiceSettings()
+    {
+        return response()->json([
+            'success' => true,
+            'settings' => InvoiceSetting::typed(),
+            'schema' => $this->invoiceSchema(),
+            'issued_count' => Invoice::count(),
+        ]);
+    }
+
+    public function updateInvoiceSettings(Request $request)
+    {
+        $request->validate([
+            'invoice_business_name' => 'sometimes|required|string|max:150',
+            'invoice_business_address' => 'sometimes|nullable|string|max:1000',
+            'invoice_business_email' => 'sometimes|nullable|string|max:150|email',
+            'invoice_business_phone' => 'sometimes|nullable|string|max:30',
+
+            // The label is editable so a platform outside India is not forced to
+            // print "GSTIN" over a number that is not one.
+            'invoice_tax_id' => 'sometimes|nullable|string|max:60',
+            'invoice_tax_id_label' => 'sometimes|nullable|string|max:30',
+
+            'invoice_logo_url' => 'sometimes|nullable|string|max:500',
+            'invoice_accent_color' => 'sometimes|required|string|regex:/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/',
+            'invoice_footer_note' => 'sometimes|nullable|string|max:300',
+            'invoice_terms' => 'sometimes|nullable|string|max:2000',
+
+            'invoice_number_prefix' => 'sometimes|required|string|max:10',
+            'invoice_number_padding' => 'sometimes|required|integer|min:1|max:12',
+
+            'invoice_show_logo' => 'sometimes|boolean',
+            'invoice_show_business_address' => 'sometimes|boolean',
+            'invoice_show_tax_id' => 'sometimes|boolean',
+            'invoice_show_provider' => 'sometimes|boolean',
+            'invoice_show_duration_column' => 'sometimes|boolean',
+            'invoice_show_terms' => 'sometimes|boolean',
+            'invoice_show_balance_due' => 'sometimes|boolean',
+        ]);
+
+        $user = $request->user();
+        $descriptions = $this->invoiceDescriptions();
+
+        $keysBeing = array_keys($request->except(['_token', '_method']));
+        $before = collect($keysBeing)
+            ->mapWithKeys(fn ($key) => [$key => InvoiceSetting::value($key)])
+            ->all();
+
+        foreach ($keysBeing as $key) {
+            $isSwitch = in_array($key, InvoiceSetting::BOOLEAN_KEYS, true);
+            $isWholeNumber = in_array($key, InvoiceSetting::INTEGER_KEYS, true);
+
+            // Blanks are stored as blanks rather than dropped, so clearing the
+            // address actually clears it instead of silently falling back to
+            // whatever the default was.
+            $raw = $isSwitch
+                ? ($request->boolean($key) ? '1' : '0')
+                : (string) $request->input($key);
+
+            InvoiceSetting::updateOrCreate(
+                ['setting_key' => $key],
+                [
+                    'setting_value' => $raw,
+                    'data_type' => $isSwitch ? 'boolean' : ($isWholeNumber ? 'integer' : 'string'),
+                    'description' => $descriptions[$key] ?? null,
+                    'updated_by' => $user->id,
+                ]
+            );
+        }
+
+        $after = collect($keysBeing)
+            ->mapWithKeys(fn ($key) => [$key => InvoiceSetting::value($key)])
+            ->all();
+
+        // Saving the form untouched is not a change worth an audit entry — the
+        // log is only useful if an entry means something moved.
+        if ($before != $after) {
+            AuditLogger::record(
+                action: AuditLog::INVOICE_SETTINGS_UPDATED,
+                label: 'Invoice format',
+                before: $before,
+                after: $after,
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Invoice format updated successfully',
+            'settings' => InvoiceSetting::typed(),
+        ]);
+    }
+
+    /**
+     * How each invoice field behaves, for the format page to render from.
+     *
+     * @return array<string, array{label: string, kind: string, hint?: string, group: string}>
+     */
+    private function invoiceSchema(): array
+    {
+        return [
+            'invoice_business_name' => ['label' => 'Business name', 'kind' => 'text', 'group' => 'issuer',
+                'hint' => 'Shown at the top of every invoice.'],
+            'invoice_business_address' => ['label' => 'Registered address', 'kind' => 'textarea', 'group' => 'issuer'],
+            'invoice_business_email' => ['label' => 'Contact email', 'kind' => 'text', 'group' => 'issuer'],
+            'invoice_business_phone' => ['label' => 'Contact phone', 'kind' => 'text', 'group' => 'issuer'],
+            'invoice_tax_id_label' => ['label' => 'Tax ID label', 'kind' => 'text', 'group' => 'issuer',
+                'hint' => 'For example GSTIN, VAT, ABN.'],
+            'invoice_tax_id' => ['label' => 'Tax ID', 'kind' => 'text', 'group' => 'issuer',
+                'hint' => 'Only printed when both this and its label are filled in.'],
+
+            'invoice_logo_url' => ['label' => 'Logo URL', 'kind' => 'text', 'group' => 'branding',
+                'hint' => 'Must start with http://, https:// or /.'],
+            'invoice_accent_color' => ['label' => 'Accent colour', 'kind' => 'color', 'group' => 'branding',
+                'hint' => 'Used for rules, headings and the balance due.'],
+
+            'invoice_number_prefix' => ['label' => 'Invoice number prefix', 'kind' => 'text', 'group' => 'numbering',
+                'hint' => 'Letters and digits only.'],
+            'invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'numbering',
+                'hint' => 'Zero padding on the running number.'],
+
+            'invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'sections'],
+            'invoice_terms' => ['label' => 'Terms and conditions', 'kind' => 'textarea', 'group' => 'sections'],
+
+            'invoice_show_logo' => ['label' => 'Logo', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_business_address' => ['label' => 'Registered address', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_tax_id' => ['label' => 'Tax ID', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_provider' => ['label' => 'Provider name', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_duration_column' => ['label' => 'Duration column', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_terms' => ['label' => 'Terms and conditions', 'kind' => 'switch', 'group' => 'sections'],
+            'invoice_show_balance_due' => ['label' => 'Balance due line', 'kind' => 'switch', 'group' => 'sections'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    private function invoiceDescriptions(): array
+    {
+        return [
+            'invoice_business_name' => 'Business name printed on every invoice',
+            'invoice_business_address' => 'Registered address printed on every invoice',
+            'invoice_business_email' => 'Contact email printed on every invoice',
+            'invoice_business_phone' => 'Contact phone printed on every invoice',
+            'invoice_tax_id' => 'Tax identity number printed on every invoice',
+            'invoice_tax_id_label' => 'Label printed before the tax identity number',
+            'invoice_logo_url' => 'Logo shown in the invoice letterhead',
+            'invoice_accent_color' => 'Accent colour used for rules, headings and the balance due',
+            'invoice_footer_note' => 'Short note printed at the foot of every invoice',
+            'invoice_terms' => 'Terms and conditions printed on every invoice',
+            'invoice_number_prefix' => 'Letters and digits placed before the invoice number',
+            'invoice_number_padding' => 'Zero padding applied to the invoice sequence number',
+            'invoice_show_logo' => 'Whether the logo is printed',
+            'invoice_show_business_address' => 'Whether the registered address is printed',
+            'invoice_show_tax_id' => 'Whether the tax ID is printed',
+            'invoice_show_provider' => 'Whether the serving provider is named',
+            'invoice_show_duration_column' => 'Whether the duration column is printed',
+            'invoice_show_terms' => 'Whether terms and conditions are printed',
+            'invoice_show_balance_due' => 'Whether the balance due line is printed',
+        ];
     }
 }

@@ -99,6 +99,15 @@ Route::get('/cities/nearest', [\App\Http\Controllers\Api\CityController::class, 
 Route::get('/cities/{cityId}/sub-areas', [\App\Http\Controllers\Api\CityController::class, 'subAreas']);
 Route::post('/enquiries', [\App\Http\Controllers\Api\PublicEnquiryController::class, 'store']);
 
+// The printable invoice. Unauthenticated on purpose and protected by a
+// signature instead: the customer opens it in a WebView, which cannot send a
+// bearer token, and putting the token in the URL would leak it. The signature
+// proves we minted this link for this invoice, and the `expires` parameter
+// stops a forwarded one working indefinitely.
+Route::get('/invoices/{invoice}', [\App\Http\Controllers\InvoiceController::class, 'show'])
+    ->middleware('signed')
+    ->name('invoices.show');
+
 // Meta calls these. Unauthenticated by necessity — the verify token proves the
 // subscription and X-Hub-Signature-256 proves every payload after it.
 Route::get('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'verify']);
@@ -157,6 +166,11 @@ Route::prefix('superadmin')->group(function () {
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);
         Route::put('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updatePolicySettings']);
+
+        // How invoices look. Separate from policy because it is branding, not
+        // a rule anybody is bound by.
+        Route::get('/settings/invoice', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getInvoiceSettings']);
+        Route::put('/settings/invoice', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updateInvoiceSettings']);
         
         Route::apiResource('wallet-schemes', \App\Http\Controllers\Api\SuperAdmin\WalletSchemeController::class);
 

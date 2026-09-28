@@ -80,6 +80,7 @@ class AuditLog extends Model
 
     // Platform settings — rules everybody is bound by.
     public const POLICY_UPDATED = 'policy.updated';
+    public const INVOICE_SETTINGS_UPDATED = 'invoice_settings.updated';
     public const SUB_AREAS_IMPORTED = 'sub_area.imported';
     public const CAMPAIGN_TEMPLATE_UPDATED = 'campaign_template.updated';
 
@@ -115,6 +116,9 @@ class AuditLog extends Model
         self::PAYOUT_DISTRIBUTED => ['label' => 'Distributed a payout', 'category' => 'Money', 'severity' => 'critical'],
 
         self::POLICY_UPDATED => ['label' => 'Changed platform policy', 'category' => 'Settings', 'severity' => 'critical'],
+        // Rewrites the letterhead, and the tax identity on it, on every
+        // invoice the platform issues from here on.
+        self::INVOICE_SETTINGS_UPDATED => ['label' => 'Changed the invoice format', 'category' => 'Settings', 'severity' => 'high'],
         // A bulk write to the list every address on the platform points at.
         self::SUB_AREAS_IMPORTED => ['label' => 'Imported areas from a file', 'category' => 'Settings', 'severity' => 'high'],
         // What every salon on the platform is allowed to send.

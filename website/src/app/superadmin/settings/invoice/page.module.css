@@ -1,0 +1,297 @@
+/* Invoice format — form on the left, a live miniature of the document on the
+   right. The preview is the point: "change the format" is a visual decision,
+   and reading a list of switches does not tell you whether the result looks
+   right. */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.twoUp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 620px) {
+  .twoUp {
+    grid-template-columns: 1fr;
+  }
+}
+
+.textarea {
+  min-height: 104px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* The colour control is a swatch plus a text box, so the value is both
+   pickable and typeable — pasted hex from a brand guide has to work. */
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.swatch {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 2px 20px;
+}
+
+.actionsSpacer {
+  flex: 1;
+}
+
+.dirtyNote {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------- preview */
+
+.previewSticky {
+  position: sticky;
+  top: 20px;
+}
+
+.paper {
+  background: #fff;
+  color: #1c1a17;
+  border-radius: 4px;
+  padding: 22px 20px;
+  /* Scaled-down proportions of the real document, which is A4 with a 14mm
+     margin. Anything wider and the preview stops being a preview. */
+  font-size: 10px;
+  line-height: 1.5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.previewHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--pv-accent, #b08d57);
+}
+
+.previewBrand {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* The logo is drawn as a background rather than an <img> or next/image: the
+   URL is whatever SuperAdmin typed, and an optimiser would need that host
+   whitelisted before anyone could preview their own logo. */
+.previewLogo {
+  width: 74px;
+  height: 30px;
+  flex: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.previewName {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+  color: #1c1a17;
+  word-break: break-word;
+}
+
+.previewMuted {
+  color: #6b655d;
+  font-size: 9px;
+  word-break: break-word;
+}
+
+.previewRight {
+  text-align: right;
+  flex: none;
+}
+
+.previewDoc {
+  font-size: 8px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #8a837a;
+}
+
+.previewNumber {
+  font-size: 11px;
+  font-weight: 650;
+  color: #1c1a17;
+  white-space: nowrap;
+}
+
+.previewCols {
+  display: flex;
+  gap: 14px;
+  padding: 12px 0;
+}
+
+.previewCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.previewLabel {
+  font-size: 7.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8a837a;
+  margin-bottom: 2px;
+}
+
+.previewStrong {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* Marks a line that came from a package, the same way the real document does. */
+.previewTag {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #f1ede6;
+  color: var(--pv-accent, #b08d57);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.previewTable th {
+  text-align: left;
+  font-size: 7.5px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #8a837a;
+  font-weight: 600;
+  padding: 5px 4px;
+  border-bottom: 1.5px solid var(--pv-accent, #b08d57);
+}
+
+.previewTable td {
+  padding: 6px 4px;
+  border-bottom: 1px solid #ece8e1;
+  vertical-align: top;
+}
+
+.previewNum {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.previewTotals {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.previewTotalsTable {
+  width: 58%;
+  border-collapse: collapse;
+}
+
+.previewTotalsTable td {
+  padding: 3px 4px;
+}
+
+.previewGrand {
+  border-top: 2px solid var(--pv-accent, #b08d57);
+  font-weight: 700;
+  font-size: 12px;
+  padding-top: 5px !important;
+}
+
+.previewDue {
+  color: var(--pv-accent, #b08d57);
+  font-weight: 600;
+}
+
+.previewPaid {
+  color: #2f7d4f;
+}
+
+.previewFoot {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid #ece8e1;
+  color: #6b655d;
+  font-size: 8.5px;
+}
+
+.previewNote {
+  margin-top: 8px;
+  color: #6b655d;
+  font-size: 9px;
+}
+
+.previewEmpty {
+  color: #b3aca1;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------- misc */
+
+.countNote {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
