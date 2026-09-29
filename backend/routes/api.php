@@ -353,6 +353,7 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/services/{service_id}/staff', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'assignServiceStaff']);
 
         // Salon Settings (Working Hours, etc.)
+        Route::put('/salons/{salon_id}', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateProfile']);
         Route::get('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getWorkingHours']);
         Route::put('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateWorkingHours']);
         // Where the salon is. Customers see the nearest first, so an unpinned

@@ -12,6 +12,67 @@ use Illuminate\Support\Facades\Validator;
 
 class SalonSettingsController extends Controller
 {
+    public function updateProfile(Request $request, $salon_id)
+    {
+        $salon = Salon::where('id', $salon_id)
+            ->where('admin_id', $request->user()->id)
+            ->firstOrFail();
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:150',
+            'phone' => 'nullable|string|max:15',
+            'description' => 'nullable|string',
+            'address' => 'nullable|string',
+            'pincode' => 'nullable|string|max:10',
+            'gender_focus' => 'nullable|string',
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $salon->name = $request->name;
+        
+        if ($request->has('description')) {
+            $salon->description = $request->description;
+        }
+        
+        if ($request->has('address')) {
+            $salon->address = $request->address;
+        }
+        
+        if ($request->has('pincode')) {
+            $salon->pincode = $request->pincode;
+        }
+        
+        if ($request->has('gender_focus')) {
+            $salon->gender_focus = $request->gender_focus;
+        }
+
+        if ($request->hasFile('cover_image')) {
+            $file = $request->file('cover_image');
+            $extension = strtolower($file->getClientOriginalExtension());
+            $filename = \Illuminate\Support\Str::uuid().'.'.$extension;
+            $path = $file->storeAs('salons', $filename, 'public');
+            $salon->cover_photo_url = asset('storage/'.$path);
+        }
+
+        $salon->save();
+
+        // If phone is provided and admin user has no phone or wants to update, we update the admin user's phone,
+        // since the salon doesn't have a phone field directly. It is attached to the admin.
+        if ($request->has('phone') && $request->phone) {
+            $admin = $request->user();
+            $admin->phone = $request->phone;
+            $admin->save();
+        }
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'salon' => $salon
+        ]);
+    }
     public function getWorkingHours($salon_id)
     {
         $hours = SalonWorkingHour::where('salon_id', $salon_id)

@@ -1739,11 +1739,34 @@ html {
   color: #8D84A3;
 }
 
-/* ---------- Placeholder legal pages ---------- */
+/* ---------- Public site shell ---------- */
+/* Wraps header + page + footer in `src/app/(site)/layout.tsx`. The column
+   layout with `min-height: 100vh` is what keeps the footer at the bottom of a
+   short page like /about instead of leaving it stranded mid-screen. */
+.blk-site {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #F5EFE3;
+}
+.blk-site > main {
+  flex: 1 0 auto;
+}
+
+/* ---------- Legal / policy pages ---------- */
 .blk-page {
   background: #F5EFE3;
   min-height: 70vh;
   padding: 6rem 0 5rem;
+}
+.blk-page__standfirst {
+  max-width: 760px;
+  margin: 0.9rem auto 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.06rem;
+  line-height: 1.65;
+  color: #6B5B7B;
+  text-align: center;
 }
 .blk-page__body {
   max-width: 760px;
@@ -1763,6 +1786,94 @@ html {
   color: #3C1361;
   font-weight: 600;
   text-decoration: underline;
+}
+.blk-page__body p {
+  margin: 0;
+}
+
+/* Table of contents. Only rendered on documents long enough to need one. */
+.blk-page__toc {
+  border: 1px solid rgba(201, 166, 75, 0.35);
+  background: #FDFBF6;
+  border-radius: 12px;
+  padding: 1.1rem 1.3rem;
+}
+.blk-page__toc-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8A6D1F;
+  margin: 0 0 0.6rem !important;
+}
+.blk-page__toc-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.95rem;
+}
+.blk-page__toc-list a {
+  text-decoration: none;
+}
+.blk-page__toc-list a:hover {
+  text-decoration: underline;
+}
+
+/* Section headings are anchor targets for the TOC, so they need to clear the
+   sticky header — see the scroll-margin rules at the end of this file. */
+.blk-page__section {
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(201, 166, 75, 0.2);
+}
+.blk-page__section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.blk-page__section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.32rem;
+  color: #2A1140;
+  margin: 0 0 0.7rem;
+  scroll-margin-top: 110px;
+}
+.blk-page__section > div + div {
+  margin-top: 0.8rem;
+}
+.blk-page__lead {
+  font-weight: 700;
+  color: #3C1361;
+}
+.blk-page__bullets {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+/* Cross-references to the other documents. */
+.blk-page__related {
+  border-top: 1px solid rgba(201, 166, 75, 0.2);
+  padding-top: 1.2rem;
+  margin-top: 0.4rem;
+}
+.blk-page__related-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.95rem;
+}
+.blk-page__back {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.92rem;
+  text-decoration: none !important;
+}
+.blk-page__back:hover {
+  text-decoration: underline !important;
 }
 
 /* ---------- Responsive: 768px and below ---------- */
@@ -1977,7 +2088,8 @@ html {
   .blk-why,
   .blk-faq,
   .blk-reviews,
-  .enquiry-section {
+  .enquiry-section,
+  .blk-page__section-title {
     scroll-margin-top: 120px;
   }
 }

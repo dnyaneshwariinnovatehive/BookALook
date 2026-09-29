@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
@@ -53,11 +54,36 @@ class SalonSelectionScreen extends StatelessWidget {
     return flat.isNotEmpty ? flat : 'Unknown location';
   }
 
-  void _addNewSalon(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()),
-    );
+  void _addNewSalon(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final authStateStr = prefs.getString('auth_state');
+    Map<String, dynamic>? userData;
+    String? phone;
+    
+    if (authStateStr != null) {
+      final authState = jsonDecode(authStateStr);
+      final user = authState['user'];
+      if (user != null) {
+        phone = user['phone'];
+        userData = {
+          'owner_name': user['name'],
+          'email': user['email']
+        };
+      }
+    }
+
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AdminRegistrationScreen(
+            phone: phone,
+            initialData: userData,
+            isExistingAdmin: true,
+          ),
+        ),
+      );
+    }
   }
 
   void _logout(BuildContext context) async {

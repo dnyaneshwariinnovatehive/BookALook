@@ -56,6 +56,9 @@ class SalonSettingsApi {
     required String name,
     required String phone,
     required String description,
+    String? address,
+    String? pincode,
+    String? genderFocus,
     String? imagePath,
   }) async {
     final request = http.MultipartRequest(
@@ -67,6 +70,16 @@ class SalonSettingsApi {
     request.fields['name'] = name;
     request.fields['phone'] = phone;
     request.fields['description'] = description;
+    
+    if (address != null && address.isNotEmpty) {
+      request.fields['address'] = address;
+    }
+    if (pincode != null && pincode.isNotEmpty) {
+      request.fields['pincode'] = pincode;
+    }
+    if (genderFocus != null && genderFocus.isNotEmpty) {
+      request.fields['gender_focus'] = genderFocus;
+    }
 
     if (imagePath != null) {
       request.files.add(await http.MultipartFile.fromPath('cover_image', imagePath));

@@ -11,7 +11,8 @@ import '../dashboard/salon_selection_screen.dart';
 class AdminRegistrationScreen extends StatefulWidget {
   final String? phone;
   final Map<String, dynamic>? initialData;
-  const AdminRegistrationScreen({super.key, this.phone, this.initialData});
+  final bool isExistingAdmin;
+  const AdminRegistrationScreen({super.key, this.phone, this.initialData, this.isExistingAdmin = false});
 
   @override
   State<AdminRegistrationScreen> createState() => _AdminRegistrationScreenState();
@@ -119,7 +120,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(), // Disable swipe to navigate
         children: [
-          Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep, phone: widget.phone, initialData: widget.initialData),
+          Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep, phone: widget.phone, initialData: widget.initialData, isExistingAdmin: widget.isExistingAdmin),
           Step2SalonDetails(onNext: _nextStep, onBack: _previousStep, initialData: widget.initialData),
           Step3Terms(onSubmit: _nextStep, onBack: _previousStep, isLoading: _isLoading),
         ],

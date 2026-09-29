@@ -18,6 +18,11 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _descriptionController;
+  late TextEditingController _addressController;
+  late TextEditingController _pincodeController;
+  String _selectedGenderFocus = 'Unisex';
+  
+  final List<String> _genderOptions = ['Unisex', 'Male', 'Female'];
   
   bool _isLoading = false;
   File? _selectedImage;
@@ -31,6 +36,13 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     _phoneController = TextEditingController(text: phone.toString());
     
     _descriptionController = TextEditingController(text: widget.salonData['description']?.toString() ?? '');
+    _addressController = TextEditingController(text: widget.salonData['address']?.toString() ?? '');
+    _pincodeController = TextEditingController(text: widget.salonData['pincode']?.toString() ?? '');
+    
+    final gender = widget.salonData['gender_focus']?.toString() ?? 'Unisex';
+    if (_genderOptions.contains(gender)) {
+      _selectedGenderFocus = gender;
+    }
   }
   
   @override
@@ -38,6 +50,8 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _descriptionController.dispose();
+    _addressController.dispose();
+    _pincodeController.dispose();
     super.dispose();
   }
 
@@ -65,6 +79,9 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         description: _descriptionController.text.trim(),
+        address: _addressController.text.trim(),
+        pincode: _pincodeController.text.trim(),
+        genderFocus: _selectedGenderFocus,
         imagePath: _selectedImage?.path,
       );
       
@@ -154,9 +171,19 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
             // Form Fields
             _buildTextField('Salon Name', _nameController, isRequired: true),
             const SizedBox(height: 20),
-            _buildTextField('Phone Number', _phoneController, keyboardType: TextInputType.phone, readOnly: true),
+            _buildTextField('Phone Number', _phoneController, keyboardType: TextInputType.phone),
             const SizedBox(height: 20),
             _buildTextField('Description', _descriptionController, maxLines: 3),
+            const SizedBox(height: 20),
+            _buildTextField('Street Address', _addressController, maxLines: 2),
+            const SizedBox(height: 20),
+            _buildTextField('Pincode', _pincodeController, keyboardType: TextInputType.number),
+            const SizedBox(height: 20),
+            _buildDropdown('Gender Focus', _selectedGenderFocus, _genderOptions, (val) {
+              setState(() {
+                _selectedGenderFocus = val!;
+              });
+            }),
             
             const SizedBox(height: 40),
 
@@ -216,6 +243,40 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
               borderSide: BorderSide(color: Theme.of(context).dividerColor),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<String> options, void Function(String?) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: Theme.of(context).dividerColor),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              items: options.map((String option) {
+                return DropdownMenuItem<String>(
+                  value: option,
+                  child: Text(option),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
           ),
         ),
       ],

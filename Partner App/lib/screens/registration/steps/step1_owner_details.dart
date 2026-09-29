@@ -7,8 +7,9 @@ class Step1OwnerDetails extends StatefulWidget {
   final VoidCallback onCancel;
   final String? phone;
   final Map<String, dynamic>? initialData;
+  final bool isExistingAdmin;
 
-  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel, this.phone, this.initialData});
+  const Step1OwnerDetails({super.key, required this.onNext, required this.onCancel, this.phone, this.initialData, this.isExistingAdmin = false});
 
   @override
   State<Step1OwnerDetails> createState() => _Step1OwnerDetailsState();
@@ -30,6 +31,9 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
     }
     if (widget.initialData != null) {
       _nameController.text = widget.initialData!['owner_name'] ?? '';
+      if (widget.initialData!['email'] != null) {
+        _emailController.text = widget.initialData!['email'];
+      }
     }
   }
 
@@ -69,6 +73,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
               controller: _nameController,
               hint: 'Full name',
               icon: Icons.person_outline,
+              readOnly: widget.isExistingAdmin,
               validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
@@ -79,6 +84,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
               hint: 'name@domain.com',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
+              readOnly: widget.isExistingAdmin,
               validator: (v) => !v!.contains('@') ? 'Enter a valid email' : null,
             ),
             const SizedBox(height: 16),
@@ -89,6 +95,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
               hint: 'Phone number',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
+              readOnly: widget.isExistingAdmin,
               validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 16),
@@ -160,6 +167,7 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
     required String hint,
     required IconData icon,
     bool obscureText = false,
+    bool readOnly = false,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
@@ -168,6 +176,10 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: validator,
+      readOnly: readOnly,
+      style: TextStyle(
+        color: readOnly ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : Theme.of(context).colorScheme.onSurface,
+      ),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),

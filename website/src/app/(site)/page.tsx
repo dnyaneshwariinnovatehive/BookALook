@@ -1,29 +1,23 @@
 "use client";
 
-import Image from 'next/image';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import './globals.css';
+import StoreBadge from '@/components/site/StoreBadge';
+import {
+  CUSTOMER_APP_STORE_URL,
+  CUSTOMER_PLAY_STORE_URL,
+  PARTNER_APP_STORE_URL,
+  PARTNER_PLAY_STORE_URL,
+} from '@/lib/site-links';
 
 /* ============================================================================
    BOOKALOOK LANDING CONTENT — added sections
    Static frontend content only. The existing salon enquiry form (see below)
    is a fixed anchor point and is intentionally left byte-for-byte untouched.
+
+   The header and footer now live in `../layout.tsx` and `StoreBadge`/the store
+   URLs in `@/components/site/StoreBadge` and `@/lib/site-links`, so this file
+   is only the page body.
    ============================================================================ */
-
-// [PLACEHOLDER] App store listing URLs — replace with the real live listings.
-// Mirrors the same placeholders used in the superadmin settings policy page.
-const CUSTOMER_APP_STORE_URL = 'https://apps.apple.com/in/app/bookalook/id0000000000'; // [PLACEHOLDER]
-const CUSTOMER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.customer'; // [PLACEHOLDER]
-const PARTNER_APP_STORE_URL = 'https://apps.apple.com/in/app/bookalook-partner/id0000000000'; // [PLACEHOLDER]
-const PARTNER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.partner'; // [PLACEHOLDER]
-
-// [PLACEHOLDER] Social handles — replace with the real branded profiles.
-const SOCIAL_URLS = {
-  instagram: 'https://www.instagram.com/bookalook', // [PLACEHOLDER]
-  facebook: 'https://www.facebook.com/bookalook', // [PLACEHOLDER]
-  x: 'https://x.com/bookalook', // [PLACEHOLDER]
-};
 
 const CUSTOMER_STEPS = [
   { title: 'Discover', desc: 'Browse verified salons and services near you.' },
@@ -211,27 +205,6 @@ function Icon({ name, className }: { name: string; className?: string }) {
   }
 }
 
-function StoreBadge({ store, url, label }: { store: 'apple' | 'google'; url: string; label: string }) {
-  return (
-    <a className="blk-badge" href={url} target="_blank" rel="noopener noreferrer" aria-label={`Download on ${label}`}>
-      {store === 'apple' ? (
-        <svg className="blk-badge__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.01-.33-.02-.124-.85.357-2.02 1.09-2.82.727-.79 1.96-1.45 2.96-1.41.09.2.138.4.138.6z" />
-          <path d="M21 16.05c-.26.66-.38.96-.72 1.55-.47.82-1.13 1.85-1.95 1.85-.75 0-1.04-.47-2.16-.46-.91 0-1.34.47-2.15.47-.82 0-1.45-.96-1.93-1.78-1.03-1.79-1.83-5.05-.7-7.26.5-1 1.3-1.58 2.2-1.58.8 0 1.5.47 2.25.47.44 0 .71-.09 1.09-.28 1.15-.59 2.3-2.03 2.47-2.03.09 0 .05.04-.1.32-.6.9-1.03 1.7-1.16 2.6-.18 1.25.5 2.5 1.89 3.43-.15.34-.31.66-.48.96z" />
-        </svg>
-      ) : (
-        <svg className="blk-badge__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3 20.5v-17c0-.59.34-1.11.84-1.35L13.69 12l-9.85 9.85c-.5-.25-.84-.76-.84-1.35zm13.81-5.38L6.05 21.34l8.49-8.49 2.27 2.27zm3.35-4.31c.34.27.59.68.59 1.19s-.22.9-.57 1.18l-2.29 1.32-2.5-2.5 2.5-2.5 2.27 1.31zM6.05 2.66l10.76 6.22-2.27 2.27-8.49-8.49z" />
-        </svg>
-      )}
-      <span className="blk-badge__text">
-        <span className="blk-badge__small">Download on the</span>
-        <span className="blk-badge__name">{label}</span>
-      </span>
-    </a>
-  );
-}
-
 // [PLACEHOLDER] Decorative QR placeholder for the download banner. It is NOT
 // scannable — replace with a real QR generated from the live store URL once the
 // Customer App listings go live.
@@ -387,28 +360,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="landing-container" style={{ minHeight: '100vh', backgroundColor: '#F5EFE3' }}>
-
-      {/* ============ HEADER / NAV ============ */}
-      <header className="blk-header">
-        <div className="blk-header__inner">
-          <a href="#top" className="blk-header__logo" aria-label="Back to top">
-            <Image src="/logo.png" alt="BookALook" width={150} height={42} style={{ objectFit: 'contain' }} priority />
-          </a>
-          <nav className="blk-header__nav" aria-label="Primary">
-            <a className="blk-header__link" href="#for-customers">Customers</a>
-            <a className="blk-header__link" href="#for-salons">For Salons</a>
-            {/* [PLACEHOLDER] No Pricing section exists yet — this nav item scrolls to the salon
-                section until a dedicated pricing section is added. */}
-            <a className="blk-header__link" href="#for-salons">Pricing</a>
-            <a className="blk-header__link" href="#faq">FAQ</a>
-          </nav>
-          {/* [PLACEHOLDER] Points at the customer-badge section for now; swap to the real
-              store listing URL once the Customer App listing is live. */}
-          <a className="blk-btn blk-btn--gold blk-btn--sm" href="#for-customers">Get the App</a>
-        </div>
-      </header>
-
+    <main className="landing-container">
       {/* ============ HERO ============ */}
       <section id="top" className="blk-hero">
         <div className="blk-hero__bgi" aria-hidden="true">
@@ -868,42 +820,6 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
-
-      {/* ============ FOOTER ============ */}
-      <footer className="blk-footer">
-        <div className="blk-container blk-footer__grid">
-          <div className="blk-footer__brand">
-            <Image src="/logo.png" alt="BookALook" width={150} height={42} style={{ objectFit: 'contain' }} />
-            <p className="blk-footer__tag">No waiting. Just booking.</p>
-          </div>
-          <div className="blk-footer__col">
-            <p className="blk-footer__head">Download</p>
-            {/* [PLACEHOLDER] Store badge URLs — replace with the real Customer App listings. */}
-            <div className="blk-footer__badges">
-              <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
-              <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
-            </div>
-          </div>
-          <div className="blk-footer__col">
-            <p className="blk-footer__head">Company</p>
-            <Link className="blk-footer__link" href="/privacy">Privacy Policy</Link>
-            <Link className="blk-footer__link" href="/terms">Terms &amp; Conditions</Link>
-          </div>
-          <div className="blk-footer__col">
-            <p className="blk-footer__head">Contact</p>
-            <a className="blk-footer__link" href="mailto:hello@bookalook.in">hello@bookalook.in</a>
-            <a className="blk-footer__link" href="tel:+910000000000">+91 00000 00000</a>
-            <div className="blk-footer__social">
-              <a href={SOCIAL_URLS.instagram} target="_blank" rel="noopener noreferrer">Instagram</a>
-              <a href={SOCIAL_URLS.facebook} target="_blank" rel="noopener noreferrer">Facebook</a>
-              <a href={SOCIAL_URLS.x} target="_blank" rel="noopener noreferrer">X</a>
-            </div>
-          </div>
-        </div>
-        <div className="blk-footer__bottom">
-          © {new Date().getFullYear()} BookALook. All rights reserved.
-        </div>
-      </footer>
-    </div>
+    </main>
   );
 }
