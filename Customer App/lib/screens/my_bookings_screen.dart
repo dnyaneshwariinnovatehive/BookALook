@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
 import 'appointment_details_screen.dart';
@@ -588,6 +589,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                         ),
                       ],
                     ),
+                  ],
+
+                  if (!isUpcoming) ...[
+                    SizedBox(height: 12),
+                    InvoiceLinkButton(booking: booking),
                   ],
 
                   if (!isUpcoming) ..._buildReviewSection(booking, isDark, headingColor, bodyColor),

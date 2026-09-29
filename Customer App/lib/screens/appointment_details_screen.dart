@@ -6,6 +6,7 @@ import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
+import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
 
@@ -680,7 +681,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ),
                 ),
 
-              // 7. Reviews (if past)
+              // 7. Invoice and reviews (if past)
+              if (!widget.isUpcoming && InvoiceInfo.fromBooking(_booking) != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: InvoiceActionButton(booking: _booking),
+                ),
+
               if (!widget.isUpcoming) ..._buildReviewSection(isDark, headingColor, bodyColor),
               
               SizedBox(height: 40),
