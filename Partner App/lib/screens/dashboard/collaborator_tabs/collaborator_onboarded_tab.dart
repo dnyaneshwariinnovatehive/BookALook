@@ -2,8 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../services/collaborator_api.dart';
+import '../../../services/collaborator_badges.dart';
 import '../../../services/onboarding_draft_store.dart';
+import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/collaborator/collaborator_card.dart';
+import '../../../widgets/collaborator/collaborator_chip.dart';
+import '../../../widgets/collaborator/collaborator_empty_state.dart';
+import '../../../widgets/collaborator/collaborator_skeleton.dart';
+import '../../../widgets/collaborator/collaborator_thumb.dart';
 import '../../collaborator/onboard_salon_screen.dart';
 
 /// Everything this collaborator has submitted, and what SuperAdmin did with it.
@@ -14,17 +21,32 @@ import '../../collaborator/onboard_salon_screen.dart';
 /// it is approved, and never after, so the edit button disappears at exactly
 /// the point the salon stops being theirs.
 class CollaboratorOnboardedTab extends StatefulWidget {
-  const CollaboratorOnboardedTab({super.key});
+  /// Counts the bottom navigation badges are drawn from. Null when the tab is
+  /// used standalone.
+  final CollaboratorBadges? badges;
+
+  /// Sends the collaborator to Assigned, offered by the empty state as the
+  /// only place work can actually come from.
+  final VoidCallback? onGoToAssigned;
+
+  const CollaboratorOnboardedTab({super.key, this.badges, this.onGoToAssigned});
 
   @override
-  State<CollaboratorOnboardedTab> createState() => _CollaboratorOnboardedTabState();
+  State<CollaboratorOnboardedTab> createState() =>
+      CollaboratorOnboardedTabState();
 }
 
-class _CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
+/// Public so the shell can ask for a refresh when the tab is re-selected.
+class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   bool _isLoading = true;
+  bool _firstLoad = true;
   List<dynamic> _salons = [];
 
   /// null = everything. Otherwise the salon status being shown.
+  ///
+  /// Kept across rebuilds now that the tab lives in an [IndexedStack] rather
+  /// than being rebuilt on every switch — previously the collaborator lost
+  /// their filter every time they glanced at Assigned and came back.
   String? _filter;
 
   static const _filters = <String?, String>{
@@ -40,6 +62,9 @@ class _CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     _fetch();
   }
 
+  /// Re-reads the list. Called by the shell when the tab is re-selected.
+  Future<void> reload() => _fetch();
+
   Future<void> _fetch() async {
     // Anything finished but unsent should go before the collaborator concludes
     // from a short list that their afternoon vanished.
@@ -47,13 +72,35 @@ class _CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
 
     try {
       final salons = await CollaboratorApi.onboardedSalons();
-      if (mounted) setState(() => _salons = salons);
+      if (!mounted) return;
+      setState(() => _salons = salons);
+      _reportBadges(salons);
     } catch (e) {
       debugPrint('Error fetching onboarded salons: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _firstLoad = false;
+        });
+      }
     }
   }
+
+  /// Only `rejected` and `pending_approval` reach the badge.
+  ///
+  /// An approved salon is finished business — it belongs to its owner now, and
+  /// a badge that never clears because "Live" grows all session would train
+  /// the collaborator to ignore the dot.
+  void _reportBadges(List<dynamic> salons) {
+    widget.badges?.reportMySalons(
+      awaitingApproval: _statusCount(salons, 'pending_approval'),
+      sentBack: _statusCount(salons, 'rejected'),
+    );
+  }
+
+  static int _statusCount(List<dynamic> salons, String status) =>
+      salons.where((s) => (s as Map)['status'] == status).length;
 
   List<Map<String, dynamic>> get _visible => _salons
       .map((s) => Map<String, dynamic>.from(s as Map))
@@ -88,13 +135,16 @@ class _CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_firstLoad && _isLoading) {
+      return const CollaboratorCardSkeleton(count: 3);
+    }
     if (_salons.isEmpty) return _buildEmptyState();
 
     final visible = _visible;
 
     return RefreshIndicator(
       onRefresh: _fetch,
+      color: AppTheme.accentColor,
       child: Column(
         children: [
           _buildFilterBar(),
@@ -113,279 +163,240 @@ class _CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   }
 
   Widget _buildFilterBar() => SizedBox(
-        height: 56,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          children: [
-            for (final entry in _filters.entries) ...[
-              _filterChip(entry.key, entry.value),
-              const SizedBox(width: 8),
-            ],
-          ],
-        ),
-      );
-
-  Widget _filterChip(String? status, String label) {
-    final selected = _filter == status;
-    final count = _countOf(status);
-
-    return GestureDetector(
-      onTap: () => setState(() => _filter = status),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.accentColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected ? AppTheme.accentColor : AppTheme.lightBorder),
-        ),
-        child: Text(
-          '$label · $count',
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-            color: selected ? Colors.white : AppTheme.lightTextBody,
+    height: 56,
+    child: ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      children: [
+        for (final entry in _filters.entries) ...[
+          CollaboratorFilterChip(
+            label: entry.value,
+            count: _countOf(entry.key),
+            selected: _filter == entry.key,
+            onTap: () => setState(() => _filter = entry.key),
           ),
-        ),
-      ),
-    );
-  }
+          const SizedBox(width: 8),
+        ],
+      ],
+    ),
+  );
 
   Widget _buildSalonCard(Map<String, dynamic> salon) {
-    final status = salon['status']?.toString() ?? 'pending_approval';
-    final (label, colour, icon) = _statusLook(status);
+    final status = salon['status']?.toString() ?? '';
+    final (statusLabel, statusColour, statusIcon) = _statusLook(status);
     final canEdit = salon['can_edit'] == true;
+    final rejectionReason = salon['rejection_reason']?.toString();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.lightBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCover(salon['cover_photo_url']?.toString()),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(salon['name']?.toString() ?? 'Salon',
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(
-                        [salon['address'], salon['city']]
-                            .where((p) => p != null && p.toString().isNotEmpty)
-                            .join(', '),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.lightTextBody),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colour.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(icon, size: 12, color: colour),
-                            const SizedBox(width: 5),
-                            Text(label,
-                                style: TextStyle(
-                                    color: colour,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            if ((salon['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.lightDangerBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
+    return CollaboratorCard(
+      onTap: canEdit ? () => _edit(salon) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CollaboratorThumb(url: salon['cover_photo_url']?.toString()),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.error_outline,
-                        size: 16, color: AppTheme.lightDanger),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(salon['rejection_reason'].toString(),
-                          style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.45,
-                              color: AppTheme.lightDanger)),
+                    Text(
+                      salon['name']?.toString() ?? 'Salon',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [salon['address'], salon['city']]
+                          .where((p) => p != null && p.toString().isNotEmpty)
+                          .join(', '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    CollaboratorChip(
+                      label: statusLabel,
+                      colour: statusColour,
+                      icon: statusIcon,
                     ),
                   ],
                 ),
               ),
             ],
+          ),
 
+          if (rejectionReason != null && rejectionReason.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${salon['owner_name'] ?? 'Owner'} · '
-                        '${salon['services_count'] ?? 0} '
-                        '${salon['services_count'] == 1 ? 'service' : 'services'}',
-                        style: const TextStyle(
-                            fontSize: 11.5, color: AppTheme.lightTextBody),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                color: context.colors.dangerBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 15,
+                    color: context.colors.danger,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      rejectionReason,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: context.colors.danger,
                       ),
-                      const SizedBox(height: 2),
-                      Text('Submitted ${_submittedOn(salon['submitted_at'])}',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.lightTextLight)),
-                    ],
-                  ),
-                ),
-                if (canEdit)
-                  OutlinedButton.icon(
-                    onPressed: () => _edit(salon),
-                    icon: const Icon(Icons.edit_outlined, size: 15),
-                    label: Text(status == 'rejected' ? 'Fix' : 'Edit',
-                        style: const TextStyle(fontSize: 12.5)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accentColor,
-                      side: const BorderSide(color: AppTheme.accentColor),
-                      visualDensity: VisualDensity.compact,
-                      shape:
-                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                     ),
-                  )
-                else
-                  // Approved: the salon now belongs to its owner, and saying so
-                  // is kinder than a button that would be refused.
-                  const Row(
-                    children: [
-                      Icon(Icons.lock_outline, size: 13, color: AppTheme.lightTextLight),
-                      SizedBox(width: 5),
-                      Text('Handed over',
-                          style: TextStyle(
-                              fontSize: 11.5, color: AppTheme.lightTextLight)),
-                    ],
                   ),
-              ],
+                ],
+              ),
             ),
           ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildCover(String? url) {
-    const size = 62.0;
-
-    if (url == null || url.isEmpty) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Icon(Icons.storefront_outlined, color: AppTheme.accentColor),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Image.network(
-        url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(
-          width: size,
-          height: size,
-          color: AppTheme.lightAccentSoft,
-          child: const Icon(Icons.storefront_outlined, color: AppTheme.accentColor),
-        ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${salon['owner_name'] ?? 'Owner'} · '
+                      '${salon['services_count'] ?? 0} '
+                      '${salon['services_count'] == 1 ? 'service' : 'services'}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Submitted ${_submittedOn(salon['submitted_at'])}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.colors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (canEdit)
+                OutlinedButton.icon(
+                  onPressed: () => _edit(salon),
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                  label: Text(
+                    status == 'rejected' ? 'Fix' : 'Edit',
+                    style: const TextStyle(fontSize: 12.5),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.accentColor,
+                    backgroundColor: context.colors.accentSoft,
+                    side: BorderSide.none,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                  ),
+                )
+              else
+                // Approved: the salon now belongs to its owner, and saying so
+                // is kinder than a button that would be refused.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 13,
+                      color: context.colors.textTertiary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Handed over',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: context.colors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   /// Salon status as the collaborator experiences it, not as the column spells
   /// it.
-  static (String, Color, IconData) _statusLook(String status) => switch (status) {
-        'active' => ('Approved & live', AppTheme.lightSuccess, Icons.check_circle_outline),
-        'rejected' => ('Sent back', AppTheme.lightDanger, Icons.error_outline),
-        'suspended' => ('Suspended', AppTheme.lightTextBody, Icons.pause_circle_outline),
-        _ => ('Waiting on SuperAdmin', AppTheme.lightWarning, Icons.hourglass_empty),
-      };
+  ///
+  /// Takes a [context] rather than reaching for the light-mode constants:
+  /// these are read as ink on a card, and the card is a different colour in
+  /// dark mode. A hardcoded success green on a near-black card is not the same
+  /// signal as the one on white.
+  (String, Color, IconData) _statusLook(String status) {
+    final palette = context.colors;
+
+    return switch (status) {
+      'active' => (
+        'Approved & live',
+        palette.success,
+        Icons.check_circle_outline,
+      ),
+      'rejected' => ('Sent back', palette.danger, Icons.error_outline),
+      'suspended' => (
+        'Suspended',
+        palette.textSecondary,
+        Icons.pause_circle_outline,
+      ),
+      _ => ('Waiting on SuperAdmin', palette.warning, Icons.hourglass_empty),
+    };
+  }
 
   static String _submittedOn(dynamic raw) {
     final parsed = DateTime.tryParse(raw?.toString() ?? '');
-    return parsed == null ? 'recently' : DateFormat('d MMM yyyy').format(parsed.toLocal());
+    return parsed == null
+        ? 'recently'
+        : DateFormat('d MMM yyyy').format(parsed.toLocal());
   }
 
-  Widget _buildNothingInFilter() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            'Nothing ${_filters[_filter]!.toLowerCase()} right now.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: AppTheme.lightTextBody),
-          ),
-        ),
-      );
+  Widget _buildNothingInFilter() => CollaboratorEmptyState(
+    icon: Icons.filter_alt_off_outlined,
+    title: 'Nothing ${_filters[_filter]!.toLowerCase()}',
+    body:
+        'No salon you submitted is ${_filters[_filter]!.toLowerCase()} at the '
+        'moment. Switch filters to see the rest.',
+    actionLabel: 'Show all',
+    onAction: () => setState(() => _filter = null),
+  );
 
-  Widget _buildEmptyState() => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.fact_check_outlined,
-                  size: 72, color: AppTheme.lightTextLight),
-              const SizedBox(height: 20),
-              const Text('Nothing submitted yet',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              const Text(
-                'Salons you onboard show up here with their approval status, so you '
-                'always know which ones went live.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, height: 1.5, color: AppTheme.lightTextBody),
-              ),
-              const SizedBox(height: 20),
-              TextButton.icon(
-                onPressed: _fetch,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh'),
-              ),
-            ],
-          ),
-        ),
-      );
+  Widget _buildEmptyState() {
+    final assignedHint = widget.onGoToAssigned != null;
+
+    return CollaboratorEmptyState(
+      icon: Icons.storefront_outlined,
+      title: 'Nothing submitted yet',
+      body:
+          'Salons you onboard show up here with their approval status, so you '
+          'always know which ones went live.',
+      actionLabel: 'Check again',
+      onAction: _fetch,
+      secondaryLabel: assignedHint ? 'Go to Assigned' : null,
+      onSecondary: widget.onGoToAssigned,
+    );
+  }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'app_colors.dart';
+
 class AppTheme {
   // Brand Colors
   static const Color accentColor = Color(0xFF9C54F2);
@@ -56,7 +58,7 @@ class AppTheme {
   static const Color brownGoldText = Color(0xFFF5DEC2);
   static const Color brownMuted = Color(0xFF8A8078);
   static const Color brownLightBg = Color(0xFFE3D9CE);
-  
+
   // Misc
   static const Color starRating = Color(0xFFFFB300);
   static const Color femaleColor = Color(0xFFC2185B);
@@ -72,6 +74,7 @@ class AppTheme {
     scaffoldBackgroundColor: lightBg,
     primaryColor: accentColor,
     dividerColor: lightBorder,
+    extensions: const [AppColors.light],
     colorScheme: const ColorScheme.light(
       primary: accentColor,
       surface: lightSurface,
@@ -79,11 +82,15 @@ class AppTheme {
       onPrimary: Colors.white,
       onSurface: lightTextHeading,
     ),
-    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
-      displayLarge: GoogleFonts.outfit(color: lightTextHeading, fontWeight: FontWeight.bold),
-      bodyLarge: GoogleFonts.outfit(color: lightTextBody),
-      bodyMedium: GoogleFonts.outfit(color: lightTextBody),
-    ),
+    textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme)
+        .copyWith(
+          displayLarge: GoogleFonts.outfit(
+            color: lightTextHeading,
+            fontWeight: FontWeight.bold,
+          ),
+          bodyLarge: GoogleFonts.outfit(color: lightTextBody),
+          bodyMedium: GoogleFonts.outfit(color: lightTextBody),
+        ),
     appBarTheme: AppBarTheme(
       backgroundColor: lightBg,
       elevation: 0,
@@ -98,7 +105,10 @@ class AppTheme {
       style: OutlinedButton.styleFrom(
         foregroundColor: accentColor,
         backgroundColor: lightAccentSoft,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+        textStyle: GoogleFonts.outfit(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
         side: BorderSide.none,
@@ -106,9 +116,13 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: accentColor, // Note: We will use a custom container for gradient buttons when needed, but this acts as fallback
+        backgroundColor:
+            accentColor, // Note: We will use a custom container for gradient buttons when needed, but this acts as fallback
         foregroundColor: Colors.white,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+        textStyle: GoogleFonts.outfit(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
         elevation: 0,
@@ -148,7 +162,10 @@ class AppTheme {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: lightSurface,
-      contentTextStyle: TextStyle(color: lightTextHeading, fontWeight: FontWeight.w500),
+      contentTextStyle: TextStyle(
+        color: lightTextHeading,
+        fontWeight: FontWeight.w500,
+      ),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
@@ -160,6 +177,7 @@ class AppTheme {
     scaffoldBackgroundColor: darkBg,
     primaryColor: accentColor,
     dividerColor: darkBorder,
+    extensions: const [AppColors.dark],
     colorScheme: const ColorScheme.dark(
       primary: accentColor,
       surface: darkSurface,
@@ -168,7 +186,10 @@ class AppTheme {
       onSurface: darkTextHeading,
     ),
     textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
-      displayLarge: GoogleFonts.outfit(color: darkTextHeading, fontWeight: FontWeight.bold),
+      displayLarge: GoogleFonts.outfit(
+        color: darkTextHeading,
+        fontWeight: FontWeight.bold,
+      ),
       bodyLarge: GoogleFonts.outfit(color: darkTextBody),
       bodyMedium: GoogleFonts.outfit(color: darkTextBody),
     ),
@@ -186,7 +207,10 @@ class AppTheme {
       style: OutlinedButton.styleFrom(
         foregroundColor: accentColor,
         backgroundColor: darkAccentSoft,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+        textStyle: GoogleFonts.outfit(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
         side: BorderSide.none,
@@ -196,7 +220,10 @@ class AppTheme {
       style: ElevatedButton.styleFrom(
         backgroundColor: accentColor,
         foregroundColor: Colors.white,
-        textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+        textStyle: GoogleFonts.outfit(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
         elevation: 0,
@@ -236,7 +263,10 @@ class AppTheme {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: darkSurface,
-      contentTextStyle: TextStyle(color: darkTextHeading, fontWeight: FontWeight.w500),
+      contentTextStyle: TextStyle(
+        color: darkTextHeading,
+        fontWeight: FontWeight.w500,
+      ),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,

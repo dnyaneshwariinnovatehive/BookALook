@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/collaborator_api.dart';
+import '../../../services/collaborator_badges.dart';
 import '../../../services/onboarding_draft_store.dart';
+import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/collaborator/collaborator_card.dart';
+import '../../../widgets/collaborator/collaborator_skeleton.dart';
 
 /// Where a collaborator starts their day.
 ///
@@ -19,23 +23,39 @@ class CollaboratorHomeTab extends StatefulWidget {
   /// Takes them to My Salons, where approval status lives.
   final VoidCallback onGoToMySalons;
 
+  /// Counts the bottom navigation badges are drawn from. Null when the tab is
+  /// used standalone.
+  final CollaboratorBadges? badges;
+
   const CollaboratorHomeTab({
     super.key,
     required this.onGoToAssigned,
     required this.onGoToMySalons,
+    this.badges,
   });
 
   @override
-  State<CollaboratorHomeTab> createState() => _CollaboratorHomeTabState();
+  State<CollaboratorHomeTab> createState() => CollaboratorHomeTabState();
 }
 
-class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
+/// Public so the shell can ask for a refresh when the collaborator comes back
+/// to Home, the same way it already asks the other tabs.
+class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
   final _store = OnboardingDraftStore.instance;
 
   Map<String, dynamic>? _profile;
   List<dynamic> _alerts = [];
   int _assignedCount = 0;
   bool _loading = true;
+  bool _firstLoad = true;
+
+  /// When the numbers on screen were last fetched.
+  ///
+  /// This tab is built around a collaborator working through a list with patchy
+  /// signal, so showing how old the figures are matters as much as the figures
+  /// themselves — otherwise a list that failed to refresh looks identical to an
+  /// up-to-date one.
+  DateTime? _fetchedAt;
 
   @override
   void initState() {
@@ -54,6 +74,10 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     if (mounted) setState(() {});
   }
 
+  /// Re-reads the counts. Called by the shell when Home is re-selected or when
+  /// the collaborator comes back from onboarding a salon.
+  Future<void> reload() => _load();
+
   Future<void> _load() async {
     await _store.load();
 
@@ -70,17 +94,29 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
         _assignedCount = (results[0] as List).length;
         _alerts = results[1] as List;
         _profile = results[2] as Map<String, dynamic>?;
+        _fetchedAt = DateTime.now();
       });
+      widget.badges?.reportAssigned(_assignedCount);
     } catch (_) {
       // Offline. Whatever we last knew stays on screen, and the draft counts
       // below are local anyway.
     } finally {
-      if (mounted) setState(() => _loading = false);
+      // Cleared in a guard rather than an early return: a `return` inside
+      // `finally` swallows anything still in flight, and it would also skip the
+      // clearing below whenever the widget went away mid-fetch.
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _firstLoad = false;
+        });
+      }
     }
   }
 
   Map<String, dynamic> get _stats =>
       Map<String, dynamic>.from(_profile?['stats'] as Map? ?? {});
+
+  String get _name => (_profile?['name']?.toString() ?? '').split(' ').first;
 
   Future<void> _callOwner(String? phone, String salonName) async {
     if (phone == null || phone.isEmpty) {
@@ -94,24 +130,35 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     if (!await launchUrl(uri)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start a call. The number is $phone.')),
+        SnackBar(
+          content: Text('Could not start a call. The number is $phone.'),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_firstLoad && _loading) {
+      return const CollaboratorCardSkeleton(count: 3);
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
+      color: AppTheme.accentColor,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         children: [
           _buildGreeting(),
-          const SizedBox(height: 20),
+          if (_fetchedAt != null) ...[
+            const SizedBox(height: 4),
+            _buildFreshness(),
+          ],
+          const SizedBox(height: 18),
 
           if (_alerts.isNotEmpty) ...[
             _buildAlertsSection(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
           ],
 
           _buildWorkGrid(),
@@ -128,10 +175,10 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
             'Salons reach you through the website enquiry form. SuperAdmin assigns '
             'one to you and it appears under Assigned.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11.5, height: 1.45, color: AppTheme.lightTextLight),
+            style: TextStyle(fontSize: 11.5, height: 1.45),
           ),
 
-          const SizedBox(height: 26),
+          const SizedBox(height: 22),
           _buildHowItWorks(),
         ],
       ),
@@ -141,7 +188,8 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
   // -------------------------------------------------------------- greeting
 
   Widget _buildGreeting() {
-    final name = (_profile?['name']?.toString() ?? '').split(' ').first;
+    final name = _name;
+    final palette = context.colors;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,18 +200,25 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
             children: [
               Text(
                 name.isEmpty ? 'Ready to onboard?' : '${_partOfDay()}, $name',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: palette.textPrimary,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 _loading
                     ? 'Catching up…'
                     : _assignedCount == 0
-                        ? 'Nothing waiting on you right now.'
-                        : '$_assignedCount ${_assignedCount == 1 ? 'salon is' : 'salons are'} '
-                            'waiting to be onboarded.',
-                style: const TextStyle(
-                    fontSize: 13.5, height: 1.4, color: AppTheme.lightTextBody),
+                    ? 'Nothing waiting on you right now.'
+                    : '$_assignedCount ${_assignedCount == 1 ? 'salon is' : 'salons are'} '
+                          'waiting to be onboarded.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.4,
+                  color: palette.textSecondary,
+                ),
               ),
             ],
           ),
@@ -171,13 +226,31 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
         Container(
           width: 46,
           height: 46,
-          decoration: const BoxDecoration(
-            color: AppTheme.lightAccentSoft,
+          decoration: BoxDecoration(
+            color: palette.accentSoft,
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.storefront, color: AppTheme.accentColor),
         ),
       ],
+    );
+  }
+
+  /// "Updated 2 min ago", under the greeting.
+  Widget _buildFreshness() {
+    final at = _fetchedAt;
+    if (at == null) return const SizedBox.shrink();
+
+    final gap = DateTime.now().difference(at);
+    final label = gap.inMinutes < 1
+        ? 'just now'
+        : gap.inHours < 1
+        ? '${gap.inMinutes} min ago'
+        : '${gap.inHours}h ago';
+
+    return Text(
+      'Updated $label',
+      style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
     );
   }
 
@@ -194,45 +267,58 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
   ///
   /// They cannot renew one — only the owner can pay — so the single action
   /// offered is the call. Nothing here pretends otherwise.
-  Widget _buildAlertsSection() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.notifications_active_outlined,
-                  size: 17, color: AppTheme.lightWarning),
-              const SizedBox(width: 8),
-              Text(
-                _alerts.length == 1 ? 'Needs a call' : '${_alerts.length} need a call',
-                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+  Widget _buildAlertsSection() {
+    final palette = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.notifications_active_outlined,
+              size: 17,
+              color: palette.warning,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _alerts.length == 1
+                  ? 'Needs a call'
+                  : '${_alerts.length} need a call',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.bold,
+                color: palette.textPrimary,
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          for (final raw in _alerts) _buildAlertCard(Map<String, dynamic>.from(raw as Map)),
-        ],
-      );
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        for (final raw in _alerts)
+          _buildAlertCard(Map<String, dynamic>.from(raw as Map)),
+      ],
+    );
+  }
 
   Widget _buildAlertCard(Map<String, dynamic> alert) {
     final lapsed = alert['severity'] == 'lapsed';
-    final colour = lapsed ? AppTheme.lightDanger : AppTheme.lightWarning;
+    final colour = lapsed ? context.colors.danger : context.colors.warning;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+    return CollaboratorCard(
+      color: lapsed ? context.colors.dangerBg : context.colors.warningBg,
+      borderColor: colour.withValues(alpha: 0.3),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: lapsed ? AppTheme.lightDangerBg : AppTheme.lightWarningBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colour.withValues(alpha: 0.3)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(lapsed ? Icons.wifi_off_rounded : Icons.timer_outlined,
-                  size: 18, color: colour),
+              Icon(
+                lapsed ? Icons.wifi_off_rounded : Icons.timer_outlined,
+                size: 18,
+                color: colour,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -249,7 +335,10 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
                 child: Text(
                   '${alert['owner_name'] ?? 'Owner'}'
                   '${alert['city'] != null ? ' · ${alert['city']}' : ''}',
-                  style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: context.colors.textSecondary,
+                  ),
                 ),
               ),
               TextButton.icon(
@@ -258,7 +347,10 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
                   alert['salon_name']?.toString() ?? 'the salon',
                 ),
                 icon: const Icon(Icons.call, size: 15),
-                label: const Text('Call owner', style: TextStyle(fontSize: 12.5)),
+                label: const Text(
+                  'Call owner',
+                  style: TextStyle(fontSize: 12.5),
+                ),
                 style: TextButton.styleFrom(
                   foregroundColor: colour,
                   visualDensity: VisualDensity.compact,
@@ -273,39 +365,51 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
 
   // ------------------------------------------------------------------ work
 
-  Widget _buildWorkGrid() => Row(
-        children: [
-          Expanded(
-            child: _tile(
-              value: _loading ? '—' : '$_assignedCount',
-              label: 'To onboard',
-              icon: Icons.assignment_outlined,
-              colour: AppTheme.accentColor,
-              onTap: widget.onGoToAssigned,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _tile(
-              value: '${_store.pendingCount}',
-              label: 'Drafts on this phone',
-              icon: Icons.edit_note_outlined,
-              colour: AppTheme.lightInfo,
-              onTap: widget.onGoToAssigned,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _tile(
-              value: _loading ? '—' : '${_stats['approved'] ?? 0}',
-              label: 'Live salons',
-              icon: Icons.verified_outlined,
-              colour: AppTheme.lightSuccess,
-              onTap: widget.onGoToMySalons,
-            ),
-          ),
+  Widget _buildWorkGrid() {
+    if (_loading) {
+      return SkeletonRow(
+        children: const [
+          SkeletonBox(height: 92, radius: 14),
+          SkeletonBox(height: 92, radius: 14),
+          SkeletonBox(height: 92, radius: 14),
         ],
       );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: _tile(
+            value: '$_assignedCount',
+            label: 'To onboard',
+            icon: Icons.assignment_outlined,
+            colour: AppTheme.accentColor,
+            onTap: widget.onGoToAssigned,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _tile(
+            value: '${_store.pendingCount}',
+            label: 'Drafts on this phone',
+            icon: Icons.edit_note_outlined,
+            colour: context.colors.info,
+            onTap: widget.onGoToAssigned,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _tile(
+            value: '${_stats['approved'] ?? 0}',
+            label: 'Live salons',
+            icon: Icons.verified_outlined,
+            colour: context.colors.success,
+            onTap: widget.onGoToMySalons,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _tile({
     required String value,
@@ -313,139 +417,232 @@ class _CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     required IconData icon,
     required Color colour,
     required VoidCallback onTap,
-  }) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.lightBorder),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 19, color: colour),
-              const SizedBox(height: 10),
-              Text(value,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 10.5, height: 1.3, color: AppTheme.lightTextBody)),
-            ],
-          ),
-        ),
-      );
+  }) {
+    final palette = context.colors;
 
-  Widget _buildQueueNote() => GestureDetector(
-        onTap: _store.sync,
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            color: AppTheme.lightWarningBg,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              if (_store.isSyncing)
-                const SizedBox(
-                  width: 17,
-                  height: 17,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.lightWarning),
-                )
-              else
-                const Icon(Icons.cloud_upload_outlined,
-                    size: 18, color: AppTheme.lightWarning),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _store.isSyncing
-                      ? 'Sending ${_store.queuedCount}…'
-                      : '${_store.queuedCount} finished '
+    return CollaboratorCard(
+      // Removed the zero bottom margin the old tile had, so the three tiles
+      // sit flush in their row rather than leaving a gap under the last one.
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      child: Semantics(
+        button: true,
+        label: '$value $label',
+        excludeSemantics: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 19, color: colour),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.3,
+                color: palette.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueNote() {
+    final warning = context.colors.warning;
+
+    return CollaboratorCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.all(13),
+      color: context.colors.warningBg,
+      borderColor: Colors.transparent,
+      onTap: _store.sync,
+      child: Semantics(
+        button: true,
+        label: _store.isSyncing
+            ? 'Sending ${_store.queuedCount}'
+            : '${_store.queuedCount} waiting to send. Tap to try now.',
+        excludeSemantics: true,
+        child: Row(
+          children: [
+            if (_store.isSyncing)
+              SizedBox(
+                width: 17,
+                height: 17,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: warning,
+                ),
+              )
+            else
+              Icon(Icons.cloud_upload_outlined, size: 18, color: warning),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _store.isSyncing
+                    ? 'Sending ${_store.queuedCount}…'
+                    : '${_store.queuedCount} finished '
                           '${_store.queuedCount == 1 ? 'salon is' : 'salons are'} waiting to '
                           'send. Tap to try now.',
-                  style: const TextStyle(
-                      fontSize: 12, height: 1.4, color: AppTheme.lightWarning),
+                style: TextStyle(fontSize: 12, height: 1.4, color: warning),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryAction() => SizedBox(
+    width: double.infinity,
+    child: ElevatedButton.icon(
+      onPressed: widget.onGoToAssigned,
+      icon: const Icon(Icons.add_business),
+      label: const Text(
+        'Onboard New Salon',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        backgroundColor: AppTheme.accentColor,
+        foregroundColor: context.colors.onAccent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+  );
+
+  /// Worth stating plainly once, but not worth the screenful.
+  ///
+  /// This used to render all four steps inline, which pushed the primary
+  /// action and the call alerts below the fold on a normal-sized phone — the
+  /// reference material was competing with the work. It is now collapsed to a
+  /// single tappable row and opens on demand.
+  Widget _buildHowItWorks() {
+    const steps = <(String, String)>[
+      ('1', 'SuperAdmin assigns you a salon that filled in the enquiry form.'),
+      (
+        '2',
+        'You visit it and build the profile — photos, hours, and services '
+            'if the owner wants them priced now.',
+      ),
+      (
+        '3',
+        'Submit for approval. No signal needed: it sends itself when you '
+            'have one.',
+      ),
+      (
+        '4',
+        'You can keep editing until SuperAdmin approves it. After that the '
+            "salon is the owner's.",
+      ),
+    ];
+
+    return _HowItWorksCard(steps: steps);
+  }
+}
+
+/// Collapsible explainer. Kept in its own widget so its open/closed state
+/// survives the parent's rebuilds.
+class _HowItWorksCard extends StatefulWidget {
+  final List<(String, String)> steps;
+
+  const _HowItWorksCard({required this.steps});
+
+  @override
+  State<_HowItWorksCard> createState() => _HowItWorksCardState();
+}
+
+class _HowItWorksCardState extends State<_HowItWorksCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.colors;
+
+    return CollaboratorCard(
+      margin: EdgeInsets.zero,
+      onTap: () => setState(() => _open = !_open),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'How onboarding works',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ),
+              AnimatedRotation(
+                turns: _open ? 0.5 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 20,
+                  color: palette.textTertiary,
                 ),
               ),
             ],
           ),
-        ),
-      );
-
-  Widget _buildPrimaryAction() => SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: widget.onGoToAssigned,
-          icon: const Icon(Icons.add_business),
-          label: const Text('Onboard New Salon',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            backgroundColor: AppTheme.accentColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      );
-
-  /// Worth stating plainly once: a collaborator's job has a defined end, and
-  /// knowing that up front avoids them going looking for an edit button on a
-  /// live salon later.
-  Widget _buildHowItWorks() => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.lightBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('How onboarding works',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          if (_open) ...[
             const SizedBox(height: 14),
-            _step('1', 'SuperAdmin assigns you a salon that filled in the enquiry form.'),
-            _step('2', 'You visit it and build the profile — photos, hours, and services '
-                'if the owner wants them priced now.'),
-            _step('3', 'Submit for approval. No signal needed: it sends itself when you '
-                'have one.'),
-            _step('4', 'You can keep editing until SuperAdmin approves it. After that the '
-                'salon is the owner\'s.', isLast: true),
-          ],
-        ),
-      );
-
-  Widget _step(String number, String text, {bool isLast = false}) => Padding(
-        padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: AppTheme.lightAccentSoft,
-                shape: BoxShape.circle,
+            for (final (number, text) in widget.steps)
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: number == widget.steps.last.$1 ? 0 : 12,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: palette.accentSoft,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          number,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.45,
+                          color: palette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Center(
-                child: Text(number,
-                    style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.accentColor)),
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(text,
-                  style: const TextStyle(
-                      fontSize: 12.5, height: 1.45, color: AppTheme.lightTextBody)),
-            ),
           ],
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
