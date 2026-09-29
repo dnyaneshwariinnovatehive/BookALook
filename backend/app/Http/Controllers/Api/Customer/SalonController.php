@@ -435,7 +435,19 @@ class SalonController extends Controller
 
         $salons = $query->get();
 
-        $rows = $this->present($salons, $access);
+        // Only when a real category is being browsed: the combo sentinel is not
+        // a catalogue category and has no services to show in the strip.
+        $servicesBySalon = [];
+
+        if ($request->filled('category_id')
+            && strtolower((string) $request->category_id) !== Combo::CATEGORY_SENTINEL) {
+            $servicesBySalon = $this->categoryServices(
+                $salons->pluck('id')->all(),
+                (string) $request->category_id,
+            );
+        }
+
+        $rows = $this->present($salons, $access, $servicesBySalon);
 
         $suggestedRows = collect();
         $alternativeCity = null;
@@ -553,10 +565,75 @@ class SalonController extends Controller
             ->first();
     }
 
-    /** The row shape the directory returns, used for results and suggestions. */
-    private function present($salons, $access)
+    /**
+     * A few of each salon's active services in the browsed category, for the
+     * horizontal strip on the directory card.
+     *
+     * Capped per salon: a card is a way into the salon's full price list, not a
+     * replacement for it, and carrying every service for every salon in a city
+     * would make the list response enormous. Fetched for all salons in one pair
+     * of queries, since a per-salon query here is a full N+1 on the list screen.
+     *
+     * Empty when no category is being browsed, so the ordinary directory keeps
+     * the exact payload it had.
+     *
+     * @param  array<int, string>  $salonIds
+     * @return array<string, array<int, array>>
+     */
+    private function categoryServices(array $salonIds, string $categoryId, int $limit = 8): array
     {
-        return $salons->map(function (Salon $salon) use ($access) {
+        if (empty($salonIds)) {
+            return [];
+        }
+
+        $rows = Service::with('template:id,name,category_id,estimated_duration_minutes')
+            ->whereIn('salon_id', $salonIds)
+            ->where('is_active', true)
+            ->whereHas('template', fn ($q) => $q->where('category_id', $categoryId))
+            ->orderBy('salon_id')
+            ->orderBy('display_order')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // Nobody trained for a service means it cannot be booked, so the app
+        // greys it out. Same rule and same reason as the salon page.
+        $providerCounts = DB::table('provider_services')
+            ->join('service_providers', 'service_providers.id', '=', 'provider_services.provider_id')
+            ->whereIn('provider_services.service_id', $rows->pluck('id'))
+            ->where('service_providers.is_active', true)
+            ->whereNull('service_providers.deleted_at')
+            ->groupBy('provider_services.service_id')
+            ->pluck(DB::raw('count(*) as total'), 'provider_services.service_id')
+            ->all();
+
+        $bySalon = [];
+
+        foreach ($rows as $service) {
+            $salonId = (string) $service->salon_id;
+
+            if (($bySalon[$salonId] ?? 0) >= $limit) {
+                continue;
+            }
+
+            $bySalon[$salonId][] = [
+                'id' => $service->id,
+                'name' => $service->template->name ?? 'Service',
+                'price' => (float) $service->price,
+                'duration_minutes' => (int) ($service->template->estimated_duration_minutes ?? 30),
+                'provider_count' => (int) ($providerCounts[$service->id] ?? 0),
+            ];
+        }
+
+        return $bySalon;
+    }
+
+    /** The row shape the directory returns, used for results and suggestions. */
+    private function present($salons, $access, array $servicesBySalon = [])
+    {
+        return $salons->map(function (Salon $salon) use ($access, $servicesBySalon) {
             $status = $access->status($salon);
 
             return [
@@ -577,6 +654,10 @@ class SalonController extends Controller
                 // the distance is indicative. The app says "about" for these
                 // rather than presenting a guess as a measurement.
                 'distance_is_approximate' => $salon->location_source === 'city_centre',
+                // The browsed category's services, for the card's strip. Absent
+                // rather than empty unless a category is being browsed, so the
+                // plain directory response is byte-for-byte what it was.
+                'category_services' => $servicesBySalon[(string) $salon->id] ?? null,
             ];
         });
     }
