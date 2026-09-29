@@ -3,9 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/search_service.dart';
+import '../models/category.dart';
 import '../theme/app_theme.dart';
 import 'salon_detail_screen.dart';
-import 'salon_list_screen.dart';
+import 'category_salons_screen.dart';
 
 /// Search, answered the way a customer asks it.
 ///
@@ -125,9 +126,12 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openCategory(CategoryHit category) => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => SalonListScreen(
-            initialCategoryId: category.id,
-            title: category.name,
+          builder: (_) => CategorySalonsScreen(
+            category: ServiceCategory(
+              id: category.id,
+              name: category.name,
+              iconUrl: category.iconUrl,
+            ),
           ),
         ),
       );

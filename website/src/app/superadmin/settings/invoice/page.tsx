@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, Button, Card, Field, PageHeader, cx, ui,
 } from '@/components/admin/ui';
+import { uploadImage } from '@/lib/cloudinary';
 import s from './page.module.css';
 
 /**
@@ -26,7 +27,7 @@ import s from './page.module.css';
  * what makes a field rewrite itself mid-word.
  */
 
-type FieldKind = 'text' | 'textarea' | 'number' | 'color' | 'switch';
+type FieldKind = 'text' | 'textarea' | 'number' | 'color' | 'switch' | 'image';
 
 interface FieldSpec {
   label: string;
@@ -73,7 +74,11 @@ export default function InvoiceFormatPage() {
   const [issuedCount, setIssuedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Fetched inside the effect rather than through a `load` callback the effect
   // calls, so nothing setStates synchronously in the effect body, and so a
@@ -116,6 +121,34 @@ export default function InvoiceFormatPage() {
     // A "Saved." notice sitting above fields that have been edited since is
     // worse than no notice at all.
     setBanner((prev) => (prev?.tone === 'ok' ? null : prev));
+  };
+
+  /**
+   * Send the picked file to Cloudinary, then store the URL it returns.
+   *
+   * The upload is unsigned and goes browser → Cloudinary directly, so no file
+   * is handled by this server. The URL is only committed to the form on
+   * success: a failed upload must leave whatever logo is already saved in
+   * place, otherwise a transient network blip would silently blank the
+   * letterhead.
+   */
+  const handleImagePick = async (key: string, file: File | undefined) => {
+    if (!file) return;
+
+    setUploadError(null);
+    setUploading(true);
+
+    try {
+      const url = await uploadImage(file);
+      set(key, url);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : 'Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      // Let the same file be chosen again after a failure, which the input
+      // would otherwise silently ignore because its value never changed.
+      if (fileInput.current) fileInput.current.value = '';
+    }
   };
 
   const changed = useMemo(
@@ -181,6 +214,65 @@ export default function InvoiceFormatPage() {
 
   const renderField = (key: string, spec: FieldSpec) => {
     switch (spec.kind) {
+      case 'image':
+        return (
+          <Field key={key} label={spec.label} hint={spec.hint}>
+            <div className={s.imageRow}>
+              <div className={s.imageThumb}>
+                {text(key) ? (
+                  /* Plain background-image, not next/image: the host is whatever
+                     Cloudinary handed back and the page may be showing a logo
+                     uploaded seconds ago, so there is nothing to optimise
+                     against. encodeURI closes off the url() injection the
+                     preview below guards against. */
+                  <span
+                    className={s.imageThumbFill}
+                    style={{ backgroundImage: `url("${encodeURI(text(key))}")` }}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span className={s.imageThumbEmpty}>None</span>
+                )}
+              </div>
+
+              <div className={s.imageActions}>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className={s.imageInput}
+                  disabled={uploading}
+                  onChange={(e) => handleImagePick(key, e.target.files?.[0])}
+                />
+                <div className={s.imageButtons}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={uploading}
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    {uploading ? 'Uploading…' : text(key) ? 'Replace image' : 'Upload image'}
+                  </Button>
+                  {text(key) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={uploading}
+                      onClick={() => set(key, '')}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                {text(key) && <div className={s.imageUrl}>{text(key)}</div>}
+                {uploadError && (
+                  <div className={s.imageError} role="alert">{uploadError}</div>
+                )}
+              </div>
+            </div>
+          </Field>
+        );
+
       case 'switch':
         return (
           <label key={key} className={cx(ui.check, flag(key) && ui.checkOn)}>

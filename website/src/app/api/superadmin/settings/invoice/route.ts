@@ -9,6 +9,33 @@ const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.bookalo
  * Same shape as the policy proxy: the browser never sees the backend token, it
  * only ever sees this route, and the httpOnly cookie stays where it is.
  */
+/**
+ * Read the backend's answer without ever losing it.
+ *
+ * `res.json()` throws on anything that is not JSON — and a 500 from Laravel is
+ * an HTML error page, not JSON. Letting that throw landed in the catch below,
+ * which replaced the real status and the real message with a generic
+ * "Internal Server Error", so a database or deployment problem was
+ * indistinguishable from a bad request. Reading as text and parsing by hand
+ * keeps the status and, when the body really is JSON, the message.
+ */
+async function readBackend(res: Response): Promise<unknown> {
+  const raw = await res.text();
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.error(
+      `Invoice settings: backend returned ${res.status} with a non-JSON body.`,
+      raw.slice(0, 1000),
+    );
+
+    return {
+      message: `The server responded with ${res.status} ${res.statusText || 'error'}. See the server logs for the cause.`,
+    };
+  }
+}
+
 export async function GET() {
   const cookieStore = await cookies();
   const token = cookieStore.get('superadmin_token')?.value;
@@ -26,11 +53,10 @@ export async function GET() {
       cache: 'no-store',
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(await readBackend(res), { status: res.status });
   } catch (error) {
     console.error('Error fetching invoice settings:', error);
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ message: 'Could not reach the server.' }, { status: 502 });
   }
 }
 
@@ -55,10 +81,9 @@ export async function PUT(request: Request) {
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(await readBackend(res), { status: res.status });
   } catch (error) {
     console.error('Error updating invoice settings:', error);
-    return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ message: 'Could not reach the server.' }, { status: 502 });
   }
 }

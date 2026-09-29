@@ -320,8 +320,8 @@ class SettingsController extends Controller
             'invoice_tax_id' => ['label' => 'Tax ID', 'kind' => 'text', 'group' => 'issuer',
                 'hint' => 'Only printed when both this and its label are filled in.'],
 
-            'invoice_logo_url' => ['label' => 'Logo URL', 'kind' => 'text', 'group' => 'branding',
-                'hint' => 'Must start with http://, https:// or /.'],
+            'invoice_logo_url' => ['label' => 'Logo', 'kind' => 'image', 'group' => 'branding',
+                'hint' => 'PNG, JPEG, SVG or WebP, up to 5 MB. Printed in the letterhead, so a wide mark works best.'],
             'invoice_accent_color' => ['label' => 'Accent colour', 'kind' => 'color', 'group' => 'branding',
                 'hint' => 'Used for rules, headings and the balance due.'],
 

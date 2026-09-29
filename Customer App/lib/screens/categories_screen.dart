@@ -5,14 +5,14 @@ import '../models/category.dart';
 import '../services/category_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_grid.dart';
-import 'discovery_screen.dart';
+import 'category_salons_screen.dart';
 
 /// Every category the platform has, as a grid.
 ///
 /// Reached from the fourth card on the home screen and from the "Browse all"
-/// link above it. Picking a category does not filter anything here — it hands
-/// the request to the Explore tab and lets that screen do the filtering, so
-/// there is only ever one place that knows how salons are listed.
+/// link above it. Picking a category does not filter anything here — it opens
+/// the list of salons offering that category, so there is only ever one place
+/// that knows how a category turns into a list of salons.
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
 
@@ -46,18 +46,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     });
   }
 
-  /// Leave this page first so the shell is visible, then push the discovery
-  /// page for whichever catalogue item was picked.
+  /// Open the list of salons that offer this category in the customer's city.
+  ///
+  /// This page stays on the stack underneath: the customer picked a category
+  /// from a grid, and backing out of the salons should return them to that grid
+  /// rather than dropping them on the home screen.
   void _openInExplore(ServiceCategory category) {
-    Navigator.of(context).pop();
-    if (category.id == CategoryGrid.comboSentinelId) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ComboDiscoveryScreen()),
-      );
-      return;
-    }
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => CategoryDiscoveryScreen(category: category)),
+      MaterialPageRoute(builder: (_) => CategorySalonsScreen(category: category)),
     );
   }
 
