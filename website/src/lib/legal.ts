@@ -1,4 +1,4 @@
-import { CONTACT_ADDRESS, CONTACT_EMAIL } from './site-links';
+import { CONTACT_ADDRESS, CONTACT_COMPANY, CONTACT_EMAIL } from './site-links';
 
 /**
  * The approved legal and policy documents.
@@ -53,9 +53,13 @@ const ALL_RELATED: RelatedLink[] = [
   { href: '/partner-terms', label: 'Partner Terms & Conditions' },
 ];
 
+// Reads as a letterhead: who you are writing to, where they are, how to reach
+// them. The "contact us at:" line that precedes this list in the Terms and
+// Privacy documents needs the name before the address, not after it.
 const CONTACT_BLOCKS: LegalBlock[] = [
-  { text: CONTACT_EMAIL },
+  { text: CONTACT_COMPANY },
   { text: CONTACT_ADDRESS },
+  { text: CONTACT_EMAIL },
 ];
 
 // ------------------------------------------------------------- terms of use

@@ -14,11 +14,11 @@ import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../notifications_screen.dart';
+import '../../help_support_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
-import '../../../services/push_notification_service.dart';
 
 class MoreTab extends StatelessWidget {
   final Map<String, dynamic> salonData;
@@ -345,7 +345,12 @@ class MoreTab extends StatelessWidget {
                     icon: Icons.help_outline,
                     iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
                     title: 'Help & Support',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
+                      );
+                    },
                   ),
                   Divider(height: 1, indent: 56),
                   const PushNotificationToggle(),

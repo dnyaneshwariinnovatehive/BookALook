@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/guest_restricted_view.dart';
+import '../../legal/legal_document_screen.dart';
+import '../../legal/legal_documents.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../phone_screen.dart';
@@ -21,6 +23,18 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   final ProfileService _profileService = ProfileService();
+
+  /// The documents a customer can reach from the profile. Partner Terms is
+  /// deliberately absent — it governs salon partners, who use the Partner App,
+  /// and showing it to a customer invites them to agree to the wrong contract.
+  /// Insertion order is the reading order: what you agreed to, what happens to
+  /// your money, then who we are.
+  static const Map<String, IconData> _legalDocuments = {
+    'terms': Icons.gavel_outlined,
+    'privacy': Icons.lock_outline,
+    'cancellation-refund': Icons.event_busy_outlined,
+    'about': Icons.info_outline,
+  };
   
   Map<String, dynamic>? _userProfile;
   int _appointmentsCount = 0;
@@ -406,7 +420,63 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
               
               const SizedBox(height: 40),
-              
+
+              // Legal Header
+              Text(
+                'HELP & LEGAL',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Always reachable, signed in or not. A guest reading the
+              // cancellation policy before their first booking is exactly the
+              // person most likely to need it.
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    for (final entry in _legalDocuments.entries) ...[
+                      LegalDocumentTile(
+                        slug: entry.key,
+                        icon: entry.value,
+                      ),
+                      if (entry.key != _legalDocuments.keys.last)
+                        Divider(height: 1, color: borderColor),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              Center(
+                child: Text(
+                  'BooKalook · ${kLegalContactEmail}',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+
               // Logout Button
               Center(
                 child: TextButton.icon(

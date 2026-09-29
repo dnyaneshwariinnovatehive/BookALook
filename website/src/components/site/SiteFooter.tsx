@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import StoreBadge from './StoreBadge';
-import { CONTACT_ADDRESS, CONTACT_EMAIL, CUSTOMER_APP_STORE_URL, CUSTOMER_PLAY_STORE_URL, SOCIAL_URLS } from '@/lib/site-links';
+import { CONTACT_ADDRESS, CONTACT_COMPANY, CONTACT_EMAIL, CUSTOMER_APP_STORE_URL, CUSTOMER_PLAY_STORE_URL, SOCIAL_URLS } from '@/lib/site-links';
 
 /**
  * The public site footer.
@@ -53,10 +53,11 @@ export default function SiteFooter() {
         </div>
         <div className="blk-footer__col">
           <p className="blk-footer__head">Contact</p>
+          <span className="blk-footer__link">{CONTACT_COMPANY}</span>
+          <span className="blk-footer__link">{CONTACT_ADDRESS}</span>
           <a className="blk-footer__link" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
-          <span className="blk-footer__link">{CONTACT_ADDRESS}</span>
           <div className="blk-footer__social">
             <a href={SOCIAL_URLS.instagram} target="_blank" rel="noopener noreferrer">
               Instagram

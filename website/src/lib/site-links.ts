@@ -25,11 +25,17 @@ export const SOCIAL_URLS = {
 /**
  * Contact details for the legal pages.
  *
- * [PLACEHOLDER] The approved policy documents name only an email address and a
- * registered address — no phone number — so there is nothing to put here yet.
- * Once a support number exists, add it to the four legal documents and show it
- * under "Contact us" on each of them.
+ * The registered entity name is kept apart from the street address rather than
+ * being folded into one string. The policies set this out as a letterhead, and
+ * a single "\n"-joined value renders as one run-on line in HTML and in Flutter
+ * unless every consumer is taught about line breaks. Separate values stay
+ * separate wherever they are printed.
+ *
+ * [PLACEHOLDER] The approved policy documents name no phone number, so there is
+ * nothing to print under "Contact us" yet. Once a support number exists, add it
+ * to the policy documents and to this file.
  */
+export const CONTACT_COMPANY = 'BOOKALOOK PRIVATE LIMITED';
 export const CONTACT_EMAIL = 'bookalook01@gmail.com';
 export const CONTACT_ADDRESS =
-  'Ambikanagar Mukundwadi N-2 CIDCO, Chhatrapati Sambhajinagar, Maharashtra, India';
+  'PLOT NO 44 SR NO 17/22, DEVGIRI COLONY N-2, Aurangabad (MH), Aurangabad, Aurangabad- 431001, Maharashtra';

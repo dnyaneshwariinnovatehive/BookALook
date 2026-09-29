@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../legal/terms_acceptance_row.dart';
 import '../services/auth_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/city_area_picker.dart';
 import 'main_screen.dart';
 
@@ -22,6 +24,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   bool _isLoading = false;
   String _selectedGender = 'unspecified';
+
+  /// Not sent to the backend — the app has no consent table, and the email and
+  /// address in the policy documents are the record. This is here so the box
+  /// cannot be ticked by default and so sign-up genuinely stops until it is.
+  bool _acceptedTerms = false;
+
+  /// The documents a customer agrees to at sign-up. The full platform Terms of
+  /// Use, the Privacy Policy, and the policy that actually decides whether they
+  /// get their money back.
+  static const List<String> _consentDocuments = [
+    'terms',
+    'privacy',
+    'cancellation-refund',
+  ];
 
   // Where they are. Required at sign-up so the first screen they see can show
   // what is actually near them.
@@ -69,6 +85,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_subAreaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please choose your area')),
+      );
+      return;
+    }
+
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please read and accept the terms to continue')),
       );
       return;
     }
@@ -183,15 +206,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               maxLines: 3,
             ),
-            SizedBox(height: 32),
+            SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _acceptedTerms
+                      ? AppTheme.accentColor.withOpacity(0.4)
+                      : Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+                ),
+              ),
+              child: TermsAcceptanceRow(
+                slugs: _consentDocuments,
+                value: _acceptedTerms,
+                onChanged: (v) => setState(() => _acceptedTerms = v),
+              ),
+            ),
+            SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _isLoading ? null : _completeProfile,
+              onPressed: (_isLoading || !_acceptedTerms) ? null : _completeProfile,
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading 
                 ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
                 : Text('Complete & Login', style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'By completing your profile you are creating a BooKalook account. '
+              'We use your phone number, name and location to show you salons near you.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              ),
             ),
           ],
         ),
