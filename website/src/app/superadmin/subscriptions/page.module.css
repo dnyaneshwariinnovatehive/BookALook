@@ -468,6 +468,68 @@
   border: 1px solid var(--border-color);
 }
 
+/* ---------- payment reference ---------- */
+/* A transaction id is set in a monospace face so it can be read out digit by
+   digit against a bank statement without the eye grouping 1/7 and 0/O. */
+.refCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+}
+
+.refId {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.refNote {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  /* The owner's own words, quoted. Kept on one line with an ellipsis so a long
+     note cannot stretch a table row out of shape; the full text is in the
+     receipt viewer. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.receiptHead {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+}
+
+.receiptRef {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.receiptRef span {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.receiptRef b {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .infoStats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\PlatformPolicySetting;
 use App\Models\Invoice;
 use App\Models\InvoiceSetting;
+use App\Models\SettlementInvoice;
 use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
@@ -217,6 +218,7 @@ class SettingsController extends Controller
             'settings' => InvoiceSetting::typed(),
             'schema' => $this->invoiceSchema(),
             'issued_count' => Invoice::count(),
+            'settlement_issued_count' => SettlementInvoice::count(),
         ]);
     }
 
@@ -248,6 +250,16 @@ class SettingsController extends Controller
             'invoice_show_duration_column' => 'sometimes|boolean',
             'invoice_show_terms' => 'sometimes|boolean',
             'invoice_show_balance_due' => 'sometimes|boolean',
+
+            // The settlement statement a salon owner is given. The issuer and
+            // branding keys above are shared on purpose — both documents come
+            // from this company and must not look like two.
+            'settlement_invoice_number_prefix' => 'sometimes|required|string|max:10',
+            'settlement_invoice_number_padding' => 'sometimes|required|integer|min:1|max:12',
+            'settlement_invoice_document_title' => 'sometimes|required|string|max:60',
+            'settlement_invoice_footer_note' => 'sometimes|nullable|string|max:300',
+            'settlement_invoice_show_billed_revenue' => 'sometimes|boolean',
+            'settlement_invoice_show_appointments_count' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -340,6 +352,17 @@ class SettingsController extends Controller
             'invoice_show_duration_column' => ['label' => 'Duration column', 'kind' => 'switch', 'group' => 'sections'],
             'invoice_show_terms' => ['label' => 'Terms and conditions', 'kind' => 'switch', 'group' => 'sections'],
             'invoice_show_balance_due' => ['label' => 'Balance due line', 'kind' => 'switch', 'group' => 'sections'],
+
+            'settlement_invoice_number_prefix' => ['label' => 'Settlement prefix', 'kind' => 'text', 'group' => 'settlement',
+                'hint' => 'Letters and digits only. Kept separate from the customer invoice series so an owner quoting a settlement cannot be mistaken for a customer.'],
+            'settlement_invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'settlement',
+                'hint' => 'Zero padding on the running settlement number.'],
+            'settlement_invoice_document_title' => ['label' => 'Document title', 'kind' => 'text', 'group' => 'settlement',
+                'hint' => 'Printed where the customer invoice reads "Invoice".'],
+            'settlement_invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'settlement',
+                'hint' => 'A separate note from the customer one — "thank you for booking" makes no sense on a commission statement.'],
+            'settlement_invoice_show_billed_revenue' => ['label' => 'Total billed by the salon', 'kind' => 'switch', 'group' => 'settlement'],
+            'settlement_invoice_show_appointments_count' => ['label' => 'Completed appointment count', 'kind' => 'switch', 'group' => 'settlement'],
         ];
     }
 
@@ -366,6 +389,12 @@ class SettingsController extends Controller
             'invoice_show_duration_column' => 'Whether the duration column is printed',
             'invoice_show_terms' => 'Whether terms and conditions are printed',
             'invoice_show_balance_due' => 'Whether the balance due line is printed',
+            'settlement_invoice_number_prefix' => 'Letters and digits placed before the settlement invoice number',
+            'settlement_invoice_number_padding' => 'Zero padding applied to the settlement invoice sequence number',
+            'settlement_invoice_document_title' => 'Title printed on a settlement invoice in place of "Invoice"',
+            'settlement_invoice_footer_note' => 'Note printed at the foot of every settlement invoice',
+            'settlement_invoice_show_billed_revenue' => 'Whether the total the salon billed is printed',
+            'settlement_invoice_show_appointments_count' => 'Whether the completed appointment count is printed',
         ];
     }
 }

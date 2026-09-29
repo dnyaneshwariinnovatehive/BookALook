@@ -279,6 +279,12 @@ class SalonPayoutRecord {
   final String status;
   final String? reference;
 
+  /// The settlement statement for this cycle, if the money has been paid out.
+  /// Null until then — a cycle that has been calculated but not distributed is
+  /// still a promise, and there is nothing to print about a promise.
+  final String? invoiceNumber;
+  final String? invoiceUrl;
+
   SalonPayoutRecord({
     required this.cycleType,
     required this.cycleLabel,
@@ -295,25 +301,33 @@ class SalonPayoutRecord {
     required this.netAmount,
     required this.status,
     this.reference,
+    this.invoiceNumber,
+    this.invoiceUrl,
   });
 
-  factory SalonPayoutRecord.fromJson(Map<String, dynamic> json) => SalonPayoutRecord(
-        cycleType: json['cycle_type'] ?? 'weekly',
-        cycleLabel: json['cycle_label'] ?? '',
-        cycleStart: json['cycle_start_date'] ?? '',
-        cycleEnd: json['cycle_end_date'] ?? '',
-        appointments: json['appointments_count'] ?? 0,
-        revenue: _num(json['appointment_revenue']),
-        advancesHeld: _num(json['gross_amount']),
-        billingType: json['billing_type'] ?? 'subscription',
-        billingLabel: json['billing_label'] ?? 'Subscription Plan',
-        commissionPercentage: _num(json['commission_percentage']),
-        commissionDeducted: _num(json['commission_deducted']),
-        walletRedeemed: _num(json['wallet_redeemed_amount']),
-        netAmount: _num(json['net_amount']),
-        status: json['status'] ?? 'pending',
-        reference: json['distribution_reference'],
-      );
+  factory SalonPayoutRecord.fromJson(Map<String, dynamic> json) {
+    final invoice = json['settlement_invoice'] as Map<String, dynamic>?;
+
+    return SalonPayoutRecord(
+      cycleType: json['cycle_type'] ?? 'weekly',
+      cycleLabel: json['cycle_label'] ?? '',
+      cycleStart: json['cycle_start_date'] ?? '',
+      cycleEnd: json['cycle_end_date'] ?? '',
+      appointments: json['appointments_count'] ?? 0,
+      revenue: _num(json['appointment_revenue']),
+      advancesHeld: _num(json['gross_amount']),
+      billingType: json['billing_type'] ?? 'subscription',
+      billingLabel: json['billing_label'] ?? 'Subscription Plan',
+      commissionPercentage: _num(json['commission_percentage']),
+      commissionDeducted: _num(json['commission_deducted']),
+      walletRedeemed: _num(json['wallet_redeemed_amount']),
+      netAmount: _num(json['net_amount']),
+      status: json['status'] ?? 'pending',
+      reference: json['distribution_reference'],
+      invoiceNumber: invoice?['number']?.toString(),
+      invoiceUrl: invoice?['url']?.toString(),
+    );
+  }
 }
 
 class SalonPayouts {

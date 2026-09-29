@@ -74,7 +74,9 @@ class PayoutController extends Controller
         $column = $request->input('column');
         $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
 
-        $rowQuery = $applyFilters(SalonPayout::with('salon:id,name'));
+        // settlementInvoice is eager-loaded because present() hands back its
+        // signed link, and a page of 20 payouts would otherwise be 20 queries.
+        $rowQuery = $applyFilters(SalonPayout::with(['salon:id,name', 'settlementInvoice']));
 
         if ($column === 'salon') {
             $rowQuery->orderBy(
@@ -182,7 +184,7 @@ class PayoutController extends Controller
 
     public function show($id)
     {
-        $payout = SalonPayout::with('salon:id,name,address,phone_num')->findOrFail($id);
+        $payout = SalonPayout::with(['salon:id,name,address,phone_num', 'settlementInvoice'])->findOrFail($id);
 
         return response()->json([
             'success' => true,

@@ -64,6 +64,31 @@ class PartnerSubscriptionController extends Controller
             ->where('status', 'pending')
             ->first();
 
+        // The requests this salon has made, newest first — including the ones
+        // already decided. `history` below is salon_subscriptions, which is a
+        // different thing: it lists the plan periods the salon has ended up
+        // with, not the payments that paid for them. Without this, an owner who
+        // uploaded a transfer could never see what became of it.
+        $paymentRequests = SubscriptionPaymentRequest::with('plan:id,name,price,validity_days')
+            ->where('salon_id', $salonId)
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (SubscriptionPaymentRequest $pr) => [
+                'id' => $pr->id,
+                'plan_name' => $pr->plan?->name,
+                'billing_type' => BillingModel::normalise($pr->billing_type),
+                'billing_label' => BillingModel::label($pr->billing_type),
+                'status' => $pr->status,
+                'screenshot_url' => $pr->screenshot_url,
+                'transaction_id' => $pr->transaction_id,
+                'note' => $pr->note,
+                'coins_to_redeem' => (int) $pr->coins_to_redeem,
+                'coin_discount_inr' => (float) $pr->coin_discount_inr,
+                'amount_payable_inr' => (float) $pr->amount_payable_inr,
+                'raised_at' => $pr->created_at?->toIso8601String(),
+            ]);
+
         $history = $salon->subscriptions()->with('plan')->orderBy('created_at', 'desc')->get();
 
         $model = $salon->billingModel();
@@ -84,6 +109,7 @@ class PartnerSubscriptionController extends Controller
             'days_remaining' => $daysRemaining,
             'warning_threshold_days' => $warningDays,
             'pending_request' => $pendingRequest,
+            'payment_requests' => $paymentRequests,
             'history' => $history
         ]);
     }
@@ -240,6 +266,10 @@ class PartnerSubscriptionController extends Controller
             'screenshot' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'plan_id' => 'required|exists:subscription_plans,id',
             'coins_to_redeem' => 'nullable|integer|min:0',
+            // Both optional. The screenshot is the proof; these only let
+            // SuperAdmin match a bank line to it without ringing the owner.
+            'transaction_id' => 'nullable|string|max:150',
+            'note' => 'nullable|string|max:1000',
         ]);
 
         $user = $request->user();
@@ -287,11 +317,20 @@ class PartnerSubscriptionController extends Controller
 
         $path = \Illuminate\Support\Facades\Storage::disk('cloudinary')->put('screenshots', $request->file('screenshot'));
         $uploadedFileUrl = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($path);
+
+        // Whitespace-only is treated as "not given". A row that says the owner
+        // typed nothing and a row that says nothing was typed have to look the
+        // same to the review screen and to the owner's own history.
+        $ownerReference = $this->cleanText($request->input('transaction_id'));
+        $ownerNote = $this->cleanText($request->input('note'));
+
         $paymentRequest = SubscriptionPaymentRequest::create([
             'salon_id' => $salonId,
             'subscription_plan_id' => $request->plan_id,
             'billing_type' => BillingModel::SUBSCRIPTION,
             'screenshot_url' => $uploadedFileUrl,
+            'transaction_id' => $ownerReference,
+            'note' => $ownerNote,
             'status' => 'pending',
             // Intent only. The coins stay in the wallet until SuperAdmin turns
             // this into a subscription — a request that is rejected, or
@@ -418,5 +457,24 @@ class PartnerSubscriptionController extends Controller
             'message' => 'Request sent. SuperAdmin will confirm your commission percentage and switch you over.',
             'data' => $commissionRequest,
         ]);
+    }
+
+    /**
+     * An optional field the owner typed, as null when they left it blank.
+     *
+     * A text input sends "" for an untouched field, and storing that would give
+     * the review screen two representations of "not provided" — one of which
+     * prints an empty chip. Trimming here also means a stray space in a pasted
+     * UTR cannot stop a search for it from matching.
+     */
+    private function cleanText(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $clean = trim($value);
+
+        return $clean === '' ? null : $clean;
     }
 }

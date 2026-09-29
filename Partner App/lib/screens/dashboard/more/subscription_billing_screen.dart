@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:partner_app/services/api_config.dart';
 import 'upgrade_plan_screen.dart';
 
@@ -22,6 +23,13 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   int _daysRemaining = 0;
   Map<String, dynamic>? _pendingRequest;
   List<dynamic> _history = [];
+
+  /// Every payment this salon has raised, decided or not. Kept apart from
+  /// `_history` above, which is a different thing: that lists the plan periods
+  /// the salon ended up with, this lists the transfers that paid for them. An
+  /// owner who uploaded proof and cannot find it again has no way to tell
+  /// BookALook it was theirs.
+  List<dynamic> _paymentRequests = [];
 
   /// Which arrangement the salon trades under. Postpaid salons have nothing to
   /// renew, so the whole screen reads differently for them.
@@ -67,6 +75,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
           }
           _pendingRequest = data['pending_request'];
           _history = data['history'] ?? [];
+          _paymentRequests = data['payment_requests'] ?? [];
           _billingModel = data['billing_model'] ?? 'subscription';
           _billingLabel = data['billing_label'] ?? 'Subscription Plan';
           _commissionPercentage = data['commission_percentage'] == null
@@ -499,6 +508,24 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 ),
               ]
             ],
+            if (_paymentRequests.isNotEmpty) ...[
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 24),
+              const Text(
+                'Payment History',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Every plan payment you have sent us, and what became of it.',
+                style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              ..._paymentRequests
+                  .map((item) => _buildPaymentRequestCard(item, colorScheme, theme))
+                  .toList(),
+            ],
             if (_history.isNotEmpty) ...[
               const SizedBox(height: 32),
               const Divider(),
@@ -559,6 +586,142 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ],
     );
+  }
+
+  /// One payment the owner sent us, whether it is still being looked at or has
+  /// already been decided.
+  ///
+  /// Shows the transaction id and note back because those are the owner's own
+  /// words about the transfer — if BookALook cannot find it, or the owner
+  /// cannot remember what they wrote, the reference is the only thing either
+  /// side can go on.
+  Widget _buildPaymentRequestCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {
+    final String status = (item['status'] ?? 'unknown').toString();
+    final String? planName = item['plan_name']?.toString();
+    final String? transactionId = item['transaction_id']?.toString();
+    final String? note = item['note']?.toString();
+    final String? screenshotUrl = item['screenshot_url']?.toString();
+
+    final double payable = double.tryParse((item['amount_payable_inr'] ?? 0).toString()) ?? 0;
+    final int coins = int.tryParse((item['coins_to_redeem'] ?? 0).toString()) ?? 0;
+
+    Color statusColor;
+    String statusLabel;
+    if (status == 'approved') {
+      statusColor = Colors.green;
+      statusLabel = 'APPROVED';
+    } else if (status == 'rejected') {
+      statusColor = Colors.redAccent;
+      statusLabel = 'NOT ACCEPTED';
+    } else {
+      statusColor = Colors.orange;
+      statusLabel = 'UNDER REVIEW';
+    }
+
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.dividerColor.withOpacity(0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    planName ?? item['billing_label']?.toString() ?? 'Plan payment',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor.withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _paymentLine('Sent on', _formatDate(item['raised_at']), colorScheme),
+            _paymentLine('Amount paid', '₹${payable.toStringAsFixed(2)}', colorScheme),
+            if (coins > 0)
+              _paymentLine('Coins used', '$coins (₹ discount applied on approval)', colorScheme),
+            if (transactionId != null && transactionId.isNotEmpty)
+              _paymentLine('Transaction ID', transactionId, colorScheme),
+            if (note != null && note.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('Note', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 2),
+              Text(note, style: TextStyle(fontSize: 14, height: 1.35)),
+            ],
+            if (screenshotUrl != null && screenshotUrl.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => _openExternal(screenshotUrl, 'Could not open the payment screenshot.'),
+                icon: const Icon(Icons.image_outlined, size: 18),
+                label: const Text('View screenshot'),
+              ),
+            ],
+            if (status == 'rejected')
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  'Not accepted. This is usually because a newer payment replaced it.',
+                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentLine(String label, String value, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(label, style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open a receipt in the phone's browser or gallery.
+  ///
+  /// Only http(s) is allowed through. The URL comes from our own storage, but
+  /// handing an arbitrary string to the platform's URL handler is not something
+  /// to do on trust — `javascript:` and `file://` both open with the app's own
+  /// permissions.
+  Future<void> _openExternal(String rawUrl, String failureMessage) async {
+    final uri = Uri.tryParse(rawUrl.trim());
+    final allowed = uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+
+    // `allowed` being true is what proves uri is non-null, so no bang needed.
+    if (!allowed || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failureMessage)));
+    }
   }
 
   Widget _buildHistoryCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {

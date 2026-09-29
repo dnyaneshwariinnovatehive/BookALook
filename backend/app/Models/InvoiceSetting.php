@@ -66,11 +66,27 @@ class InvoiceSetting extends Model
         'invoice_show_duration_column' => true,
         'invoice_show_terms' => true,
         'invoice_show_balance_due' => true,
+
+        // ---- The settlement invoice BookALook issues to a salon owner ----
+        //
+        // The issuer keys above are deliberately shared: both documents come
+        // from the same company, so the letterhead must not be able to disagree
+        // with itself. What differs is the numbering — a salon owner quoting a
+        // settlement needs a number that is unmistakably not a customer
+        // invoice's — and the footer, because "thank you for booking with us" is
+        // nonsense on a statement about commission.
+        'settlement_invoice_number_prefix' => 'SET',
+        'settlement_invoice_number_padding' => 5,
+        'settlement_invoice_document_title' => 'Settlement Invoice',
+        'settlement_invoice_footer_note' => 'Figures are those BookALook held and paid out for the period above.',
+        'settlement_invoice_show_billed_revenue' => true,
+        'settlement_invoice_show_appointments_count' => true,
     ];
 
     /** Keys stored as a whole number. */
     public const INTEGER_KEYS = [
         'invoice_number_padding',
+        'settlement_invoice_number_padding',
     ];
 
     /** Keys that are on/off switches. */
@@ -82,6 +98,8 @@ class InvoiceSetting extends Model
         'invoice_show_duration_column',
         'invoice_show_terms',
         'invoice_show_balance_due',
+        'settlement_invoice_show_billed_revenue',
+        'settlement_invoice_show_appointments_count',
     ];
 
     /**

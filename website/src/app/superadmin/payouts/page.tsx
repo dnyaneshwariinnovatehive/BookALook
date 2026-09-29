@@ -27,6 +27,8 @@ interface Payout {
   status: string;
   distributed_at: string | null;
   distribution_reference: string | null;
+  /** The statement issued for this cycle, present only once the money moved. */
+  settlement_invoice: { number: string; url: string; issued_at: string } | null;
 }
 
 interface Totals {
@@ -429,6 +431,24 @@ export default function PayoutsPage() {
                       <small style={{ color: 'var(--text-body)' }}>ref {p.distribution_reference}</small>
                     </>
                   )}
+                  {/* The statement is the document the owner is given when the
+                      money lands, so it is surfaced here too — SuperAdmin is
+                      who answers when an owner queries the commission figure
+                      weeks later, and hunting for the number then is how a
+                      dispute goes unresolved. */}
+                  {p.settlement_invoice && (
+                    <>
+                      <br />
+                      <a
+                        className={styles.statementLink}
+                        href={p.settlement_invoice.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {p.settlement_invoice.number}
+                      </a>
+                    </>
+                  )}
                 </td>
                 <td>
                   <span
@@ -485,9 +505,22 @@ export default function PayoutsPage() {
                       </button>
                     )}
                     {p.status === 'distributed' && (
-                      <small style={{ color: 'var(--text-body)' }}>
-                        {p.distributed_at ? new Date(p.distributed_at).toLocaleDateString() : 'done'}
-                      </small>
+                      <>
+                        <small style={{ color: 'var(--text-body)', display: 'block' }}>
+                          {p.distributed_at ? new Date(p.distributed_at).toLocaleDateString() : 'done'}
+                        </small>
+                        {p.settlement_invoice && (
+                          <a
+                            className={styles.smallButton}
+                            href={p.settlement_invoice.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ marginTop: 6 }}
+                          >
+                            Statement
+                          </a>
+                        )}
+                      </>
                     )}
                   </div>
                 </td>

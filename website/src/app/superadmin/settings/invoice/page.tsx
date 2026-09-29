@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Button, Card, Field, PageHeader, cx, ui,
+  Alert, Button, Card, Field, PageHeader, Segmented, cx, ui,
 } from '@/components/admin/ui';
 import { uploadImage } from '@/lib/cloudinary';
 import s from './page.module.css';
@@ -45,6 +45,7 @@ const GROUPS: { id: string; title: string; subtitle: string }[] = [
   { id: 'branding', title: 'Branding', subtitle: 'How the document looks. The accent colour drives the rules and the balance due.' },
   { id: 'numbering', title: 'Numbering', subtitle: 'The reference a customer quotes when they call about a booking.' },
   { id: 'sections', title: 'Sections', subtitle: 'What appears on the document. A section nobody has filled in stays switched off rather than printing a heading over nothing.' },
+  { id: 'settlement', title: 'Settlement Statement', subtitle: 'The statement a salon owner is given when a cycle of earnings is paid out. It reuses the issuer, branding and terms above — only what makes a settlement different is set here.' },
 ];
 
 /** A stand-in appointment, so the preview has something real to show. */
@@ -63,6 +64,33 @@ const SAMPLE = {
   advance: 1500,
 };
 
+/**
+ * A stand-in settlement cycle.
+ *
+ * The figures are a worked example rather than a random set, because a preview
+ * only teaches anything if the arithmetic visibly works. These follow the same
+ * rule the server uses — net is advances held, less commission, less refunds,
+ * plus coins settled — so every number here can be checked by hand:
+ *
+ *   12,000 advances held − 10,000 commission (25% of 40,000 billed) + 500 coins
+ *   = 2,500 paid
+ *
+ * The coins row is a credit, not a deduction: settling them gives the salon
+ * part of the commission back, which is why they are added to the net.
+ */
+const SETTLEMENT_SAMPLE = {
+  salon: 'Studio Nine',
+  period: '1 – 31 Oct 2026',
+  rhythm: 'Monthly',
+  appointments: 64,
+  billed: 40000,
+  advances: 12000,
+  commissionRate: 25,
+  commission: 10000,
+  walletRedeemed: 500,
+  net: 2500,
+};
+
 export default function InvoiceFormatPage() {
   const [form, setForm] = useState<Form>({});
   // What the server last confirmed. "Changed" always means changed from what
@@ -72,6 +100,11 @@ export default function InvoiceFormatPage() {
   const [saved, setSaved] = useState<Form>({});
   const [schema, setSchema] = useState<Schema>({});
   const [issuedCount, setIssuedCount] = useState(0);
+  const [settlementIssuedCount, setSettlementIssuedCount] = useState(0);
+  // Which document the preview is showing. Two documents share one letterhead
+  // but number separately, so whichever is on screen is the one being reasoned
+  // about — a preview that blended both would be of neither.
+  const [preview, setPreview] = useState<'invoice' | 'settlement'>('invoice');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -97,6 +130,7 @@ export default function InvoiceFormatPage() {
 
         setSchema(data.schema ?? {});
         setIssuedCount(Number(data.issued_count ?? 0));
+        setSettlementIssuedCount(Number(data.settlement_issued_count ?? 0));
         setSaved(data.settings ?? {});
         setForm(data.settings ?? {});
       } catch (e) {
@@ -371,16 +405,35 @@ export default function InvoiceFormatPage() {
   const terms = text('invoice_terms');
   const balance = Math.max(0, SAMPLE.total - SAMPLE.advance);
 
+  const settlementPrefix = text('settlement_invoice_number_prefix').toUpperCase() || 'SET';
+  const settlementPadding = Math.max(1, Math.min(12, Number(form.settlement_invoice_number_padding) || 5));
+  const settlementTitle = text('settlement_invoice_document_title') || 'Settlement Statement';
+  const settlementFooter = text('settlement_invoice_footer_note');
+  const showBilledRevenue = flag('settlement_invoice_show_billed_revenue');
+  const showAppointmentsCount = flag('settlement_invoice_show_appointments_count');
+  const rupees = (n: number) => `\u20b9${n.toLocaleString('en-IN')}`;
+  const year = new Date().getFullYear();
+
   return (
     <div>
       <PageHeader
         eyebrow="Platform"
         title="Invoice Format"
-        subtitle="How the invoice a customer receives after booking is laid out and branded. Changes apply to invoices issued from now on — anything already issued keeps the format it was created with."
+        subtitle="How the invoice a customer receives after booking is laid out and branded, and the statement a salon owner is given when earnings are settled. Changes apply to documents issued from now on — anything already issued keeps the format it was created with."
         actions={
-          issuedCount > 0 ? (
+          issuedCount > 0 || settlementIssuedCount > 0 ? (
             <span className={s.countNote}>
-              {issuedCount.toLocaleString('en-IN')} invoice{issuedCount === 1 ? '' : 's'} issued
+              {[
+                issuedCount > 0
+                  ? `${issuedCount.toLocaleString('en-IN')} invoice${issuedCount === 1 ? '' : 's'}`
+                  : null,
+                settlementIssuedCount > 0
+                  ? `${settlementIssuedCount.toLocaleString('en-IN')} statement${settlementIssuedCount === 1 ? '' : 's'}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' \u00b7 ')}{' '}
+              issued
             </span>
           ) : null
         }
@@ -427,9 +480,21 @@ export default function InvoiceFormatPage() {
         <div className={s.previewSticky}>
           <Card
             title="Preview"
-            subtitle="A sample invoice, using the values above."
+            subtitle="A sample document, using the values above."
+            actions={
+              <Segmented
+                ariaLabel="Document to preview"
+                value={preview}
+                onChange={setPreview}
+                options={[
+                  { value: 'invoice', label: 'Invoice' },
+                  { value: 'settlement', label: 'Settlement' },
+                ]}
+              />
+            }
             padded
           >
+            {preview === 'invoice' ? (
             <div className={s.paper} style={{ ['--pv-accent' as string]: accent }}>
               <div className={s.previewHead}>
                 <div className={s.previewBrand}>
@@ -530,6 +595,135 @@ export default function InvoiceFormatPage() {
                 {footerNote && <div className={s.previewNote}>{footerNote}</div>}
               </div>
             </div>
+            ) : (
+            /* The settlement statement reuses the same letterhead, accent and
+               terms as the customer invoice — the server reads the same
+               settings — so only the body and the numbering differ here. */
+            <div className={s.paper} style={{ ['--pv-accent' as string]: accent }}>
+              <div className={s.previewHead}>
+                <div className={s.previewBrand}>
+                  {showLogo && logoUrl && (
+                    <span
+                      className={s.previewLogo}
+                      /* Same reasoning as the invoice preview above. */
+                      style={{ backgroundImage: `url("${encodeURI(logoUrl)}")` }}
+                      aria-hidden="true"
+                    />
+                  )}
+
+                  <div>
+                    <div className={s.previewName}>{businessName || 'Business name'}</div>
+                    {showAddress && address && <div className={s.previewMuted}>{address}</div>}
+                    {showTax && taxId && taxLabel && (
+                      <div className={s.previewMuted}><strong>{taxLabel}:</strong> {taxId}</div>
+                    )}
+                  </div>
+                </div>
+                <div className={s.previewRight}>
+                  <div className={s.previewDoc}>{settlementTitle}</div>
+                  <div className={s.previewNumber}>
+                    {settlementPrefix}-{year}-{String(1).padStart(settlementPadding, '0')}
+                  </div>
+                  <div className={s.previewMuted}>Issued 1 Nov 2026</div>
+                </div>
+              </div>
+
+              <div className={s.previewCols}>
+                <div className={s.previewCol}>
+                  <div className={s.previewLabel}>Salon</div>
+                  <div className={s.previewStrong}>{SETTLEMENT_SAMPLE.salon}</div>
+                  <div className={s.previewMuted}>Settled {SETTLEMENT_SAMPLE.rhythm.toLowerCase()}</div>
+                </div>
+                <div className={s.previewCol}>
+                  <div className={s.previewLabel}>Period</div>
+                  <div className={s.previewStrong}>{SETTLEMENT_SAMPLE.period}</div>
+                  {showAppointmentsCount && (
+                    <div className={s.previewMuted}>
+                      {SETTLEMENT_SAMPLE.appointments} completed appointments
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <table className={s.previewTable}>
+                <thead>
+                  <tr>
+                    <th>Statement</th>
+                    <th className={s.previewNum}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {showBilledRevenue && (
+                    <tr>
+                      <td>
+                        <span className={s.previewStrong}>Total billed by the salon</span>
+                        {/* The count is its own switch, so it is not repeated
+                            here when that switch is off — the preview would
+                            then be hiding something the document shows. */}
+                        {showAppointmentsCount && (
+                          <span className={s.previewMuted} style={{ display: 'block' }}>
+                            Across {SETTLEMENT_SAMPLE.appointments} completed appointments
+                          </span>
+                        )}
+                      </td>
+                      <td className={s.previewNum}>{rupees(SETTLEMENT_SAMPLE.billed)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td>
+                      <span className={s.previewStrong}>Advance collected online</span>
+                      <span className={s.previewMuted} style={{ display: 'block' }}>
+                        Held by BookALook and released in this cycle
+                      </span>
+                    </td>
+                    <td className={s.previewNum}>{rupees(SETTLEMENT_SAMPLE.advances)}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span className={s.previewStrong}>Commission deducted</span>
+                      <span className={s.previewMuted} style={{ display: 'block' }}>
+                        {SETTLEMENT_SAMPLE.commissionRate}% of billed services
+                      </span>
+                    </td>
+                    <td className={s.previewNum}>&minus; {rupees(SETTLEMENT_SAMPLE.commission)}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span className={s.previewStrong}>Wallet balance settled</span>
+                      <span className={s.previewMuted} style={{ display: 'block' }}>
+                        Coins from bookings, credited back against commission
+                      </span>
+                    </td>
+                    {/* No "+" here: the printed statement shows a bare positive
+                        figure, and a preview that adds a sign the document
+                        lacks is worse than no preview. */}
+                    <td className={s.previewNum}>{rupees(SETTLEMENT_SAMPLE.walletRedeemed)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className={s.previewTotals}>
+                <table className={s.previewTotalsTable}>
+                  <tbody>
+                    <tr className={s.previewDue}>
+                      <td>Net paid to salon</td>
+                      <td className={s.previewNum}>{rupees(SETTLEMENT_SAMPLE.net)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={s.previewFoot}>
+                {showTerms && terms
+                  ? <div style={{ whiteSpace: 'pre-line' }}>{terms}</div>
+                  : showTerms
+                    ? <span className={s.previewEmpty}>Terms and conditions would print here.</span>
+                    : null}
+                {settlementFooter && <div className={s.previewNote}>{settlementFooter}</div>}
+                {footerNote && <div className={s.previewNote}>{footerNote}</div>}
+              </div>
+            </div>
+            )}
           </Card>
         </div>
       </div>

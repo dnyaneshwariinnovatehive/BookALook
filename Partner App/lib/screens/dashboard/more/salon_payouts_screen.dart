@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../services/payroll_api.dart';
 import '../../../theme/app_theme.dart';
 
@@ -277,10 +278,49 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
               Text('Subscription Plan — no commission is deducted.',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: Colors.grey.shade600)),
             ],
+
+            if (p.invoiceUrl != null && p.invoiceUrl!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openInvoice(p),
+                  icon: const Icon(Icons.receipt_long, size: 18),
+                  label: Text(
+                    p.invoiceNumber != null
+                        ? 'View invoice ${p.invoiceNumber}'
+                        : 'View settlement invoice',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  /// Open the settlement statement in the phone's browser.
+  ///
+  /// The browser, not an in-app viewer: it is already there, it prints, and a
+  /// statement is a document the owner may well want to save or forward rather
+  /// than only read. Only http(s) is allowed through — handing an arbitrary
+  /// string to the platform's URL handler is not something to do on trust, and
+  /// `javascript:` and `file://` both open with the app's own permissions.
+  Future<void> _openInvoice(SalonPayoutRecord p) async {
+    final uri = Uri.tryParse((p.invoiceUrl ?? '').trim());
+    final allowed = uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+
+    // `allowed` being true is what proves uri is non-null, so no bang needed.
+    if (!allowed || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the invoice. Try again in a moment.')),
+      );
+    }
   }
 
   Widget _line(String label, double amount, {Color? color, bool muted = false}) => Padding(

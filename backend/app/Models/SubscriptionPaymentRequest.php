@@ -11,6 +11,11 @@ class SubscriptionPaymentRequest extends Model
         'subscription_plan_id',
         'billing_type',
         'screenshot_url',
+        // What the owner typed alongside the screenshot. Both optional — plenty
+        // of owners have no UTR to quote, and a note is a courtesy. The
+        // screenshot is the proof; these only make matching a bank line easier.
+        'transaction_id',
+        'note',
         'status',
         // The coins the owner put towards this plan. Held as intent until
         // SuperAdmin approves — a request that is never approved must not have

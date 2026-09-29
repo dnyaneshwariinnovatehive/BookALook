@@ -37,7 +37,22 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool _applyCoins = true;
   String? _selectedPlanId;
   XFile? _screenshot;
+
+  /// What the owner can type alongside the screenshot to help SuperAdmin match
+  /// it to a bank line. Both optional and both sent only when there is something
+  /// to send — plenty of owners pay by card and have no UTR to quote, and the
+  /// screenshot alone is accepted as proof.
+  final TextEditingController _transactionController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
+
   final String _baseUrl = ApiConfig.baseUrl;
+
+  @override
+  void dispose() {
+    _transactionController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -264,6 +279,15 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       // request rather than an instruction.
       request.fields['coins_to_redeem'] = _coinsApplied.toString();
 
+      // Trimmed here as well as on the server, so an untouched field is not sent
+      // as an empty string — the two are the same thing everywhere else, and
+      // they are both optional.
+      final transactionId = _transactionController.text.trim();
+      if (transactionId.isNotEmpty) request.fields['transaction_id'] = transactionId;
+
+      final note = _noteController.text.trim();
+      if (note.isNotEmpty) request.fields['note'] = note;
+
       if (_screenshot != null) {
         final bytes = await _screenshot!.readAsBytes();
         request.files.add(http.MultipartFile.fromBytes(
@@ -432,6 +456,41 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
                       onPressed: _pickScreenshot,
                       icon: Icon(Icons.upload_file),
                       label: Text(_screenshot != null ? 'Screenshot Selected' : 'Upload Screenshot'),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Optional — helps us match your transfer faster',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _transactionController,
+                      textInputAction: TextInputAction.next,
+                      maxLength: 150,
+                      decoration: const InputDecoration(
+                        labelText: 'Transaction ID / UTR',
+                        hintText: 'e.g. 421873654321',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.tag),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _noteController,
+                      maxLines: 3,
+                      maxLength: 1000,
+                      decoration: const InputDecoration(
+                        labelText: 'Note for BookALook',
+                        hintText: 'e.g. Paid from my business account',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
                     ),
                   ],
                 ),

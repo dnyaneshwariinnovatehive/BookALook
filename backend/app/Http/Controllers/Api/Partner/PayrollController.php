@@ -192,7 +192,9 @@ class PayrollController extends Controller
 
         $salon = Salon::find($salonId);
 
-        $payouts = SalonPayout::with('salon:id,name')
+        // settlementInvoice is eager-loaded because present() hands back its
+        // signed link, and a 52-cycle history would otherwise be 52 queries.
+        $payouts = SalonPayout::with(['salon:id,name', 'settlementInvoice'])
             ->where('salon_id', $salonId)
             ->orderByDesc('cycle_start_date')
             ->limit(52)

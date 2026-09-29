@@ -113,6 +113,14 @@ Route::get('/invoices/{invoice}', [\App\Http\Controllers\InvoiceController::clas
     ->middleware('signed')
     ->name('invoices.show');
 
+// The settlement statement BookALook issues to a salon owner when a week's or a
+// month's money is paid out. Signed on exactly the same terms as the customer
+// invoice above, and for the same reason: the owner opens it in the phone's
+// browser, which cannot present a bearer token.
+Route::get('/settlement-invoices/{invoice}', [\App\Http\Controllers\SettlementInvoiceController::class, 'show'])
+    ->middleware('signed')
+    ->name('settlement-invoices.show');
+
 // Meta calls these. Unauthenticated by necessity — the verify token proves the
 // subscription and X-Hub-Signature-256 proves every payload after it.
 Route::get('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'verify']);

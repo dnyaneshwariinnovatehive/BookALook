@@ -420,14 +420,28 @@ class SubscriptionPlanController extends Controller
     }
 
     /**
-     * Requests waiting on SuperAdmin: paid subscriptions to verify, and salons
-     * asking to move onto the Commission Model.
+     * Requests made by salons: paid subscriptions to verify, and salons asking
+     * to move onto the Commission Model.
+     *
+     * Defaults to pending, which is the queue the dashboard is built around. A
+     * `status` of `all` widens it to everything ever raised, because a request
+     * that has been approved or rejected is the only record that a salon paid —
+     * and the transaction id and note the owner typed with it are the reason
+     * those are kept at all.
      */
-    public function getSubscriptionRequests()
+    public function getSubscriptionRequests(Request $request)
     {
-        $requests = SubscriptionPaymentRequest::with(['salon.admin', 'plan'])
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
+        $status = (string) $request->input('status', 'pending');
+
+        $query = SubscriptionPaymentRequest::with(['salon.admin', 'plan'])
+            ->orderBy('created_at', 'desc');
+
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $requests = $query
+            ->limit(200)
             ->get()
             ->map(function (SubscriptionPaymentRequest $request) {
                 $model = BillingModel::normalise($request->billing_type);
@@ -438,11 +452,16 @@ class SubscriptionPlanController extends Controller
                     // A Commission Model request is not a payment, so there is
                     // no screenshot to check — only a rate to agree.
                     'needs_commission_rate' => BillingModel::isCommission($model),
+                    // A blank from the app is stored as null, so a screen that
+                    // checks this never has to tell "" from "not provided".
+                    'transaction_id' => $request->transaction_id ?: null,
+                    'note' => $request->note ?: null,
                 ]);
             });
 
         return response()->json([
             'success' => true,
+            'status' => $status,
             'requests' => $requests,
         ]);
     }

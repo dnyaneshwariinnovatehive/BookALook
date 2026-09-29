@@ -77,8 +77,16 @@ export default function SubscriptionsPage() {
   const [salons, setSalons] = useState<any[]>([]);
   const [commissionPlanId, setCommissionPlanId] = useState<string | null>(null);
   const [graceDays, setGraceDays] = useState<number>(7);
-  const [subscriptionRequests, setSubscriptionRequests] = useState<any[]>([]);
-  const [viewingScreenshot, setViewingScreenshot] = useState<string | null>(null);
+  // Fetched with `status=all` rather than pending, so the queue and the history
+  // table below are two views of one response. The pending list is derived from
+  // it — two fetches of the same rows would be two things to fall out of step.
+  const [allRequests, setAllRequests] = useState<any[]>([]);
+  const [requestStatus, setRequestStatus] = useState('all');
+  const [requestSearch, setRequestSearch] = useState('');
+  // The whole request, not just its screenshot URL: the transaction id and note
+  // the owner typed are the reason the receipt is being looked at, so they are
+  // shown alongside it rather than making the viewer go and find them.
+  const [viewingRequest, setViewingRequest] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -141,10 +149,10 @@ export default function SubscriptionsPage() {
         setLoadError(data.message || 'Could not load plans.');
       }
 
-      const reqRes = await fetch('/api/proxy/superadmin/subscription-requests', { headers: authHeaders() });
+      const reqRes = await fetch('/api/proxy/superadmin/subscription-requests?status=all', { headers: authHeaders() });
       const reqData = await reqRes.json();
       if (reqData.success) {
-        setSubscriptionRequests(Array.isArray(reqData.requests) ? reqData.requests : []);
+        setAllRequests(Array.isArray(reqData.requests) ? reqData.requests : []);
       }
     } catch (e) {
       console.error(e);
@@ -400,6 +408,41 @@ export default function SubscriptionsPage() {
     return 0;
   });
 
+  const pendingRequests = useMemo(
+    () => allRequests.filter((r) => r.status === 'pending'),
+    [allRequests],
+  );
+
+  /* The decided history, filtered live. Search covers the fields someone would
+     actually have to hand: the salon, the plan, and the transaction reference —
+     because the reference is how a bank transfer is traced back to the row that
+     authorised it, and searching only by salon would not find it. */
+  const decidedRequests = useMemo(() => {
+    const q = requestSearch.trim().toLowerCase();
+
+    return allRequests
+      .filter((r) => r.status !== 'pending')
+      .filter((r) => (requestStatus === 'all' ? true : r.status === requestStatus))
+      .filter((r) => {
+        if (!q) return true;
+        return [r.salon?.name, r.plan?.name, r.billing_label, r.transaction_id, r.note]
+          .some((v) => String(v ?? '').toLowerCase().includes(q));
+      });
+  }, [allRequests, requestStatus, requestSearch]);
+
+  /** A blank typed reference means the owner left it out, not that it is empty. */
+  const refText = (req: any) => req.transaction_id || req.note ? (
+    <>
+      {req.transaction_id && <b className={styles.refId}>{req.transaction_id}</b>}
+      {req.note && <span className={styles.refNote}>{req.note}</span>}
+    </>
+  ) : (
+    <span className={styles.mutedNote}>Not given</span>
+  );
+
+  const statusTone = (status: string): 'success' | 'danger' | 'neutral' =>
+    status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'neutral';
+
   return (
     <div className={styles.container}>
       <PageHeader
@@ -434,10 +477,10 @@ export default function SubscriptionsPage() {
         <StatCard
           label="Waiting on you"
           icon="receipt"
-          tone={subscriptionRequests.length ? 'warning' : 'success'}
+          tone={pendingRequests.length ? 'warning' : 'success'}
           loading={isLoading}
-          value={subscriptionRequests.length}
-          sub={subscriptionRequests.length ? 'Requests to verify' : 'Nothing pending'}
+          value={pendingRequests.length}
+          sub={pendingRequests.length ? 'Requests to verify' : 'Nothing pending'}
         />
         <StatCard
           label="Expiring in 7 days"
@@ -450,10 +493,10 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* ------------------------------------------------ pending requests */}
-      {subscriptionRequests.length > 0 && (
+      {pendingRequests.length > 0 && (
         <Card
           className={styles.pendingCard}
-          title={<>Waiting on you <Badge tone="warning" dot={false}>{subscriptionRequests.length}</Badge></>}
+          title={<>Waiting on you <Badge tone="warning" dot={false}>{pendingRequests.length}</Badge></>}
           subtitle="Paid subscriptions to verify, and salons asking to move onto the Commission Model. A commission request has no receipt — you agree the percentage when you approve it."
         >
           <div className={ui.tableWrap}>
@@ -463,12 +506,13 @@ export default function SubscriptionsPage() {
                   <th>Salon</th>
                   <th>Asking for</th>
                   <th>Plan</th>
+                  <th>Transaction reference</th>
                   <th>Raised</th>
                   <th className={ui.alignRight}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {subscriptionRequests.map((req) => {
+                {pendingRequests.map((req) => {
                   const isCommission = req.billing_type === COMMISSION;
                   return (
                     <tr key={req.id}>
@@ -477,11 +521,15 @@ export default function SubscriptionsPage() {
                         <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
                       </td>
                       <td>{req.plan?.name || '—'}</td>
+                      {/* What the owner said about their transfer, on the row
+                          itself. Deciding a request on the strength of a
+                          reference should not require opening the receipt. */}
+                      <td><div className={styles.refCell}>{refText(req)}</div></td>
                       <td className={ui.num}>{new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</td>
                       <td className={ui.alignRight}>
                         <div className={styles.rowActions}>
                           {req.screenshot_url ? (
-                            <Button size="sm" icon="receipt" onClick={() => setViewingScreenshot(req.screenshot_url)}>Receipt</Button>
+                            <Button size="sm" icon="receipt" onClick={() => setViewingRequest(req)}>Receipt</Button>
                           ) : (
                             !isCommission && <span className={styles.mutedNote}>Nothing paid yet</span>
                           )}
@@ -503,6 +551,100 @@ export default function SubscriptionsPage() {
           </div>
         </Card>
       )}
+
+      {/* ------------------------------------------------ payment history */}
+      <Card
+        title="Payment history"
+        subtitle="Every payment a salon has sent, and what became of it. Approved rows are the record that money arrived; a transaction id typed by the owner is kept against them so a transfer can still be traced to this row later."
+        actions={
+          <Segmented
+            ariaLabel="Filter by decision"
+            value={requestStatus}
+            onChange={setRequestStatus}
+            options={[
+              { value: 'all', label: 'All', count: allRequests.filter((r) => r.status !== 'pending').length },
+              { value: 'approved', label: 'Approved', count: allRequests.filter((r) => r.status === 'approved').length },
+              { value: 'rejected', label: 'Rejected', count: allRequests.filter((r) => r.status === 'rejected').length },
+            ]}
+          />
+        }
+      >
+        <div className={styles.subToolbar}>
+          <SearchInput
+            value={requestSearch}
+            onChange={setRequestSearch}
+            placeholder="Search salon, plan, transaction ID or note."
+            ariaLabel="Search payment history"
+          />
+          <span className={styles.mutedNote}>
+            {decidedRequests.length} of {allRequests.filter((r) => r.status !== 'pending').length} shown
+          </span>
+        </div>
+
+        {isLoading ? (
+          <Skeleton height={120} radius={14} />
+        ) : decidedRequests.length === 0 ? (
+          <EmptyState
+            icon="receipt"
+            title={requestSearch || requestStatus !== 'all' ? 'Nothing matches that' : 'No payments decided yet'}
+            hint={
+              requestSearch || requestStatus !== 'all'
+                ? 'Try a different status, or clear the search.'
+                : 'Once a payment is approved or declined it is listed here.'
+            }
+          />
+        ) : (
+          <div className={ui.tableWrap}>
+            <table className={ui.table}>
+              <thead>
+                <tr>
+                  <th>Salon</th>
+                  <th>Arrangement</th>
+                  <th>Plan</th>
+                  <th className={ui.alignRight}>Paid</th>
+                  <th>Transaction reference</th>
+                  <th>Sent</th>
+                  <th>Decision</th>
+                  <th className={ui.alignRight}>Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decidedRequests.map((req) => (
+                  <tr key={req.id}>
+                    <td><Person name={req.salon?.name ?? 'Unknown salon'} size={32} /></td>
+                    <td><Badge tone={req.billing_type === COMMISSION ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge></td>
+                    <td>{req.plan?.name || '—'}</td>
+                    <td className={ui.alignRight}>
+                      {req.amount_payable_inr != null ? formatINR(req.amount_payable_inr, 2) : <span className={styles.mutedNote}>—</span>}
+                      {Number(req.coins_to_redeem) > 0 && (
+                        <div className={styles.refNote}>+{req.coins_to_redeem} coins</div>
+                      )}
+                    </td>
+                    <td><div className={styles.refCell}>{refText(req)}</div></td>
+                    <td className={ui.num}>
+                      {new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td>
+                      <Badge tone={statusTone(req.status)} dot={false}>
+                        {req.status === 'approved' ? 'Approved' : 'Rejected'}
+                      </Badge>
+                    </td>
+                    <td className={ui.alignRight}>
+                      {req.screenshot_url ? (
+                        <Button size="sm" variant="ghost" icon="receipt" onClick={() => setViewingRequest(req)}>
+                          View
+                        </Button>
+                      ) : (
+                        <span className={styles.mutedNote}>None</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {/* ------------------------------------------------ commission model */}
       <Card padded>
@@ -782,24 +924,62 @@ export default function SubscriptionsPage() {
       {/* ============================================================ overlays */}
 
       <Modal
-        open={!!viewingScreenshot}
-        onClose={() => setViewingScreenshot(null)}
+        open={!!viewingRequest}
+        onClose={() => setViewingRequest(null)}
         size="lg"
         title="Payment receipt"
+        description={
+          viewingRequest
+            ? `${viewingRequest.salon?.name ?? 'Unknown salon'} — ${viewingRequest.plan?.name ?? viewingRequest.billing_label ?? ''}`
+            : undefined
+        }
         footer={
           <>
-            {viewingScreenshot && (
-              <a href={viewingScreenshot} target="_blank" rel="noreferrer" className={cx(ui.btn, ui.btnGhost)}>
+            {viewingRequest?.screenshot_url && (
+              <a href={viewingRequest.screenshot_url} target="_blank" rel="noreferrer" className={cx(ui.btn, ui.btnGhost)}>
                 Open original <Icon name="external" size={14} />
               </a>
             )}
-            <Button variant="primary" onClick={() => setViewingScreenshot(null)}>Close</Button>
+            <Button variant="primary" onClick={() => setViewingRequest(null)}>Close</Button>
           </>
         }
       >
-        {viewingScreenshot && (
-          // eslint-disable-next-line @next/next/no-img-element -- user-uploaded receipt from an arbitrary host
-          <img src={viewingScreenshot} alt="Payment receipt" className={styles.receipt} />
+        {viewingRequest && (
+          <>
+            {/* The reference above the image, not below it. Whether the
+                screenshot is legible is exactly what is in doubt when a payment
+                is disputed, so the text the owner typed has to be readable
+                without opening the original. */}
+            <div className={styles.receiptHead}>
+              {viewingRequest.status && (
+                <Badge tone={statusTone(viewingRequest.status)} dot={false}>
+                  {viewingRequest.status === 'approved' ? 'Approved' : viewingRequest.status === 'rejected' ? 'Rejected' : 'Under review'}
+                </Badge>
+              )}
+              {viewingRequest.transaction_id && (
+                <div className={styles.receiptRef}>
+                  <span>Transaction ID</span>
+                  <b>{viewingRequest.transaction_id}</b>
+                </div>
+              )}
+              {viewingRequest.note && (
+                <div className={styles.receiptRef}>
+                  <span>Note from the salon</span>
+                  <b>{viewingRequest.note}</b>
+                </div>
+              )}
+            </div>
+
+            {viewingRequest.screenshot_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- user-uploaded receipt from an arbitrary host
+              <img src={viewingRequest.screenshot_url} alt="Payment receipt" className={styles.receipt} />
+            ) : (
+              <p className={styles.mutedNote}>
+                No screenshot was sent with this request.
+                {viewingRequest.needs_commission_rate && ' Commission requests carry no payment, only a rate to agree.'}
+              </p>
+            )}
+          </>
         )}
       </Modal>
 

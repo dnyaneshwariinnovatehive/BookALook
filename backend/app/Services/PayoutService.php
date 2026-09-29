@@ -40,8 +40,10 @@ class PayoutService
     public const STATUS_APPROVED = 'approved';
     public const STATUS_DISTRIBUTED = 'distributed';
 
-    public function __construct(private CommissionService $commission)
-    {
+    public function __construct(
+        private CommissionService $commission,
+        private SettlementInvoiceService $settlementInvoices,
+    ) {
     }
 
     /**
@@ -195,6 +197,12 @@ class PayoutService
      * closed — the salon receives the net and the deduction stays on the record
      * for both sides to refer to. Settling a Commission Model month also buys
      * the salon the month that follows it.
+     *
+     * The settlement invoice is drawn once the money is recorded, not before,
+     * and outside the transaction. A statement is the last step, never the one
+     * that can fail: the salon has already been paid by the time it is drawn,
+     * so a problem producing the document must not undo the payment or leave the
+     * owner without one.
      */
     public function markDistributed(SalonPayout $payout, User $actor, ?string $reference, ?string $notes = null): SalonPayout
     {
@@ -202,7 +210,7 @@ class PayoutService
             throw new \RuntimeException('This payout has already been distributed.');
         }
 
-        return DB::transaction(function () use ($payout, $actor, $reference, $notes) {
+        $payout = DB::transaction(function () use ($payout, $actor, $reference, $notes) {
             $payout->forceFill([
                 // Recomputed one last time so a late change cannot leave the
                 // distributed figure disagreeing with its own components.
@@ -223,6 +231,16 @@ class PayoutService
 
             return $payout->fresh();
         });
+
+        try {
+            $this->settlementInvoices->issueFor($payout);
+        } catch (\Throwable $e) {
+            // Reported, not swallowed silently, and never rethrown. The payout
+            // is distributed and that is not reversible.
+            report($e);
+        }
+
+        return $payout->fresh();
     }
 
     /**
@@ -258,6 +276,35 @@ class PayoutService
             'distributed_at' => $payout->distributed_at,
             'distribution_reference' => $payout->distribution_reference,
             'notes' => $payout->notes,
+            'settlement_invoice' => $this->settlementInvoiceState($payout),
+        ];
+    }
+
+    /**
+     * What a client needs to open the settlement statement for this payout: the
+     * reference to quote, and a link that is regenerated on read rather than
+     * stored, so a link that has expired is replaced instead of being a dead
+     * button forever.
+     *
+     * Null until the payout is distributed, which is also the only point at
+     * which a document exists.
+     *
+     * @return array{number: string, issued_at: string, url: string}|null
+     */
+    private function settlementInvoiceState(SalonPayout $payout): ?array
+    {
+        $invoice = $payout->relationLoaded('settlementInvoice')
+            ? $payout->settlementInvoice
+            : $payout->settlementInvoice()->first();
+
+        if (! $invoice) {
+            return null;
+        }
+
+        return [
+            'number' => $invoice->invoice_number,
+            'issued_at' => $invoice->issued_at?->toIso8601String(),
+            'url' => $invoice->temporaryUrl(),
         ];
     }
 
