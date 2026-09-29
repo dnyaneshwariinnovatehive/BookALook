@@ -9,7 +9,6 @@ import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
 import '../utils/app_haptics.dart';
-import 'tabs/favourites_tab.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
 
@@ -17,7 +16,8 @@ class MainScreen extends StatefulWidget {
   final bool isGuest;
   final int initialIndex;
 
-  const MainScreen({Key? key, this.isGuest = false, this.initialIndex = 0}) : super(key: key);
+  const MainScreen({Key? key, this.isGuest = false, this.initialIndex = 0})
+    : super(key: key);
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -30,11 +30,13 @@ class _MainScreenState extends State<MainScreen> {
 
   /// One navigator per tab so a page pushed from inside a tab stays inside
   /// that tab and the bottom navigation bar remains visible.
-  final List<GlobalKey<NavigatorState>> _navigatorKeys =
-      List.generate(5, (_) => GlobalKey<NavigatorState>());
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = List.generate(
+    4,
+    (_) => GlobalKey<NavigatorState>(),
+  );
 
-  final GlobalKey<FavouritesTabState> _favouritesKey = GlobalKey<FavouritesTabState>();
-  final GlobalKey<MyBookingsScreenState> _bookingsKey = GlobalKey<MyBookingsScreenState>();
+  final GlobalKey<MyBookingsScreenState> _bookingsKey =
+      GlobalKey<MyBookingsScreenState>();
 
   /// Explore is filtered from outside its own tab — a category picked on the
   /// home tab lands here — so the shell needs a handle to apply it.
@@ -55,14 +57,15 @@ class _MainScreenState extends State<MainScreen> {
     // After the first frame: the shell has to exist before a sheet can sit on
     // top of it.
     if (!widget.isGuest) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _askForPendingReviews());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _askForPendingReviews(),
+      );
     }
 
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
       ExploreTab(key: _exploreKey),
       BookingsTab(bookingsKey: _bookingsKey, isGuest: widget.isGuest),
-      FavouritesTab(key: _favouritesKey, isGuest: widget.isGuest),
       ProfileTab(isGuest: widget.isGuest),
     ];
 
@@ -104,9 +107,6 @@ class _MainScreenState extends State<MainScreen> {
     if (index == 2 && !widget.isGuest) {
       _bookingsKey.currentState?.loadBookings();
     }
-    if (index == 3 && !widget.isGuest) {
-      _favouritesKey.currentState?.loadFavourites();
-    }
     if (index == 1) {
       // Reaching Explore by tapping the bar means "show me the directory", not
       // "keep showing whichever category I filtered by last". The request
@@ -114,7 +114,7 @@ class _MainScreenState extends State<MainScreen> {
       // and cannot undo its own filter.
       _exploreKey.currentState?.clearCategoryFilter();
     }
-    
+
     if (index == _currentIndex) {
       // Tapping the tab you are already on goes back to its first page.
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
@@ -189,7 +189,10 @@ class _MainScreenState extends State<MainScreen> {
             // banner carousel — would keep running off screen.
             TickerMode(
               enabled: i == _currentIndex,
-              child: TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
+              child: TabNavigator(
+                navigatorKey: _navigatorKeys[i],
+                root: _tabs[i],
+              ),
             ),
         ],
       ),
@@ -205,7 +208,9 @@ class _MainScreenState extends State<MainScreen> {
                 : null,
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withOpacity(0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 5),
               ),
@@ -213,48 +218,75 @@ class _MainScreenState extends State<MainScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: _onTabTapped,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: _onTabTapped,
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               selectedItemColor: AppTheme.accentColor,
-              unselectedItemColor: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkTextBody 
+              unselectedItemColor:
+                  Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkTextBody
                   : const Color(0xFF9E98AE), // muted gray-purple
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+              ),
               elevation: 0,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_outlined, size: 22)),
-                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.home_rounded, size: 22)),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.explore_outlined, size: 22)),
-                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.explore_rounded, size: 22)),
-                label: 'Explore',
-              ),
-              BottomNavigationBarItem(
-                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.calendar_today_outlined, size: 22)),
-                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.calendar_month_rounded, size: 22)),
-                label: 'Bookings',
-              ),
-              BottomNavigationBarItem(
-                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.favorite_outline, size: 22)),
-                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.favorite_rounded, size: 22)),
-                label: 'Favourites',
-              ),
-              BottomNavigationBarItem(
-                icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_outline, size: 22)),
-                activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_rounded, size: 22)),
-                label: 'Profile',
-              ),
-            ],
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.home_outlined, size: 22),
+                  ),
+                  activeIcon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.home_rounded, size: 22),
+                  ),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.explore_outlined, size: 22),
+                  ),
+                  activeIcon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.explore_rounded, size: 22),
+                  ),
+                  label: 'Explore',
+                ),
+                BottomNavigationBarItem(
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.calendar_today_outlined, size: 22),
+                  ),
+                  activeIcon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.calendar_month_rounded, size: 22),
+                  ),
+                  label: 'Bookings',
+                ),
+                BottomNavigationBarItem(
+                  icon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.person_outline, size: 22),
+                  ),
+                  activeIcon: Padding(
+                    padding: EdgeInsets.only(bottom: 4),
+                    child: Icon(Icons.person_rounded, size: 22),
+                  ),
+                  label: 'Profile',
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }

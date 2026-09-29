@@ -5,6 +5,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
+import '../widgets/initials_avatar.dart';
 
 /// Sentinel provider key for the "Any Available" option.
 const String _kAnyProvider = '__any__';
@@ -476,6 +477,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             subtitle: 'We will assign a free staff member for your slot',
             isEligible: true,
             icon: Icons.groups_outlined,
+            isPerson: false,
           ),
         ..._providers.map((provider) {
           final isEligible = provider['is_eligible'] == true;
@@ -489,6 +491,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : 'Does not perform: ${missing.join(', ')}',
             isEligible: isEligible,
             icon: Icons.person_outline,
+            isPerson: true,
           );
         }),
       ],
@@ -501,6 +504,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String? subtitle,
     required bool isEligible,
     required IconData icon,
+
+    /// True for a named staff member, false for the "Any Available" row that
+    /// stands for whoever is free rather than for one person.
+    required bool isPerson,
   }) {
     final isSelected = _selectedProviderKey == key;
 
@@ -525,11 +532,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: isEligible ? AppTheme.lightAccentSoft : AppTheme.lightBorder,
-                  child: Icon(icon, color: isEligible ? AppTheme.accentColor : AppTheme.lightTextLight),
-                ),
+                // "Any Available" stands for a group, so it keeps its icon; a
+                // named person gets their initials, since no human role has a
+                // photo and a silhouette here reads as a failed image.
+                isPerson
+                    ? InitialsAvatar(name: name, radius: 22, dimmed: !isEligible)
+                    : CircleAvatar(
+                        radius: 22,
+                        backgroundColor: isEligible ? AppTheme.lightAccentSoft : AppTheme.lightBorder,
+                        child: Icon(icon, color: isEligible ? AppTheme.accentColor : AppTheme.lightTextLight),
+                      ),
                 SizedBox(width: 14),
                 Expanded(
                   child: Column(

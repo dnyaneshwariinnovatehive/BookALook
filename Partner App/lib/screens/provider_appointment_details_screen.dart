@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
 import '../utils/time_fmt.dart';
+import '../widgets/initials_avatar.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'qr_scanner_screen.dart';
@@ -160,11 +161,7 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundColor: const Color(0xFFE0F2FE),
-                            child: const Icon(Icons.person_outline, color: Color(0xFF0369A1)),
-                          ),
+                          InitialsAvatar(name: customerName, radius: 24),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(

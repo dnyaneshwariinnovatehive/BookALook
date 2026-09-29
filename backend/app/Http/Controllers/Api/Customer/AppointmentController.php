@@ -1008,7 +1008,17 @@ class AppointmentController extends Controller
                 'id' => $appointment->salon_id,
                 'name' => $appointment->salon->name ?? 'Salon',
                 'address' => $appointment->salon->address ?? null,
-                // Owner's number — deliberately withheld from customers.
+                // The salon's own contact number, so a customer with an upcoming
+                // booking can call the salon from the card. This is the business
+                // line the salon lists publicly; it is deliberately not the
+                // owner's personal number, which the app never reads.
+                'phone' => $appointment->salon->phone_num ?? null,
+                'latitude' => $appointment->salon->latitude !== null
+                    ? (float) $appointment->salon->latitude
+                    : null,
+                'longitude' => $appointment->salon->longitude !== null
+                    ? (float) $appointment->salon->longitude
+                    : null,
             ],
             'provider_name' => $appointment->appointedProvider->user->name ?? 'Any available staff',
             'appointment_date' => $date,

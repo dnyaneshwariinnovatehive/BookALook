@@ -9,6 +9,7 @@ import '../../legal/legal_documents.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../phone_screen.dart';
+import 'favourites_tab.dart';
 import '../../utils/app_haptics.dart';
 import '../../main.dart'; // To access themeNotifier
 
@@ -35,7 +36,7 @@ class _ProfileTabState extends State<ProfileTab> {
     'cancellation-refund': Icons.event_busy_outlined,
     'about': Icons.info_outline,
   };
-  
+
   Map<String, dynamic>? _userProfile;
   int _appointmentsCount = 0;
   int _favSalonsCount = 0;
@@ -83,7 +84,7 @@ class _ProfileTabState extends State<ProfileTab> {
         _locationAccess = prefs.getBool('location_access') ?? true;
       });
     }
-    
+
     // Load Push notification preference from backend if not guest
     if (!widget.isGuest) {
       try {
@@ -114,7 +115,9 @@ class _ProfileTabState extends State<ProfileTab> {
   /// account being signed out of is named before it happens.
   Future<void> _logout(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textHeading = isDark
+        ? AppTheme.darkTextHeading
+        : AppTheme.lightTextHeading;
     final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
     final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
     final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
@@ -133,17 +136,33 @@ class _ProfileTabState extends State<ProfileTab> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: surface,
         titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        title: Text('Log out of BookALook?',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20, color: textHeading)),
+        title: Text(
+          'Log out of BookALook?',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: textHeading,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (name.isNotEmpty)
-              Text(name, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: textHeading)),
+              Text(
+                name,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: textHeading,
+                ),
+              ),
             if (contact.isNotEmpty) ...[
               if (name.isNotEmpty) const SizedBox(height: 2),
-              Text(contact, style: GoogleFonts.outfit(fontSize: 14, color: textBody)),
+              Text(
+                contact,
+                style: GoogleFonts.outfit(fontSize: 14, color: textBody),
+              ),
             ],
             const SizedBox(height: 14),
             Text(
@@ -153,8 +172,10 @@ class _ProfileTabState extends State<ProfileTab> {
               style: GoogleFonts.outfit(fontSize: 14, color: textBody),
             ),
             const SizedBox(height: 12),
-            Text('Your bookings and cart stay saved to your account.',
-                style: GoogleFonts.outfit(fontSize: 12, color: textLight)),
+            Text(
+              'Your bookings and cart stay saved to your account.',
+              style: GoogleFonts.outfit(fontSize: 12, color: textLight),
+            ),
           ],
         ),
         actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -164,14 +185,23 @@ class _ProfileTabState extends State<ProfileTab> {
               AppHaptics.lightImpact();
               Navigator.pop(dialogContext, false);
             },
-            child: Text('Stay signed in', style: GoogleFonts.outfit(color: textBody)),
+            child: Text(
+              'Stay signed in',
+              style: GoogleFonts.outfit(color: textBody),
+            ),
           ),
           TextButton(
             onPressed: () {
               AppHaptics.lightImpact();
               Navigator.pop(dialogContext, true);
             },
-            child: Text('Log out', style: GoogleFonts.outfit(color: danger, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Log out',
+              style: GoogleFonts.outfit(
+                color: danger,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -187,6 +217,20 @@ class _ProfileTabState extends State<ProfileTab> {
       MaterialPageRoute(builder: (context) => PhoneScreen()),
       (route) => false,
     );
+  }
+
+  /// Favourites is a page pushed inside the profile tab, so the footer stays put
+  /// and the tab's own back gesture still works. The count is refreshed on the
+  /// way back, because un-favouriting on that page changes it.
+  Future<void> _openFavourites() async {
+    AppHaptics.lightImpact();
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FavouritesTab(isGuest: false)),
+    );
+
+    if (!mounted) return;
+    _loadProfileData();
   }
 
   String _formatJoinDate(String? dateStr) {
@@ -205,14 +249,17 @@ class _ProfileTabState extends State<ProfileTab> {
       return GuestRestrictedView(
         title: 'Sign In Required',
         message: 'Please sign in to access your profile settings and history.',
-        tabIndex: 4,
+        // Favourites left the footer, so Profile is the last tab.
+        tabIndex: 3,
         icon: Icons.person_outline,
       );
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dangerColor = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final headingColor = isDark
+        ? AppTheme.darkTextHeading
+        : AppTheme.lightTextHeading;
     final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
     final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
     final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
@@ -221,7 +268,9 @@ class _ProfileTabState extends State<ProfileTab> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: bgColor,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.accentColor),
+        ),
       );
     }
 
@@ -242,8 +291,13 @@ class _ProfileTabState extends State<ProfileTab> {
                   });
                   _loadProfileData();
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-                child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -289,7 +343,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       padding: const EdgeInsets.all(3.0),
                       child: CircleAvatar(
                         backgroundColor: surfaceColor,
-                        child: Icon(Icons.person, size: 40, color: AppTheme.accentColor),
+                        child: Icon(
+                          Icons.person,
+                          size: 40,
+                          color: AppTheme.accentColor,
+                        ),
                       ),
                     ),
                   ),
@@ -311,7 +369,9 @@ class _ProfileTabState extends State<ProfileTab> {
                           joinDate,
                           style: GoogleFonts.outfit(
                             fontSize: 14,
-                            color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                            color: isDark
+                                ? AppTheme.darkTextLight
+                                : AppTheme.lightTextLight,
                           ),
                         ),
                       ],
@@ -320,7 +380,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 ],
               ),
               const SizedBox(height: 32),
-              
+
               // Stats Grid
               Row(
                 children: [
@@ -347,8 +407,37 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+
+              // Favourites lives here rather than in the footer, where it took a
+              // slot that the four core destinations use better.
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _buildNavRow(
+                  context,
+                  icon: Icons.favorite_outline,
+                  label: 'My Favourites',
+                  trailing: _favSalonsCount > 0 ? '${_favSalonsCount}' : null,
+                  headingColor: headingColor,
+                  onTap: _openFavourites,
+                ),
+              ),
+
               const SizedBox(height: 40),
-              
+
               // Settings Header
               Text(
                 'ACCOUNT SETTINGS',
@@ -356,7 +445,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                  color: isDark
+                      ? AppTheme.darkTextLight
+                      : AppTheme.lightTextLight,
                 ),
               ),
               const SizedBox(height: 16),
@@ -369,7 +460,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -383,7 +476,9 @@ class _ProfileTabState extends State<ProfileTab> {
                       label: 'Dark Mode',
                       value: isDark,
                       onChanged: (val) {
-                        themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                        themeNotifier.value = val
+                            ? ThemeMode.dark
+                            : ThemeMode.light;
                       },
                       headingColor: headingColor,
                     ),
@@ -396,7 +491,9 @@ class _ProfileTabState extends State<ProfileTab> {
                       onChanged: (val) {
                         setState(() => _pushNotifications = val);
                         if (!widget.isGuest) {
-                          _profileService.updateNotificationPreferences({'push_enabled': val});
+                          _profileService.updateNotificationPreferences({
+                            'push_enabled': val,
+                          });
                         } else {
                           _toggleSetting('push_notifications', val);
                         }
@@ -418,7 +515,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 40),
 
               // Legal Header
@@ -428,7 +525,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                  color: isDark
+                      ? AppTheme.darkTextLight
+                      : AppTheme.lightTextLight,
                 ),
               ),
               const SizedBox(height: 16),
@@ -443,7 +542,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   border: Border.all(color: borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -452,10 +553,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 child: Column(
                   children: [
                     for (final entry in _legalDocuments.entries) ...[
-                      LegalDocumentTile(
-                        slug: entry.key,
-                        icon: entry.value,
-                      ),
+                      LegalDocumentTile(slug: entry.key, icon: entry.value),
                       if (entry.key != _legalDocuments.keys.last)
                         Divider(height: 1, color: borderColor),
                     ],
@@ -471,7 +569,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                     fontSize: 11,
-                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                    color: isDark
+                        ? AppTheme.darkTextLight
+                        : AppTheme.lightTextLight,
                   ),
                 ),
               ),
@@ -491,9 +591,16 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                   ),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    backgroundColor: isDark
+                        ? AppTheme.darkDangerBg
+                        : const Color(0xFFFEE8EA),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
                 ),
               ),
@@ -505,7 +612,14 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String count, String label, Color surfaceColor, Color borderColor, Color headingColor) {
+  Widget _buildStatCard(
+    BuildContext context,
+    String count,
+    String label,
+    Color surfaceColor,
+    Color borderColor,
+    Color headingColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
@@ -535,10 +649,72 @@ class _ProfileTabState extends State<ProfileTab> {
             label,
             style: GoogleFonts.outfit(
               fontSize: 12,
-              color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkTextLight
+                  : AppTheme.lightTextLight,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// A tappable destination, matching the account-settings rows so the profile
+  /// reads as one list rather than two different card styles.
+  Widget _buildNavRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color headingColor,
+    required VoidCallback onTap,
+    String? trailing,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: headingColor.withOpacity(0.7)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: headingColor,
+                ),
+              ),
+            ),
+            if (trailing != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.darkAccentSoft
+                      : AppTheme.lightAccentSoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  trailing,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accentColor,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: headingColor.withOpacity(0.4),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -9,6 +9,7 @@ import 'phone_screen.dart';
 import 'cart_screen.dart';
 import 'salon_reviews_screen.dart';
 import '../widgets/cart_offers.dart';
+import '../widgets/initials_avatar.dart';
 import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
 
@@ -1348,7 +1349,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       radius: 24,
                       backgroundColor: AppTheme.lightAccentSoft,
                       child: Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        InitialsAvatar.initialsOf(name),
                         style: GoogleFonts.outfit(
                             fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
                       ),

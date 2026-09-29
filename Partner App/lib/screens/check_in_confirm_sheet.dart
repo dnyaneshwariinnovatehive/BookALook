@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
 import '../theme/app_theme.dart';
+import '../widgets/initials_avatar.dart';
 import 'collect_payment_sheet.dart';
 
 /// Confirms who walked in and who will serve them, then starts the session.
@@ -164,15 +165,7 @@ class _CheckInConfirmSheetState extends State<CheckInConfirmSheet> {
 
   Widget _buildCustomer() => Row(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: AppTheme.accentColor.withValues(alpha: 0.12),
-            child: Text(
-              _apt.customerName.isNotEmpty ? _apt.customerName[0].toUpperCase() : '?',
-              style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
-            ),
-          ),
+          InitialsAvatar(name: _apt.customerName, radius: 26),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
