@@ -100,25 +100,32 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
             ),
             const SizedBox(height: 16),
 
-            _buildLabel('Password *'),
-            _buildTextField(
-              controller: _passwordController,
-              hint: 'Password',
-              icon: Icons.lock_outline,
-              obscureText: true,
-              validator: (v) => v!.length < 6 ? 'Minimum 6 characters' : null,
-            ),
-            const SizedBox(height: 16),
+            if (!widget.isExistingAdmin) ...[
+              _buildLabel('Password *'),
+              _buildTextField(
+                controller: _passwordController,
+                hint: 'Password',
+                icon: Icons.lock_outline,
+                obscureText: true,
+                validator: (v) => v!.length < 6 ? 'Minimum 6 characters' : null,
+              ),
+              const SizedBox(height: 16),
+            ],
 
-            _buildLabel('Confirm Password *'),
-            _buildTextField(
-              controller: _confirmPasswordController,
-              hint: 'Confirm password',
-              icon: Icons.lock_outline,
-              obscureText: true,
-              validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
-            ),
-            const SizedBox(height: 32),
+            if (!widget.isExistingAdmin) ...[
+              _buildLabel('Confirm Password *'),
+              _buildTextField(
+                controller: _confirmPasswordController,
+                hint: 'Confirm password',
+                icon: Icons.lock_outline,
+                obscureText: true,
+                validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
+              ),
+              const SizedBox(height: 32),
+            ],
+            
+            if (widget.isExistingAdmin)
+              const SizedBox(height: 16),
 
             Row(
               children: [
