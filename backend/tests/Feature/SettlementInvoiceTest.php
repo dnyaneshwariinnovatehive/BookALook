@@ -261,7 +261,11 @@ class SettlementInvoiceTest extends TestCase
 
         // The owner opens this in the phone's browser, which cannot present a
         // token — the signature is the only proof, which is the point.
-        $this->get($url)->assertStatus(200)->assertSee('Settlement Invoice', false);
+        //
+        // "Statement", not "Invoice": the document records money already paid
+        // to a salon owner, and calling that a bill invites someone to chase it
+        // as though it were outstanding.
+        $this->get($url)->assertStatus(200)->assertSee('Settlement Statement', false);
 
         // Someone swapped the id out for another salon's.
         $this->get(str_replace('signature=', 'signature=' . str_repeat('0', 5), $url))

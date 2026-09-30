@@ -198,7 +198,7 @@ class PayoutService
      * for both sides to refer to. Settling a Commission Model month also buys
      * the salon the month that follows it.
      *
-     * The settlement invoice is drawn once the money is recorded, not before,
+     * The settlement statement is drawn once the money is recorded, not before,
      * and outside the transaction. A statement is the last step, never the one
      * that can fail: the salon has already been paid by the time it is drawn,
      * so a problem producing the document must not undo the payment or leave the

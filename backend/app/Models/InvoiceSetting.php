@@ -67,17 +67,21 @@ class InvoiceSetting extends Model
         'invoice_show_terms' => true,
         'invoice_show_balance_due' => true,
 
-        // ---- The settlement invoice BookALook issues to a salon owner ----
+        // ---- The settlement statement BookALook issues to a salon owner ----
         //
         // The issuer keys above are deliberately shared: both documents come
         // from the same company, so the letterhead must not be able to disagree
         // with itself. What differs is the numbering — a salon owner quoting a
-        // settlement needs a number that is unmistakably not a customer
-        // invoice's — and the footer, because "thank you for booking with us" is
-        // nonsense on a statement about commission.
+        // statement needs a number that is unmistakably not a customer
+        // invoice's — the title, and the footer, because "thank you for booking
+        // with us" is nonsense on a statement about commission.
+        //
+        // The title says "Statement", not "Invoice", on purpose. Both documents
+        // are legally invoices, but calling a record of money already paid to a
+        // salon owner an "invoice" invites someone to treat it as a bill.
         'settlement_invoice_number_prefix' => 'SET',
         'settlement_invoice_number_padding' => 5,
-        'settlement_invoice_document_title' => 'Settlement Invoice',
+        'settlement_invoice_document_title' => 'Settlement Statement',
         'settlement_invoice_footer_note' => 'Figures are those BookALook held and paid out for the period above.',
         'settlement_invoice_show_billed_revenue' => true,
         'settlement_invoice_show_appointments_count' => true,

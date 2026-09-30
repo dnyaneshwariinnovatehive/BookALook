@@ -284,12 +284,12 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _openInvoice(p),
+                  onPressed: () => _openStatement(p),
                   icon: const Icon(Icons.receipt_long, size: 18),
                   label: Text(
                     p.invoiceNumber != null
-                        ? 'View invoice ${p.invoiceNumber}'
-                        : 'View settlement invoice',
+                        ? 'View statement ${p.invoiceNumber}'
+                        : 'View settlement statement',
                   ),
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -310,7 +310,7 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
   /// than only read. Only http(s) is allowed through — handing an arbitrary
   /// string to the platform's URL handler is not something to do on trust, and
   /// `javascript:` and `file://` both open with the app's own permissions.
-  Future<void> _openInvoice(SalonPayoutRecord p) async {
+  Future<void> _openStatement(SalonPayoutRecord p) async {
     final uri = Uri.tryParse((p.invoiceUrl ?? '').trim());
     final allowed = uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 

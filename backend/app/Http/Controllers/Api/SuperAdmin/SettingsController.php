@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use App\Models\PlatformPolicySetting;
 use App\Models\Invoice;
 use App\Models\InvoiceSetting;
@@ -301,7 +302,11 @@ class SettingsController extends Controller
         if ($before != $after) {
             AuditLogger::record(
                 action: AuditLog::INVOICE_SETTINGS_UPDATED,
-                label: 'Invoice format',
+                // Both documents, not just the customer one. Half these keys
+                // change settlement statements too, and an audit trail that
+                // calls that "Invoice format" is what makes the blast radius
+                // of a change hard to reconstruct later.
+                label: 'Invoice & statement format',
                 before: $before,
                 after: $after,
             );
@@ -309,7 +314,7 @@ class SettingsController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Invoice format updated successfully',
+            'message' => 'Invoice & statement format updated successfully',
             'settings' => InvoiceSetting::typed(),
         ]);
     }
@@ -317,84 +322,118 @@ class SettingsController extends Controller
     /**
      * How each invoice field behaves, for the format page to render from.
      *
-     * @return array<string, array{label: string, kind: string, hint?: string, group: string}>
+     * Every field carries a `scope` saying which document it actually reaches:
+     * `both`, `invoice` or `settlement`. This is not decoration — it is the
+     * correction to a trap the page used to fall into. The show/hide switches
+     * for the letterhead (`invoice_show_logo`, `invoice_show_business_address`,
+     * `invoice_show_tax_id`) and the terms live in the same group as the
+     * customer-only columns, so grouping alone implied they belonged to the
+     * customer invoice when in fact switching the logo off also takes it off
+     * every settlement statement. The scope is read from the two templates
+     * rather than guessed from the key's name, so it cannot drift when a
+     * template changes what it prints.
+     *
+     * @return array<string, array{label: string, kind: string, group: string, group_title: string, scope: string, hint?: string}>
      */
     private function invoiceSchema(): array
     {
-        return [
-            'invoice_business_name' => ['label' => 'Business name', 'kind' => 'text', 'group' => 'issuer',
-                'hint' => 'Shown at the top of every invoice.'],
-            'invoice_business_address' => ['label' => 'Registered address', 'kind' => 'textarea', 'group' => 'issuer'],
-            'invoice_business_email' => ['label' => 'Contact email', 'kind' => 'text', 'group' => 'issuer'],
-            'invoice_business_phone' => ['label' => 'Contact phone', 'kind' => 'text', 'group' => 'issuer'],
-            'invoice_tax_id_label' => ['label' => 'Tax ID label', 'kind' => 'text', 'group' => 'issuer',
-                'hint' => 'For example GSTIN, VAT, ABN.'],
-            'invoice_tax_id' => ['label' => 'Tax ID', 'kind' => 'text', 'group' => 'issuer',
-                'hint' => 'Only printed when both this and its label are filled in.'],
+        $both = 'both';
+        $invoice = 'invoice';
+        $settlement = 'settlement';
 
-            'invoice_logo_url' => ['label' => 'Logo', 'kind' => 'image', 'group' => 'branding',
+        $letterhead = 'Letterhead';
+        $numbering = 'Numbering';
+        $whatPrints = 'What prints';
+
+        return [
+            'invoice_business_name' => ['label' => 'Business name', 'kind' => 'text', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both,
+                'hint' => 'Shown at the top of every document.'],
+            'invoice_business_address' => ['label' => 'Registered address', 'kind' => 'textarea', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both],
+            'invoice_business_email' => ['label' => 'Contact email', 'kind' => 'text', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both],
+            'invoice_business_phone' => ['label' => 'Contact phone', 'kind' => 'text', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both],
+            'invoice_tax_id_label' => ['label' => 'Tax ID label', 'kind' => 'text', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both,
+                'hint' => 'For example GSTIN, VAT, ABN.'],
+            'invoice_tax_id' => ['label' => 'Tax ID', 'kind' => 'text', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both,
+                'hint' => 'Only printed when both this and its label are filled in.'],
+            'invoice_logo_url' => ['label' => 'Logo', 'kind' => 'image', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both,
                 'hint' => 'PNG, JPEG, SVG or WebP, up to 5 MB. Printed in the letterhead, so a wide mark works best.'],
-            'invoice_accent_color' => ['label' => 'Accent colour', 'kind' => 'color', 'group' => 'branding',
+            'invoice_accent_color' => ['label' => 'Accent colour', 'kind' => 'color', 'group' => 'letterhead', 'group_title' => $letterhead, 'scope' => $both,
                 'hint' => 'Used for rules, headings and the balance due.'],
 
-            'invoice_number_prefix' => ['label' => 'Invoice number prefix', 'kind' => 'text', 'group' => 'numbering',
+            'invoice_number_prefix' => ['label' => 'Invoice number prefix', 'kind' => 'text', 'group' => 'numbering', 'group_title' => $numbering, 'scope' => $invoice,
                 'hint' => 'Letters and digits only.'],
-            'invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'numbering',
+            'invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'numbering', 'group_title' => $numbering, 'scope' => $invoice,
                 'hint' => 'Zero padding on the running number.'],
 
-            'invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'sections'],
-            'invoice_terms' => ['label' => 'Terms and conditions', 'kind' => 'textarea', 'group' => 'sections'],
+            'invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $invoice],
+            'invoice_show_provider' => ['label' => 'Provider name', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $invoice],
+            'invoice_show_duration_column' => ['label' => 'Duration column', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $invoice],
+            'invoice_show_balance_due' => ['label' => 'Balance due line', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $invoice],
 
-            'invoice_show_logo' => ['label' => 'Logo', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_business_address' => ['label' => 'Registered address', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_tax_id' => ['label' => 'Tax ID', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_provider' => ['label' => 'Provider name', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_duration_column' => ['label' => 'Duration column', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_terms' => ['label' => 'Terms and conditions', 'kind' => 'switch', 'group' => 'sections'],
-            'invoice_show_balance_due' => ['label' => 'Balance due line', 'kind' => 'switch', 'group' => 'sections'],
+            // These four read as customer switches but print on both documents.
+            'invoice_show_logo' => ['label' => 'Logo', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $both],
+            'invoice_show_business_address' => ['label' => 'Registered address', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $both],
+            'invoice_show_tax_id' => ['label' => 'Tax ID', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $both],
+            'invoice_show_terms' => ['label' => 'Terms and conditions', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $both],
+            'invoice_terms' => ['label' => 'Terms and conditions', 'kind' => 'textarea', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $both,
+                'hint' => 'One set of terms, printed on both documents. A settlement is a record of money paid, so anything promising a customer a refund belongs on the invoice only.'],
 
-            'settlement_invoice_number_prefix' => ['label' => 'Settlement prefix', 'kind' => 'text', 'group' => 'settlement',
+            'settlement_invoice_number_prefix' => ['label' => 'Settlement prefix', 'kind' => 'text', 'group' => 'numbering', 'group_title' => $numbering, 'scope' => $settlement,
                 'hint' => 'Letters and digits only. Kept separate from the customer invoice series so an owner quoting a settlement cannot be mistaken for a customer.'],
-            'settlement_invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'settlement',
+            'settlement_invoice_number_padding' => ['label' => 'Sequence digits', 'kind' => 'number', 'group' => 'numbering', 'group_title' => $numbering, 'scope' => $settlement,
                 'hint' => 'Zero padding on the running settlement number.'],
-            'settlement_invoice_document_title' => ['label' => 'Document title', 'kind' => 'text', 'group' => 'settlement',
+            'settlement_invoice_document_title' => ['label' => 'Document title', 'kind' => 'text', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $settlement,
                 'hint' => 'Printed where the customer invoice reads "Invoice".'],
-            'settlement_invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'settlement',
+            'settlement_invoice_footer_note' => ['label' => 'Footer note', 'kind' => 'textarea', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $settlement,
                 'hint' => 'A separate note from the customer one — "thank you for booking" makes no sense on a commission statement.'],
-            'settlement_invoice_show_billed_revenue' => ['label' => 'Total billed by the salon', 'kind' => 'switch', 'group' => 'settlement'],
-            'settlement_invoice_show_appointments_count' => ['label' => 'Completed appointment count', 'kind' => 'switch', 'group' => 'settlement'],
+            'settlement_invoice_show_billed_revenue' => ['label' => 'Total billed by the salon', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $settlement],
+            'settlement_invoice_show_appointments_count' => ['label' => 'Completed appointment count', 'kind' => 'switch', 'group' => 'sections', 'group_title' => $whatPrints, 'scope' => $settlement],
         ];
     }
 
-    /** @return array<string, string> */
+    /**
+     * Plain descriptions of what each setting does, stored alongside the value
+     * and shown in the audit log.
+     *
+     * These are written from a reader's point of view, so they name the document
+     * the change reaches. An audit entry that says "address printed on every
+     * invoice" is no use to whoever later asks why the settlement statements
+     * changed too.
+     *
+     * @return array<string, string>
+     */
     private function invoiceDescriptions(): array
     {
+        $both = 'both documents';
+        $invoice = 'the customer invoice';
+        $settlement = 'settlement statements';
+
         return [
-            'invoice_business_name' => 'Business name printed on every invoice',
-            'invoice_business_address' => 'Registered address printed on every invoice',
-            'invoice_business_email' => 'Contact email printed on every invoice',
-            'invoice_business_phone' => 'Contact phone printed on every invoice',
-            'invoice_tax_id' => 'Tax identity number printed on every invoice',
-            'invoice_tax_id_label' => 'Label printed before the tax identity number',
-            'invoice_logo_url' => 'Logo shown in the invoice letterhead',
-            'invoice_accent_color' => 'Accent colour used for rules, headings and the balance due',
-            'invoice_footer_note' => 'Short note printed at the foot of every invoice',
-            'invoice_terms' => 'Terms and conditions printed on every invoice',
-            'invoice_number_prefix' => 'Letters and digits placed before the invoice number',
-            'invoice_number_padding' => 'Zero padding applied to the invoice sequence number',
-            'invoice_show_logo' => 'Whether the logo is printed',
-            'invoice_show_business_address' => 'Whether the registered address is printed',
-            'invoice_show_tax_id' => 'Whether the tax ID is printed',
-            'invoice_show_provider' => 'Whether the serving provider is named',
-            'invoice_show_duration_column' => 'Whether the duration column is printed',
-            'invoice_show_terms' => 'Whether terms and conditions are printed',
-            'invoice_show_balance_due' => 'Whether the balance due line is printed',
-            'settlement_invoice_number_prefix' => 'Letters and digits placed before the settlement invoice number',
-            'settlement_invoice_number_padding' => 'Zero padding applied to the settlement invoice sequence number',
-            'settlement_invoice_document_title' => 'Title printed on a settlement invoice in place of "Invoice"',
-            'settlement_invoice_footer_note' => 'Note printed at the foot of every settlement invoice',
-            'settlement_invoice_show_billed_revenue' => 'Whether the total the salon billed is printed',
-            'settlement_invoice_show_appointments_count' => 'Whether the completed appointment count is printed',
+            'invoice_business_name' => "Business name in the letterhead on $both",
+            'invoice_business_address' => "Registered address, printed on $both",
+            'invoice_business_email' => 'Contact email on '.$both,
+            'invoice_business_phone' => 'Contact phone on '.$both,
+            'invoice_tax_id' => 'Tax identity number, printed on '.$both,
+            'invoice_tax_id_label' => 'Label printed before the tax identity number on '.$both,
+            'invoice_logo_url' => 'Logo shown in the letterhead on '.$both,
+            'invoice_accent_color' => 'Accent colour used for rules and headings on '.$both,
+            'invoice_footer_note' => "Short note at the foot of $invoice",
+            'invoice_terms' => "Terms and conditions printed on $both",
+            'invoice_number_prefix' => "Letters and digits placed before the $invoice number",
+            'invoice_number_padding' => "Zero padding applied to the $invoice sequence number",
+            'invoice_show_logo' => "Whether the logo is printed on $both",
+            'invoice_show_business_address' => "Whether the registered address is printed on $both",
+            'invoice_show_tax_id' => "Whether the tax ID is printed on $both",
+            'invoice_show_provider' => "Whether the serving provider is named on $invoice",
+            'invoice_show_duration_column' => "Whether the duration column is printed on $invoice",
+            'invoice_show_terms' => "Whether terms and conditions are printed on $both",
+            'invoice_show_balance_due' => "Whether the balance due line is printed on $invoice",
+            'settlement_invoice_number_prefix' => "Letters and digits placed before the settlement number",
+            'settlement_invoice_number_padding' => 'Zero padding applied to the settlement sequence number',
+            'settlement_invoice_document_title' => 'Title on '.Str::plural('settlement', 2, 'statements').' in place of "Invoice"',
+            'settlement_invoice_footer_note' => "Short note at the foot of $settlement",
+            'settlement_invoice_show_billed_revenue' => 'Whether the total the salon billed is printed on '.$settlement,
+            'settlement_invoice_show_appointments_count' => 'Whether the completed appointment count is printed on '.$settlement,
         ];
     }
 }

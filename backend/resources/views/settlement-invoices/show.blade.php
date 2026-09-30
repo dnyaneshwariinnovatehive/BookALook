@@ -31,7 +31,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <title>{{ $settings['settlement_invoice_document_title'] ?: 'Settlement Invoice' }} {{ $invoice->invoice_number }}</title>
+    <title>{{ $settings['settlement_invoice_document_title'] ?: 'Settlement Statement' }} {{ $invoice->invoice_number }}</title>
     <style>
         :root { --accent: {{ $accent }}; }
         * { box-sizing: border-box; }
@@ -142,7 +142,7 @@
             </div>
         </div>
         <div class="meta">
-            <div class="doc">{{ $settings['settlement_invoice_document_title'] ?: 'Settlement Invoice' }}</div>
+            <div class="doc">{{ $settings['settlement_invoice_document_title'] ?: 'Settlement Statement' }}</div>
             <div class="num">{{ $invoice->invoice_number }}</div>
             <div class="when">Issued {{ $invoice->issued_at->format('d M Y') }}</div>
         </div>

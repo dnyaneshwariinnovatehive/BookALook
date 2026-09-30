@@ -1,25 +1,40 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Icon from '@/components/admin/Icon';
 import {
-  Alert, Button, Card, Field, PageHeader, Segmented, cx, ui,
+  Alert, Button, Card, Field, PageHeader, cx, ui,
 } from '@/components/admin/ui';
 import { uploadImage } from '@/lib/cloudinary';
 import s from './page.module.css';
 
 /**
- * Invoice format.
+ * Two documents, one page.
  *
- * Everything on this page is branding, and branding is a visual decision, so
- * the page is built around showing you the document while you change it. The
- * preview on the right is driven by exactly the same values the server will
- * print — including the show/hide switches — so a section switched off
- * disappears from the preview rather than from a description of itself.
+ * SuperAdmin kept reading this page as though it configured a single "invoice",
+ * and then wondering why their settlement statements came out numbered like
+ * customer receipts. The confusion was not their fault: the fields were grouped
+ * by *what kind of value* they held, so a logo, a tax ID and a duration column
+ * all sat in the same "Sections" card — and the first two of those print on the
+ * settlement too.
  *
- * The form is rendered from the schema the API returns rather than from a
- * hand-written list of inputs. That means adding a printable section is a
- * change to one PHP array, and this page picks it up with no edit here — and,
- * more importantly, cannot drift out of step with what the server accepts.
+ * So the organising idea is now the document, which is the thing a reader
+ * actually has in mind:
+ *
+ *   - a CUSTOMER INVOICE goes to someone who has just booked, and says what
+ *     they owe.
+ *   - a SETTLEMENT STATEMENT goes to a salon owner when a cycle of their
+ *     earnings is paid out, and says what they were paid, less commission.
+ *
+ * The page is scoped to one of those at a time, chosen at the top, and the
+ * preview beside the form is that same document — never a blend of the two.
+ * Fields that genuinely reach both are collected into their own card and
+ * labelled as shared, because silently editing a setting that also changes the
+ * other document is how a rebrand goes out half-applied.
+ *
+ * The form is still rendered from the schema the API returns rather than from a
+ * hand-written list of inputs, so adding a printable section remains a change to
+ * one PHP array and cannot drift out of step with what the server accepts.
  *
  * Every field is held as the value the user is actually editing — a string for
  * text, a number for the sequence padding, a real boolean for a switch — and
@@ -29,23 +44,48 @@ import s from './page.module.css';
 
 type FieldKind = 'text' | 'textarea' | 'number' | 'color' | 'switch' | 'image';
 
+/** Which document a field reaches. `both` is the reason the shared card exists. */
+type Scope = 'both' | 'invoice' | 'settlement';
+type DocumentId = Exclude<Scope, 'both'>;
+
 interface FieldSpec {
   label: string;
   kind: FieldKind;
+  /** Sub-heading within its card, e.g. "Numbering". */
   group: string;
+  /** The human title for that group, supplied by the server. */
+  group_title: string;
+  scope: Scope;
   hint?: string;
 }
 
 type Schema = Record<string, FieldSpec>;
 type Form = Record<string, string | number | boolean>;
 
-/** Presentation only — which groups exist, and in what order. */
-const GROUPS: { id: string; title: string; subtitle: string }[] = [
-  { id: 'issuer', title: 'Issuer', subtitle: 'Who the invoice is from, printed in the letterhead.' },
-  { id: 'branding', title: 'Branding', subtitle: 'How the document looks. The accent colour drives the rules and the balance due.' },
-  { id: 'numbering', title: 'Numbering', subtitle: 'The reference a customer quotes when they call about a booking.' },
-  { id: 'sections', title: 'Sections', subtitle: 'What appears on the document. A section nobody has filled in stays switched off rather than printing a heading over nothing.' },
-  { id: 'settlement', title: 'Settlement Statement', subtitle: 'The statement a salon owner is given when a cycle of earnings is paid out. It reuses the issuer, branding and terms above — only what makes a settlement different is set here.' },
+interface DocumentMeta {
+  id: DocumentId;
+  name: string;
+  /** Reads as a sentence fragment under the name. */
+  recipient: string;
+  summary: string;
+  icon: 'receipt' | 'wallet';
+}
+
+const DOCUMENTS: DocumentMeta[] = [
+  {
+    id: 'invoice',
+    name: 'Customer invoice',
+    recipient: 'Sent to a customer',
+    summary: 'Issued when someone books. Lists what they chose, what was paid up front, and what is still owed at the salon.',
+    icon: 'receipt',
+  },
+  {
+    id: 'settlement',
+    name: 'Settlement statement',
+    recipient: 'Sent to a salon owner',
+    summary: 'Issued when a cycle of earnings is paid out. Shows the advances held, the commission taken, and the net that reached the bank.',
+    icon: 'wallet',
+  },
 ];
 
 /** A stand-in appointment, so the preview has something real to show. */
@@ -101,10 +141,10 @@ export default function InvoiceFormatPage() {
   const [schema, setSchema] = useState<Schema>({});
   const [issuedCount, setIssuedCount] = useState(0);
   const [settlementIssuedCount, setSettlementIssuedCount] = useState(0);
-  // Which document the preview is showing. Two documents share one letterhead
-  // but number separately, so whichever is on screen is the one being reasoned
-  // about — a preview that blended both would be of neither.
-  const [preview, setPreview] = useState<'invoice' | 'settlement'>('invoice');
+  // Which document the whole page is about. Every panel below — the form, the
+  // preview, the save bar — belongs to this one, so there is never a moment
+  // where it is unclear which document a field affects.
+  const [doc, setDoc] = useState<DocumentId>('invoice');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -245,6 +285,57 @@ export default function InvoiceFormatPage() {
 
   const text = (key: string) => String(form[key] ?? '');
   const flag = (key: string) => form[key] === true || form[key] === 'true' || form[key] === '1';
+
+  /**
+   * The two cards this document's form is built from, taken straight from the
+   * server's `scope` rather than from a local list of key names.
+   *
+   * Group order follows the order the API returned the fields in, which is the
+   * order they are meant to be read down the page. A group with nothing left in
+   * it is dropped rather than printed as a bare heading.
+   */
+  const cards = useMemo(() => {
+    const buckets: Record<'shared' | 'own', string[]> = { shared: [], own: [] };
+
+    for (const [key, spec] of Object.entries(schema)) {
+      if (spec.scope === 'both') buckets.shared.push(key);
+      else if (spec.scope === doc) buckets.own.push(key);
+      // A field scoped to the *other* document is deliberately not rendered
+      // here. The document chooser is the way to reach it.
+    }
+
+    const sections = (keys: string[], title: string, subtitle: string) => {
+      const groups = new Map<string, string[]>();
+      for (const key of keys) {
+        const g = schema[key].group;
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g)!.push(key);
+      }
+      const parts = Array.from(groups, ([id, members]) => ({
+        id,
+        title: schema[members[0]].group_title || id,
+        keys: members,
+      }));
+      return parts.length ? [{ title, subtitle, groups: parts }] : [];
+    };
+
+    const docName = DOCUMENTS.find((d) => d.id === doc)!.name.toLowerCase();
+
+    return [
+      ...sections(
+        buckets.shared,
+        'Shared with both documents',
+        'These print on the customer invoice and on every settlement statement. Changing one changes both.',
+      ),
+      ...sections(
+        buckets.own,
+        `Only on the ${docName}`,
+        doc === 'settlement'
+          ? 'Numbering and sections that reach the settlement statement alone.'
+          : 'Numbering and sections that reach the customer invoice alone.',
+      ),
+    ];
+  }, [schema, doc]);
 
   const renderField = (key: string, spec: FieldSpec) => {
     switch (spec.kind) {
@@ -418,52 +509,81 @@ export default function InvoiceFormatPage() {
     <div>
       <PageHeader
         eyebrow="Platform"
-        title="Invoice Format"
-        subtitle="How the invoice a customer receives after booking is laid out and branded, and the statement a salon owner is given when earnings are settled. Changes apply to documents issued from now on — anything already issued keeps the format it was created with."
-        actions={
-          issuedCount > 0 || settlementIssuedCount > 0 ? (
-            <span className={s.countNote}>
-              {[
-                issuedCount > 0
-                  ? `${issuedCount.toLocaleString('en-IN')} invoice${issuedCount === 1 ? '' : 's'}`
-                  : null,
-                settlementIssuedCount > 0
-                  ? `${settlementIssuedCount.toLocaleString('en-IN')} statement${settlementIssuedCount === 1 ? '' : 's'}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(' \u00b7 ')}{' '}
-              issued
-            </span>
-          ) : null
-        }
+        title="Invoice &amp; statement format"
+        subtitle="BookALook prints two different documents, and they are not the same thing. Pick one below — the settings, the preview and the save button all belong to whichever you pick. Changes apply to documents issued from now on; anything already issued keeps the format it was created with."
       />
 
       {banner && <Alert tone={banner.tone === 'ok' ? 'success' : 'error'}>{banner.text}</Alert>}
 
+      {/* ------------------------------------------------ pick a document */}
+      <div className={s.docPicker} role="radiogroup" aria-label="Document to configure">
+        {DOCUMENTS.map((d) => {
+          const count = d.id === 'invoice' ? issuedCount : settlementIssuedCount;
+          const active = d.id === doc;
+
+          return (
+            <button
+              key={d.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              className={cx(s.docCard, active && s.docCardActive)}
+              onClick={() => setDoc(d.id)}
+            >
+              <span className={s.docTop}>
+                <span className={cx(s.docIcon, d.id === 'settlement' && s.docIconSettlement)}>
+                  <Icon name={d.icon} size={18} />
+                </span>
+                <span className={s.docNames}>
+                  <span className={s.docName}>{d.name}</span>
+                  <span className={s.docRecipient}>{d.recipient}</span>
+                </span>
+                <span className={s.docCheck}>{active ? <Icon name="check" size={16} /> : null}</span>
+              </span>
+              <span className={s.docSummary}>{d.summary}</span>
+              <span className={s.docCount}>
+                {count.toLocaleString('en-IN')} issued so far
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Names the document again, directly above the fields. The chooser can
+          scroll out of view on a long form, and without this there is nothing
+          at hand to answer "which document am I editing?" */}
+      <div className={s.scopeBar}>
+        <span className={s.scopeDot} data-doc={doc} />
+        Editing the <b>{DOCUMENTS.find((d) => d.id === doc)!.name}</b>
+      </div>
+
       <div className={s.layout}>
         <div className={s.form}>
-          {GROUPS.map((group) => {
-            const keys = Object.keys(schema).filter((key) => schema[key].group === group.id);
-            if (!keys.length) return null;
-
-            return (
-              <Card
-                key={group.id}
-                title={group.title}
-                subtitle={group.subtitle}
-                padded
-              >
-                <div className={keys.some((k) => schema[k].kind === 'switch') ? s.checks : undefined}>
-                  {keys.map((key) => renderField(key, schema[key]))}
+          {cards.map((card) => (
+            <Card
+              key={card.title}
+              title={card.title}
+              subtitle={card.subtitle}
+              padded
+            >
+              {card.groups.map((group) => (
+                <div key={group.id} className={s.group}>
+                  {card.groups.length > 1 && <div className={s.groupTitle}>{group.title}</div>}
+                  <div className={group.keys.some((k) => schema[k].kind === 'switch') ? s.checks : undefined}>
+                    {group.keys.map((key) => renderField(key, schema[key]))}
+                  </div>
                 </div>
-              </Card>
-            );
-          })}
+              ))}
+            </Card>
+          ))}
 
           <div className={s.actions}>
+            {/* Not named after the visible document. Switching between the two
+                does not discard anything, so a user can hold unsaved edits to
+                both and save them in one go — a button reading "Save customer
+                invoice" would understate what it is about to write. */}
             <Button variant="primary" icon="check" loading={saving} disabled={!isDirty} onClick={handleSave}>
-              Save format
+              Save changes
             </Button>
             <Button variant="ghost" disabled={!isDirty || saving} onClick={discard}>
               Discard
@@ -480,21 +600,18 @@ export default function InvoiceFormatPage() {
         <div className={s.previewSticky}>
           <Card
             title="Preview"
-            subtitle="A sample document, using the values above."
+            /* Names the document on the preview itself. The sample is the only
+               thing on this page a reader cannot infer the purpose of from the
+               fields beside it, so it is labelled twice over. */
+            subtitle={`A sample ${doc === 'invoice' ? 'customer invoice' : 'settlement statement'}, using the values above.`}
             actions={
-              <Segmented
-                ariaLabel="Document to preview"
-                value={preview}
-                onChange={setPreview}
-                options={[
-                  { value: 'invoice', label: 'Invoice' },
-                  { value: 'settlement', label: 'Settlement' },
-                ]}
-              />
+              <span className={s.previewDocTag} data-doc={doc}>
+                {doc === 'invoice' ? 'Customer invoice' : 'Settlement statement'}
+              </span>
             }
             padded
           >
-            {preview === 'invoice' ? (
+            {doc === 'invoice' ? (
             <div className={s.paper} style={{ ['--pv-accent' as string]: accent }}>
               <div className={s.previewHead}>
                 <div className={s.previewBrand}>

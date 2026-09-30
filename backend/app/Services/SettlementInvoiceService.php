@@ -12,7 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Issues the settlement invoice for a cycle of money paid out to a salon.
+ * Issues the settlement statement for a cycle of money paid out to a salon.
  *
  * The arithmetic is not computed here. Every figure is read off the payout row
  * that PayoutService has already frozen by marking it distributed, so the
@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\DB;
 class SettlementInvoiceService
 {
     /**
-     * Issue the settlement invoice for a payout, or return the one already issued.
+     * Issue the settlement statement for a payout, or return the one already issued.
      *
      * Idempotent on purpose. markDistributed() is guarded against a second
      * distribution, but a retry of the request that triggered it should not be
@@ -182,7 +182,7 @@ class SettlementInvoiceService
             'setting_key' => $key,
             'setting_value' => '0',
             'data_type' => 'integer',
-            'description' => 'Last settlement invoice number issued for ' . $year,
+            'description' => 'Last settlement statement number issued for ' . $year,
         ]);
 
         $row = InvoiceSetting::where('setting_key', $key)->lockForUpdate()->firstOrFail();
