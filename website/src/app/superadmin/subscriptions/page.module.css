@@ -547,7 +547,10 @@
   .commissionFacts,
   .formGrid,
   .checkGrid,
-  .modelChoice {
+  .modelChoice,
+  /* This three-up summary was missed by the collapse list above, so it stayed
+     three columns on a phone and squeezed. */
+  .infoStats {
     grid-template-columns: 1fr;
   }
   .sortSelect {

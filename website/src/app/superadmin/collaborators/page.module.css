@@ -156,6 +156,54 @@
   color: var(--color-danger);
 }
 
+/* ------------------------------------------------------------------
+   Table
+   ------------------------------------------------------------------
+   The table element, its cells and the scroll container are borrowed from
+   salon-approval/page.module.css, which gives them an 860px min-width.
+   That is right for the approval queue's ten columns and far too wide for
+   this five-column list: it would force a horizontal scroll on a phone even
+   though the content would fit.
+
+   These rules hang off a local .tableWrap class rather than redefining
+   .table / .th / .td, because CSS Modules hashes class names per file: a
+   `.table` here would compile to a different name than the one the borrowed
+   element actually carries, and silently match nothing. Element selectors
+   (th, td) are not hashed, so they are safe to use directly. */
+.tableWrap > table {
+  min-width: 560px;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 0.75rem 1rem;
+}
+
+/* On a narrow phone, trim this card's own chrome as well — the superadmin
+   shell already supplies page padding, so the card's own is what makes the
+   form feel squeezed on top of it. */
+@media (max-width: 640px) {
+  .card {
+    padding: 1.15rem 1rem;
+    margin-bottom: 1.75rem;
+    border-radius: var(--radius-md);
+  }
+
+  .cardDesc {
+    margin-bottom: 1.1rem;
+  }
+
+  /* Full-bleed submit: a half-width button under a full-width form reads as
+     an accident on a phone. */
+  .actions {
+    justify-content: stretch;
+  }
+
+  .submit {
+    width: 100%;
+  }
+}
+
 @media (max-width: 720px) {
   .form {
     grid-template-columns: 1fr;

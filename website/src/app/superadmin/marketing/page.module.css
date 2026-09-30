@@ -159,8 +159,20 @@
   margin-top: 1.4rem;
 }
 
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
 .table {
   width: 100%;
+  /* Scroll floor. The headers here did not carry `white-space: nowrap` and
+     there was no scroll wrapper, so the salon-name column simply wrapped and
+     squeezed instead of the table becoming horizontally scrollable. */
+  min-width: 420px;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -171,6 +183,7 @@
   color: var(--text-body);
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .table td {
@@ -372,10 +385,4 @@
   padding: 2.5rem;
   text-align: center;
   color: var(--text-body);
-}
-
-@media (max-width: 640px) {
-  .container {
-    padding: 1.25rem 1rem;
-  }
 }

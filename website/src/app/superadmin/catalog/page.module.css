@@ -54,7 +54,11 @@
 
 .catalogGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  /* min() keeps the 360px card width on a desktop but lets the track shrink
+     below it on a phone. A bare minmax(360px, 1fr) is a hard floor: on a 360px
+     viewport the grid was wider than the screen and the page scrolled
+     sideways. */
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
   gap: 24px;
 }
 

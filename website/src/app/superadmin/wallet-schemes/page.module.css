@@ -287,7 +287,9 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  /* See the note in catalog: min() keeps the desktop card width while letting
+     the track shrink on a phone, so the grid never exceeds the viewport. */
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
   gap: 20px;
 }
 
@@ -926,9 +928,8 @@
 }
 
 @media (max-width: 560px) {
-  .container {
-    padding: 16px;
-  }
+  /* The container padding rule that used to be here doubled up with the
+     superadmin shell's own .pageFrame padding. The shell handles it. */
 
   .tierHead,
   .tierArrow {

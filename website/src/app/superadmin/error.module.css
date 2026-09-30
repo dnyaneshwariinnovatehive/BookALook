@@ -87,3 +87,31 @@
   border-color: var(--accent-color);
   color: var(--accent-text);
 }
+
+@media (max-width: 640px) {
+  .wrap {
+    /* 40px/32px of padding on top of the shell's own left/right padding left
+       barely 260px of usable width on a 360px phone. */
+    margin-top: 6vh;
+    padding: 24px 18px;
+    border-radius: var(--radius-lg);
+  }
+
+  .icon {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 16px;
+  }
+
+  /* Let the buttons use the full width rather than sit side by side at a size
+     that is hard to hit. */
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primary,
+  .secondary {
+    justify-content: center;
+  }
+}

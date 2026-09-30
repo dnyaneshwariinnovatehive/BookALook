@@ -6,6 +6,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* See the note in salons: the action cluster needs to be able to drop below
+     the heading rather than overlap it. */
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 2rem;
 }
 
@@ -139,7 +143,9 @@
 /* Grid Styles */
 .bannersGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* min() so the 300px track can shrink on a narrow phone instead of forcing
+     the grid wider than the viewport. */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 1.5rem;
 }
 

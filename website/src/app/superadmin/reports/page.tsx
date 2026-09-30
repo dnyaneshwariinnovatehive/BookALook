@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 /**
@@ -148,15 +149,19 @@ export default function ReportsPage() {
   if (loading && !overview) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <div className={styles.titleRow}>
-              <h1 className={styles.title}>Platform Reporting</h1>
-              <span className={styles.badge}><span className={styles.badgeDot} /> Loading</span>
-            </div>
-            <p className={styles.subtitle}>Gathering analytics from across the network…</p>
-          </div>
-        </div>
+        {/* Same header as the loaded state, so switching between loading,
+            error and data doesn't shift the page or change its look. */}
+        <PageHeader
+          eyebrow="Platform"
+          title="Reporting"
+          subtitle="Gathering analytics from across the network…"
+          actions={
+            <span className={styles.badge}>
+              <span className={styles.badgeDot} />
+              Loading
+            </span>
+          }
+        />
         <div className={styles.content}>
           <div className={`${styles.skeletonHeader} ${styles.skeleton}`} />
           <div className={styles.skeletonGrid}>
@@ -177,14 +182,11 @@ export default function ReportsPage() {
   if (error) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <div className={styles.titleRow}>
-              <h1 className={styles.title}>Platform Reporting</h1>
-            </div>
-            <p className={styles.subtitle}>Analytics and analysis across the platform.</p>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Platform"
+          title="Reporting"
+          subtitle="A complete view of every salon, area and service on the platform."
+        />
         <div className={styles.content}>
           <div className={styles.errorCard}>
             <p className={styles.errorTitle}>Unable to load reports</p>
@@ -207,29 +209,33 @@ export default function ReportsPage() {
 
   return (
     <div className={styles.container}>
-      {/* ---- header banner ---- */}
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title}>Platform Reporting</h1>
+      {/* The shared header, as every other admin page uses. This page had its
+          own full-bleed purple banner instead, which cost a large slice of a
+          phone screen before any data appeared and made the page read as a
+          different product from the rest of the dashboard. The "read-only" note
+          and the generation timestamp are preserved as header content. */}
+      <PageHeader
+        eyebrow="Platform"
+        title="Reporting"
+        subtitle="A complete view of every salon, area and service on the platform."
+        actions={
+          <div className={styles.headerMeta}>
             <span className={styles.badge}>
               <span className={styles.badgeDot} />
               Read-only
             </span>
+            {overview?.generated_at && (
+              <span className={styles.generatedAt}>
+                Generated{' '}
+                {new Date(overview.generated_at).toLocaleString('en-IN', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
+              </span>
+            )}
           </div>
-          <p className={styles.subtitle}>
-            A complete view of every salon, area and service on the platform.
-          </p>
-          {overview?.generated_at && (
-            <p className={styles.generatedAt}>
-              Generated {new Date(overview.generated_at).toLocaleString('en-IN', {
-                day: 'numeric', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-              })}
-            </p>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       <div className={styles.content}>
         {/* ---- filter bar ---- */}

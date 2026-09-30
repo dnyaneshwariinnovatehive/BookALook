@@ -21,18 +21,35 @@
   font-size: 0.95rem;
 }
 
+/* The scroll container for the wide tables below.
+ *
+ * This was `overflow: hidden`, which does the opposite of what it looks like:
+ * it clips the columns that overflow instead of letting the reader reach them,
+ * so on a phone the last columns were simply gone with no way to get them.
+ *
+ * `auto` on x is what actually enables the horizontal scroll. The table needs a
+ * min-width to give that scroller something to do — with `width: 100%` and no
+ * floor, the table just squeezes to the viewport and never overflows. Kept in
+ * step with the shared `ui.module.css` .tableWrap. */
 .tableContainer {
   background: var(--surface-color);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   box-shadow: var(--card-shadow);
-  overflow: hidden;
+  overflow-x: auto;
+  /* Momentum scrolling on touch devices, and stop iOS from hijacking it. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  /* The floor that makes the wrapper scrollable. Approximates the columns'
+   * natural min-content width plus their padding; without it a wide table
+   * compresses into an unreadable sliver on a 360px screen. */
+  min-width: 860px;
 }
 
 .th {
@@ -45,6 +62,9 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-color);
+  /* Keeps a header from wrapping and eating the row height. This is also what
+   * gives the table its intrinsic min-width. */
+  white-space: nowrap;
 }
 
 .td {
@@ -291,4 +311,54 @@
   color: var(--color-success, #16a34a);
   font-weight: 500;
   text-align: right;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 720px) {
+  .header {
+    margin-bottom: 1.25rem;
+  }
+
+  /* The search box keeps its 250px floor, which is fine on its own but
+     overflows once a sibling shares the row. Letting it flex and shrink is
+     what keeps the toolbar on one line down to a 320px screen. */
+  .controlsRow {
+    gap: 0.6rem;
+  }
+
+  .searchInput {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .pageButton {
+    padding: 0.4rem 0.65rem;
+  }
+}
+
+@media (max-width: 520px) {
+  /* Cell padding is a large share of the row on a phone; the text needs less
+     than the 24px it was given. */
+  .th,
+  .td {
+    padding: 0.7rem 0.9rem;
+  }
+
+  .emptyState {
+    padding: 2rem 1rem;
+  }
+
+  /* Stack the page-size control above the arrows rather than letting the
+     number buttons get squeezed off the right edge. */
+  .pagination {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .pageControls {
+    width: 100%;
+    overflow-x: auto;
+  }
 }

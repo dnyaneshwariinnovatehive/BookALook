@@ -15,13 +15,6 @@
   margin-bottom: 40px;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
-  margin-top: 16px;
-}
-
 .card {
   background: var(--surface);
   padding: 24px;
@@ -187,12 +180,31 @@
   margin-top: 4px;
 }
 
-.table {
+/* Scroll container for the payouts table.
+ *
+ * The table had no wrapper at all, so its ten columns — several of them money
+ * columns with long headings — pushed the whole page into a sideways scroll
+ * rather than scrolling inside the card. `overflow: hidden` had been set on the
+ * <table> itself, which is not a scroll container and did nothing.
+ *
+ * The min-width is what gives this scroller something to do: at `width: 100%`
+ * with no floor the table would just compress to the viewport. 980px is about
+ * what these ten columns need before the figures stop being readable. */
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--surface-color);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.tableScroll .table {
   width: 100%;
+  min-width: 980px;
   border-collapse: collapse;
   background: var(--surface-color);
-  border-radius: 12px;
-  overflow: hidden;
+  font-size: 0.875rem;
 }
 
 .table th {
@@ -284,9 +296,44 @@
 }
 
 
+/* `hidden` here clipped the page-number buttons on a phone: the shared
+   Pagination's number row does not wrap, so anything past the first few was
+   simply unreachable. */
 .pager {
   margin-top: 16px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 12px);
-  overflow: hidden;
+  overflow-x: auto;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 720px) {
+  .toolbar {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  /* The filter fields share the row until there isn't room, then each takes
+     the full width rather than being squeezed to an unusable size. */
+  .field {
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  .field select,
+  .field input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .button {
+    flex: 1 1 100%;
+    margin-top: 4px;
+  }
+
+  .summaryGrid {
+    gap: 10px;
+    margin-bottom: 16px;
+  }
 }

@@ -201,7 +201,9 @@ export default function CollaboratorManagement() {
       {/* Collaborators List */}
       <div>
         <h2 className={ui.sectionTitle}>All collaborators</h2>
-        <div className={styles.tableContainer}>
+        {/* tableWrap is a local hook for this page's narrower table floor; the
+            scroller itself is borrowed from salon-approval. */}
+        <div className={`${styles.tableContainer} ${ui.tableWrap}`}>
           <table className={styles.table}>
             <thead>
               <tr>

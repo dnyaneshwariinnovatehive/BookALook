@@ -6,6 +6,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Without this the action cluster kept its full width beside the heading and
+     the two overlapped on a narrow screen. */
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 2rem;
 }
 
