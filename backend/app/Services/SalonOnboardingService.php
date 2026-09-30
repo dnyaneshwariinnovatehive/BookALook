@@ -50,18 +50,35 @@ class SalonOnboardingService
      */
     public function onboard(SalonEnquiry $enquiry, User $collaborator, array $payload, array $photos = []): array
     {
-        $existing = $enquiry->salon()->first();
+        return DB::transaction(function () use ($enquiry, $collaborator, $payload, $photos) {
+            // The same draft can legitimately be in flight twice at the same
+            // moment: the Submit button on the last step and the device's own
+            // background retry queue both send it, and neither one can see the
+            // other. Locking the enquiry row makes the second attempt queue
+            // behind the first, so it runs against the rows the first one wrote
+            // instead of interleaving with them.
+            //
+            // Without this the two transactions interleave their writes to
+            // salon_working_hours and the second one trips the
+            // (salon_id, day_of_week) unique constraint on the very first day
+            // it inserts.
+            $enquiry = $enquiry->newQuery()->lockForUpdate()->findOrFail($enquiry->id);
 
-        // Approved, suspended or deactivated: the collaborator is done here.
-        // Also the landing spot for a retried submission of a salon that has
-        // since gone live, which must not be rewritten by a stale draft.
-        if ($existing && ! in_array($existing->status, self::EDITABLE_STATUSES, true)) {
-            return ['salon' => $existing->load('city:id,name,state'), 'created' => false, 'resubmitted' => false];
-        }
+            // Re-read inside the lock. Reading it before the transaction is what
+            // let both attempts believe they were the first to see the salon.
+            $existing = $enquiry->salon()->first();
 
-        $owner = $this->resolveOwner($enquiry, $payload);
+            // Approved, suspended or deactivated: the collaborator is done here.
+            // Also the landing spot for a retried submission of a salon that has
+            // since gone live, which must not be rewritten by a stale draft.
+            if ($existing && ! in_array($existing->status, self::EDITABLE_STATUSES, true)) {
+                return ['salon' => $existing->load('city:id,name,state'), 'created' => false, 'resubmitted' => false];
+            }
 
-        return DB::transaction(function () use ($enquiry, $collaborator, $payload, $photos, $existing, $owner) {
+            // Inside the transaction too, for the same reason: creating the owner
+            // races on the unique users.phone column just as badly.
+            $owner = $this->resolveOwner($enquiry, $payload);
+
             $salon = $existing
                 ? $this->reviseSalon($existing, $owner, $payload)
                 : $this->createSalon($enquiry, $collaborator, $owner, $payload);
@@ -186,8 +203,15 @@ class SalonOnboardingService
     }
 
     /**
-     * Replaced wholesale rather than merged: the submission is the complete
-     * week, and a day missing from it means closed, not unchanged.
+     * A day absent from the submission is closed, not unchanged — the
+     * collaborator's form is the complete week, so the days missing from it are
+     * removed rather than left holding last submission's times.
+     *
+     * The days that *are* submitted are keyed updates rather than inserts. A
+     * repeated submission has to be a no-op rather than a collision: the
+     * (salon_id, day_of_week) unique index means an insert would fail the
+     * moment the row was already there, which is exactly what happened when two
+     * submissions overlapped.
      *
      * @param  array<int, array<string, mixed>>  $days
      */
@@ -197,18 +221,30 @@ class SalonOnboardingService
             return;
         }
 
-        SalonWorkingHour::where('salon_id', $salon->id)->delete();
+        // Keyed by day so a payload listing the same day twice cannot insert it
+        // twice within one request and trip its own constraint. Later entry
+        // wins, matching how the form renders one row per day.
+        $byDay = [];
 
         foreach ($days as $day) {
+            $byDay[(int) $day['day_of_week']] = $day;
+        }
+
+        SalonWorkingHour::where('salon_id', $salon->id)
+            ->whereNotIn('day_of_week', array_keys($byDay))
+            ->delete();
+
+        foreach ($byDay as $dayOfWeek => $day) {
             $closed = filter_var($day['is_closed'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-            SalonWorkingHour::create([
-                'salon_id' => $salon->id,
-                'day_of_week' => (int) $day['day_of_week'],
-                'is_closed' => $closed,
-                'open_time' => $closed ? null : ($day['open_time'] ?? null),
-                'close_time' => $closed ? null : ($day['close_time'] ?? null),
-            ]);
+            SalonWorkingHour::updateOrCreate(
+                ['salon_id' => $salon->id, 'day_of_week' => $dayOfWeek],
+                [
+                    'is_closed' => $closed,
+                    'open_time' => $closed ? null : ($day['open_time'] ?? null),
+                    'close_time' => $closed ? null : ($day['close_time'] ?? null),
+                ]
+            );
         }
     }
 

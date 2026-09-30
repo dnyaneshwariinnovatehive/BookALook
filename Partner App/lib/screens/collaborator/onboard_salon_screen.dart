@@ -200,6 +200,14 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
   bool _showErrorsOn(int step) => _stepsAttempted.contains(step);
 
   Future<void> _submit() async {
+    // The last step's button is the one thing a collaborator can double-tap, and
+    // two submissions of the same draft used to reach the server at once. It had
+    // to be the server's problem to absorb, and the unique index on a salon's
+    // working hours did not absorb it — it rejected the second one outright.
+    // Better not to send it.
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
     await _persist();
     if (!mounted) return;
 
@@ -214,6 +222,7 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
       await _goTo(firstBadStep);
 
       if (mounted) {
+        setState(() => _submitting = false);
         _say(missing.length == 1
             ? '${missing.first} is still required.'
             : '${missing.length} required fields are still empty.');
