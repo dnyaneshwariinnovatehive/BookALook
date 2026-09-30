@@ -121,6 +121,9 @@
 .actions {
   display: flex;
   gap: 0.6rem;
+  /* The status badge beside these is `white-space: nowrap`, so this row had to
+     be able to wrap rather than force the card wider than the screen. */
+  flex-wrap: wrap;
 }
 
 /* Badges */
@@ -355,5 +358,7 @@
   background: var(--surface-color, var(--surface-1, #fff));
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg, 12px);
-  overflow: hidden;
+  /* Was `hidden`, which clipped the shared Pagination's non-wrapping number
+     row so later page buttons were unreachable on a phone. */
+  overflow-x: auto;
 }

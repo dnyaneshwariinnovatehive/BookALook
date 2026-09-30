@@ -796,10 +796,15 @@ label.button {
   border-radius: 10px;
   overflow: auto;
   max-height: 22rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
   width: 100%;
+  /* The wrapper already scrolled, but with no floor and wrappable cells the
+     table compressed to the viewport, so the scroller had nothing to do and
+     the right-hand columns were unreadable on a phone. */
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 0.83rem;
 }
@@ -868,9 +873,8 @@ label.button {
 }
 
 @media (max-width: 640px) {
-  .container {
-    padding: 1.25rem 1rem;
-  }
+  /* The container padding rule that used to be here doubled up with the
+     superadmin shell's own .pageFrame padding. The shell handles it. */
 
   .browser {
     grid-template-columns: 1fr;

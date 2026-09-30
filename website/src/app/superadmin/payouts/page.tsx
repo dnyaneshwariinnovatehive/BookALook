@@ -405,6 +405,7 @@ export default function PayoutsPage() {
           cycle has data.
         </div>
       ) : (
+        <div className={styles.tableScroll}>
         <table className={styles.table}>
           <thead>
             <tr>
@@ -528,6 +529,7 @@ export default function PayoutsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {payouts.length > 0 && (

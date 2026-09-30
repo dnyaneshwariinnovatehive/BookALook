@@ -203,6 +203,7 @@ export default function MarketingPage() {
           {overview.top_salons.length > 0 && (
             <div className={styles.topSalons}>
               <h3 className={styles.subTitle}>Busiest senders</h3>
+              <div className={styles.tableScroll}>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -221,6 +222,7 @@ export default function MarketingPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </section>
