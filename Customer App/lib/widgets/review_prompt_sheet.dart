@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// Asks a customer how their visit went, the moment they next open the app.
 ///
@@ -126,9 +127,9 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
@@ -141,7 +142,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppTheme.lightBorder,
+                    color: context.colors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -188,7 +189,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: AppTheme.lightAccentSoft,
+            color: context.colors.accentSoft,
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.rate_review_outlined,
@@ -201,7 +202,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
           style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppTheme.lightTextHeading),
+              color: context.colors.textPrimary),
         ),
         const SizedBox(height: 6),
         Text(
@@ -213,7 +214,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
             if (visited.isNotEmpty) visited,
           ].join(' · '),
           textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+          style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
         ),
       ],
     );
@@ -238,7 +239,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
                   child: Icon(
                     filled ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 42,
-                    color: filled ? const Color(0xFFF5A623) : AppTheme.lightBorder,
+                    color: filled ? const Color(0xFFF5A623) : context.colors.border,
                   ),
                 ),
               );
@@ -250,7 +251,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: _rating == 0 ? FontWeight.normal : FontWeight.bold,
-              color: _rating == 0 ? AppTheme.lightTextLight : AppTheme.lightTextHeading,
+              color: _rating == 0 ? context.colors.textTertiary : context.colors.textPrimary,
             ),
           ),
         ],
@@ -265,7 +266,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
                   style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
               const SizedBox(width: 6),
               Text('optional',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextLight)),
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: context.colors.textTertiary)),
             ],
           ),
           const SizedBox(height: 8),
@@ -278,13 +279,13 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
               hintText: _rating >= 4
                   ? 'What went well?'
                   : 'What would have made it better?',
-              hintStyle: GoogleFonts.outfit(color: AppTheme.lightTextLight, fontSize: 13.5),
+              hintStyle: GoogleFonts.outfit(color: context.colors.textTertiary, fontSize: 13.5),
               counterText: '',
               filled: true,
-              fillColor: AppTheme.lightBg,
+              fillColor: context.colors.surfaceMuted,
               contentPadding: const EdgeInsets.all(14),
-              border: _border(AppTheme.lightBorder),
-              enabledBorder: _border(AppTheme.lightBorder),
+              border: _border(context.colors.border),
+              enabledBorder: _border(context.colors.border),
               focusedBorder: _border(AppTheme.accentColor),
             ),
           ),
@@ -303,10 +304,10 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _reporting ? AppTheme.lightDangerBg : AppTheme.lightBg,
+            color: _reporting ? context.colors.dangerBg : context.colors.surfaceMuted,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _reporting ? AppTheme.lightDanger.withOpacity(0.4) : AppTheme.lightBorder,
+              color: _reporting ? context.colors.danger.withValues(alpha: 0.4) : context.colors.border,
             ),
           ),
           child: Row(
@@ -314,7 +315,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
               Icon(
                 _reporting ? Icons.check_box : Icons.check_box_outline_blank,
                 size: 20,
-                color: _reporting ? AppTheme.lightDanger : AppTheme.lightTextLight,
+                color: _reporting ? context.colors.danger : context.colors.textTertiary,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -325,13 +326,13 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
                         style: GoogleFonts.outfit(
                           fontSize: 13.5,
                           fontWeight: FontWeight.bold,
-                          color: _reporting ? AppTheme.lightDanger : AppTheme.lightTextHeading,
+                          color: _reporting ? context.colors.danger : context.colors.textPrimary,
                         )),
                     const SizedBox(height: 2),
                     Text(
                       'Goes privately to the BookALook team, not to the salon.',
                       style: GoogleFonts.outfit(
-                          fontSize: 11.5, height: 1.3, color: AppTheme.lightTextBody),
+                          fontSize: 11.5, height: 1.3, color: context.colors.textSecondary),
                     ),
                   ],
                 ),
@@ -350,14 +351,14 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               labelText: 'What happened, in a few words',
-              labelStyle: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+              labelStyle: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
               counterText: '',
               filled: true,
-              fillColor: AppTheme.lightBg,
+              fillColor: context.colors.surfaceMuted,
               contentPadding: const EdgeInsets.all(14),
-              border: _border(AppTheme.lightBorder),
-              enabledBorder: _border(AppTheme.lightBorder),
-              focusedBorder: _border(AppTheme.lightDanger),
+              border: _border(context.colors.border),
+              enabledBorder: _border(context.colors.border),
+              focusedBorder: _border(context.colors.danger),
             ),
           ),
           const SizedBox(height: 10),
@@ -368,14 +369,14 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               labelText: 'Tell us more',
-              labelStyle: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+              labelStyle: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
               counterText: '',
               filled: true,
-              fillColor: AppTheme.lightBg,
+              fillColor: context.colors.surfaceMuted,
               contentPadding: const EdgeInsets.all(14),
-              border: _border(AppTheme.lightBorder),
-              enabledBorder: _border(AppTheme.lightBorder),
-              focusedBorder: _border(AppTheme.lightDanger),
+              border: _border(context.colors.border),
+              enabledBorder: _border(context.colors.border),
+              focusedBorder: _border(context.colors.danger),
             ),
           ),
         ],
@@ -384,18 +385,18 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
   Widget _buildError() => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppTheme.lightDangerBg,
+          color: context.colors.dangerBg,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, size: 17, color: AppTheme.lightDanger),
+            Icon(Icons.error_outline, size: 17, color: context.colors.danger),
             const SizedBox(width: 9),
             Expanded(
               child: Text(_error!,
                   style: GoogleFonts.outfit(
-                      fontSize: 12.5, height: 1.35, color: AppTheme.lightDanger)),
+                      fontSize: 12.5, height: 1.35, color: context.colors.danger)),
             ),
           ],
         ),
@@ -411,7 +412,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: AppTheme.accentColor,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: AppTheme.lightBorder,
+                disabledBackgroundColor: context.colors.border,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _submitting
@@ -427,7 +428,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
           TextButton(
             onPressed: _submitting ? null : () => Navigator.pop(context, false),
             child: Text('Maybe later',
-                style: GoogleFonts.outfit(fontSize: 13.5, color: AppTheme.lightTextBody)),
+                style: GoogleFonts.outfit(fontSize: 13.5, color: context.colors.textSecondary)),
           ),
         ],
       );
