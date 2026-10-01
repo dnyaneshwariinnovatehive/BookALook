@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import 'salon_detail_screen.dart';
 import 'category_salons_screen.dart';
 import '../theme/app_colors.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 /// Search, answered the way a customer asks it.
 ///
@@ -242,7 +244,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _body() {
     if (_error != null) {
-      return _centred(Icons.wifi_off_rounded, 'Something went wrong', _error!);
+      return RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _rerun,
+        child: ScrollableState(
+          child: ErrorState(title: 'Could not search', message: _error!, onRetry: _rerun),
+        ),
+      );
     }
 
     if (_controller.text.trim().length < 2) {
@@ -254,50 +262,70 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_searching && _results == null) {
-      return const Center(child: CircularProgressIndicator());
+      return SkeletonList(
+        count: 6,
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        itemBuilder: (_) => const ResultRowSkeleton(),
+      );
     }
 
     final results = _results;
     if (results == null) return const SizedBox.shrink();
 
     if (results.isEmpty) {
-      return _centred(
-        Icons.search_off,
-        'Nothing found for "${_controller.text.trim()}"',
-        'Try a shorter word, or check the spelling.',
+      return RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _rerun,
+        child: ScrollableState(
+          child: EmptyState(
+            icon: Icons.search_off,
+            title: 'Nothing found for "${_controller.text.trim()}"',
+            message: 'Try a shorter word, or check the spelling.',
+          ),
+        ),
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 28),
-      children: [
-        // Shown above the results rather than instead of them: the customer's
-        // spelling may well have been right, so the results stay and the
-        // correction is only an offer.
-        if (results.didYouMean != null)
-          _didYouMean(results.didYouMean!),
+    // Pull to search again: availability and prices move while the customer
+    // is looking.
+    return RefreshIndicator(
+      color: AppTheme.accentColor,
+      onRefresh: _rerun,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 28),
+        children: [
+          // Shown above the results rather than instead of them: the customer's
+          // spelling may well have been right, so the results stay and the
+          // correction is only an offer.
+          if (results.didYouMean != null)
+            _didYouMean(results.didYouMean!),
 
-        if (results.categories.isNotEmpty) ...[
-          _sectionTitle('Browse'),
-          _categoryRow(results.categories),
-        ],
+          if (results.categories.isNotEmpty) ...[
+            _sectionTitle('Browse'),
+            _categoryRow(results.categories),
+          ],
 
-        if (results.services.isNotEmpty) ...[
-          _sectionTitle(
-            '${results.services.length} service${results.services.length == 1 ? '' : 's'}',
-          ),
-          ...results.services.map((hit) => _serviceRow(hit)),
-        ],
+          if (results.services.isNotEmpty) ...[
+            _sectionTitle(
+              '${results.services.length} service${results.services.length == 1 ? '' : 's'}',
+            ),
+            ...results.services.map((hit) => _serviceRow(hit)),
+          ],
 
-        if (results.salons.isNotEmpty) ...[
-          _sectionTitle(
-            '${results.salons.length} salon${results.salons.length == 1 ? '' : 's'}',
-          ),
-          ...results.salons.map((hit) => _salonRow(hit)),
+          if (results.salons.isNotEmpty) ...[
+            _sectionTitle(
+              '${results.salons.length} salon${results.salons.length == 1 ? '' : 's'}',
+            ),
+            ...results.salons.map((hit) => _salonRow(hit)),
+          ],
         ],
-      ],
+      ),
     );
   }
+
+  /// The current query, again — for retry and pull-to-refresh.
+  Future<void> _rerun() => _run(_controller.text);
 
   Widget _didYouMean(String suggestion) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
