@@ -3,6 +3,7 @@ import '../legal/terms_acceptance_row.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/city_area_picker.dart';
+import '../widgets/feedback_states.dart';
 import 'main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,6 +12,11 @@ class ProfileScreen extends StatefulWidget {
   final int returnIndex;
 
   const ProfileScreen({Key? key, required this.phone, this.isModal = false, this.returnIndex = 0}) : super(key: key);
+
+  /// Inline messages, for tests: the location problem under the picker, and
+  /// a failed submit above the button.
+  static const Key locationErrorKey = Key('profile-location-error');
+  static const Key submitErrorKey = Key('profile-submit-error');
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -24,6 +30,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   bool _isLoading = false;
   String _selectedGender = 'unspecified';
+
+  /// Each problem is shown next to the thing it is about, not in a SnackBar:
+  /// this is a form, the keyboard is often up, and a SnackBar would vanish
+  /// before someone scrolled to the field it meant.
+  String? _nameError;
+  String? _dobError;
+  String? _locationError;
+  String? _submitError;
 
   /// Not sent to the backend — the app has no consent table, and the email and
   /// address in the policy documents are the record. This is here so the box
@@ -53,6 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (picked != null) {
       setState(() {
+        _dobError = null;
         _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
@@ -60,39 +75,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _completeProfile() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Name is required')),
-      );
-      return;
-    }
-
     final dob = _dobController.text.trim();
-    if (dob.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Date of Birth is required')),
-      );
-      return;
-    }
 
-    if (_cityId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please choose your city')),
-      );
-      return;
-    }
-
-    if (_subAreaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please choose your area')),
-      );
-      return;
-    }
-
-    if (!_acceptedTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please read and accept the terms to continue')),
-      );
+    // Every missing field at once, so fixing one does not uncover the next.
+    setState(() {
+      _nameError = name.isEmpty ? 'Name is required' : null;
+      _dobError = dob.isEmpty ? 'Date of Birth is required' : null;
+      _locationError = _cityId == null
+          ? 'Please choose your city'
+          : (_subAreaId == null ? 'Please choose your area' : null);
+      _submitError = _acceptedTerms ? null : 'Please read and accept the terms to continue';
+    });
+    if (_nameError != null || _dobError != null || _locationError != null || _submitError != null) {
       return;
     }
 
@@ -108,6 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       subAreaId: _subAreaId,
     );
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (success) {
@@ -121,9 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to complete profile. Please try again.')),
-      );
+      setState(() => _submitError = 'We could not create your account. Please try again.');
     }
   }
 
@@ -150,8 +143,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(height: 32),
             TextField(
               controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              autofillHints: const [AutofillHints.name],
+              onChanged: (_) {
+                if (_nameError != null) setState(() => _nameError = null);
+              },
               decoration: InputDecoration(
                 labelText: 'Full Name *',
+                errorText: _nameError,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person),
               ),
@@ -182,9 +181,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() {
                   _cityId = cityId;
                   _subAreaId = subAreaId;
+                  _locationError = null;
                 });
               },
             ),
+            if (_locationError != null) ...[
+              SizedBox(height: 8),
+              InlineStatus(
+                key: ProfileScreen.locationErrorKey,
+                message: _locationError!,
+                kind: StatusKind.warning,
+              ),
+            ],
             SizedBox(height: 16),
             TextField(
               controller: _dobController,
@@ -192,6 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => _selectDate(context),
               decoration: InputDecoration(
                 labelText: 'Date of Birth (YYYY-MM-DD) *',
+                errorText: _dobError,
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.calendar_today),
               ),
@@ -221,10 +230,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: TermsAcceptanceRow(
                 slugs: _consentDocuments,
                 value: _acceptedTerms,
-                onChanged: (v) => setState(() => _acceptedTerms = v),
+                onChanged: (v) => setState(() {
+                  _acceptedTerms = v;
+                  if (v) _submitError = null;
+                }),
               ),
             ),
             SizedBox(height: 24),
+            if (_submitError != null) ...[
+              InlineStatus(
+                key: ProfileScreen.submitErrorKey,
+                message: _submitError!,
+                onRetry: _acceptedTerms && !_isLoading ? _completeProfile : null,
+              ),
+              SizedBox(height: 12),
+            ],
             ElevatedButton(
               onPressed: (_isLoading || !_acceptedTerms) ? null : _completeProfile,
               style: ElevatedButton.styleFrom(
