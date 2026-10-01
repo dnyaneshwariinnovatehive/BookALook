@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
+import '../theme/app_colors.dart';
 
 /// Granularity of the booking grid the API returns. Mirrors
 /// `AvailabilityService::SLOT_MINUTES` on the server.
@@ -322,11 +323,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, color: AppTheme.lightSuccess, size: 80),
+            Icon(Icons.check_circle, color: context.colors.success, size: 80),
             SizedBox(height: 16),
             Text('Booking Confirmed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
-            Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+            Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: context.colors.textSecondary)),
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
@@ -407,7 +408,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             SizedBox(height: 4),
             Text(
               'Staff who cannot perform every service in your cart are shown greyed out.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
             ),
             SizedBox(height: 12),
             _buildProviderList(),
@@ -425,7 +426,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               SizedBox(height: 4),
               Text(
                 'Your services take about $_totalDuration minutes.',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+                style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
               ),
             ],
             SizedBox(height: 16),
@@ -441,7 +442,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _sectionTitle(String text) => Text(
         text,
-        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
       );
 
   Widget _buildProviderList() {
@@ -453,12 +454,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     if (_providersError.isNotEmpty) {
-      return Text(_providersError, style: GoogleFonts.outfit(color: AppTheme.lightDanger));
+      return Text(_providersError, style: GoogleFonts.outfit(color: context.colors.danger));
     }
 
     if (_providers.isEmpty) {
       return Text('This salon has no staff available right now.',
-          style: GoogleFonts.outfit(color: AppTheme.lightTextBody));
+          style: GoogleFonts.outfit(color: context.colors.textSecondary));
     }
 
     return Column(
@@ -500,9 +501,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+              color: isSelected ? context.colors.accentSoft : context.colors.surface,
               border: Border.all(
-                color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
+                color: isSelected ? AppTheme.accentColor : context.colors.border,
                 width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(14),
@@ -521,13 +522,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           style: GoogleFonts.outfit(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.lightTextHeading)),
+                              color: context.colors.textPrimary)),
                       if (subtitle != null && subtitle.isNotEmpty) ...[
                         SizedBox(height: 2),
                         Text(subtitle,
                             style: GoogleFonts.outfit(
                                 fontSize: 13,
-                                color: isEligible ? AppTheme.lightTextBody : AppTheme.lightDanger)),
+                                color: isEligible ? context.colors.textSecondary : context.colors.danger)),
                       ],
                     ],
                   ),
@@ -595,7 +596,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             isCustom
                 ? 'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)}'
                 : 'Pick Today or Tomorrow, or tap the calendar to choose any other date.',
-            style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
+            style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
           ),
         ],
       ),
@@ -614,9 +615,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+          color: isSelected ? context.colors.accentSoft : context.colors.surface,
           border: Border.all(
-            color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
+            color: isSelected ? AppTheme.accentColor : context.colors.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -633,13 +634,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? AppTheme.accentColor : AppTheme.lightTextHeading,
+                      color: isSelected ? AppTheme.accentColor : context.colors.textPrimary,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
                     DateFormat('EEE, MMM d').format(date),
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody),
+                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary),
                   ),
                 ],
               ),
@@ -659,9 +660,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         width: 52,
         padding: EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+          color: isActive ? context.colors.accentSoft : context.colors.surface,
           border: Border.all(
-            color: isActive ? AppTheme.accentColor : AppTheme.lightBorder,
+            color: isActive ? AppTheme.accentColor : context.colors.border,
             width: isActive ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(14),
@@ -703,7 +704,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
               'This staff member is fully booked on this date. Try another date or provider.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightWarning),
+              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.warning),
             ),
           ),
         Wrap(
@@ -719,18 +720,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
             Color background;
             Color textColor;
-            Color borderColor = AppTheme.lightBorder;
+            Color borderColor = context.colors.border;
 
             if (isSelected || isOccupied) {
               background = AppTheme.accentColor;
               textColor = Colors.white;
               borderColor = AppTheme.accentColor;
             } else if (isAvailable) {
-              background = AppTheme.lightSurface;
-              textColor = AppTheme.lightTextHeading;
+              background = context.colors.surface;
+              textColor = context.colors.textPrimary;
             } else {
-              background = AppTheme.lightBorder;
-              textColor = AppTheme.lightTextLight;
+              background = context.colors.border;
+              textColor = context.colors.textTertiary;
             }
 
             return InkWell(
@@ -776,7 +777,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _selectedTime != null && _totalDuration > _kSlotMinutes
               ? 'All the purple blocks together are your $_totalDuration minute appointment, starting at $_selectedTime.'
               : 'Greyed out slots are outside working hours or already booked. Tap one to see why.',
-          style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
+          style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
         ),
       ],
     );
@@ -786,10 +787,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         width: double.infinity,
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft,
+          color: context.colors.accentSoft,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(text, style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+        child: Text(text, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
       );
 
   Widget _buildBottomBar() {
@@ -804,16 +805,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
                 Text('₹${_totalAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading)),
+                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
               ],
             ),
             SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Advance payable now', style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+                Text('Advance payable now', style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
                 Text('₹${_advanceAmount.toStringAsFixed(2)}',
                     style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
               ],
