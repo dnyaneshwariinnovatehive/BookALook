@@ -57,6 +57,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Neutral drop shadow under home-tab cards: black at 4% (light) or 20%
+  /// (dark), baked to the old 8-bit alpha.
+  final Color dropShadow;
+
   /// Idle state of a small toggle icon (e.g. the favourite heart): Colors.grey
   /// shade600 in light mode, shade400 in dark.
   final Color iconIdle;
@@ -141,6 +145,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.dropShadow,
     required this.iconIdle,
     required this.serviceTileBg,
     required this.actionFill,
@@ -182,6 +187,7 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    dropShadow: Color(0x0A000000),
     iconIdle: Color(0xFF757575),
     serviceTileBg: Color(0xFFFAF9FF),
     actionFill: AppTheme.accentColor,
@@ -223,6 +229,7 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    dropShadow: Color(0x33000000),
     iconIdle: Color(0xFFBDBDBD),
     serviceTileBg: AppTheme.darkBg,
     actionFill: AppTheme.darkButtonBg,
@@ -270,6 +277,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? dropShadow,
     Color? iconIdle,
     Color? serviceTileBg,
     Color? actionFill,
@@ -310,6 +318,7 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      dropShadow: dropShadow ?? this.dropShadow,
       iconIdle: iconIdle ?? this.iconIdle,
       serviceTileBg: serviceTileBg ?? this.serviceTileBg,
       actionFill: actionFill ?? this.actionFill,
@@ -356,6 +365,7 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      dropShadow: Color.lerp(dropShadow, other.dropShadow, t)!,
       iconIdle: Color.lerp(iconIdle, other.iconIdle, t)!,
       serviceTileBg: Color.lerp(serviceTileBg, other.serviceTileBg, t)!,
       actionFill: Color.lerp(actionFill, other.actionFill, t)!,

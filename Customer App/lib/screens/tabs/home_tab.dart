@@ -24,6 +24,7 @@ import '../categories_screen.dart';
 import '../../utils/app_haptics.dart';
 import '../search_screen.dart';
 import '../category_salons_screen.dart';
+import '../../theme/app_colors.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -215,7 +216,7 @@ class _HomeTabState extends State<HomeTab> {
               title: Text('Filter Salons',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.lightTextHeading)),
+                      color: context.colors.textPrimary)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,11 +225,11 @@ class _HomeTabState extends State<HomeTab> {
                       style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: AppTheme.lightTextBody)),
+                          color: context.colors.textSecondary)),
                   SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.lightAccentSoft.withOpacity(0.3),
+                      color: context.colors.accentSoft.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     padding: EdgeInsets.all(4),
@@ -257,7 +258,7 @@ class _HomeTabState extends State<HomeTab> {
                                   style: TextStyle(
                                     color: isSelected
                                         ? Colors.white
-                                        : AppTheme.lightTextBody,
+                                        : context.colors.textSecondary,
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.normal,
@@ -281,7 +282,7 @@ class _HomeTabState extends State<HomeTab> {
                     });
                   },
                   child: Text('Reset',
-                      style: TextStyle(color: AppTheme.lightTextBody)),
+                      style: TextStyle(color: context.colors.textSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -408,10 +409,9 @@ class _HomeTabState extends State<HomeTab> {
   // HEADER
   // ---------------------------------------------------------------------------
   Widget _buildHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -430,7 +430,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             child: CircleAvatar(
               radius: 23,
-              backgroundColor: AppTheme.lightAccentSoft,
+              backgroundColor: context.colors.accentSoft,
               child: Icon(Icons.person, color: AppTheme.accentColor, size: 28),
             ),
           ),
@@ -487,11 +487,10 @@ class _HomeTabState extends State<HomeTab> {
   // NOTIFICATION BELL
   // ---------------------------------------------------------------------------
   Widget _buildNotificationBell() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+        context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
 
     return InkWell(
       onTap: widget.isGuest ? null : _openNotifications,
@@ -505,7 +504,7 @@ class _HomeTabState extends State<HomeTab> {
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.accentColor.withOpacity(0.01),
+              color: AppTheme.accentColor.withValues(alpha: 0.01),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -519,7 +518,7 @@ class _HomeTabState extends State<HomeTab> {
                 _unreadNotifications > 0
                     ? Icons.notifications
                     : Icons.notifications_none,
-                color: headingColor.withOpacity(0.75),
+                color: headingColor.withValues(alpha: 0.75),
                 size: 20,
               ),
             ),
@@ -531,7 +530,7 @@ class _HomeTabState extends State<HomeTab> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppTheme.lightDanger,
+                    color: context.colors.danger,
                     shape: BoxShape.circle,
                     border: Border.all(color: surfaceColor, width: 1.5),
                   ),
@@ -564,10 +563,10 @@ class _HomeTabState extends State<HomeTab> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.lightWarningBg,
+            color: context.colors.warningBg,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: AppTheme.lightWarning.withOpacity(0.3)),
+                color: context.colors.warning.withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,11 +576,11 @@ class _HomeTabState extends State<HomeTab> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: AppTheme.lightWarning.withOpacity(0.15),
+                      color: context.colors.warning.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.event_busy,
-                        size: 16, color: AppTheme.lightWarning),
+                    child: Icon(Icons.event_busy,
+                        size: 16, color: context.colors.warning),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -590,7 +589,7 @@ class _HomeTabState extends State<HomeTab> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.lightWarning,
+                        color: context.colors.warning,
                       ),
                     ),
                   ),
@@ -605,7 +604,7 @@ class _HomeTabState extends State<HomeTab> {
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.5,
-                  color: AppTheme.lightTextBody,
+                  color: context.colors.textSecondary,
                 ),
               ),
               const SizedBox(height: 14),
@@ -636,12 +635,10 @@ class _HomeTabState extends State<HomeTab> {
   // SEARCH BAR
   // ---------------------------------------------------------------------------
   Widget _buildSearchBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final bodyColor = context.colors.textSecondary;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+        context.colors.textPrimary;
 
     return Row(
       children: [
@@ -655,7 +652,7 @@ class _HomeTabState extends State<HomeTab> {
               borderRadius: BorderRadius.circular(100),
               boxShadow: [
                 BoxShadow(
-                  color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                  color: context.colors.dropShadow,
                   blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
@@ -664,7 +661,7 @@ class _HomeTabState extends State<HomeTab> {
             child: Row(
               children: [
                 Icon(Icons.search_rounded,
-                    color: bodyColor.withOpacity(0.7), size: 22),
+                    color: bodyColor.withValues(alpha: 0.7), size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -676,7 +673,7 @@ class _HomeTabState extends State<HomeTab> {
                     decoration: InputDecoration(
                       hintText: 'Search salons, services...',
                       hintStyle: TextStyle(
-                        color: bodyColor.withOpacity(0.5),
+                        color: bodyColor.withValues(alpha: 0.5),
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                       ),
@@ -702,7 +699,7 @@ class _HomeTabState extends State<HomeTab> {
           height: 52,
           decoration: BoxDecoration(
             color: _selectedGender != 'All'
-                ? AppTheme.accentColor.withOpacity(0.1)
+                ? AppTheme.accentColor.withValues(alpha: 0.1)
                 : surfaceColor,
             shape: BoxShape.circle,
             border: _selectedGender != 'All'
@@ -710,7 +707,7 @@ class _HomeTabState extends State<HomeTab> {
                 : null,
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                color: context.colors.dropShadow,
                 blurRadius: 15,
                 offset: const Offset(0, 4),
               ),
@@ -740,13 +737,13 @@ class _HomeTabState extends State<HomeTab> {
       return Container(
         height: 185,
         decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft.withOpacity(0.4),
+          color: context.colors.accentSoft.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(22),
         ),
         child: Center(
           child: CircularProgressIndicator(
             strokeWidth: 2.5,
-            color: AppTheme.accentColor.withOpacity(0.5),
+            color: AppTheme.accentColor.withValues(alpha: 0.5),
           ),
         ),
       );
@@ -758,12 +755,11 @@ class _HomeTabState extends State<HomeTab> {
   // CATEGORIES SECTION
   // ---------------------------------------------------------------------------
   Widget _buildCategoriesSection() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
+    final bodyColor = context.colors.textSecondary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,7 +810,7 @@ class _HomeTabState extends State<HomeTab> {
             child: Center(
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: AppTheme.accentColor.withOpacity(0.4),
+                color: AppTheme.accentColor.withValues(alpha: 0.4),
               ),
             ),
           )
@@ -832,7 +828,7 @@ class _HomeTabState extends State<HomeTab> {
               child: Center(
                 child: Text(
                   'No categories available yet.',
-                  style: TextStyle(color: bodyColor.withOpacity(0.7)),
+                  style: TextStyle(color: bodyColor.withValues(alpha: 0.7)),
                 ),
               ),
             ),
@@ -851,8 +847,10 @@ class _HomeTabState extends State<HomeTab> {
   // NEXT APPOINTMENT SECTION
   // ---------------------------------------------------------------------------
   Widget _buildNextAppointmentSection() {
+    // isDark picks the hero card's own decorative palette (gradient stops,
+    // accent tints, the muted label). Those are a one-off illustration, not
+    // theme roles; the shared shadow and glow come from the theme tokens.
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     if (_upcoming.isNotEmpty && !widget.isGuest) {
       return _buildNextAppointmentCard(_upcoming.first);
@@ -882,7 +880,7 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.2) : AppTheme.accentColor.withOpacity(0.05),
+            color: isDark ? Colors.black.withValues(alpha: 0.2) : AppTheme.accentColor.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -900,8 +898,8 @@ class _HomeTabState extends State<HomeTab> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    isDark ? const Color(0xFF7451A4).withOpacity(0.35) : const Color(0xFFCBA4F2).withOpacity(0.45),
-                    isDark ? const Color(0xFF7451A4).withOpacity(0.0) : const Color(0xFFCBA4F2).withOpacity(0.0),
+                    context.colors.cardGlow,
+                    context.colors.cardGlow.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -915,10 +913,10 @@ class _HomeTabState extends State<HomeTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.accentColor.withOpacity(0.1),
+                    color: isDark ? AppTheme.accentColor.withValues(alpha: 0.15) : AppTheme.accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: isDark ? AppTheme.accentColor.withOpacity(0.3) : AppTheme.accentColor.withOpacity(0.2),
+                      color: isDark ? AppTheme.accentColor.withValues(alpha: 0.3) : AppTheme.accentColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -946,7 +944,7 @@ class _HomeTabState extends State<HomeTab> {
                       children: [
                         Icon(Icons.calendar_today_outlined,
                             size: 48,
-                            color: isDark ? AppTheme.accentColor.withOpacity(0.4) : AppTheme.accentColor.withOpacity(0.25)),
+                            color: isDark ? AppTheme.accentColor.withValues(alpha: 0.4) : AppTheme.accentColor.withValues(alpha: 0.25)),
                         const SizedBox(height: 16),
                         Text(
                           widget.isGuest
@@ -978,8 +976,8 @@ class _HomeTabState extends State<HomeTab> {
             .join(', ') ??
         'Services';
 
-    final headingColor = AppTheme.lightTextHeading;
-    final bodyColor = AppTheme.lightTextBody;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -997,10 +995,10 @@ class _HomeTabState extends State<HomeTab> {
           stops: [0.0, 0.5, 1.0],
         ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppTheme.lightPurpleBorder, width: 1.0),
+        border: Border.all(color: context.colors.cardBorder, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.02),
+            color: AppTheme.accentColor.withValues(alpha: 0.02),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -1019,8 +1017,8 @@ class _HomeTabState extends State<HomeTab> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    isDark ? const Color(0xFF7451A4).withOpacity(0.35) : const Color(0xFFCBA4F2).withOpacity(0.45),
-                    isDark ? const Color(0xFF7451A4).withOpacity(0.0) : const Color(0xFFCBA4F2).withOpacity(0.0),
+                    context.colors.cardGlow,
+                    context.colors.cardGlow.withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -1036,10 +1034,10 @@ class _HomeTabState extends State<HomeTab> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.accentColor.withOpacity(0.1),
+                    color: isDark ? AppTheme.accentColor.withValues(alpha: 0.15) : AppTheme.accentColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: isDark ? AppTheme.accentColor.withOpacity(0.3) : AppTheme.accentColor.withOpacity(0.2),
+                      color: isDark ? AppTheme.accentColor.withValues(alpha: 0.3) : AppTheme.accentColor.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -1077,14 +1075,14 @@ class _HomeTabState extends State<HomeTab> {
                   Row(
                     children: [
                       Icon(Icons.location_on_outlined,
-                          size: 14, color: bodyColor.withOpacity(0.6)),
+                          size: 14, color: bodyColor.withValues(alpha: 0.6)),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           address,
                           style: TextStyle(
                             fontSize: 13,
-                            color: bodyColor.withOpacity(0.75),
+                            color: bodyColor.withValues(alpha: 0.75),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1099,14 +1097,14 @@ class _HomeTabState extends State<HomeTab> {
                   children: [
                     Icon(Icons.content_cut,
                         size: 14,
-                        color: AppTheme.accentColor.withOpacity(0.75)),
+                        color: AppTheme.accentColor.withValues(alpha: 0.75)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         services,
                         style: TextStyle(
                           fontSize: 13,
-                          color: bodyColor.withOpacity(0.8),
+                          color: bodyColor.withValues(alpha: 0.8),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1206,12 +1204,11 @@ class _HomeTabState extends State<HomeTab> {
   // BOOK AGAIN SECTION
   // ---------------------------------------------------------------------------
   Widget _buildBookAgainSection() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
+    final bodyColor = context.colors.textSecondary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1282,14 +1279,14 @@ class _HomeTabState extends State<HomeTab> {
             child: Column(
               children: [
                 Icon(Icons.history,
-                    size: 32, color: bodyColor.withOpacity(0.3)),
+                    size: 32, color: bodyColor.withValues(alpha: 0.3)),
                 const SizedBox(height: 10),
                 Text(
                   widget.isGuest
                       ? 'Sign in to view your past bookings'
                       : 'You have no previous bookings to show here.',
                   style: TextStyle(
-                      color: bodyColor.withOpacity(0.6), fontSize: 14),
+                      color: bodyColor.withValues(alpha: 0.6), fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1307,12 +1304,11 @@ class _HomeTabState extends State<HomeTab> {
         'Services';
     final salonId = booking['salon_id'];
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
+    final bodyColor = context.colors.textSecondary;
 
     return GestureDetector(
       onTap: () {
@@ -1337,7 +1333,7 @@ class _HomeTabState extends State<HomeTab> {
         border: Border.all(color: borderColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.02),
+            color: AppTheme.accentColor.withValues(alpha: 0.02),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -1363,9 +1359,9 @@ class _HomeTabState extends State<HomeTab> {
                         'https://via.placeholder.com/250x110',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: AppTheme.lightAccentSoft,
+                      color: context.colors.accentSoft,
                       child: Icon(Icons.image,
-                          color: AppTheme.accentColor.withOpacity(0.5)),
+                          color: AppTheme.accentColor.withValues(alpha: 0.5)),
                     ),
                   ),
                 ),
@@ -1418,7 +1414,7 @@ class _HomeTabState extends State<HomeTab> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppTheme.accentColor.withOpacity(0.1),
+                        color: AppTheme.accentColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
