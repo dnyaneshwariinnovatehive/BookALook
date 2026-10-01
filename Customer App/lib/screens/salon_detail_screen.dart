@@ -13,6 +13,9 @@ import '../widgets/initials_avatar.dart';
 import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 /// Which reviews the inline Ratings & reviews preview is showing.
 enum _ReviewFilter { topRated, five, fourPlus, threePlus }
@@ -205,7 +208,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = describeError(e, fallback: 'We could not load this salon.');
         _isLoading = false;
       });
     }
@@ -242,12 +245,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       AppHaptics.lightImpact();
       setState(() {
         _isFavourited = isFavourited;
+        _actionError = null;
       });
-      _showMessage(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites');
+      _toast(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites');
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showError(describeError(e, fallback: 'Could not update your favourites.'));
     } finally {
       if (mounted) {
         setState(() => _isTogglingFavourite = false);
@@ -274,12 +278,15 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       if (!mounted) return;
 
       AppHaptics.lightImpact();
-      setState(() => _cart = cart);
+      setState(() {
+        _cart = cart;
+        _actionError = null;
+      });
 
       // The moment after adding is when a package nudge is worth anything, so
       // it is shown here rather than waiting for the cart screen.
       if (!_showOffersFor(cart, label)) {
-        _showMessage('$label added to cart');
+        _toast('$label added to cart');
       }
     } on CartConflictException catch (e) {
       if (!mounted) return;
@@ -317,7 +324,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showError(describeError(e, fallback: 'Could not add that to your cart.'));
     }
   }
 
@@ -428,20 +435,60 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         cart = await _cartService.addItem(widget.salonId, id);
       }
     } catch (e) {
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      AppHaptics.error();
+      _showError(describeError(e, fallback: 'Could not add the whole package to your cart.'));
       await _loadCart();
       return;
     }
 
     if (!mounted) return;
-    setState(() => _cart = cart);
+    setState(() {
+      _cart = cart;
+      _actionError = null;
+    });
     _showOffersFor(cart, 'Package');
   }
 
-  void _showMessage(String text) {
+  /// Confirmations only ("added to cart", favourites): passing news.
+  void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text), duration: Duration(seconds: 2)),
+    );
+  }
+
+  /// A failed favourite or add-to-cart, docked above the cart bar until
+  /// dismissed or the next success. Part of the layout rather than a
+  /// SnackBar, so it neither vanishes unread nor covers the cart bar.
+  String? _actionError;
+
+  void _showError(String text) {
+    if (!mounted) return;
+    setState(() => _actionError = text);
+  }
+
+  /// The docked area: the action error, if any, above the cart bar.
+  Widget? _buildBottomArea() {
+    final bar = _buildStickyBar();
+    final error = _actionError;
+    if (error == null) return bar;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SafeArea(
+          top: false,
+          bottom: bar == null,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, bar == null ? 12 : 8),
+            child: InlineStatus(
+              message: error,
+              onDismiss: () => setState(() => _actionError = null),
+            ),
+          ),
+        ),
+        if (bar != null) bar,
+      ],
     );
   }
 
@@ -458,13 +505,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final bgColor = context.colors.surfaceMuted;
-    final textBody = context.colors.textSecondary;
-    final textLight = context.colors.textTertiary;
-
     if (_isLoading) {
       return Scaffold(
         backgroundColor: bgColor,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
+        body: const SalonDetailSkeleton(),
       );
     }
 
@@ -472,23 +516,22 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       return Scaffold(
         backgroundColor: bgColor,
         appBar: AppBar(backgroundColor: bgColor, elevation: 0),
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.storefront_outlined, size: 64, color: textLight),
-                SizedBox(height: 12),
-                Text(_error.isNotEmpty ? _error : 'Salon not found',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(fontSize: 16, color: textBody)),
-                SizedBox(height: 16),
-                ElevatedButton(onPressed: _loadSalonDetails, child: Text('Try again')),
-              ],
-            ),
-          ),
-        ),
+        body: _error.isNotEmpty
+            ? ErrorState(
+                title: 'Could not load this salon',
+                message: _error,
+                onRetry: () {
+                  setState(() => _isLoading = true);
+                  _loadSalonDetails();
+                },
+              )
+            : EmptyState(
+                icon: Icons.storefront_outlined,
+                title: 'Salon not found',
+                message: 'It may have closed or stopped taking bookings.',
+                actionLabel: 'Go back',
+                onAction: () => Navigator.maybePop(context),
+              ),
       );
     }
 
@@ -516,7 +559,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: _buildStickyBar(),
+      bottomNavigationBar: _buildBottomArea(),
     );
   }
 
