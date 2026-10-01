@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
+import '../theme/app_colors.dart';
 
 /// Moves an existing booking to a new provider / date / slot. Same availability
 /// rules as checkout — the booking's own slot does not block itself.
@@ -169,13 +170,12 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   /// customer is shown the old slot, the new slot and what happens to their
   /// money before it happens.
   Future<bool> _confirmReschedule() async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final textHeading = context.colors.textPrimary;
+    final textBody = context.colors.textSecondary;
+    final textLight = context.colors.textTertiary;
     final accent = AppTheme.accentColor;
-    final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
-    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final softBg = context.colors.accentSoft;
+    final surface = context.colors.surface;
 
     final fromDate = _currentDate == null
         ? '—'
@@ -202,7 +202,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _slotRow('From', '$fromDate · ${_prettyTime(_currentTime)}',
-                isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, textBody, textLight, !sameSlot),
+                context.colors.textTertiary, textBody, textLight, !sameSlot),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Icon(Icons.arrow_downward, size: 16, color: textLight),
@@ -360,7 +360,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                     padding: EdgeInsets.all(32),
                     child: Text(_error,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontSize: 16)),
+                        style: GoogleFonts.outfit(color: context.colors.danger, fontSize: 16)),
                   ),
                 )
               : _buildBody(),
@@ -380,17 +380,17 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               margin: EdgeInsets.only(bottom: 20),
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.lightInfoBg,
+                color: context.colors.infoBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppTheme.lightInfo),
+                  Icon(Icons.info_outline, color: context.colors.info),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'The salon is closed on your original date. This reschedule is free — your advance carries over.',
-                      style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightInfo),
+                      style: GoogleFonts.outfit(fontSize: 13, color: context.colors.info),
                     ),
                   ),
                 ],
@@ -402,7 +402,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               padding: EdgeInsets.only(bottom: 20),
               child: Text(
                 'Currently booked for ${DateFormat('EEE, MMM d').format(DateTime.parse(_currentDate!))} at $_currentTime.',
-                style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody),
+                style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary),
               ),
             ),
 
@@ -420,7 +420,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           if (_totalDuration > 0) ...[
             SizedBox(height: 4),
             Text('Your services take about $_totalDuration minutes.',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody)),
+                style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
           ],
           SizedBox(height: 16),
           _buildSlots(),
@@ -432,13 +432,13 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   Widget _sectionTitle(String text) => Text(
         text,
-        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading),
+        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
       );
 
   Widget _buildProviderList() {
     if (_providers.isEmpty) {
       return Text('This salon has no staff available right now.',
-          style: GoogleFonts.outfit(color: AppTheme.lightTextBody));
+          style: GoogleFonts.outfit(color: context.colors.textSecondary));
     }
 
     return Column(
@@ -490,9 +490,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.lightAccentSoft : AppTheme.lightSurface,
+              color: isSelected ? context.colors.accentSoft : context.colors.surface,
               border: Border.all(
-                color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder,
+                color: isSelected ? AppTheme.accentColor : context.colors.border,
                 width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(14),
@@ -509,13 +509,13 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                     children: [
                       Text(name,
                           style: GoogleFonts.outfit(
-                              fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading)),
+                              fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
                       if (subtitle != null && subtitle.isNotEmpty) ...[
                         SizedBox(height: 2),
                         Text(subtitle,
                             style: GoogleFonts.outfit(
                                 fontSize: 13,
-                                color: isEligible ? AppTheme.lightTextBody : AppTheme.lightDanger)),
+                                color: isEligible ? context.colors.textSecondary : context.colors.danger)),
                       ],
                     ],
                   ),
@@ -544,8 +544,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           decoration: BoxDecoration(
-            color: AppTheme.lightSurface,
-            border: Border.all(color: AppTheme.lightBorder),
+            color: context.colors.surface,
+            border: Border.all(color: context.colors.border),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -588,7 +588,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
               'This staff member is fully booked on this date. Try another date or provider.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightWarning),
+              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.warning),
             ),
           ),
         Wrap(
@@ -616,9 +616,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   color: isSelected
                       ? AppTheme.accentColor
                       : isAvailable
-                          ? AppTheme.lightSurface
-                          : AppTheme.lightBorder,
-                  border: Border.all(color: isSelected ? AppTheme.accentColor : AppTheme.lightBorder),
+                          ? context.colors.surface
+                          : context.colors.border,
+                  border: Border.all(color: isSelected ? AppTheme.accentColor : context.colors.border),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -630,8 +630,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       color: isSelected
                           ? Colors.white
                           : isAvailable
-                              ? AppTheme.lightTextHeading
-                              : AppTheme.lightTextLight,
+                              ? context.colors.textPrimary
+                              : context.colors.textTertiary,
                       decoration: isAvailable ? TextDecoration.none : TextDecoration.lineThrough,
                     ),
                   ),
@@ -643,7 +643,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         SizedBox(height: 12),
         Text(
           'Greyed out slots are outside working hours or already booked. Tap one to see why.',
-          style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
+          style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
         ),
       ],
     );
@@ -653,10 +653,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         width: double.infinity,
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft,
+          color: context.colors.accentSoft,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(text, style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+        child: Text(text, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
       );
 
   Widget _buildBottomBar() {
