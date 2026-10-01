@@ -1,0 +1,14 @@
+# Live credentials. backend/env is a copy of the server's environment file and
+# holds real Cloudinary, AISensy and database secrets.
+backend/env
+backend/.env
+backend/.env.backup
+backend/.env.production
+
+# Dependencies and build output
+backend/vendor/
+backend/node_modules/
+website/node_modules/
+website/.next/
+**/build/
+**/.dart_tool/
