@@ -6,6 +6,8 @@ import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
 
 /// Moves an existing booking to a new provider / date / slot. Same availability
 /// rules as checkout — the booking's own slot does not block itself.
@@ -89,6 +91,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
     setState(() {
       _isLoadingSlots = true;
+      _slotsError = null;
       _selectedTime = null;
       _slots = [];
       _isClosed = false;
@@ -113,8 +116,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       setState(() {
         _slots = [];
         _isLoadingSlots = false;
+        _slotsError = describeError(e, fallback: 'Could not load the time slots.');
       });
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -298,7 +301,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
     if (!await _confirmReschedule()) return;
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveError = null;
+    });
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
@@ -313,18 +319,38 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       setState(() => _isSaving = false);
       Navigator.pop(context, true);
       AppHaptics.mediumImpact();
-      _showMessage(result['message'] ?? 'Appointment rescheduled.');
+      _toast(result['message'] ?? 'Appointment rescheduled.');
     } catch (e) {
       AppHaptics.error();
-      setState(() => _isSaving = false);
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      setState(() {
+        _isSaving = false;
+        _saveError = describeError(e, fallback: 'Could not move your booking. Please try again.');
+      });
       _fetchSlots(); // the slot may have been taken meanwhile
     }
   }
 
-  void _showMessage(String text) {
+  /// Inline feedback, next to what it is about: a failed save above the
+  /// Confirm button, a failed slot load in the time section, and a hint
+  /// under the section whose greyed-out item was tapped.
+  String? _saveError;
+  String? _slotsError;
+  String? _providerHint;
+  String? _dateHint;
+  String? _slotHint;
+
+  /// Confirmations only: shown as the screen closes, so vanishing is fine.
+  void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _hint(String? text, VoidCallback onDismiss) {
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: InlineStatus(message: text, kind: StatusKind.info, onDismiss: onDismiss),
+    );
   }
 
   String _reasonLabel(String? reason) {
@@ -409,11 +435,13 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           _sectionTitle('1. Service Provider'),
           SizedBox(height: 12),
           _buildProviderList(),
+          _hint(_providerHint, () => setState(() => _providerHint = null)),
 
           SizedBox(height: 32),
           _sectionTitle('2. New Date'),
           SizedBox(height: 12),
           _buildDateField(),
+          _hint(_dateHint, () => setState(() => _dateHint = null)),
 
           SizedBox(height: 32),
           _sectionTitle('3. New Time'),
@@ -424,6 +452,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           ],
           SizedBox(height: 16),
           _buildSlots(),
+          _hint(_slotHint, () => setState(() => _slotHint = null)),
           SizedBox(height: 24),
         ],
       ),
@@ -477,13 +506,16 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                 AppHaptics.selectionClick();
                 setState(() {
                   _selectedProviderKey = key;
+                  _providerHint = null;
+                  _dateHint = null;
+                  _slotHint = null;
                   _selectedTime = null;
                 });
                 _fetchSlots();
               }
             : () {
                 AppHaptics.error();
-                _showMessage('$name cannot perform every service in this booking.');
+                setState(() => _providerHint = '$name cannot perform every service in this booking.');
               },
         child: Opacity(
           opacity: isEligible ? 1.0 : 0.5,
@@ -539,7 +571,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
             ? _pickDate
             : () {
                 AppHaptics.error();
-                _showMessage('Choose a service provider first.');
+                setState(() => _dateHint = 'Choose a service provider first.');
               },
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
@@ -575,6 +607,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         child: CircularProgressIndicator(color: AppTheme.accentColor),
       ));
     }
+    if (_slotsError != null) {
+      return InlineStatus(message: _slotsError!, onRetry: _fetchSlots);
+    }
     if (_isClosed) return _hintBox(_closedReason ?? 'No slots available for this date.');
     if (_slots.isEmpty) return _hintBox('No slots available for this date.');
 
@@ -603,11 +638,14 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               onTap: isAvailable
                   ? () {
                       AppHaptics.selectionClick();
-                      setState(() => _selectedTime = slot['time']);
+                      setState(() {
+                        _selectedTime = slot['time'];
+                        _slotHint = null;
+                      });
                     }
                   : () {
                       AppHaptics.error();
-                      _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                      setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
                     },
               child: Container(
                 width: (MediaQuery.of(context).size.width - 64) / 3,
@@ -665,20 +703,32 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.all(20),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: canSave ? () {
-              AppHaptics.lightImpact();
-              _confirm();
-            } : null,
-            style: Theme.of(context).elevatedButtonTheme.style?.copyWith(
-              padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_saveError != null) ...[
+              InlineStatus(
+                message: _saveError!,
+                onDismiss: () => setState(() => _saveError = null),
+              ),
+              SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: canSave ? () {
+                  AppHaptics.lightImpact();
+                  _confirm();
+                } : null,
+                style: Theme.of(context).elevatedButtonTheme.style?.copyWith(
+                  padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
+                ),
+                child: _isSaving
+                    ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text('Confirm New Slot', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
             ),
-            child: _isSaving
-                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text('Confirm New Slot', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
+          ],
         ),
       ),
     );
