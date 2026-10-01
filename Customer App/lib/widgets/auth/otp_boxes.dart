@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
 import '../../utils/auth_motion.dart';
+import '../../theme/app_colors.dart';
 
 /// OTP entry drawn as six boxes, driven by a single real [TextField].
 ///
@@ -121,9 +122,9 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
     final accent = theme.colorScheme.primary;
     final error = theme.colorScheme.error;
     final borderIdle =
-        isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+        context.colors.border;
     final label =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+        context.colors.textPrimary;
     final surface = theme.colorScheme.surface;
 
     final text = widget.controller.text;
@@ -215,9 +216,7 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: hasDigit
-                                ? (isDark
-                                    ? AppTheme.darkAccentSoft
-                                    : AppTheme.lightAccentSoft)
+                                ? (context.colors.accentSoft)
                                 : surface,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
@@ -337,12 +336,9 @@ class _SuccessTickState extends State<SuccessTick>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     // Semantic success, not the accent: the tick means "verified", and a purple
     // ring would read as another step rather than a confirmed state.
-    final success = theme.brightness == Brightness.dark
-        ? AppTheme.darkSuccess
-        : AppTheme.lightSuccess;
+    final success = context.colors.success;
     return ScaleTransition(
       scale: CurvedAnimation(parent: _c, curve: Curves.elasticOut),
       child: FadeTransition(
@@ -373,10 +369,8 @@ class _SuccessTickState extends State<SuccessTick>
             Icons.check_rounded,
             size: widget.size * 0.55,
             // Dark mode's success green is light enough that white on top of it
-            // loses contrast; the light-mode one needs white to stay readable.
-            color: theme.brightness == Brightness.dark
-                ? AppTheme.darkBg
-                : Colors.white,
+            // loses contrast; onSuccess picks the readable one per theme.
+            color: context.colors.onSuccess,
           ),
         ),
       ),
@@ -485,9 +479,7 @@ class ResendCountdown extends StatelessWidget {
               'Resend in 0:${s.toString().padLeft(2, '0')}',
               key: ValueKey(s),
               style: TextStyle(
-                color: theme.brightness == Brightness.dark
-                    ? AppTheme.darkTextBody
-                    : AppTheme.lightTextBody,
+                color: context.colors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -515,14 +507,12 @@ class AuthShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Stack(
       children: [
         Positioned.fill(
           child: ColoredBox(
-            color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+            color: context.colors.surfaceMuted,
           ),
         ),
         Positioned.fill(child: AmbientBackdrop(color: accent)),
