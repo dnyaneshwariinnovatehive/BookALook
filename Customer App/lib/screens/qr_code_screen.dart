@@ -107,6 +107,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     );
   }
 
+  // Both cards below are always white, in either theme: a QR code scans
+  // reliably only as dark modules on a white field. Everything drawn on them
+  // therefore uses the light palette explicitly — the theme's dark-mode text
+  // colours would be pale on white.
   Widget _buildError() => Container(
         margin: const EdgeInsets.all(20),
         padding: const EdgeInsets.all(24),
@@ -117,12 +121,12 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.qr_code_2, size: 56, color: context.colors.textTertiary),
+            Icon(Icons.qr_code_2, size: 56, color: AppColors.light.textTertiary),
             const SizedBox(height: 12),
             Text(
               _error,
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: context.colors.danger, fontSize: 15),
+              style: GoogleFonts.outfit(color: AppColors.light.danger, fontSize: 15),
             ),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _generateQr, child: const Text('Try again')),
@@ -151,12 +155,12 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: context.colors.textPrimary)),
+                  color: AppColors.light.textPrimary)),
           const SizedBox(height: 8),
           Text(
             'Show this to the staff member to start your appointment.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: context.colors.textSecondary),
+            style: GoogleFonts.outfit(color: AppColors.light.textSecondary),
           ),
           const SizedBox(height: 28),
 
@@ -169,18 +173,18 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                   data: _qrToken ?? '',
                   version: QrVersions.auto,
                   size: 220.0,
-                  foregroundColor: context.colors.textPrimary,
+                  foregroundColor: AppColors.light.textPrimary,
                 ),
               ),
               if (_isExpired)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.timer_off_outlined, size: 40, color: context.colors.danger),
+                    Icon(Icons.timer_off_outlined, size: 40, color: AppColors.light.danger),
                     const SizedBox(height: 8),
                     Text('This code has expired',
                         style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold, color: context.colors.danger)),
+                            fontWeight: FontWeight.bold, color: AppColors.light.danger)),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _generateQr,
@@ -196,7 +200,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.schedule, size: 16, color: context.colors.textTertiary),
+                Icon(Icons.schedule, size: 16, color: AppColors.light.textTertiary),
                 const SizedBox(width: 6),
                 Text(
                   'Valid for ${_formatRemaining(remaining)}',
@@ -204,8 +208,8 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: remaining.inMinutes < 5
-                          ? context.colors.warning
-                          : context.colors.textTertiary),
+                          ? AppColors.light.warning
+                          : AppColors.light.textTertiary),
                 ),
               ],
             ),
