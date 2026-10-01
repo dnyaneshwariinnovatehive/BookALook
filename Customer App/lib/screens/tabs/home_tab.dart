@@ -25,6 +25,7 @@ import '../../utils/app_haptics.dart';
 import '../search_screen.dart';
 import '../category_salons_screen.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/skeleton.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -197,6 +198,7 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _fetchCategories() async {
     final categoryService = CategoryService();
     final categories = await categoryService.fetchCategories();
+    if (!mounted) return;
     setState(() {
       _categories = categories;
       _isLoadingCategories = false;
@@ -355,12 +357,25 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   // ---------------------------------------------------------------------------
+  /// Everything the home tab shows, fetched again together.
+  Future<void> _refreshAll() => Future.wait([
+        _fetchBanners(),
+        _fetchCategories(),
+        _fetchAlerts(),
+      ]);
+
   // BUILD
   // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: SingleChildScrollView(
+      // Pull to refresh the whole page: offers, categories and the next
+      // appointment all change while the app sits open.
+      child: RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _refreshAll,
+        child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -401,6 +416,7 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 140), // Bottom navigation padding
           ],
         ),
+      ),
       ),
     );
   }
@@ -734,18 +750,10 @@ class _HomeTabState extends State<HomeTab> {
   // ---------------------------------------------------------------------------
   Widget _buildBannerSection() {
     if (_isLoadingBanners) {
-      return Container(
-        height: 185,
-        decoration: BoxDecoration(
-          color: context.colors.accentSoft.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: AppTheme.accentColor.withValues(alpha: 0.5),
-          ),
-        ),
+      // The carousel's own footprint, so nothing below jumps when it lands.
+      return const Skeleton(
+        semanticLabel: 'Loading offers',
+        child: SkeletonBox(height: 185, radius: 22),
       );
     }
     return BannerCarousel(banners: _banners);
@@ -805,12 +813,20 @@ class _HomeTabState extends State<HomeTab> {
         const SizedBox(height: 12),
         // Category chips
         if (_isLoadingCategories)
-          SizedBox(
-            height: 58,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppTheme.accentColor.withValues(alpha: 0.4),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Skeleton(
+              semanticLabel: 'Loading categories',
+              child: Row(
+                children: [
+                  Expanded(child: SkeletonBox(height: 58, radius: 16)),
+                  SizedBox(width: 10),
+                  Expanded(child: SkeletonBox(height: 58, radius: 16)),
+                  SizedBox(width: 10),
+                  Expanded(child: SkeletonBox(height: 58, radius: 16)),
+                  SizedBox(width: 10),
+                  Expanded(child: SkeletonBox(height: 58, radius: 16)),
+                ],
               ),
             ),
           )
