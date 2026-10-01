@@ -129,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         'Salon Marketplace Platform',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.8),
                           letterSpacing: 1.2,
                         ),
                       ),
