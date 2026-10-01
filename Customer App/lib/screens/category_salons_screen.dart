@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../widgets/discovery_salon_card.dart';
+import '../theme/app_colors.dart';
 
 /// Salons that offer a service in one category, in the city the customer picked.
 ///
@@ -145,24 +146,23 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+      backgroundColor: context.colors.surfaceMuted,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(isDark),
-            Expanded(child: _buildPanel(isDark)),
+            _buildHeader(),
+            Expanded(child: _buildPanel()),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader() {
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+        context.colors.textPrimary;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 20, 14),
@@ -184,16 +184,16 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
               ),
             ),
           ),
-          _buildCityChip(isDark),
+          _buildCityChip(),
         ],
       ),
     );
   }
 
-  Widget _buildCityChip(bool isDark) {
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+  Widget _buildCityChip() {
+    final borderColor = context.colors.border;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+        context.colors.textPrimary;
     final cityName = LocationService.instance.city?.name ?? 'Select city';
 
     return GestureDetector(
@@ -201,7 +201,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkSurface : Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: borderColor, width: 1.2),
         ),
@@ -230,7 +230,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
             Icon(
               Icons.arrow_drop_down,
               size: 18,
-              color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+              color: context.colors.textSecondary,
             ),
           ],
         ),
@@ -240,9 +240,9 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
   /// The rectangle: one bordered, rounded surface holding the whole answer for
   /// this category in this city.
-  Widget _buildPanel(bool isDark) {
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+  Widget _buildPanel() {
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -254,7 +254,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
         boxShadow: [
           BoxShadow(
             color:
-                Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -262,17 +262,17 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       ),
       child: Column(
         children: [
-          _buildPanelHeader(isDark),
-          Expanded(child: _buildPanelBody(isDark)),
+          _buildPanelHeader(),
+          Expanded(child: _buildPanelBody()),
         ],
       ),
     );
   }
 
-  Widget _buildPanelHeader(bool isDark) {
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+  Widget _buildPanelHeader() {
+    final borderColor = context.colors.border;
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+        context.colors.textPrimary;
     final cityName = LocationService.instance.city?.name;
 
     return Container(
@@ -308,9 +308,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.darkAccentSoft
-                    : AppTheme.lightAccentSoft,
+                color: context.colors.accentSoft,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -327,7 +325,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     );
   }
 
-  Widget _buildPanelBody(bool isDark) {
+  Widget _buildPanelBody() {
     if (_isLoading) {
       return Center(
         child: SizedBox(
@@ -343,7 +341,6 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
     if (_loadFailed) {
       return _buildMessage(
-        isDark,
         icon: Icons.wifi_off_rounded,
         title: 'Could not load salons',
         detail: 'Check your connection and try again.',
@@ -354,7 +351,6 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
     if (_salons.isEmpty) {
       return _buildMessage(
-        isDark,
         icon: Icons.search_off_rounded,
         title: 'No salons found',
         detail: _isCombo
@@ -391,8 +387,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     );
   }
 
-  Widget _buildMessage(
-    bool isDark, {
+  Widget _buildMessage({
     required IconData icon,
     required String title,
     required String detail,
@@ -400,8 +395,8 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     required Future<void> Function() onAction,
   }) {
     final headingColor =
-        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     return Center(
       child: Padding(
@@ -412,15 +407,13 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.darkAccentSoft
-                    : AppTheme.lightAccentSoft,
+                color: context.colors.accentSoft,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 38,
-                color: AppTheme.accentColor.withOpacity(0.6),
+                color: AppTheme.accentColor.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
@@ -444,7 +437,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
               onPressed: () => onAction(),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(
-                  color: isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6),
+                  color: context.colors.listBorder,
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
