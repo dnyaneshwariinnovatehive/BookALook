@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/guest_restricted_view.dart';
 import '../../services/salon_service.dart';
 import '../salon_detail_screen.dart';
+import '../../theme/app_colors.dart';
 
 class FavouritesTab extends StatefulWidget {
   final bool isGuest;
@@ -75,7 +76,7 @@ class FavouritesTabState extends State<FavouritesTab> {
               'Failed to remove favourite: $e',
               style: GoogleFonts.outfit(),
             ),
-            backgroundColor: AppTheme.lightDanger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -105,21 +106,18 @@ class FavouritesTabState extends State<FavouritesTab> {
       return Center(
         child: Text(
           _error,
-          style: GoogleFonts.outfit(color: AppTheme.lightDanger),
+          style: GoogleFonts.outfit(color: context.colors.danger),
         ),
       );
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFFBF9FF),
+      backgroundColor: context.colors.pageTint,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,7 +166,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                   BoxShadow(
                                     color: Theme.of(
                                       context,
-                                    ).colorScheme.onSurface.withOpacity(0.02),
+                                    ).colorScheme.onSurface.withValues(alpha: 0.02),
                                     blurRadius: 12,
                                     offset: Offset(0, 4),
                                   ),
@@ -177,9 +175,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                               child: Icon(
                                 Icons.favorite_border,
                                 size: 64,
-                                color: isDark
-                                    ? AppTheme.darkTextLight
-                                    : AppTheme.lightTextLight,
+                                color: context.colors.textTertiary,
                               ),
                             ),
                             SizedBox(height: 24),
@@ -257,7 +253,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                     BoxShadow(
                                       color: Theme.of(
                                         context,
-                                      ).colorScheme.onSurface.withOpacity(0.03),
+                                      ).colorScheme.onSurface.withValues(alpha: 0.03),
                                       blurRadius: 10,
                                       offset: Offset(0, 4),
                                     ),
@@ -278,9 +274,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                             fit: BoxFit.cover,
                                             errorBuilder: (_, __, ___) =>
                                                 Container(
-                                                  color: isDark
-                                                      ? AppTheme.darkAccentSoft
-                                                      : const Color(0xFFF3F0FF),
+                                                  color: context.colors.imagePlaceholder,
                                                   child: Icon(
                                                     Icons.storefront,
                                                     color: AppTheme.accentColor,
@@ -300,7 +294,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                                   color: Theme.of(context)
                                                       .colorScheme
                                                       .onSurface
-                                                      .withOpacity(0.7),
+                                                      .withValues(alpha: 0.7),
                                                   borderRadius:
                                                       BorderRadius.circular(6),
                                                 ),
@@ -324,16 +318,14 @@ class FavouritesTabState extends State<FavouritesTab> {
                                               child: Container(
                                                 padding: EdgeInsets.all(6),
                                                 decoration: BoxDecoration(
-                                                  color: isDark
-                                                      ? AppTheme.darkSurface
-                                                      : Colors.white,
+                                                  color: context.colors.surface,
                                                   shape: BoxShape.circle,
                                                   boxShadow: [
                                                     BoxShadow(
                                                       color: Theme.of(context)
                                                           .colorScheme
                                                           .onSurface
-                                                          .withOpacity(0.1),
+                                                          .withValues(alpha: 0.1),
                                                       blurRadius: 4,
                                                       offset: Offset(0, 2),
                                                     ),
@@ -342,7 +334,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                                 child: Icon(
                                                   Icons.favorite,
                                                   size: 16,
-                                                  color: AppTheme.lightDanger,
+                                                  color: context.colors.danger,
                                                 ),
                                               ),
                                             ),
