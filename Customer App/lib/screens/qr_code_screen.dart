@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../theme/app_colors.dart';
 
 /// The code the salon scans to start the appointment.
 ///
@@ -116,12 +117,12 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.qr_code_2, size: 56, color: AppTheme.lightTextLight),
+            Icon(Icons.qr_code_2, size: 56, color: context.colors.textTertiary),
             const SizedBox(height: 12),
             Text(
               _error,
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontSize: 15),
+              style: GoogleFonts.outfit(color: context.colors.danger, fontSize: 15),
             ),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _generateQr, child: const Text('Try again')),
@@ -140,7 +141,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       child: Column(
@@ -150,12 +151,12 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.lightTextHeading)),
+                  color: context.colors.textPrimary)),
           const SizedBox(height: 8),
           Text(
             'Show this to the staff member to start your appointment.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+            style: GoogleFonts.outfit(color: context.colors.textSecondary),
           ),
           const SizedBox(height: 28),
 
@@ -168,18 +169,18 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                   data: _qrToken ?? '',
                   version: QrVersions.auto,
                   size: 220.0,
-                  foregroundColor: AppTheme.lightTextHeading,
+                  foregroundColor: context.colors.textPrimary,
                 ),
               ),
               if (_isExpired)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.timer_off_outlined, size: 40, color: AppTheme.lightDanger),
+                    Icon(Icons.timer_off_outlined, size: 40, color: context.colors.danger),
                     const SizedBox(height: 8),
                     Text('This code has expired',
                         style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold, color: AppTheme.lightDanger)),
+                            fontWeight: FontWeight.bold, color: context.colors.danger)),
                     const SizedBox(height: 12),
                     ElevatedButton(
                       onPressed: _generateQr,
@@ -195,7 +196,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.schedule, size: 16, color: AppTheme.lightTextLight),
+                Icon(Icons.schedule, size: 16, color: context.colors.textTertiary),
                 const SizedBox(width: 6),
                 Text(
                   'Valid for ${_formatRemaining(remaining)}',
@@ -203,8 +204,8 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: remaining.inMinutes < 5
-                          ? AppTheme.lightWarning
-                          : AppTheme.lightTextLight),
+                          ? context.colors.warning
+                          : context.colors.textTertiary),
                 ),
               ],
             ),
