@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// The star colour, in one place, so nothing drifts.
 const kStarColour = Color(0xFFF5A623);
@@ -88,16 +89,16 @@ class RatingSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_count == 0) return _buildEmpty();
+    if (_count == 0) return _buildEmpty(context);
 
     final breakdown = _breakdown;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.lightBorder),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,14 +112,14 @@ class RatingSummaryCard extends StatelessWidget {
                         fontSize: 38,
                         height: 1.05,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.lightTextHeading)),
+                        color: context.colors.textPrimary)),
                 const SizedBox(height: 4),
                 StarRow(rating: _average, size: 15),
                 const SizedBox(height: 6),
                 Text('$_count ${_count == 1 ? 'rating' : 'ratings'}',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
-                        fontSize: 11.5, color: AppTheme.lightTextBody)),
+                        fontSize: 11.5, color: context.colors.textSecondary)),
               ],
             ),
           ),
@@ -127,7 +128,7 @@ class RatingSummaryCard extends StatelessWidget {
             child: Column(
               children: [
                 for (var star = 5; star >= 1; star--)
-                  _buildBar(star, breakdown[star] ?? (count: 0, percent: 0)),
+                  _buildBar(context, star, breakdown[star] ?? (count: 0, percent: 0)),
               ],
             ),
           ),
@@ -136,7 +137,7 @@ class RatingSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBar(int star, ({int count, int percent}) row) {
+  Widget _buildBar(BuildContext context, int star, ({int count, int percent}) row) {
     final active = activeStar == star;
     final tappable = onStarTapped != null && row.count > 0;
 
@@ -153,7 +154,7 @@ class RatingSummaryCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                    color: active ? AppTheme.accentColor : AppTheme.lightTextBody,
+                    color: active ? AppTheme.accentColor : context.colors.textSecondary,
                   )),
             ),
             const Icon(Icons.star_rounded, size: 11, color: kStarColour),
@@ -164,7 +165,7 @@ class RatingSummaryCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: row.percent / 100,
                   minHeight: 7,
-                  backgroundColor: AppTheme.lightBg,
+                  backgroundColor: context.colors.surfaceMuted,
                   valueColor: AlwaysStoppedAnimation(
                       active ? AppTheme.accentColor : kStarColour),
                 ),
@@ -177,7 +178,7 @@ class RatingSummaryCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 11.5,
                     fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                    color: active ? AppTheme.accentColor : AppTheme.lightTextBody,
+                    color: active ? AppTheme.accentColor : context.colors.textSecondary,
                   )),
             ),
           ],
@@ -186,20 +187,20 @@ class RatingSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty() => Container(
+  Widget _buildEmpty(BuildContext context) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.lightBorder),
+          border: Border.all(color: context.colors.border),
         ),
         child: Row(
           children: [
-            const Icon(Icons.rate_review_outlined, color: AppTheme.lightTextLight),
+            Icon(Icons.rate_review_outlined, color: context.colors.textTertiary),
             const SizedBox(width: 12),
             Expanded(
               child: Text('No ratings yet — be the first to rate this salon.',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody)),
+                  style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
             ),
           ],
         ),
@@ -222,9 +223,9 @@ class ReviewTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.lightBorder),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,8 +235,8 @@ class ReviewTile extends StatelessWidget {
               Container(
                 width: 30,
                 height: 30,
-                decoration: const BoxDecoration(
-                  color: AppTheme.lightAccentSoft,
+                decoration: BoxDecoration(
+                  color: context.colors.accentSoft,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -254,10 +255,10 @@ class ReviewTile extends StatelessWidget {
                     style: GoogleFonts.outfit(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.lightTextHeading)),
+                        color: context.colors.textPrimary)),
               ),
               Text(review['age_label']?.toString() ?? '',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextLight)),
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: context.colors.textTertiary)),
             ],
           ),
           const SizedBox(height: 9),
@@ -266,7 +267,7 @@ class ReviewTile extends StatelessWidget {
             const SizedBox(height: 9),
             Text(comment,
                 style: GoogleFonts.outfit(
-                    fontSize: 13.5, height: 1.45, color: AppTheme.lightTextBody)),
+                    fontSize: 13.5, height: 1.45, color: context.colors.textSecondary)),
           ],
         ],
       ),
