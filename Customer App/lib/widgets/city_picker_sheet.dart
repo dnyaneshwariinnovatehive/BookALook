@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import 'feedback_states.dart';
 
 /// Where the customer chooses which city they are shopping in.
 ///
@@ -31,6 +32,10 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
   List<ServiceCity> _all = [];
   bool _loading = true;
   bool _locating = false;
+
+  /// Why "use my location" did not work (permission refused, services off),
+  /// shown under the button. A SnackBar would appear behind this sheet.
+  String? _locationProblem;
   String _error = '';
 
   @override
@@ -81,7 +86,10 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
   /// Location is a shortcut, never a requirement — a refusal leaves the list
   /// below fully usable rather than blocking the screen.
   Future<void> _useMyLocation() async {
-    setState(() => _locating = true);
+    setState(() {
+      _locating = true;
+      _locationProblem = null;
+    });
 
     final problem = await LocationService.instance.useCurrentLocation();
 
@@ -89,7 +97,7 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
     setState(() => _locating = false);
 
     if (problem != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+      setState(() => _locationProblem = problem);
       return;
     }
 
@@ -171,6 +179,15 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
                 ),
               ),
             ),
+            if (_locationProblem != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: InlineStatus(
+                  message: _locationProblem!,
+                  kind: StatusKind.warning,
+                  onDismiss: () => setState(() => _locationProblem = null),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
               child: TextField(
