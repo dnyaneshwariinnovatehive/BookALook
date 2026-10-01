@@ -57,6 +57,15 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Dashes of a dashed divider (grey shade400-ish / shade700).
+  final Color dashLine;
+
+  /// Outline of a destructive action tile.
+  final Color dangerOutline;
+
+  /// Fill of an enabled square action tile on a booking card.
+  final Color actionTile;
+
   /// Unselected icon in a small toggle group (the explore list/map switch).
   final Color iconInactive;
 
@@ -161,6 +170,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.dashLine,
+    required this.dangerOutline,
+    required this.actionTile,
     required this.iconInactive,
     required this.chipSelected,
     required this.disabledLabel,
@@ -208,6 +220,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    dashLine: Color(0xFFBDBDBD),
+    dangerOutline: Color(0xFFFBD5D8),
+    actionTile: AppTheme.lightAccentSoft,
     iconInactive: Color(0xFF9E98AE),
     chipSelected: AppTheme.lightAccentSoft,
     disabledLabel: Color(0xFF757575),
@@ -255,6 +270,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    dashLine: Color(0xFF616161),
+    dangerOutline: AppTheme.darkDangerBg,
+    actionTile: AppTheme.darkSurface,
     iconInactive: AppTheme.darkTextLight,
     chipSelected: Color(0x269C54F2),
     disabledLabel: Color(0xFFBDBDBD),
@@ -308,6 +326,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? dashLine,
+    Color? dangerOutline,
+    Color? actionTile,
     Color? iconInactive,
     Color? chipSelected,
     Color? disabledLabel,
@@ -354,6 +375,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      dashLine: dashLine ?? this.dashLine,
+      dangerOutline: dangerOutline ?? this.dangerOutline,
+      actionTile: actionTile ?? this.actionTile,
       iconInactive: iconInactive ?? this.iconInactive,
       chipSelected: chipSelected ?? this.chipSelected,
       disabledLabel: disabledLabel ?? this.disabledLabel,
@@ -406,6 +430,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      dashLine: Color.lerp(dashLine, other.dashLine, t)!,
+      dangerOutline: Color.lerp(dangerOutline, other.dangerOutline, t)!,
+      actionTile: Color.lerp(actionTile, other.actionTile, t)!,
       iconInactive: Color.lerp(iconInactive, other.iconInactive, t)!,
       chipSelected: Color.lerp(chipSelected, other.chipSelected, t)!,
       disabledLabel: Color.lerp(disabledLabel, other.disabledLabel, t)!,

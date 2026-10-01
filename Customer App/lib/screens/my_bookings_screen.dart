@@ -11,6 +11,7 @@ import '../widgets/review_prompt_sheet.dart';
 import 'appointment_details_screen.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
+import '../theme/app_colors.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -89,27 +90,27 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           children: [
             Text(
               '${booking['salon']['name']} · ${DateFormat('EEE, MMM d').format(DateTime.parse(booking['appointment_date']))} at ${booking['start_time']}',
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
             ),
             SizedBox(height: 16),
             if (advance > 0) ...[
               _dialogRow(
                 'Advance paid',
                 '₹${advance.toStringAsFixed(2)}',
-                AppTheme.lightTextHeading,
+                context.colors.textPrimary,
               ),
               SizedBox(height: 6),
               _dialogRow(
                 'Refundable',
                 '₹${refundable.toStringAsFixed(2)}',
-                AppTheme.lightSuccess,
+                context.colors.success,
               ),
               if (forfeited > 0) ...[
                 SizedBox(height: 6),
                 _dialogRow(
                   'Non-refundable',
                   '₹${forfeited.toStringAsFixed(2)}',
-                  AppTheme.lightDanger,
+                  context.colors.danger,
                 ),
               ],
               SizedBox(height: 12),
@@ -120,13 +121,13 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     : 'Refunds follow each service\'s own refund policy.',
                 style: GoogleFonts.outfit(
                   fontSize: 12,
-                  color: AppTheme.lightTextLight,
+                  color: context.colors.textTertiary,
                 ),
               ),
             ] else
               Text(
                 'Nothing has been paid for this booking yet.',
-                style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+                style: GoogleFonts.outfit(color: context.colors.textSecondary),
               ),
           ],
         ),
@@ -135,7 +136,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(
               'Keep booking',
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
             ),
           ),
           TextButton(
@@ -143,7 +144,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             child: Text(
               'Cancel booking',
               style: GoogleFonts.outfit(
-                color: AppTheme.lightDanger,
+                color: context.colors.danger,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -263,7 +264,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
   /// currently disabled.
   Widget _buildActionGrid(
     Map<String, dynamic> booking,
-    bool isDark, {
+    {
     required bool canCancel,
     required bool canReschedule,
     required bool freeReschedule,
@@ -281,7 +282,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
               child: _buildSquareAction(
                 icon: Icons.phone_outlined,
                 label: 'Call',
-                isDark: isDark,
                 enabled: hasPhone,
                 onTap: () => _callSalon(booking),
               ),
@@ -291,7 +291,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
               child: _buildSquareAction(
                 icon: Icons.directions_outlined,
                 label: 'Directions',
-                isDark: isDark,
                 enabled: canNavigate,
                 onTap: () => _openDirections(booking),
               ),
@@ -305,7 +304,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
               child: _buildSquareAction(
                 icon: Icons.edit_calendar_outlined,
                 label: freeReschedule ? 'Reschedule Free' : 'Reschedule',
-                isDark: isDark,
                 enabled: canReschedule,
                 onTap: () => _openReschedule(booking),
               ),
@@ -315,7 +313,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
               child: _buildSquareAction(
                 icon: Icons.close_rounded,
                 label: 'Cancel',
-                isDark: isDark,
                 enabled: canCancel,
                 danger: true,
                 onTap: () => _confirmCancel(booking),
@@ -334,26 +331,23 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
   Widget _buildSquareAction({
     required IconData icon,
     required String label,
-    required bool isDark,
     required bool enabled,
     required VoidCallback onTap,
     bool danger = false,
   }) {
-    final borderColor = isDark
-        ? AppTheme.darkBorder
-        : AppTheme.lightPurpleBorder;
+    final borderColor = context.colors.cardBorder;
 
     final Color background;
     final Color foreground;
 
     if (!enabled) {
-      background = isDark ? Colors.grey.shade800 : Colors.grey.shade100;
-      foreground = isDark ? Colors.grey.shade500 : Colors.grey;
+      background = context.colors.disabledFillSoft;
+      foreground = Colors.grey.shade500;
     } else if (danger) {
-      background = isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA);
-      foreground = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
+      background = context.colors.dangerSoft;
+      foreground = context.colors.danger;
     } else {
-      background = isDark ? AppTheme.darkSurface : AppTheme.lightAccentSoft;
+      background = context.colors.actionTile;
       foreground = AppTheme.accentColor;
     }
 
@@ -378,7 +372,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: enabled && danger
-                    ? (isDark ? AppTheme.darkDangerBg : const Color(0xFFFBD5D8))
+                    ? context.colors.dangerOutline
                     : borderColor,
                 width: 1.3,
               ),
@@ -416,7 +410,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     children: [
       Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody),
+        style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary),
       ),
       Text(
         value,
@@ -438,15 +432,12 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
+    final headingColor = context.colors.textPrimary;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
+      backgroundColor: context.colors.pageNeutral,
       appBar: AppBar(
-        backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
+        backgroundColor: context.colors.pageNeutral,
         elevation: 0,
         title: Text(
           'My Bookings',
@@ -469,21 +460,19 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppTheme.darkAccentSoft
-                        : const Color(0xFFF3F0FF),
+                    color: context.colors.imagePlaceholder,
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: TabBar(
                     controller: _tabController,
                     indicator: BoxDecoration(
-                      color: isDark ? AppTheme.darkSurface : Colors.white,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.05),
+                          ).colorScheme.onSurface.withValues(alpha: 0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -491,10 +480,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     ),
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
-                    labelColor: isDark
-                        ? AppTheme.accentColor
-                        : AppTheme.accentColor,
-                    unselectedLabelColor: AppTheme.accentColor.withOpacity(0.6),
+                    labelColor: AppTheme.accentColor,
+                    unselectedLabelColor: AppTheme.accentColor.withValues(alpha: 0.6),
                     labelStyle: GoogleFonts.outfit(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -525,12 +512,12 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline, size: 56, color: AppTheme.lightTextLight),
+          Icon(Icons.error_outline, size: 56, color: context.colors.textTertiary),
           SizedBox(height: 12),
           Text(
             _error,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+            style: GoogleFonts.outfit(color: context.colors.textSecondary),
           ),
           SizedBox(height: 16),
           ElevatedButton(onPressed: _loadBookings, child: Text('Try again')),
@@ -548,7 +535,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           physics: AlwaysScrollableScrollPhysics(),
           children: [
             SizedBox(height: 140),
-            Icon(Icons.event_busy, size: 72, color: AppTheme.lightTextBody),
+            Icon(Icons.event_busy, size: 72, color: context.colors.textSecondary),
             SizedBox(height: 16),
             Center(
               child: Text(
@@ -556,7 +543,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     ? 'No upcoming appointments.'
                     : 'No past appointments.',
                 style: GoogleFonts.outfit(
-                  color: AppTheme.lightTextBody,
+                  color: context.colors.textSecondary,
                   fontSize: 16,
                 ),
               ),
@@ -581,7 +568,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 'Bookings can be cancelled up to $_cancelCutoffMinutes minutes or rescheduled up to $_rescheduleCutoffMinutes minutes before the start time.',
                 style: GoogleFonts.outfit(
                   fontSize: 12,
-                  color: AppTheme.lightTextBody,
+                  color: context.colors.textSecondary,
                 ),
               ),
             );
@@ -633,14 +620,10 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     final formattedDate = '$datePrefix${DateFormat('d MMM').format(date)}';
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final borderColor = isDark
-        ? AppTheme.darkBorder
-        : AppTheme.lightPurpleBorder;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final borderColor = context.colors.cardBorder;
+    final surfaceColor = context.colors.surface;
     final bgGradient = isDark
         ? null
         : const LinearGradient(
@@ -673,12 +656,12 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           gradient: bgGradient,
           borderRadius: BorderRadius.circular(26),
           border: Border.all(
-            color: needsReschedule ? AppTheme.lightWarning : borderColor,
+            color: needsReschedule ? context.colors.warning : borderColor,
             width: needsReschedule ? 2 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.accentColor.withOpacity(0.02),
+              color: AppTheme.accentColor.withValues(alpha: 0.02),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -698,8 +681,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        const Color(0xFFCBA4F2).withOpacity(0.45),
-                        const Color(0xFFCBA4F2).withOpacity(0.0),
+                        const Color(0xFFCBA4F2).withValues(alpha: 0.45),
+                        const Color(0xFFCBA4F2).withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -726,7 +709,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                           errorBuilder: (_, __, ___) => Container(
                             width: 48,
                             height: 48,
-                            color: const Color(0xFFF3F0FF),
+                            color: context.colors.imagePlaceholder,
                             child: Icon(
                               Icons.storefront,
                               color: AppTheme.accentColor,
@@ -854,9 +837,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? AppTheme.darkBg
-                            : const Color(0xFFF9F9FC),
+                        color: context.colors.pageNeutral,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -915,15 +896,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                             : null,
                         style: TextButton.styleFrom(
                           backgroundColor: canReschedule
-                              ? (isDark
-                                    ? AppTheme.darkButtonBg
-                                    : AppTheme.accentColor)
-                              : (isDark
-                                    ? Colors.grey.shade800
-                                    : Colors.grey.shade200),
+                              ? context.colors.actionFill
+                              : context.colors.disabledFill,
                           foregroundColor: canReschedule
                               ? Colors.white
-                              : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              : Colors.grey.shade500,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
@@ -946,15 +923,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                             : null,
                         style: TextButton.styleFrom(
                           backgroundColor: canCancel
-                              ? (isDark
-                                    ? AppTheme.darkDangerBg
-                                    : const Color(0xFFFEE8EA))
-                              : (isDark
-                                    ? Colors.grey.shade800
-                                    : Colors.grey.shade100),
+                              ? context.colors.dangerSoft
+                              : context.colors.disabledFillSoft,
                           foregroundColor: canCancel
-                              ? AppTheme.lightDanger
-                              : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              ? context.colors.danger
+                              : Colors.grey.shade500,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
@@ -972,7 +945,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     const SizedBox(height: 14),
                     _buildActionGrid(
                       booking,
-                      isDark,
                       canCancel: canCancel,
                       canReschedule: canReschedule,
                       freeReschedule: freeReschedule,
@@ -987,7 +959,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                   if (!isUpcoming)
                     ..._buildReviewSection(
                       booking,
-                      isDark,
                       headingColor,
                       bodyColor,
                     ),
@@ -1002,7 +973,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
 
   List<Widget> _buildReviewSection(
     Map<String, dynamic> booking,
-    bool isDark,
     Color headingColor,
     Color bodyColor,
   ) {
@@ -1014,14 +984,14 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       return [
         SizedBox(height: 14),
         Divider(
-          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          color: context.colors.border,
           height: 1,
         ),
         SizedBox(height: 12),
         _buildGivenRating(
           review,
           bodyColor,
-          isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+          context.colors.textTertiary,
         ),
       ];
     }
@@ -1036,9 +1006,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             icon: Icon(Icons.star_rounded, size: 19),
             label: Text('Rate your visit'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark
-                  ? AppTheme.darkButtonBg
-                  : AppTheme.accentColor,
+              backgroundColor: context.colors.actionFill,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1053,7 +1021,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           blockedReason,
           style: GoogleFonts.outfit(
             fontSize: 12,
-            color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+            color: context.colors.textTertiary,
           ),
         ),
       ];
@@ -1130,7 +1098,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     children: [
       Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody),
+        style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
       ),
       Text(
         '₹${amount.toStringAsFixed(2)}',
@@ -1153,7 +1121,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.2 : 0.1),
+        color: color.withValues(alpha: isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -1171,19 +1139,19 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     switch (status) {
       case 'scheduled':
       case 'confirmed':
-        return AppTheme.lightInfo;
+        return context.colors.info;
       case 'pending_payment':
       case 'in_progress':
       case 'rescheduled':
       case 'awaiting_reschedule':
-        return AppTheme.lightWarning;
+        return context.colors.warning;
       case 'completed':
-        return AppTheme.lightSuccess;
+        return context.colors.success;
       case 'cancelled':
       case 'no_show':
-        return AppTheme.lightDanger;
+        return context.colors.danger;
       default:
-        return AppTheme.lightTextBody;
+        return context.colors.textSecondary;
     }
   }
 }
@@ -1204,9 +1172,7 @@ class _DashedDivider extends StatelessWidget {
               height: dashHeight,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey.shade700
-                      : const Color(0xFFBDBDBD),
+                  color: context.colors.dashLine,
                 ),
               ),
             );
