@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../screens/salon_detail_screen.dart';
 import '../theme/app_theme.dart';
 import 'category_service_strip.dart';
+import '../theme/app_colors.dart';
 
 class DiscoverySalonCard extends StatelessWidget {
   final Map<String, dynamic> salon;
@@ -31,13 +32,10 @@ class DiscoverySalonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
     final isServiceable = salon['is_serviceable'] != false;
     final count = (salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
@@ -80,7 +78,7 @@ class DiscoverySalonCard extends StatelessWidget {
                 BoxShadow(
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.04),
+                  ).colorScheme.onSurface.withValues(alpha: 0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -105,9 +103,7 @@ class DiscoverySalonCard extends StatelessWidget {
                               salon['cover_photo_url'] ?? '',
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
-                                color: isDark
-                                    ? AppTheme.darkAccentSoft
-                                    : const Color(0xFFF3F0FF),
+                                color: context.colors.imagePlaceholder,
                                 child: const Icon(
                                   Icons.storefront,
                                   color: AppTheme.accentColor,
@@ -124,11 +120,8 @@ class DiscoverySalonCard extends StatelessWidget {
                                   child: Container(
                                     padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
-                                      color: isDark
-                                          ? AppTheme.darkSurface.withOpacity(
-                                              0.85,
-                                            )
-                                          : Colors.white.withOpacity(0.85),
+                                      color: context.colors.surface
+                                          .withValues(alpha: 0.85),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -137,10 +130,8 @@ class DiscoverySalonCard extends StatelessWidget {
                                           : Icons.favorite_border,
                                       size: 16,
                                       color: isFavourited
-                                          ? AppTheme.lightDanger
-                                          : (isDark
-                                                ? Colors.grey.shade400
-                                                : Colors.grey.shade600),
+                                          ? context.colors.danger
+                                          : context.colors.iconIdle,
                                     ),
                                   ),
                                 ),
@@ -226,9 +217,7 @@ class DiscoverySalonCard extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTheme.darkWarningBg
-                                    : AppTheme.lightWarningBg,
+                                color: context.colors.warningBg,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -239,9 +228,7 @@ class DiscoverySalonCard extends StatelessWidget {
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? AppTheme.darkWarning
-                                      : AppTheme.lightWarning,
+                                  color: context.colors.warning,
                                 ),
                               ),
                             )
