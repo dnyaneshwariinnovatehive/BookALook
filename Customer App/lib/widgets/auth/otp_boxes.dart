@@ -140,9 +140,18 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
           children: [
             // The editable field sits on top, invisible, so tapping anywhere in
             // the row opens the keyboard and native autofill still applies.
+            //
+            // alwaysIncludeSemantics keeps it in the semantics tree: a plain
+            // zero Opacity drops its child from TalkBack and VoiceOver, which
+            // left screen-reader users no way to enter the code at all. The
+            // boxes below are excluded instead, so the code is read once, as a
+            // labelled field, rather than as six unlabelled digits.
             Positioned.fill(
-              child: Opacity(
+              child: Semantics(
+                label: 'One-time code, ${widget.length} digits',
+                child: Opacity(
                 opacity: 0,
+                alwaysIncludeSemantics: true,
                 child: TextField(
                   controller: widget.controller,
                   focusNode: _focus,
@@ -174,8 +183,10 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+              ),
             ),
-            Row(
+            ExcludeSemantics(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(widget.length, (i) {
                 final hasDigit = i < filled;
@@ -298,6 +309,7 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                   },
                 );
               }),
+            ),
             ),
           ],
         );

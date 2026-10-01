@@ -111,7 +111,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
 
     Widget tab(String label, bool selected, VoidCallback onTap) {
       return Expanded(
-        child: GestureDetector(
+        // Announced as one of a pair with its selected state, so a screen
+        // reader says which mode is active instead of two bare labels.
+        child: Semantics(
+          button: true,
+          selected: selected,
+          inMutuallyExclusiveGroup: true,
+          child: GestureDetector(
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
           child: SizedBox(
@@ -129,6 +135,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
               ),
             ),
           ),
+        ),
         ),
       );
     }
