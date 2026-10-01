@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:customer_app/screens/phone_screen.dart';
+import 'package:customer_app/services/http_client.dart' as api;
 import 'package:customer_app/theme/app_theme.dart';
+import 'package:customer_app/utils/auth_errors.dart';
 import 'package:customer_app/utils/auth_motion.dart';
 import 'package:customer_app/widgets/auth/otp_boxes.dart';
 
@@ -148,9 +154,69 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // The original screen used a SnackBar here; the call path still does, so
-    // this asserts we did not break it rather than claiming it is inline.
-    expect(find.byType(SnackBar), findsOneWidget);
+    // Inline under the field now, where it cannot hide behind the keyboard.
+    // This used to assert the SnackBar existed, to pin the old behaviour.
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byKey(PhoneScreen.statusKey), findsOneWidget);
+    expect(find.text('Please enter a valid phone number (min 10 digits)'), findsOneWidget);
+
+    // Editing clears it rather than leaving a stale complaint on screen.
+    await tester.enterText(find.byType(TextField), '1234');
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(PhoneScreen.statusKey), findsNothing);
+  });
+
+  testWidgets('a failed send is explained in words, never as a raw response',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+    api.debugSetClient(MockClient((_) async => http.Response(
+          '{"message":"The given data was invalid.","errors":{"phone":["The phone field must be 10 digits."]}}',
+          422,
+        )));
+
+    await tester.pumpWidget(_wrap(const PhoneScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    await tester.enterText(find.byKey(PhoneScreen.phoneFieldKey), '9876543210');
+    await tester.tap(find.text('Continue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.textContaining('HTTP Error'), findsNothing);
+    expect(find.textContaining('422'), findsNothing);
+    expect(find.text('The phone field must be 10 digits.'), findsOneWidget);
+  });
+
+  group('friendlyAuthError', () {
+    test('a dropped connection becomes a connection message', () {
+      expect(friendlyAuthError('Network Exception: SocketException: Failed host lookup'),
+          'Could not reach BookALook. Check your connection and try again.');
+    });
+
+    test('a server error page is never shown', () {
+      final text = friendlyAuthError('HTTP Error 502: <html><body>Bad Gateway</body></html>');
+      expect(text, isNot(contains('<html')));
+      expect(text, isNot(contains('502')));
+    });
+
+    test('a 4xx uses the message the server wrote for people', () {
+      expect(friendlyAuthError('HTTP Error 400: {"message":"User is blocked."}'),
+          'User is blocked.');
+    });
+
+    test('rate limiting says to wait', () {
+      expect(friendlyAuthError('HTTP Error 429: {}'), contains('wait'));
+    });
+
+    test('anything unrecognised falls back to a generic sentence', () {
+      expect(friendlyAuthError('HTTP Error 404: not json'),
+          'We could not send a code right now. Please try again.');
+      expect(friendlyAuthError(null),
+          'We could not send a code right now. Please try again.');
+    });
   });
 
   testWidgets('Continue animates a sheen rather than swapping in a spinner',

@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'otp_screen.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
+import '../utils/auth_errors.dart';
 import '../utils/auth_motion.dart';
 import '../widgets/auth/otp_boxes.dart';
 
@@ -22,6 +23,10 @@ class PhoneScreen extends StatefulWidget {
   static const Key modeRailKey = Key('auth-mode-rail');
   static const Key modeKnobKey = Key('auth-mode-knob');
 
+  /// The phone number field and the inline status under it, for tests.
+  static const Key phoneFieldKey = Key('auth-phone-field');
+  static const Key statusKey = Key('auth-phone-status');
+
   const PhoneScreen({Key? key, this.isModal = false, this.returnIndex = 0}) : super(key: key);
 
   @override
@@ -33,16 +38,30 @@ class _PhoneScreenState extends State<PhoneScreen> {
   final _authService = AuthService();
   bool _isLoading = false;
 
+  /// Inline, under the field, rather than a SnackBar: the keyboard is up while
+  /// someone types a number, and a SnackBar would sit behind it or over it.
+  String? _error;
+  int _shakeToken = 0;
+
+  void _fail(String message) {
+    AppHaptics.error();
+    setState(() {
+      _error = message;
+      _shakeToken++;
+    });
+  }
+
   void _sendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid phone number (min 10 digits)')),
-      );
+      _fail('Please enter a valid phone number (min 10 digits)');
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     final result = await _authService.sendOtp(phone);
     
@@ -66,10 +85,8 @@ class _PhoneScreenState extends State<PhoneScreen> {
         Navigator.pop(context, true);
       }
     } else {
-      AppHaptics.error();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $result')),
-      );
+      // Never the raw result: it can carry a status code and a response body.
+      _fail(friendlyAuthError(result));
     }
   }
 
@@ -225,25 +242,49 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 16),
-                    decoration: InputDecoration(
-                      hintText: 'Enter your mobile no.',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.dividerColor),
+                  Shake(
+                    token: _shakeToken,
+                    child: TextField(
+                      key: PhoneScreen.phoneFieldKey,
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      autofillHints: const [AutofillHints.telephoneNumber],
+                      style: const TextStyle(fontSize: 16),
+                      onChanged: (_) {
+                        if (_error != null) setState(() => _error = null);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Enter your mobile no.',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: theme.dividerColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: theme.dividerColor),
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surface,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.dividerColor),
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surface,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     ),
+                  ),
+                  AnimatedSize(
+                    duration: AuthMotion.base,
+                    curve: AuthMotion.curveInOut,
+                    alignment: Alignment.topCenter,
+                    child: _error == null
+                        ? const SizedBox(width: double.infinity)
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: StatusNote(
+                              key: PhoneScreen.statusKey,
+                              text: _error!,
+                              tone: theme.colorScheme.error,
+                              icon: Icons.error_outline_rounded,
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 22),
 
