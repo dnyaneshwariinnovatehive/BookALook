@@ -11,6 +11,7 @@ import 'tabs/bookings_tab.dart';
 import '../utils/app_haptics.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
+import '../theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
   final bool isGuest;
@@ -203,14 +204,16 @@ class _MainScreenState extends State<MainScreen> {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(30),
-            border: Theme.of(context).brightness == Brightness.dark
-                ? Border.all(color: AppTheme.darkBorder, width: 1)
+            // Only drawn when the theme has an outline to show: a border adds
+            // padding even when transparent, which would shift the bar 1px.
+            border: context.colors.raisedOutline.a > 0
+                ? Border.all(color: context.colors.raisedOutline, width: 1)
                 : null,
             boxShadow: [
               BoxShadow(
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withOpacity(0.05),
+                ).colorScheme.onSurface.withValues(alpha: 0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 5),
               ),
@@ -224,10 +227,7 @@ class _MainScreenState extends State<MainScreen> {
               type: BottomNavigationBarType.fixed,
               backgroundColor: Theme.of(context).colorScheme.surface,
               selectedItemColor: AppTheme.accentColor,
-              unselectedItemColor:
-                  Theme.of(context).brightness == Brightness.dark
-                  ? AppTheme.darkTextBody
-                  : const Color(0xFF9E98AE), // muted gray-purple
+              unselectedItemColor: context.colors.navIdle,
               selectedLabelStyle: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 11,

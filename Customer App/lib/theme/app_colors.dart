@@ -57,6 +57,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Outline for floating surfaces. Light mode lifts them with a shadow alone;
+  /// a shadow does not read on a dark page, so dark mode adds a hairline.
+  final Color raisedOutline;
+
+  /// Unselected icons and labels in the bottom navigation pill.
+  final Color navIdle;
+
   const AppColors({
     required this.surface,
     required this.surfaceMuted,
@@ -77,6 +84,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.raisedOutline,
+    required this.navIdle,
   });
 
   static const AppColors light = AppColors(
@@ -99,6 +108,8 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    raisedOutline: Color(0x00000000),
+    navIdle: Color(0xFF9E98AE),
   );
 
   static const AppColors dark = AppColors(
@@ -121,6 +132,8 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    raisedOutline: AppTheme.darkBorder,
+    navIdle: AppTheme.darkTextBody,
   );
 
   @override
@@ -144,6 +157,8 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? raisedOutline,
+    Color? navIdle,
   }) {
     return AppColors(
       surface: surface ?? this.surface,
@@ -165,6 +180,8 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      raisedOutline: raisedOutline ?? this.raisedOutline,
+      navIdle: navIdle ?? this.navIdle,
     );
   }
 
@@ -192,6 +209,8 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      raisedOutline: Color.lerp(raisedOutline, other.raisedOutline, t)!,
+      navIdle: Color.lerp(navIdle, other.navIdle, t)!,
     );
   }
 }
