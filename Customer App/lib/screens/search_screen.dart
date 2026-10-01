@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../theme/app_theme.dart';
 import 'salon_detail_screen.dart';
 import 'category_salons_screen.dart';
+import '../theme/app_colors.dart';
 
 /// Search, answered the way a customer asks it.
 ///
@@ -138,23 +139,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppTheme.darkBg : AppTheme.lightBg;
+    final bg = context.colors.surfaceMuted;
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         titleSpacing: 0,
-        title: _searchField(isDark),
+        title: _searchField(),
       ),
       body: widget.categoryId == null
-          ? _body(isDark)
+          ? _body()
           : Column(
               children: [
-                _scopeStrip(isDark),
-                Expanded(child: _body(isDark)),
+                _scopeStrip(),
+                Expanded(child: _body()),
               ],
             ),
     );
@@ -162,18 +162,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Says the search is narrowed, because a customer who typed "facial" while
   /// inside Hair deserves to know why nothing came back rather than guessing.
-  Widget _scopeStrip(bool isDark) {
+  Widget _scopeStrip() {
     final label = widget.categoryLabel;
 
     if (label == null || label.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final muted = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final muted = context.colors.textTertiary;
 
     return Container(
       width: double.infinity,
-      color: isDark ? AppTheme.darkSurface : Colors.white,
+      color: context.colors.surface,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
@@ -190,20 +190,20 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _searchField(bool isDark) {
+  Widget _searchField() {
     return Container(
       height: 44,
       margin: const EdgeInsets.only(right: 16),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+        color: context.colors.surfaceMuted,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(Icons.search,
               size: 20,
-              color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
+              color: context.colors.textTertiary),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
@@ -218,7 +218,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 hintText: 'Search haircut, facial, salon…',
                 hintStyle: TextStyle(
                   fontSize: 14.5,
-                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                  color: context.colors.textTertiary,
                 ),
               ),
               style: const TextStyle(fontSize: 14.5),
@@ -233,16 +233,16 @@ class _SearchScreenState extends State<SearchScreen> {
               },
               child: Icon(Icons.close,
                   size: 18,
-                  color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
+                  color: context.colors.textTertiary),
             ),
         ],
       ),
     );
   }
 
-  Widget _body(bool isDark) {
+  Widget _body() {
     if (_error != null) {
-      return _centred(Icons.wifi_off_rounded, 'Something went wrong', _error!, isDark);
+      return _centred(Icons.wifi_off_rounded, 'Something went wrong', _error!);
     }
 
     if (_controller.text.trim().length < 2) {
@@ -250,7 +250,6 @@ class _SearchScreenState extends State<SearchScreen> {
         Icons.search,
         'What are you looking for?',
         'Search for a service like "haircut" or "facial", or type a salon name.',
-        isDark,
       );
     }
 
@@ -266,7 +265,6 @@ class _SearchScreenState extends State<SearchScreen> {
         Icons.search_off,
         'Nothing found for "${_controller.text.trim()}"',
         'Try a shorter word, or check the spelling.',
-        isDark,
       );
     }
 
@@ -277,33 +275,31 @@ class _SearchScreenState extends State<SearchScreen> {
         // spelling may well have been right, so the results stay and the
         // correction is only an offer.
         if (results.didYouMean != null)
-          _didYouMean(results.didYouMean!, isDark),
+          _didYouMean(results.didYouMean!),
 
         if (results.categories.isNotEmpty) ...[
-          _sectionTitle('Browse', isDark),
-          _categoryRow(results.categories, isDark),
+          _sectionTitle('Browse'),
+          _categoryRow(results.categories),
         ],
 
         if (results.services.isNotEmpty) ...[
           _sectionTitle(
             '${results.services.length} service${results.services.length == 1 ? '' : 's'}',
-            isDark,
           ),
-          ...results.services.map((hit) => _serviceRow(hit, isDark)),
+          ...results.services.map((hit) => _serviceRow(hit)),
         ],
 
         if (results.salons.isNotEmpty) ...[
           _sectionTitle(
             '${results.salons.length} salon${results.salons.length == 1 ? '' : 's'}',
-            isDark,
           ),
-          ...results.salons.map((hit) => _salonRow(hit, isDark)),
+          ...results.salons.map((hit) => _salonRow(hit)),
         ],
       ],
     );
   }
 
-  Widget _didYouMean(String suggestion, bool isDark) => Padding(
+  Widget _didYouMean(String suggestion) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: GestureDetector(
           onTap: () {
@@ -313,7 +309,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+              color: context.colors.accentSoft,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -326,9 +322,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     text: TextSpan(
                       style: TextStyle(
                         fontSize: 13.5,
-                        color: isDark
-                            ? AppTheme.darkTextBody
-                            : AppTheme.lightTextBody,
+                        color: context.colors.textSecondary,
                       ),
                       children: [
                         const TextSpan(text: 'Did you mean '),
@@ -350,7 +344,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       );
 
-  Widget _sectionTitle(String text, bool isDark) => Padding(
+  Widget _sectionTitle(String text) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
         child: Text(
           text,
@@ -358,12 +352,12 @@ class _SearchScreenState extends State<SearchScreen> {
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.3,
-            color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+            color: context.colors.textSecondary,
           ),
         ),
       );
 
-  Widget _categoryRow(List<CategoryHit> categories, bool isDark) => SizedBox(
+  Widget _categoryRow(List<CategoryHit> categories) => SizedBox(
         height: 38,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
@@ -378,11 +372,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurface : Colors.white,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(19),
                   border: Border.all(
                       color:
-                          isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                          context.colors.border),
                 ),
                 child: Text(
                   category.name,
@@ -397,16 +391,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// The service, and everything needed to judge it: what it costs, how long
   /// it takes, who does it, how well they are rated and where they are.
-  Widget _serviceRow(ServiceHit hit, bool isDark) => InkWell(
+  Widget _serviceRow(ServiceHit hit) => InkWell(
         onTap: () => _openSalon(hit.salon.id),
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.white,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                color: context.colors.border),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,9 +429,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           Text(' · ${hit.durationMinutes} min',
                               style: TextStyle(
                                   fontSize: 12.5,
-                                  color: isDark
-                                      ? AppTheme.darkTextBody
-                                      : AppTheme.lightTextBody)),
+                                  color: context.colors.textSecondary)),
                         ],
                       ],
                     ),
@@ -448,9 +440,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       children: [
                         Icon(Icons.storefront_outlined,
                             size: 14,
-                            color: isDark
-                                ? AppTheme.darkTextBody
-                                : AppTheme.lightTextBody),
+                            color: context.colors.textSecondary),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
@@ -480,9 +470,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         hit.salon.area!,
                         style: TextStyle(
                             fontSize: 12,
-                            color: isDark
-                                ? AppTheme.darkTextLight
-                                : AppTheme.lightTextLight),
+                            color: context.colors.textTertiary),
                       ),
                     ],
                   ],
@@ -490,24 +478,22 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               const SizedBox(width: 10),
               Icon(Icons.chevron_right_rounded,
-                  color: isDark
-                      ? AppTheme.darkTextLight
-                      : AppTheme.lightTextLight),
+                  color: context.colors.textTertiary),
             ],
           ),
         ),
       );
 
-  Widget _salonRow(SalonHit hit, bool isDark) => InkWell(
+  Widget _salonRow(SalonHit hit) => InkWell(
         onTap: () => _openSalon(hit.id),
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.white,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                color: context.colors.border),
           ),
           child: Row(
             children: [
@@ -515,9 +501,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.darkAccentSoft
-                      : AppTheme.lightAccentSoft,
+                  color: context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.storefront_rounded,
@@ -549,16 +533,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           Text('New',
                               style: TextStyle(
                                   fontSize: 12.5,
-                                  color: isDark
-                                      ? AppTheme.darkTextLight
-                                      : AppTheme.lightTextLight)),
+                                  color: context.colors.textTertiary)),
                         if (hit.area != null) ...[
                           Text(' · ${hit.area}',
                               style: TextStyle(
                                   fontSize: 12.5,
-                                  color: isDark
-                                      ? AppTheme.darkTextBody
-                                      : AppTheme.lightTextBody)),
+                                  color: context.colors.textSecondary)),
                         ],
                       ],
                     ),
@@ -566,15 +546,13 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               Icon(Icons.chevron_right_rounded,
-                  color: isDark
-                      ? AppTheme.darkTextLight
-                      : AppTheme.lightTextLight),
+                  color: context.colors.textTertiary),
             ],
           ),
         ),
       );
 
-  Widget _centred(IconData icon, String title, String detail, bool isDark) => Center(
+  Widget _centred(IconData icon, String title, String detail) => Center(
         child: Padding(
           padding: const EdgeInsets.all(40),
           child: Column(
@@ -582,9 +560,7 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Icon(icon,
                   size: 46,
-                  color: isDark
-                      ? AppTheme.darkTextLight
-                      : AppTheme.lightTextLight),
+                  color: context.colors.textTertiary),
               const SizedBox(height: 16),
               Text(title,
                   textAlign: TextAlign.center,
@@ -598,7 +574,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   fontSize: 13.5,
                   height: 1.5,
                   color:
-                      isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+                      context.colors.textSecondary,
                 ),
               ),
             ],
