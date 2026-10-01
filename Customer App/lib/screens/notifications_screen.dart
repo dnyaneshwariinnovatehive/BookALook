@@ -78,7 +78,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notifications', style: AppTheme.lightTheme.appBarTheme.titleTextStyle),
+        title: Text('Notifications', style: Theme.of(context).appBarTheme.titleTextStyle),
         centerTitle: true,
         actions: [
           if (_notifications.any((n) => n['is_read'] != true))

@@ -208,7 +208,7 @@ class _CartScreenState extends State<CartScreen> {
     } catch (e) {
       AppHaptics.error();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to remove item: $e', style: AppTheme.lightTheme.snackBarTheme.contentTextStyle)),
+        SnackBar(content: Text('Failed to remove item: $e', style: Theme.of(context).snackBarTheme.contentTextStyle)),
       );
     }
   }

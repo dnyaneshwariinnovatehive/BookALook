@@ -672,7 +672,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               AppHaptics.lightImpact();
               _confirm();
             } : null,
-            style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
+            style: Theme.of(context).elevatedButtonTheme.style?.copyWith(
               padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
             ),
             child: _isSaving

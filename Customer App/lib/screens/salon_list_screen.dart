@@ -62,7 +62,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title, style: AppTheme.lightTheme.appBarTheme.titleTextStyle),
+        title: Text(widget.title, style: Theme.of(context).appBarTheme.titleTextStyle),
         centerTitle: true,
       ),
       body: _isLoading

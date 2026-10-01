@@ -335,7 +335,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 // `true` tells the cart screen the cart was consumed.
                 Navigator.pop(context, true);
               },
-              style: AppTheme.lightTheme.elevatedButtonTheme.style,
+              style: Theme.of(context).elevatedButtonTheme.style,
               child: Center(child: Text('View My Bookings')),
             )
           ],
@@ -827,7 +827,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   AppHaptics.lightImpact();
                   _bookAppointment();
                 } : null,
-                style: AppTheme.lightTheme.elevatedButtonTheme.style?.copyWith(
+                style: Theme.of(context).elevatedButtonTheme.style?.copyWith(
                   padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
                 ),
                 child: _isBooking
