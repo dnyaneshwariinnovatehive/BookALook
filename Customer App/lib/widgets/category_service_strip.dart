@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
+import '../theme/app_colors.dart';
 
 /// The horizontally scrolling services of one category inside a salon card.
 ///
@@ -91,8 +92,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
   /// question rather than an error. Same wording as the salon page so the rule
   /// is not learned twice.
   void _confirmReplace(CartConflictException e, Map<String, dynamic> service) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final bodyColor = context.colors.textSecondary;
 
     showDialog<void>(
       context: context,
@@ -150,12 +150,9 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final borderColor = context.colors.listBorder;
 
     if (widget.services.isEmpty) return const SizedBox.shrink();
 
@@ -205,7 +202,6 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
               final service = _visible[index];
               return _buildChip(
                 service,
-                isDark: isDark,
                 headingColor: headingColor,
                 bodyColor: bodyColor,
                 borderColor: borderColor,
@@ -219,7 +215,6 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
 
   Widget _buildChip(
     Map<String, dynamic> service, {
-    required bool isDark,
     required Color headingColor,
     required Color bodyColor,
     required Color borderColor,
@@ -238,7 +233,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
       width: 168,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBg : const Color(0xFFFAF9FF),
+        color: context.colors.serviceTileBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor, width: 1.2),
       ),
