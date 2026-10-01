@@ -1,12 +1,43 @@
-import 'package:partner_app/theme/app_theme.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../services/auth_service.dart';
-import 'otp_screen.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_haptics.dart';
+import '../utils/auth_motion.dart';
+import '../widgets/auth/otp_boxes.dart';
+import 'otp_screen.dart';
 import 'registration/admin_registration_screen.dart';
 
+/// Entry to the Partner App: log in with a phone number, or start registering a
+/// salon.
+///
+/// The two modes share one sliding control, and every way of asking to register
+/// — the segment or the link under the form — lands in the same Register mode,
+/// whose button opens the registration wizard. Registration does not verify the
+/// phone first; the wizard collects it, as it always has.
 class PhoneScreen extends StatefulWidget {
-  const PhoneScreen({super.key});
+  const PhoneScreen({super.key, this.authService});
+
+  /// Injected by tests. Null means the real [AuthService].
+  final AuthService? authService;
+
+  /// Keys for the Login / Register indicator.
+  ///
+  /// Public so tests can measure where the knob is actually painted rather
+  /// than reading AnimatedAlign.alignment, which only reports the destination
+  /// and would make a jump look identical to a real slide.
+  ///
+  /// modeKnobKey sits on the pill itself, not on the AnimatedAlign: an
+  /// alignment widget fills its parent, so keying it would measure the rail.
+  static const Key modeRailKey = Key('auth-mode-rail');
+  static const Key modeKnobKey = Key('auth-mode-knob');
+
+  /// The phone number field, for tests.
+  static const Key phoneFieldKey = Key('auth-phone-field');
 
   @override
   State<PhoneScreen> createState() => _PhoneScreenState();
@@ -14,216 +45,480 @@ class PhoneScreen extends StatefulWidget {
 
 class _PhoneScreenState extends State<PhoneScreen> {
   final _phoneController = TextEditingController();
-  final _authService = AuthService();
-  bool _isLoading = false;
+  late final AuthService _authService = widget.authService ?? AuthService();
 
-  void _sendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid phone number (min 10 digits)')),
-      );
+  bool _isLogin = true;
+  bool _isLoading = false;
+  String? _error;
+  String? _info;
+  int _shakeToken = 0;
+
+  /// Raised when a send is taking long enough that silence would read as a
+  /// hang. Cancelled the moment the request returns.
+  Timer? _slowTimer;
+
+  static const _slowAfter = Duration(seconds: 6);
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  void _setMode(bool login) {
+    if (_isLogin == login) return;
+    AppHaptics.selectionClick();
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLogin = login;
+      _error = null;
+      _info = null;
+    });
+  }
+
+  void _fail(String message) {
+    AppHaptics.error();
+    setState(() {
+      _error = message;
+      _info = null;
+      _shakeToken++;
+    });
+  }
+
+  Future<void> _sendOtp() async {
+    final phone = _phoneController.text;
+    if (phone.length != 10) {
+      _fail('Enter your 10-digit mobile number.');
       return;
     }
 
-    setState(() => _isLoading = true);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _info = null;
+    });
+    _slowTimer = Timer(_slowAfter, () {
+      if (mounted && _isLoading) {
+        setState(() => _info = 'Still sending your code. This is taking longer than usual…');
+      }
+    });
+
     final result = await _authService.sendOtp(phone);
-    if (mounted) setState(() => _isLoading = false);
+    _slowTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _info = null;
+    });
 
     if (result == 'success') {
-      Navigator.push(
+      AppHaptics.success();
+      await Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => OtpScreen(phone: phone)),
+        authRoute<void>(
+          builder: (context) => OtpScreen(phone: phone),
+        ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $result')),
-      );
+      _fail(friendlyAuthError(result, fallback: 'We could not send a code right now. Please try again.'));
     }
   }
 
-  bool _isLogin = true;
+  void _startRegistration() {
+    AppHaptics.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Logo Section
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 60,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Manage your salon, services, and staff seamlessly',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                // Login / Sign Up Toggle
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? AppTheme.darkSurface
-                        : const Color(0xFFF3F0FF),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
+      backgroundColor: Colors.transparent,
+      body: AuthShell(
+        child: SafeArea(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                child: ConstrainedBox(
+                  // Keeps the form a readable width on tablets and in landscape.
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: StaggeredReveal(
                     children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _isLogin = true),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: _isLogin 
-                                  ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: _isLogin
-                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                  : [],
-                            ),
-                            child: Text(
-                              'Login',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _isLogin 
-                                    ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
-                                    : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
-                              ),
-                            ),
-                          ),
-                        ),
+                      _header(colors),
+                      const SizedBox(height: 32),
+                      _modeSwitch(colors),
+                      const SizedBox(height: 28),
+                      AnimatedSize(
+                        duration: AuthMotion.reduceMotion(context)
+                            ? Duration.zero
+                            : AuthMotion.base,
+                        curve: AuthMotion.curveInOut,
+                        alignment: Alignment.topCenter,
+                        child: _isLogin ? _loginForm(colors) : _registerPanel(colors),
                       ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: !_isLogin 
-                                  ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: !_isLogin
-                                  ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                  : [],
-                            ),
-                            child: Text(
-                              'Register',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: !_isLogin 
-                                    ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
-                                    : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                      const SizedBox(height: 20),
+                      _switchLink(colors),
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
-
-                // Phone Number Input
-                Text(
-                  'Phone Number',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  style: TextStyle(fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Enter your mobile no.',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).colorScheme.outline),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Continue Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _sendOtp,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: AppTheme.accentColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward, size: 20),
-                          ],
-                        ),
-                ),
-                const SizedBox(height: 24),
-
-                if (_isLogin)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Don\'t have an account? ', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminRegistrationScreen()));
-                        },
-                        child: Text(
-                          'Register here',
-                          style: TextStyle(
-                            color: AppTheme.accentColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _header(AppColors colors) {
+    return Column(
+      children: [
+        Semantics(
+          label: 'BookALook Partner',
+          image: true,
+          child: Image.asset('assets/images/logo.png', height: 60, fit: BoxFit.contain),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Manage your salon, services, and staff seamlessly',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Sliding Login / Register control. The indicator sits behind both labels in
+  /// a Stack and animates between them, so the switch reads as one piece
+  /// moving rather than two colours swapping.
+  Widget _modeSwitch(AppColors colors) {
+    Widget tab(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: selected,
+          inMutuallyExclusiveGroup: true,
+          child: GestureDetector(
+            onTap: onTap,
+            behavior: HitTestBehavior.opaque,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: AuthMotion.base,
+                  curve: AuthMotion.curve,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    // The knob carries the selection; the label only needs to
+                    // stay legible on it, so it takes the strongest text token.
+                    color: selected ? colors.textPrimary : colors.textSecondary,
+                  ),
+                  child: Text(label),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colors.accentSoft,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      // Sized from the rail itself rather than the window, so the knob still
+      // lines up in split-screen and on tablets.
+      child: LayoutBuilder(
+        builder: (context, rail) {
+          return Stack(
+            key: PhoneScreen.modeRailKey,
+            children: [
+              Positioned.fill(
+                child: AnimatedAlign(
+                  duration: AuthMotion.reduceMotion(context) ? Duration.zero : AuthMotion.base,
+                  curve: AuthMotion.curve,
+                  alignment: _isLogin ? Alignment.centerLeft : Alignment.centerRight,
+                  child: Container(
+                    key: PhoneScreen.modeKnobKey,
+                    width: rail.maxWidth / 2,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.accentColor.withValues(alpha: 0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  tab('Login', _isLogin, () => _setMode(true)),
+                  tab('Register', !_isLogin, () => _setMode(false)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _loginForm(AppColors colors) {
+    return Column(
+      key: const ValueKey('login-form'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Phone number',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: colors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Shake(
+          token: _shakeToken,
+          child: _phoneField(colors),
+        ),
+        AnimatedSize(
+          duration: AuthMotion.reduceMotion(context) ? Duration.zero : AuthMotion.base,
+          curve: AuthMotion.curveInOut,
+          alignment: Alignment.topCenter,
+          child: (_error == null && _info == null)
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _error != null
+                      ? StatusNote(
+                          text: _error!,
+                          tone: colors.danger,
+                          background: colors.dangerBg,
+                          icon: Icons.error_outline_rounded,
+                        )
+                      : StatusNote(
+                          text: _info!,
+                          tone: colors.info,
+                          background: colors.infoBg,
+                          icon: Icons.hourglass_top_rounded,
+                        ),
+                ),
+        ),
+        const SizedBox(height: 20),
+        SweepButton(
+          label: 'Get OTP',
+          leading: Icons.sms_outlined,
+          loading: _isLoading,
+          onPressed: _isLoading
+              ? null
+              : () {
+                  AppHaptics.lightImpact();
+                  _sendOtp();
+                },
+        ),
+      ],
+    );
+  }
+
+  Widget _phoneField(AppColors colors) {
+    OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return TextField(
+      key: PhoneScreen.phoneFieldKey,
+      controller: _phoneController,
+      enabled: !_isLoading,
+      keyboardType: TextInputType.phone,
+      textInputAction: TextInputAction.go,
+      autofillHints: const [AutofillHints.telephoneNumberNational],
+      inputFormatters: [IndianMobileFormatter()],
+      onChanged: (_) {
+        if (_error != null) setState(() => _error = null);
+      },
+      onSubmitted: (_) {
+        if (!_isLoading) _sendOtp();
+      },
+      style: TextStyle(fontSize: 17, color: colors.textPrimary, letterSpacing: 0.4),
+      decoration: InputDecoration(
+        hintText: '10-digit mobile number',
+        hintStyle: TextStyle(color: colors.textTertiary, letterSpacing: 0),
+        // Fixed, not editable: the backend matches the number exactly as it was
+        // registered, which is the bare 10 digits. The chip says which country
+        // those digits belong to without changing what is sent.
+        prefixIcon: Semantics(
+          label: 'Country code plus 91, India',
+          excludeSemantics: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.accentSoft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '+91',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        filled: true,
+        fillColor: colors.surface,
+        border: border(colors.border),
+        enabledBorder: border(colors.border),
+        disabledBorder: border(colors.border),
+        focusedBorder: border(AppTheme.accentColor, 2),
+        errorBorder: border(colors.danger, 2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      ),
+    );
+  }
+
+  Widget _registerPanel(AppColors colors) {
+    Widget point(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(child: Icon(icon, size: 20, color: AppTheme.accentColor)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(fontSize: 14, height: 1.4, color: colors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Column(
+      key: const ValueKey('register-panel'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bring your salon to BookALook',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              point(Icons.storefront_outlined, 'Tell us about your salon and where it is.'),
+              point(Icons.content_cut_rounded, 'Add your services, prices and staff.'),
+              point(Icons.verified_outlined, 'We review it, then customers can book you.'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        SweepButton(
+          label: 'Start registration',
+          leading: Icons.arrow_forward_rounded,
+          onPressed: _startRegistration,
+        ),
+      ],
+    );
+  }
+
+  /// The secondary path, phrased for whichever mode is showing. Both point at
+  /// the other segment rather than navigating, so the control and the link can
+  /// never disagree about where "Register" goes.
+  Widget _switchLink(AppColors colors) {
+    final prompt = _isLogin ? 'New partner?' : 'Already a partner?';
+    final action = _isLogin ? 'Register your salon' : 'Log in';
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('$prompt ', style: TextStyle(color: colors.textSecondary)),
+        TextButton(
+          onPressed: () => _setMode(!_isLogin),
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+          child: Text(action, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+}
+
+/// Turns raw [AuthService] failures into something a person can act on.
+///
+/// The service passes through the server's own message, which is written for
+/// users, but on a dropped connection it returns "Network error: " plus the
+/// exception text — that must never reach the screen.
+String friendlyAuthError(String? message, {required String fallback}) {
+  if (message == null || message.trim().isEmpty) return fallback;
+  if (message.startsWith('Network error')) {
+    return 'Could not reach BookALook. Check your connection and try again.';
+  }
+  return message;
+}
+
+/// Keeps the phone field to the 10 digits the backend expects.
+///
+/// Strips spaces and dashes, and drops a pasted or autofilled `+91`, `91` or
+/// leading `0` so "+91 98765 43210" becomes "9876543210" instead of being
+/// truncated to the wrong ten digits.
+class IndianMobileFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length > 10 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length > 10 && digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (digits.length > 10) digits = digits.substring(0, 10);
+
+    return TextEditingValue(
+      text: digits,
+      selection: TextSelection.collapsed(offset: digits.length),
     );
   }
 }
