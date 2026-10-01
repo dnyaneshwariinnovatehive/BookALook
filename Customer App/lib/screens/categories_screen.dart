@@ -6,6 +6,7 @@ import '../services/category_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_grid.dart';
 import 'category_salons_screen.dart';
+import '../theme/app_colors.dart';
 
 /// Every category the platform has, as a grid.
 ///
@@ -141,10 +142,10 @@ class _CategoryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkSurface : Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6),
+            color: context.colors.listBorder,
           ),
         ),
         child: Column(
@@ -154,7 +155,7 @@ class _CategoryCard extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: isDark ? foreground.withOpacity(0.16) : background,
+                  color: isDark ? foreground.withValues(alpha: 0.16) : background,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 padding: const EdgeInsets.all(12),
@@ -171,7 +172,7 @@ class _CategoryCard extends StatelessWidget {
                           if (progress == null) return child;
                           return Icon(
                             CategoryGrid.fallbackIcon(category.name),
-                            color: foreground.withOpacity(0.35),
+                            color: foreground.withValues(alpha: 0.35),
                             size: 26,
                           );
                         },
@@ -192,7 +193,7 @@ class _CategoryCard extends StatelessWidget {
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+                color: context.colors.textPrimary,
               ),
             ),
           ],
