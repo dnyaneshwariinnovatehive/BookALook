@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import 'reschedule_screen.dart';
+import '../theme/app_colors.dart';
 
 /// The customer's message inbox. A salon-closure notice is actionable: tapping
 /// it goes straight to picking a new slot.
@@ -91,7 +92,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : _error.isNotEmpty
-              ? Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)))
+              ? Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)))
               : _notifications.isEmpty
                   ? _buildEmpty()
                   : RefreshIndicator(
@@ -113,10 +114,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.notifications_none, size: 72, color: AppTheme.lightTextLight),
+            Icon(Icons.notifications_none, size: 72, color: context.colors.textTertiary),
             const SizedBox(height: 12),
             Text('Nothing to catch up on',
-                style: GoogleFonts.outfit(fontSize: 16, color: AppTheme.lightTextBody)),
+                style: GoogleFonts.outfit(fontSize: 16, color: context.colors.textSecondary)),
           ],
         ),
       );
@@ -133,10 +134,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead ? AppTheme.lightSurface : AppTheme.lightAccentSoft,
+          color: isRead ? context.colors.surface : context.colors.accentSoft,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isRead ? AppTheme.lightBorder : AppTheme.accentColor.withOpacity(0.4),
+            color: isRead ? context.colors.border : AppTheme.accentColor.withValues(alpha: 0.4),
           ),
         ),
         child: Column(
@@ -147,7 +148,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 Icon(
                   isActionable ? Icons.event_busy : Icons.notifications_outlined,
                   size: 18,
-                  color: isActionable ? AppTheme.lightWarning : AppTheme.accentColor,
+                  color: isActionable ? context.colors.warning : AppTheme.accentColor,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -156,7 +157,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: isRead ? FontWeight.w600 : FontWeight.bold,
-                      color: AppTheme.lightTextHeading,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -172,14 +173,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const SizedBox(height: 8),
             Text(
               notification['message'] ?? '',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody, height: 1.4),
+              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 10),
             Row(
               children: [
                 Text(
                   _timeAgo(notification['created_at']),
-                  style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.lightTextLight),
+                  style: GoogleFonts.outfit(fontSize: 11, color: context.colors.textTertiary),
                 ),
                 const Spacer(),
                 if (isActionable)
