@@ -12,6 +12,7 @@ use App\Models\SalonWallet;
 use App\Models\WalletScheme;
 use App\Models\SubscriptionPaymentRequest;
 use App\Services\CommissionService;
+use App\Services\Notifications\NotificationService;
 use App\Support\BillingModel;
 use Carbon\Carbon;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
@@ -28,8 +29,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PartnerSubscriptionController extends Controller
 {
-    public function __construct(private CommissionService $commission)
-    {
+    public function __construct(
+        private CommissionService $commission,
+        private NotificationService $notifications
+    ) {
     }
 
     public function getSubscription(Request $request, $salon_id)
@@ -204,6 +207,10 @@ class PartnerSubscriptionController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
+        // Same reason as on renew: a new plan is a paid plan, and the
+        // collaborator only needs to know the salon is not going dark.
+        $this->notifications->assignedSalonRenewed($salon, $newSub->fresh('plan'));
+
         return response()->json([
             'success' => true,
             'message' => "Successfully upgraded to {$plan->name}. Total paid: " . $finalPrice . '.',
@@ -244,6 +251,11 @@ class PartnerSubscriptionController extends Controller
             $subscription->end_date = Carbon::parse($subscription->end_date)
                 ->addDays($plan?->validity_days ?? 30);
             $subscription->save();
+
+            // The collaborator who set this salon up has been told twice already
+            // that it is about to go dark. Silence is not the answer — tell them
+            // the call they were asked to make landed.
+            $this->notifications->assignedSalonRenewed($salon, $subscription->fresh('plan'));
         } else {
             return response()->json(['success' => false, 'message' => 'No active subscription to renew'], 404);
         }
@@ -403,6 +415,8 @@ class PartnerSubscriptionController extends Controller
         } catch (\RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+
+        $this->notifications->assignedSalonRenewed($salon, $subscription->fresh('plan'));
 
         return response()->json([
             'success' => true,

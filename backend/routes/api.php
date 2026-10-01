@@ -332,6 +332,12 @@ Route::prefix('partner')->group(function () {
         // Plans running out on salons this collaborator onboarded. They cannot
         // renew one — they can ring the owner, which is the point.
         Route::get('/collaborator/alerts', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'alerts']);
+        // The bell on Home. Its own paths rather than the owner's /notifications,
+        // because a collaborator's inbox is scoped to the salons assigned to
+        // them and an owner answering for a single salon is a different screen.
+        Route::get('/collaborator/notifications', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'notifications']);
+        Route::post('/collaborator/notifications/read-all', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'markAllNotificationsRead']);
+        Route::post('/collaborator/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'markNotificationRead']);
         Route::get('/collaborator/master-catalog', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'masterCatalog']);
         // What a rejected salon already holds, so a correction is an edit and
         // not a retype.

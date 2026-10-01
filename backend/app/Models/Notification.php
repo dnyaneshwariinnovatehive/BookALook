@@ -32,6 +32,17 @@ class Notification extends Model
         return $this->belongsTo(Appointment::class, 'related_appointment_id');
     }
 
+    /**
+     * The salon this is about, when there is one.
+     *
+     * Eager-loadable so an inbox can label every card without an N+1. Null for
+     * customer notices, which have no salon on them at all.
+     */
+    public function salon()
+    {
+        return $this->belongsTo(Salon::class, 'related_salon_id');
+    }
+
     public function deliveries()
     {
         return $this->hasMany(NotificationDelivery::class);

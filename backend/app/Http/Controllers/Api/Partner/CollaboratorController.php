@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
+use App\Models\Notification;
 use App\Models\PlatformPolicySetting;
 use App\Models\Salon;
 use App\Models\SalonEnquiry;
@@ -10,6 +11,7 @@ use App\Models\SalonSubscription;
 use App\Models\ServiceCategory;
 use App\Services\SalonAccessService;
 use App\Services\SalonOnboardingService;
+use App\Support\Notifications\NotificationType;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -409,6 +411,142 @@ class CollaboratorController extends Controller
                 'photo_urls' => $salon->media->pluck('file_url')->values(),
             ],
         ]);
+    }
+
+    /*
+    |---------------------------------------------------------------------------
+    | Notifications
+    |---------------------------------------------------------------------------
+    */
+
+    /**
+     * The types that count towards the bell's badge, and therefore the ones a
+     * collaborator is expected to act on: a salon that needs a phone call, and a
+     * call that landed. Everything else they are told can wait for the screen to
+     * be opened deliberately.
+     */
+    private const IMPORTANT_NOTIFICATION_TYPES = [
+        NotificationType::ASSIGNED_SALON_EXPIRING,
+        NotificationType::ASSIGNED_SALON_RENEWED,
+    ];
+
+    /**
+     * The collaborator's own notification inbox.
+     *
+     * Deliberately a different endpoint from the one that answers for a salon
+     * owner. The owner has one salon and every notice they get is about it. A
+     * collaborator's reach is deliberately wider — they can carry dozens of
+     * salons — so an inbox that showed them everything addressed to their
+     * account would be a different screen wearing the same name. A salon
+     * reassigned away from them drops out of this list, which is the honest
+     * answer: it is no longer theirs to act on.
+     */
+    public function notifications(Request $request)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+
+        $notifications = Notification::with('salon:id,name')
+            ->where('user_id', $user->id)
+            ->whereIn('related_salon_id', $salonIds)
+            ->orderByDesc('created_at')
+            ->limit((int) $request->get('limit', 50))
+            ->get();
+
+        $scoped = Notification::where('user_id', $user->id)->whereIn('related_salon_id', $salonIds);
+
+        return response()->json([
+            'success' => true,
+            'notifications' => $notifications->map(fn (Notification $n) => $this->notificationPayload($n))->values(),
+            'unread_count' => (clone $scoped)->where('is_read', false)->count(),
+            'important_count' => (clone $scoped)
+                ->where('is_read', false)
+                ->whereIn('type', self::IMPORTANT_NOTIFICATION_TYPES)
+                ->count(),
+        ]);
+    }
+
+    /**
+     * Mark one read. Scoped by the same assigned-salon list as the list itself,
+     * so a collaborator cannot read somebody else's notice by guessing its id.
+     */
+    public function markNotificationRead(Request $request, $id)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+
+        Notification::where('user_id', $user->id)
+            ->whereIn('related_salon_id', $salonIds)
+            ->whereKey($id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /** Mark everything in this collaborator's inbox read, and nothing else. */
+    public function markAllNotificationsRead(Request $request)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+
+        $updated = Notification::where('user_id', $user->id)
+            ->whereIn('related_salon_id', $salonIds)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+
+        return response()->json(['success' => true, 'updated' => $updated]);
+    }
+
+    /**
+     * Flatten one row for the app.
+     *
+     * The interesting fields are lifted out of the JSON payload onto the top
+     * level. The app needs them to draw the card and to decide whether to offer
+     * the dialer, and making it reach into a `data` object whose shape depends
+     * on the notification type is how a card ends up half-drawn.
+     *
+     * `days_left` is passed through as null rather than negative. A lapsed salon
+     * has no days left to count down from, and the app shows a lapsed notice as
+     * a different thing rather than as a very large negative number.
+     *
+     * @return array<string, mixed>
+     */
+    private function notificationPayload(Notification $notification): array
+    {
+        $data = is_array($notification->data) ? $notification->data : [];
+        $daysLeft = isset($data['days_left']) ? (int) $data['days_left'] : null;
+
+        return [
+            'id' => $notification->id,
+            'type' => $notification->type,
+            'title' => $notification->title,
+            'message' => $notification->message,
+            'action' => $data['action'] ?? NotificationType::defaultActionFor($notification->type),
+            'salon_id' => $notification->related_salon_id,
+            'salon_name' => $notification->salon?->name ?? ($data['salon_name'] ?? null),
+            'owner_phone' => $data['owner_phone'] ?? null,
+            'days_left' => $daysLeft !== null && $daysLeft >= 0 ? $daysLeft : null,
+            'lapsed' => ($data['lapsed'] ?? false) === true,
+            'is_read' => (bool) $notification->is_read,
+            'important' => in_array($notification->type, self::IMPORTANT_NOTIFICATION_TYPES, true),
+            'created_at' => optional($notification->created_at)->toIso8601String(),
+        ];
     }
 
     /**

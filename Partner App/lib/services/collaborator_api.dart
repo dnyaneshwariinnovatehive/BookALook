@@ -84,6 +84,53 @@ class CollaboratorApi {
     }
   }
 
+  /// The collaborator's own inbox — notices about the salons assigned to them.
+  ///
+  /// Returns an empty inbox on failure, like [alerts]. The bell and the screen
+  /// behind it are glanceable; neither may become an error page because a
+  /// request failed, and neither is worth a retry queue.
+  static Future<CollaboratorInbox> notifications({int limit = 50}) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/notifications?limit=$limit'),
+        headers: await _headers(),
+      );
+
+      if (response.statusCode != 200) return const CollaboratorInbox();
+
+      final body = _decode(response.body);
+      if (body['success'] != true) return const CollaboratorInbox();
+
+      final items = body['notifications'] as List<dynamic>? ?? const [];
+
+      return CollaboratorInbox(
+        notifications: items
+            .whereType<Map<String, dynamic>>()
+            .map(CollaboratorNotification.fromJson)
+            .toList(),
+        unreadCount: (body['unread_count'] as num?)?.toInt() ?? 0,
+        importantCount: (body['important_count'] as num?)?.toInt() ?? 0,
+      );
+    } catch (_) {
+      return const CollaboratorInbox();
+    }
+  }
+
+  /// Mark one read. Fails silently — a stuck dot is not worth interrupting the
+  /// collaborator over, and the next list refresh tells the truth anyway.
+  static Future<void> markNotificationRead(String id) async {
+    try {
+      await http.post(Uri.parse('$_baseUrl/notifications/$id/read'), headers: await _headers());
+    } catch (_) {}
+  }
+
+  /// Mark the whole inbox read. Same reasoning as above.
+  static Future<void> markAllNotificationsRead() async {
+    try {
+      await http.post(Uri.parse('$_baseUrl/notifications/read-all'), headers: await _headers());
+    } catch (_) {}
+  }
+
   /// What a previously submitted salon already holds, so a rejection can be
   /// corrected rather than retyped. Null when it cannot be reached — the
   /// collaborator then starts from the enquiry, which is worse but not broken.
@@ -197,4 +244,108 @@ class OnboardingRejected implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// One notice in the collaborator inbox.
+///
+/// [daysLeft] is deliberately nullable rather than 0-when-lapsed: "expires
+/// today" and "expired on some date in the past" are different things for a
+/// collaborator, and collapsing them into one number makes the second one look
+/// urgent instead of final.
+class CollaboratorNotification {
+  final String id;
+  final String title;
+  final String message;
+  final String type;
+  final String? action;
+  final String? salonId;
+  final String? salonName;
+  final String? ownerPhone;
+  final int? daysLeft;
+  final bool lapsed;
+  final bool read;
+  final bool important;
+  final DateTime? createdAt;
+
+  const CollaboratorNotification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.type,
+    this.action,
+    this.salonId,
+    this.salonName,
+    this.ownerPhone,
+    this.daysLeft,
+    this.lapsed = false,
+    this.read = false,
+    this.important = false,
+    this.createdAt,
+  });
+
+  /// Read state under the name the screen thinks in.
+  bool get isRead => read;
+
+  /// Whether the card offers a "call the owner" button.
+  ///
+  /// Needs all three: the action the server chose, a number to dial, and a salon
+  /// that is still assigned. Without the salon the call cannot be placed from
+  /// the right context, and after a reassignment the notice is history anyway.
+  bool get canCallOwner =>
+      action == 'call_owner' &&
+      (ownerPhone ?? '').isNotEmpty &&
+      (salonId ?? '').isNotEmpty;
+
+  factory CollaboratorNotification.fromJson(Map<String, dynamic> json) {
+    final rawDays = (json['days_left'] as num?)?.toInt();
+
+    return CollaboratorNotification(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      type: json['type']?.toString() ?? '',
+      action: json['action']?.toString(),
+      salonId: json['salon_id']?.toString(),
+      salonName: json['salon_name']?.toString(),
+      ownerPhone: json['owner_phone']?.toString(),
+      daysLeft: rawDays != null && rawDays >= 0 ? rawDays : null,
+      lapsed: json['lapsed'] == true || (rawDays != null && rawDays < 0),
+      read: json['is_read'] == true || json['read'] == true,
+      important: json['important'] == true,
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+    );
+  }
+
+  CollaboratorNotification copyWith({bool? read}) => CollaboratorNotification(
+        id: id,
+        title: title,
+        message: message,
+        type: type,
+        action: action,
+        salonId: salonId,
+        salonName: salonName,
+        ownerPhone: ownerPhone,
+        daysLeft: daysLeft,
+        lapsed: lapsed,
+        read: read ?? this.read,
+        important: important,
+        createdAt: createdAt,
+      );
+}
+
+/// The inbox plus the counters the bell badge needs.
+///
+/// Carrying the counts means the bell can show an unread number after the list
+/// has already been discarded, instead of the collaborator being told they have
+/// nothing to read the moment the screen is popped.
+class CollaboratorInbox {
+  final List<CollaboratorNotification> notifications;
+  final int unreadCount;
+  final int importantCount;
+
+  const CollaboratorInbox({
+    this.notifications = const [],
+    this.unreadCount = 0,
+    this.importantCount = 0,
+  });
 }

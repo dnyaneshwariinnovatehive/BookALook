@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../services/collaborator_badges.dart';
 import '../../services/onboarding_draft_store.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/collaborator/collaborator_notification_bell.dart';
 import '../../widgets/collaborator/collaborator_pill_nav_bar.dart';
 import '../../widgets/tab_navigator.dart';
 import 'collaborator_tabs/collaborator_assigned_tab.dart';
@@ -243,6 +244,12 @@ class _CollaboratorDashboardScreenState
           ),
         ],
       ),
+      // Dropped entirely on the other tabs, not just hidden. Dropping it is what
+      // disposes the bell and cancels its poll — a bell kept alive behind three
+      // tabs the collaborator cannot see would be a request a minute for nothing.
+      actions: _currentIndex == _homeTab
+          ? const [CollaboratorNotificationBell()]
+          : null,
     );
   }
 

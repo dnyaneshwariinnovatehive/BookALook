@@ -6,10 +6,12 @@ use App\Jobs\SendPushNotificationJob;
 use App\Models\Appointment;
 use App\Models\Notification;
 use App\Models\Salon;
+use App\Models\SalonSubscription;
 use App\Models\User;
 use App\Models\WhatsAppMessage;
 use App\Support\Notifications\NotificationAction;
 use App\Support\Notifications\NotificationType;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -374,6 +376,135 @@ class NotificationService
                 appointment: $appointment,
             );
         }
+    }
+
+    /*
+    |---------------------------------------------------------------------------
+    | Collaborator events
+    |---------------------------------------------------------------------------
+    */
+
+    /**
+     * A salon in this collaborator's care is about to stop taking bookings.
+     *
+     * The collaborator cannot pay for somebody else's salon, so there is no
+     * renewal action to offer — only the owner's number. The dedupe key is
+     * passed in rather than derived here because only the caller knows which
+     * warning window this notice belongs to, and the ladder is the caller's
+     * business, not the wording's.
+     *
+     * [$daysLeft] is days until the plan ends, negative once it has. The two
+     * sides read as different events because they are: one asks for a call to
+     * prevent a lapse, the other reports that the lapse happened and the salon
+     * has come off the marketplace.
+     *
+     * Returns null when the salon has no collaborator, or when this exact
+     * window has already been notified. Both are ordinary, not failures.
+     */
+    public function assignedSalonExpiring(
+        Salon $salon,
+        int $daysLeft,
+        string $dedupeKey
+    ): ?Notification {
+        $salon->loadMissing('admin:id,name,phone');
+
+        if (! $salon->assigned_collaborator_id) {
+            return null;
+        }
+
+        $lapsed = $daysLeft < 0;
+
+        if ($lapsed) {
+            $title = "{$salon->name}'s plan has expired";
+            $message = sprintf(
+                '%s is no longer taking bookings. Call %s to get it back online.',
+                $salon->name,
+                $salon->admin->name ?? 'the owner'
+            );
+        } else {
+            $when = match (true) {
+                $daysLeft === 0 => 'today',
+                $daysLeft === 1 => 'tomorrow',
+                default => "in {$daysLeft} days",
+            };
+
+            $title = "{$salon->name}'s plan ends {$when}";
+            $message = sprintf(
+                'A salon you onboarded is about to stop taking bookings. Give %s a call '
+                .'before it goes offline.',
+                $salon->admin->name ?? 'the owner'
+            );
+        }
+
+        return $this->send(
+            recipient: $salon->assigned_collaborator_id,
+            type: NotificationType::ASSIGNED_SALON_EXPIRING,
+            title: $title,
+            message: $message,
+            data: [
+                'action' => NotificationAction::CALL_OWNER,
+                'salon_id' => $salon->id,
+                'salon_name' => $salon->name,
+                'owner_phone' => $salon->admin->phone ?? null,
+                'days_left' => $daysLeft,
+                'lapsed' => $lapsed,
+            ],
+            salon: $salon,
+            dedupeKey: $dedupeKey,
+        );
+    }
+
+    /**
+     * The owner paid, so the salon this collaborator set up is live again.
+     *
+     * Fires from every path that puts a paid plan on a salon — the owner's own
+     * renew button, buying a different plan, paying in coins, and SuperAdmin
+     * approving a transfer — because from the collaborator's side they are one
+     * event. Without it the chase they were told to make simply stops, with no
+     * confirmation that it worked.
+     */
+    public function assignedSalonRenewed(
+        Salon $salon,
+        ?SalonSubscription $subscription = null
+    ): ?Notification {
+        $salon->loadMissing('admin:id,name');
+
+        if (! $salon->assigned_collaborator_id) {
+            return null;
+        }
+
+        $plan = $subscription?->plan;
+        $planName = $plan?->name ?? 'a plan';
+
+        $message = $subscription?->end_date
+            ? sprintf(
+                '%s renewed %s. It is live until %s — no call needed.',
+                $salon->admin->name ?? 'The owner',
+                $planName,
+                Carbon::parse($subscription->end_date)->format('j M Y')
+            )
+            : sprintf('%s renewed %s. No call needed.', $salon->admin->name ?? 'The owner', $planName);
+
+        return $this->send(
+            recipient: $salon->assigned_collaborator_id,
+            type: NotificationType::ASSIGNED_SALON_RENEWED,
+            title: "{$salon->name} is renewed",
+            message: $message,
+            data: [
+                'action' => NotificationAction::VIEW_SALON,
+                'salon_id' => $salon->id,
+                'salon_name' => $salon->name,
+                'plan_name' => $planName,
+                'ends_on' => $subscription?->end_date?->toDateString(),
+            ],
+            salon: $salon,
+            // One confirmation per plan period. A salon bought twice on the same
+            // day should only be reported once, and a retry after a dropped
+            // request must not double it.
+            dedupeKey: $subscription
+                ? "assigned_salon_renewed:{$salon->id}:{$subscription->id}"
+                : null,
+        );
     }
 
     /*

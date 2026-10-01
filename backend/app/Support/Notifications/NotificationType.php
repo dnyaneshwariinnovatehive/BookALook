@@ -82,6 +82,16 @@ final class NotificationType
     /** A salon this collaborator onboards is about to lapse. */
     public const ASSIGNED_SALON_EXPIRING = 'assigned_salon_expiring';
 
+    /**
+     * The owner paid, so the salon the collaborator set up is live again.
+     *
+     * The counterpart to [self::ASSIGNED_SALON_EXPIRING] and the reason the
+     * collaborator can stop chasing. Without it the only thing they ever learn
+     * about a renewal is that the nagging eventually went quiet, which is the
+     * one outcome that reads as "nobody told me".
+     */
+    public const ASSIGNED_SALON_RENEWED = 'assigned_salon_renewed';
+
     /*
     |---------------------------------------------------------------------------
     | Fallback
@@ -215,8 +225,13 @@ final class NotificationType
         ],
         self::ASSIGNED_SALON_EXPIRING => [
             'category' => self::CATEGORY_SYSTEM,
-            'action' => null,
+            'action' => NotificationAction::CALL_OWNER,
             'label' => 'Onboarded salon ending soon',
+        ],
+        self::ASSIGNED_SALON_RENEWED => [
+            'category' => self::CATEGORY_SYSTEM,
+            'action' => NotificationAction::VIEW_SALON,
+            'label' => 'Onboarded salon renewed',
         ],
 
         self::GENERAL => [
@@ -347,7 +362,8 @@ final class NotificationType
             self::SALON_REINSTATED,
             self::SUBSCRIPTION_EXPIRING,
             self::SUBSCRIPTION_EXPIRED,
-            self::ASSIGNED_SALON_EXPIRING => 'partner_app',
+            self::ASSIGNED_SALON_EXPIRING,
+            self::ASSIGNED_SALON_RENEWED => 'partner_app',
 
             // `general` is only ever written by the provider reschedule path.
             self::GENERAL => 'partner_app',

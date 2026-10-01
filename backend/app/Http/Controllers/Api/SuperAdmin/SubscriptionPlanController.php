@@ -10,6 +10,7 @@ use App\Models\SubscriptionPaymentRequest;
 use App\Models\SubscriptionPlan;
 use App\Services\AuditLogger;
 use App\Services\CommissionService;
+use App\Services\Notifications\NotificationService;
 use App\Services\WalletService;
 use App\Support\BillingModel;
 use Illuminate\Http\Request;
@@ -27,8 +28,10 @@ use Illuminate\Support\Facades\Log;
  */
 class SubscriptionPlanController extends Controller
 {
-    public function __construct(private CommissionService $commission)
-    {
+    public function __construct(
+        private CommissionService $commission,
+        private NotificationService $notifications
+    ) {
     }
 
     /**
@@ -264,6 +267,12 @@ class SubscriptionPlanController extends Controller
         );
 
         $this->closePendingRequests($salon->id);
+
+        // Most renewals land here rather than through the owner's own button:
+        // the owner uploads a transfer and SuperAdmin is the one who turns it
+        // into a live plan. The collaborator has been told this salon is about
+        // to go dark, so they are owed the confirmation too.
+        $this->notifications->assignedSalonRenewed($salon, $subscription->fresh('plan'));
 
         return response()->json([
             'success' => true,

@@ -32,6 +32,14 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   bool _firstLoad = true;
   bool _failed = false;
 
+  /// Whether the contact-details capsule is showing its rows.
+  ///
+  /// Starts collapsed. The details are things a collaborator already knows and
+  /// edits rarely — they are not what they open Profile to see, and Profile was
+  /// scrolling past them every session on the way to the tally. The capsule
+  /// keeps them one tap away without spending the height on them by default.
+  bool _detailsExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -387,28 +395,57 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
 
   // --------------------------------------------------------------- details
 
+  /// The contact details, as a capsule that opens.
+  ///
+  /// Collapsed it is one row: the label, enough of the details to recognise
+  /// them without opening anything, and a chevron that says which way it goes.
+  /// That matters more than the height it saves — an unlabelled row with no
+  /// chevron reads as a setting, and a collaborator cannot tell whether tapping
+  /// it navigates somewhere or just expands.
+  ///
+  /// [AnimatedCrossFade] rather than a conditional build, so opening it grows
+  /// the card in place instead of the whole list jumping under the finger.
   Widget _buildDetailsCard() {
-    final dob = DateTime.tryParse(_profile!['date_of_birth']?.toString() ?? '');
     final palette = context.colors;
+    final dob = DateTime.tryParse(_profile!['date_of_birth']?.toString() ?? '');
 
     return CollaboratorCard(
       margin: EdgeInsets.zero,
       radius: 16,
+      onTap: () => setState(() => _detailsExpanded = !_detailsExpanded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'Contact details',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
-                    color: palette.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Contact details',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _detailsExpanded ? 'Tap to hide' : _detailsSummary(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              // Inside the capsule's own tap target, so this button has to stop
+              // the tap from bubbling — otherwise editing also folds the capsule
+              // shut behind the sheet.
               TextButton.icon(
                 onPressed: _edit,
                 icon: const Icon(Icons.edit_outlined, size: 16),
@@ -418,41 +455,85 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
                   visualDensity: VisualDensity.compact,
                 ),
               ),
+              AnimatedRotation(
+                turns: _detailsExpanded ? 0.5 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: palette.textTertiary,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          _row(Icons.person_outline, 'Name', _profile!['name']?.toString()),
-          _row(
-            Icons.smartphone_outlined,
-            'Phone',
-            _profile!['phone']?.toString(),
-            note: 'Used to sign in',
-          ),
-          _row(Icons.alternate_email, 'Email', _profile!['email']?.toString()),
-          _row(
-            Icons.wc_outlined,
-            'Gender',
-            _prettyGender(_profile!['gender']?.toString()),
-          ),
-          _row(
-            Icons.cake_outlined,
-            'Date of birth',
-            dob == null ? null : DateFormat('d MMMM yyyy').format(dob),
-          ),
-          _row(
-            Icons.home_outlined,
-            'Address',
-            _profile!['address']?.toString(),
-          ),
-          _row(
-            Icons.pin_drop_outlined,
-            'Pincode',
-            _profile!['pincode']?.toString(),
-            isLast: true,
+          AnimatedCrossFade(
+            crossFadeState: _detailsExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeOutCubic,
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _row(
+                    Icons.person_outline,
+                    'Name',
+                    _profile!['name']?.toString(),
+                  ),
+                  _row(
+                    Icons.smartphone_outlined,
+                    'Phone',
+                    _profile!['phone']?.toString(),
+                    note: 'Used to sign in',
+                  ),
+                  _row(
+                    Icons.alternate_email,
+                    'Email',
+                    _profile!['email']?.toString(),
+                  ),
+                  _row(
+                    Icons.wc_outlined,
+                    'Gender',
+                    _prettyGender(_profile!['gender']?.toString()),
+                  ),
+                  _row(
+                    Icons.cake_outlined,
+                    'Date of birth',
+                    dob == null ? null : DateFormat('d MMMM yyyy').format(dob),
+                  ),
+                  _row(
+                    Icons.home_outlined,
+                    'Address',
+                    _profile!['address']?.toString(),
+                  ),
+                  _row(
+                    Icons.pin_drop_outlined,
+                    'Pincode',
+                    _profile!['pincode']?.toString(),
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  /// What the collapsed row shows instead of the rows themselves: one detail
+  /// worth recognising, so the capsule is not a mystery box that has to be
+  /// opened to find out what is in it.
+  String _detailsSummary() {
+    for (final key in ['email', 'phone']) {
+      final value = (_profile![key]?.toString() ?? '').trim();
+      if (value.isNotEmpty) return value;
+    }
+
+    return 'Tap to see';
   }
 
   static String? _prettyGender(String? raw) {

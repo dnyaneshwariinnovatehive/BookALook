@@ -36,6 +36,15 @@ final class NotificationAction
     /** Open the booking list. */
     public const VIEW_BOOKINGS = 'view_bookings';
 
+    /**
+     * Put the owner's number in the dialer.
+     *
+     * Written by the collaborator-side subscription notices. A collaborator
+     * cannot pay for somebody else's salon, so "renew" would be a dead end and
+     * the only action worth offering is the phone call.
+     */
+    public const CALL_OWNER = 'call_owner';
+
     /** Nothing to open. The app shows the notification and stops. */
     public const NONE = 'none';
 
@@ -73,6 +82,10 @@ final class NotificationAction
         self::VIEW_BOOKINGS => [
             'entity_type' => null,
             'entity_key' => null,
+        ],
+        self::CALL_OWNER => [
+            'entity_type' => 'salon',
+            'entity_key' => 'salon_id',
         ],
         self::NONE => [
             'entity_type' => null,
