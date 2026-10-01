@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
+import '../utils/auth_errors.dart';
 import '../utils/auth_motion.dart';
 import '../widgets/auth/otp_boxes.dart';
 import 'otp_screen.dart';
@@ -118,7 +119,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
       await Navigator.push(
         context,
         authRoute<void>(
-          builder: (context) => OtpScreen(phone: phone),
+          builder: (context) => OtpScreen(phone: phone, authService: _authService),
         ),
       );
     } else {
@@ -484,19 +485,6 @@ class _PhoneScreenState extends State<PhoneScreen> {
       ],
     );
   }
-}
-
-/// Turns raw [AuthService] failures into something a person can act on.
-///
-/// The service passes through the server's own message, which is written for
-/// users, but on a dropped connection it returns "Network error: " plus the
-/// exception text — that must never reach the screen.
-String friendlyAuthError(String? message, {required String fallback}) {
-  if (message == null || message.trim().isEmpty) return fallback;
-  if (message.startsWith('Network error')) {
-    return 'Could not reach BookALook. Check your connection and try again.';
-  }
-  return message;
 }
 
 /// Keeps the phone field to the 10 digits the backend expects.

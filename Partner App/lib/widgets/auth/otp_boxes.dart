@@ -108,6 +108,13 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
       old.controller.removeListener(_onText);
       widget.controller.addListener(_onText);
     }
+    // Disabling the field drops its focus. When it comes back — a rejected
+    // code — reopen the keyboard so the partner can retype straight away.
+    if (!old.enabled && widget.enabled && widget.autofocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.enabled) _focus.requestFocus();
+      });
+    }
   }
 
   @override
