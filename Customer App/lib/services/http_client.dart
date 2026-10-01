@@ -17,6 +17,45 @@ http_real.Client _client = http_real.Client();
 /// Swaps the client used by [get], [post], [put] and [delete].
 void debugSetClient(http_real.Client client) => _client = client;
 
+/// Tracks the route on top of the root navigator, so an expiring session can
+/// tell whether the customer is already looking at the login page.
+///
+/// It has to be an observer. The obvious check —
+/// `ModalRoute.of(navigatorKey.currentContext)` — always returns null: the
+/// navigator's own context sits above every route it hosts. That check used to
+/// be here, never fired, and only looked correct because the redirect clears
+/// the whole stack anyway, which also threw away whatever the customer had
+/// typed on the login page.
+class TopRouteObserver extends NavigatorObserver {
+  Route<dynamic>? _top;
+
+  /// Name of the route currently on top, or null if it has none.
+  String? get topRouteName => _top?.settings.name;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _top = route;
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (identical(route, _top)) _top = previousRoute;
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    // pushAndRemoveUntil reports the new route first and then removes the old
+    // ones underneath it; only a removal of the top route moves the top.
+    if (identical(route, _top)) _top = previousRoute;
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (identical(oldRoute, _top)) _top = newRoute;
+  }
+}
+
+/// Registered on the app's root navigator in main.dart.
+final TopRouteObserver topRouteObserver = TopRouteObserver();
+
 /// Sends the customer to the login screen when a request comes back unauthorised.
 ///
 /// An expired token fails every request that is in flight at the same moment,
@@ -38,12 +77,17 @@ Future<void> _handle401(http_real.Response response) async {
   }
 
   // If the login screen is already what the customer is looking at, another
-  // copy must not be stacked on top of it.
-  final alreadyOnLogin = ModalRoute.of(context)?.settings.name == loginRouteName;
+  // copy must not replace it — that would also wipe the number they typed.
+  final alreadyOnLogin = topRouteObserver.topRouteName == loginRouteName;
 
   await AuthService().logout();
 
-  if (alreadyOnLogin) return;
+  if (alreadyOnLogin) {
+    // They are where the redirect would have taken them. Release the claim so
+    // the session that follows can still be redirected when it expires.
+    AuthService.cancelSessionExpiryRedirect();
+    return;
+  }
 
   navigator.pushAndRemoveUntil(
     MaterialPageRoute<void>(
@@ -60,9 +104,19 @@ Future<http_real.Response> get(Uri url, {Map<String, String>? headers}) async {
   return response;
 }
 
-Future<http_real.Response> post(Uri url, {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
+/// [redirectOn401] is false only for the auth endpoints themselves. Signing in
+/// is not something a session can expire out of, and logging out with an
+/// already-expired token answers 401 by design — redirecting then would race
+/// the logout's own navigation to the login page.
+Future<http_real.Response> post(
+  Uri url, {
+  Map<String, String>? headers,
+  Object? body,
+  Encoding? encoding,
+  bool redirectOn401 = true,
+}) async {
   final response = await _client.post(url, headers: headers, body: body, encoding: encoding);
-  await _handle401(response);
+  if (redirectOn401) await _handle401(response);
   return response;
 }
 

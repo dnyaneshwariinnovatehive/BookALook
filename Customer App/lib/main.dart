@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/splash_screen.dart';
 import 'services/deep_link_service.dart';
+import 'services/http_client.dart' show topRouteObserver;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
@@ -42,6 +43,8 @@ class MyApp extends StatelessWidget {
           // A link can land before any screen exists, so routing goes through
           // this key rather than a BuildContext.
           navigatorKey: DeepLinkService.navigatorKey,
+          // Lets an expiring session see that the login page is already up.
+          navigatorObservers: [topRouteObserver],
           title: 'BookALook Customer',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

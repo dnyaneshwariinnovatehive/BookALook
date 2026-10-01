@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'location_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'push_notification_service.dart';
+import 'http_client.dart' as http;
 
 class AuthService {
   static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
@@ -43,6 +44,7 @@ class AuthService {
         Uri.parse('$baseUrl/send-otp'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: jsonEncode({'phone': phone}),
+        redirectOn401: false,
       );
       
       if (response.statusCode == 200) {
@@ -51,7 +53,7 @@ class AuthService {
         return 'HTTP Error ${response.statusCode}: ${response.body}';
       }
     } catch (e) {
-      print('Send OTP error: $e');
+      debugPrint('Send OTP error: $e');
       return 'Network Exception: $e';
     }
   }
@@ -68,6 +70,7 @@ class AuthService {
         Uri.parse('$baseUrl/verify-otp'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: jsonEncode(body),
+        redirectOn401: false,
       );
 
       if (response.statusCode == 200) {
@@ -80,10 +83,10 @@ class AuthService {
           return 'requires_registration';
         }
       }
-      print('Verify OTP failed: ${response.body}');
+      debugPrint('Verify OTP failed: ${response.body}');
       return false;
     } catch (e) {
-      print('Verify OTP error: $e');
+      debugPrint('Verify OTP error: $e');
       rethrow;
     }
   }
@@ -118,6 +121,7 @@ class AuthService {
         Uri.parse('$baseUrl/complete-profile'),
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: jsonEncode(body),
+        redirectOn401: false,
       );
 
       if (response.statusCode == 200) {
@@ -128,10 +132,10 @@ class AuthService {
           return true;
         }
       }
-      print('Complete Profile failed: ${response.body}');
+      debugPrint('Complete Profile failed: ${response.body}');
       return false;
     } catch (e) {
-      print('Complete Profile error: $e');
+      debugPrint('Complete Profile error: $e');
       return false;
     }
   }
@@ -148,9 +152,10 @@ class AuthService {
             'Accept': 'application/json',
             'Authorization': 'Bearer $token',
           },
+          redirectOn401: false,
         );
       } catch (e) {
-        print('Logout error: $e');
+        debugPrint('Logout error: $e');
       }
     }
     await _removeToken();
