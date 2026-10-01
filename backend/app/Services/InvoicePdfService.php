@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Support\InvoiceTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -25,27 +25,23 @@ use Throwable;
  */
 class InvoicePdfService
 {
-    /**
-     * The disk the PDFs are published to.
-     *
-     * Cloudinary rather than local storage because the URL is handed to a
-     * third-party messaging provider to fetch, which means it has to be
-     * reachable from the public internet on a hostname that is not
-     * `localhost`. A file on the app server's disk is invisible to AISensy even
-     * when the app itself is perfectly reachable.
-     */
-    private const DISK = 'cloudinary';
-
     /** Path prefix. Kept flat so the media library is navigable. */
     private const PREFIX = 'invoices';
 
     /**
      * A public URL for this invoice's PDF, rendering and uploading it once.
      *
-     * Returns null rather than throwing when the disk is unusable. An invoice is
-     * already issued and already visible in the app by the time anyone asks for
-     * a PDF of it, so failing to produce one is an operational problem to log
-     * and report — never a reason to fail the booking that caused the invoice.
+     * Cloudinary rather than local storage because the URL is handed to a
+     * third-party messaging provider to fetch, which means it has to be
+     * reachable from the public internet on a hostname that is not `localhost`.
+     * A file on the app server's disk is invisible to AISensy even when the app
+     * itself is perfectly reachable.
+     *
+     * Returns null rather than throwing when the upload is not possible. An
+     * invoice is already issued and already visible in the app by the time
+     * anyone asks for a PDF of it, so failing to produce one is an operational
+     * problem to log and report — never a reason to fail the booking that caused
+     * the invoice.
      */
     public function urlFor(Invoice $invoice): ?string
     {
@@ -54,8 +50,6 @@ class InvoicePdfService
         }
 
         try {
-            $disk = Storage::disk(self::DISK);
-
             $pdf = Pdf::loadView('invoices.pdf', [
                 'invoice' => $invoice,
                 // Frozen onto the invoice at issue time, with defaults filled in.
@@ -97,23 +91,64 @@ class InvoicePdfService
                 fwrite($stream, $pdf);
                 rewind($stream);
 
-                $stored = $disk->put($path, $stream);
+                // Uploaded through the SDK rather than Storage::put(), because the
+                // disk adapter cannot express what a PDF needs. Two reasons, both
+                // found in production:
+                //
+                // 1. It builds the public ID from pathinfo(), which drops the
+                //    extension, and it classifies application/pdf as a *raw*
+                //    resource. A raw upload only gets a filename when the file is
+                //    a local path, so a streamed upload reaches Cloudinary with a
+                //    nameless multipart part. Cloudinary then falls back to
+                //    treating the body as a source URL and rejects the whole
+                //    request — first as "Invalid request parameters", and with the
+                //    filename supplied it is accepted. The adapter's write() also
+                //    ignores the $options argument outright, so there is no way to
+                //    pass the name through it. Screenshots are unaffected because
+                //    they are uploaded as images and Cloudinary sniffs their
+                //    content instead.
+                //
+                // 2. It returns no URL. Storage::url() would have to *guess* the
+                //    public URL by string-building the path, when the upload
+                //    response carries the real one.
+                //
+                // Going direct also keeps the same stream fix: a string here would
+                // be read as a local file path and fopen() called on the PDF.
+                $response = Cloudinary::uploadApi()->upload($stream, [
+                    'public_id' => Str::beforeLast($path, '.'),
+                    'resource_type' => 'raw',
+                    'format' => 'pdf',
+                    // Named explicitly because the SDK only infers a filename from a
+                    // local path. Without it a raw stream is read as an *URL* by the
+                    // Cloudinary API, which is the whole failure in one line.
+                    'filename' => $invoice->invoice_number.'.pdf',
+                ]);
+            } catch (Throwable $e) {
+                report($e);
+
+                Log::warning('Invoice PDF upload failed', [
+                    'invoice_id' => $invoice->id,
+                    'path' => $path,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
             } finally {
                 if (is_resource($stream)) {
                     fclose($stream);
                 }
             }
 
-            if (! $stored) {
-                Log::warning('Invoice PDF upload returned false', [
+            $url = $response['secure_url'] ?? null;
+
+            if (! is_string($url) || $url === '') {
+                Log::warning('Cloudinary returned no URL for the invoice PDF', [
                     'invoice_id' => $invoice->id,
                     'path' => $path,
                 ]);
 
                 return null;
             }
-
-            $url = $disk->url($path);
 
             $invoice->forceFill(['pdf_url' => $url])->save();
 

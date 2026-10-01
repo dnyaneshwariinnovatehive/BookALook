@@ -17,8 +17,8 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Tests\Support\FakesCloudinaryUpload;
 use Tests\TestCase;
 
 /**
@@ -41,6 +41,7 @@ use Tests\TestCase;
 class WhatsAppOutboxTest extends TestCase
 {
     use DatabaseTransactions;
+    use FakesCloudinaryUpload;
 
     private ?Appointment $appointment = null;
 
@@ -113,7 +114,7 @@ class WhatsAppOutboxTest extends TestCase
 
         $appointment = $this->appointment();
 
-        app(\App\Services\Notifications\NotificationService::class)
+        app(NotificationService::class)
             ->bookingConfirmed($appointment, 'Glow Studio', 'Sep 26, 2026 at 4:30 PM');
 
         // The provider must not have been called during the request.
@@ -131,11 +132,11 @@ class WhatsAppOutboxTest extends TestCase
 
         $appointment = $this->appointment();
 
-        app(\App\Services\Notifications\NotificationService::class)
+        app(NotificationService::class)
             ->bookingConfirmed($appointment, 'Glow Studio', 'Sep 26, 2026 at 4:30 PM');
 
         $message = WhatsAppMessage::where('related_appointment_id', $appointment->id)
-            ->where('template', 'bookalook_booking_confirmed')
+            ->where('template', config('services.whatsapp.templates.booking_confirmed'))
             ->firstOrFail();
 
         // The invoice is named, not resolved: at this point in the booking it does
@@ -146,7 +147,10 @@ class WhatsAppOutboxTest extends TestCase
 
     public function test_the_job_attaches_the_invoice_pdf_before_sending(): void
     {
-        Storage::fake('cloudinary');
+        // The upload goes through the Cloudinary SDK now, so Storage::fake() no
+        // longer intercepts it — without this the test would upload to the real
+        // account named in .env.
+        $this->fakeCloudinaryUpload();
 
         // The job resolves the gateway through the container, so the driver has to
         // be switched here rather than the gateway injected — otherwise the test
@@ -180,14 +184,14 @@ class WhatsAppOutboxTest extends TestCase
 
         $message = WhatsAppMessage::create([
             'to_phone' => '9876543210',
-            'template' => 'bookalook_booking_confirmed',
+            'template' => config('services.whatsapp.templates.booking_confirmed'),
             'payload' => ['parameters' => ['Glow Studio'], 'attachment' => 'invoice'],
             'related_appointment_id' => $appointment->id,
             'status' => WhatsAppMessage::STATUS_QUEUED,
         ]);
 
         (new SendWhatsAppMessageJob($message->id))->handle(
-            app(\App\Services\Notifications\WhatsAppGateway::class),
+            app(WhatsAppGateway::class),
             app(InvoicePdfService::class),
         );
 
@@ -217,7 +221,7 @@ class WhatsAppOutboxTest extends TestCase
         ]);
 
         (new SendWhatsAppMessageJob($message->id))->handle(
-            app(\App\Services\Notifications\WhatsAppGateway::class),
+            app(WhatsAppGateway::class),
             app(InvoicePdfService::class),
         );
 
@@ -294,6 +298,10 @@ class WhatsAppOutboxTest extends TestCase
     public function test_the_drain_command_does_nothing_on_the_log_driver(): void
     {
         Queue::fake();
+
+        // Pinned rather than assumed: .env may name a real provider, and this test
+        // is about what the command does when it cannot send.
+        config(['services.whatsapp.driver' => 'log']);
 
         // The log driver is the default, and it leaves rows `queued` on purpose.
         $message = WhatsAppMessage::create([
@@ -407,7 +415,7 @@ class WhatsAppOutboxTest extends TestCase
 
         $admin = User::create([
             'name' => "Outbox Admin {$unique}",
-            'phone' => '9' . substr((string) crc32("admin{$unique}"), 0, 9),
+            'phone' => '9'.substr((string) crc32("admin{$unique}"), 0, 9),
             'password_hash' => 'x',
             'role' => 'admin',
             'is_active' => true,
@@ -415,7 +423,7 @@ class WhatsAppOutboxTest extends TestCase
 
         $customer = User::create([
             'name' => "Outbox Customer {$unique}",
-            'phone' => '9' . substr((string) crc32("cust{$unique}"), 0, 9),
+            'phone' => '9'.substr((string) crc32("cust{$unique}"), 0, 9),
             'password_hash' => 'x',
             'role' => 'customer',
             'is_active' => true,
@@ -433,7 +441,7 @@ class WhatsAppOutboxTest extends TestCase
 
         $staffUser = User::create([
             'name' => "Outbox Staff {$unique}",
-            'phone' => '8' . substr((string) crc32("staff{$unique}"), 0, 9),
+            'phone' => '8'.substr((string) crc32("staff{$unique}"), 0, 9),
             'password_hash' => 'x',
             'role' => 'service_provider',
             'is_active' => true,

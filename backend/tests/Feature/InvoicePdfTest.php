@@ -11,8 +11,9 @@ use App\Models\User;
 use App\Services\InvoicePdfService;
 use App\Support\InvoiceTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\Storage;
+use Tests\Support\FakesCloudinaryUpload;
 use Tests\TestCase;
 
 /**
@@ -37,6 +38,7 @@ use Tests\TestCase;
 class InvoicePdfTest extends TestCase
 {
     use DatabaseTransactions;
+    use FakesCloudinaryUpload;
 
     public function test_it_renders_an_invoice_to_a_pdf(): void
     {
@@ -53,8 +55,7 @@ class InvoicePdfTest extends TestCase
 
     public function test_it_uploads_the_pdf_and_records_the_url(): void
     {
-        Storage::fake('cloudinary');
-
+        $cloud = $this->fakeCloudinaryUpload();
         $invoice = $this->issuedInvoice();
 
         $url = app(InvoicePdfService::class)->urlFor($invoice);
@@ -62,129 +63,87 @@ class InvoicePdfTest extends TestCase
         $this->assertNotNull($url, 'the PDF should have been produced');
         $this->assertSame($url, $invoice->refresh()->pdf_url);
 
-        // Asserted against the disk's own listing rather than by picking the path
-        // back out of the URL: what matters is that the URL handed to AISensy
-        // names the file that is actually there.
-        $files = Storage::disk('cloudinary')->allFiles();
+        // Asserted against the public ID and format actually sent, rather than by
+        // picking the path back out of the URL: what matters is that the URL handed
+        // to AISensy names the file that is actually there.
+        $this->assertStringStartsWith('invoices/', $cloud->options['public_id']);
+        $this->assertSame('pdf', $cloud->options['format']);
+        $this->assertStringEndsWith('/'.basename($url), $url);
+    }
 
-        $this->assertCount(1, $files);
-        $this->assertStringStartsWith('invoices/', $files[0]);
-        $this->assertStringEndsWith('/'.basename($files[0]), $url);
+    public function test_the_upload_names_the_pdf_so_cloudinary_accepts_it(): void
+    {
+        // Found in production. The disk adapter classifies application/pdf as a
+        // *raw* resource, and the SDK only infers a filename from a local path. A
+        // streamed raw upload therefore reaches Cloudinary as a nameless multipart
+        // part, and Cloudinary falls back to reading the body as a *source URL*,
+        // rejecting the request with "Invalid request parameters". Passing the
+        // filename explicitly is what turns the body back into a file.
+        //
+        // This is why screenshots upload fine and invoices do not: they go up as
+        // images, where Cloudinary sniffs the content rather than trusting a name.
+        $cloud = $this->fakeCloudinaryUpload();
+        $invoice = $this->issuedInvoice();
+        $this->assertNotNull(app(InvoicePdfService::class)->urlFor($invoice));
+
+        $this->assertSame(
+            $invoice->invoice_number.'.pdf',
+            $cloud->options['filename'],
+            'a raw stream without an explicit filename is read as a source URL and rejected'
+        );
+        $this->assertSame('raw', $cloud->options['resource_type'], 'a PDF is a raw resource, not an image');
+        $this->assertSame('pdf', $cloud->options['format']);
+        $this->assertStringNotContainsString(
+            '.pdf',
+            $cloud->options['public_id'],
+            'the public ID must not carry the extension as well as declaring the format, or Cloudinary stores it twice'
+        );
+    }
+
+    public function test_the_url_comes_from_the_upload_response_rather_than_being_guessed(): void
+    {
+        // Storage::url() would string-build the public URL from the path. The
+        // upload response carries the real one, so that is what gets stored —
+        // otherwise a CDN prefix or a signature would be silently dropped and
+        // AISensy would be handed a URL that 404s.
+        $cloud = $this->fakeCloudinaryUpload();
+        $invoice = $this->issuedInvoice();
+
+        $url = app(InvoicePdfService::class)->urlFor($invoice);
+
+        $this->assertNotNull($url);
+        $this->assertSame(
+            'https://res.cloudinary.com/demo/image/upload/'.$cloud->options['public_id'].'.pdf',
+            $url
+        );
+    }
+
+    public function test_a_cloudinary_failure_leaves_the_invoice_without_a_pdf_url(): void
+    {
+        // An invoice is already issued and already visible in the app by the time
+        // anyone asks for a PDF of it, so an upload failure is something to log
+        // and report — never a reason to fail the booking that caused it, and never
+        // a reason to record a URL that does not resolve.
+        Cloudinary::shouldReceive('uploadApi')->andThrow(new \RuntimeException('Invalid request parameters'));
+
+        $invoice = $this->issuedInvoice();
+
+        $this->assertNull(app(InvoicePdfService::class)->urlFor($invoice));
+        $this->assertNull($invoice->refresh()->pdf_url);
     }
 
     public function test_the_pdf_reaches_cloudinary_as_a_stream_rather_than_a_string(): void
     {
-        // Found in production. Storage::fake() swaps in a local disk, and a local
-        // disk is happy to be handed the PDF as a string of bytes, so the faked
-        // disk proves nothing about the real Cloudinary adapter.
-        //
-        // The adapter forwards a bare string into Cloudinary's upload API, which
-        // reads a string as a *local file path* and calls fopen() on it. A PDF is
-        // binary and full of null bytes, so fopen() refuses it and the upload
-        // throws "Argument #1 ($filename) must not contain any null bytes" — which
-        // names neither Cloudinary nor PDF generation, and so read as a corrupt
-        // file rather than a contract mismatch. Because the catch in urlFor()
-        // swallows it into a log line, the customer simply never received a
-        // message.
-        //
-        // This drives a real Laravel FilesystemAdapter over a recording Flysystem
-        // adapter, so what is asserted is the contract between the two libraries
-        // rather than the behaviour of a substitute disk. The recorded value is
-        // the last thing that crossed into the adapter — the same position the
-        // real Cloudinary adapter occupies.
-        $recorded = new class implements \League\Flysystem\FilesystemAdapter
-        {
-            public mixed $received = null;
-
-            public function fileExists(string $path): bool
-            {
-                return true;
-            }
-
-            public function directoryExists(string $path): bool
-            {
-                return true;
-            }
-
-            public function write(string $path, string $contents, \League\Flysystem\Config $config): void
-            {
-                $this->received = ['type' => 'string', 'value' => $contents];
-            }
-
-            public function writeStream(string $path, $contents, \League\Flysystem\Config $config): void
-            {
-                // Read it here rather than after the call returns: the caller owns
-                // the handle and closes it, which is correct of it and is exactly
-                // why a stream is a one-shot thing to test against.
-                $this->received = ['type' => 'stream', 'value' => $contents];
-                $this->body = (string) stream_get_contents($contents);
-            }
-
-            public function read(string $path): string
-            {
-                return '';
-            }
-
-            public function readStream(string $path)
-            {
-                return null;
-            }
-
-            public function delete(string $path): void {}
-
-            public function deleteDirectory(string $path): void {}
-
-            public function createDirectory(string $path, \League\Flysystem\Config $config): void {}
-
-            public function setVisibility(string $path, string $visibility): void {}
-
-            public function listContents(string $path, bool $deep): iterable
-            {
-                return [];
-            }
-
-            public function move(string $source, string $destination, \League\Flysystem\Config $config): void {}
-
-            public function copy(string $source, string $destination, \League\Flysystem\Config $config): void {}
-
-            /** The real adapter answers this; url() falls through to it. */
-            public function getUrl(string $path): string
-            {
-                return 'https://res.cloudinary.com/demo/image/upload/'.$path;
-            }
-
-            public function visibility(string $path): \League\Flysystem\FileAttributes
-            {
-                return new \League\Flysystem\FileAttributes($path);
-            }
-
-            public function mimeType(string $path): \League\Flysystem\FileAttributes
-            {
-                return new \League\Flysystem\FileAttributes($path);
-            }
-
-            public function lastModified(string $path): \League\Flysystem\FileAttributes
-            {
-                return new \League\Flysystem\FileAttributes($path);
-            }
-
-            public function fileSize(string $path): \League\Flysystem\FileAttributes
-            {
-                return new \League\Flysystem\FileAttributes($path);
-            }
-        };
-
-        Storage::extend('recording', fn () => new \Illuminate\Filesystem\FilesystemAdapter(
-            new \League\Flysystem\Filesystem($recorded),
-            $recorded
-        ));
-
-        config([
-            'filesystems.disks.cloudinary' => [
-                'driver' => 'recording',
-                'url' => 'https://res.cloudinary.com/demo/image/upload',
-            ],
-        ]);
+        // Found in production. The first version of this passed a string, because
+        // that is what Storage::put() is documented to take and what every other
+        // disk in the app wants. Cloudinary's upload API reads a bare string as a
+        // *local file path* and calls fopen() on it. A PDF is binary and full of
+        // null bytes, so fopen() refuses it and the upload throws "Argument #1
+        // ($filename) must not contain any null bytes" — an error that names
+        // neither Cloudinary nor PDF generation, so it read as a corrupt file
+        // rather than a contract mismatch. Because the catch in urlFor() swallows
+        // it into a log line, the customer simply never received a message.
+        $cloud = $this->fakeCloudinaryUpload();
 
         $invoice = $this->issuedInvoice();
 
@@ -193,52 +152,19 @@ class InvoicePdfTest extends TestCase
             'the PDF should have been produced'
         );
 
-        $this->assertIsArray($recorded->received, 'nothing reached the upload adapter');
-        $this->assertSame(
-            'stream',
-            $recorded->received['type'],
+        $this->assertIsResource(
+            $cloud->asset,
             'Cloudinary must receive a stream; a string is treated as a local file path and fopen() is called on the PDF itself'
         );
-        $this->assertIsResource($recorded->received['value']);
 
-        // The stream has to hold the PDF itself, not a path to it. Read inside the
-        // adapter, because the caller closes the handle once it is done.
-        $this->assertStringStartsWith('%PDF', $recorded->body);
-        $this->assertStringContainsString('%EOF', $recorded->body, 'a truncated write would still start with %PDF');
-    }
-
-    public function test_the_stored_pdf_is_byte_identical_to_the_rendered_one(): void
-    {
-        // Guards the seam this fix introduced. The bytes now travel through a
-        // stream rather than being handed over directly, and a stream can be read
-        // once — so a rewrite that forgets to rewind, or that reads the handle
-        // after the upload consumed it, would store an empty file that still
-        // satisfies a "does it start with %PDF" check on the wrong side of the
-        // read.
-        Storage::fake('cloudinary');
-
-        $invoice = $this->issuedInvoice();
-
-        $url = app(InvoicePdfService::class)->urlFor($invoice);
-        $this->assertNotNull($url);
-
-        $files = Storage::disk('cloudinary')->allFiles();
-        $this->assertCount(1, $files);
-
-        $stored = Storage::disk('cloudinary')->get($files[0]);
-
-        $this->assertStringStartsWith('%PDF', $stored, 'the stored file must be the PDF itself');
-        $this->assertStringContainsString('%EOF', $stored, 'the stored file must be complete, not a truncated stream');
-        $this->assertGreaterThan(
-            1000,
-            strlen($stored),
-            'a PDF this small means the stream was consumed rather than copied'
-        );
+        // The stream has to hold the PDF itself, not a path to it.
+        $this->assertStringStartsWith('%PDF', $cloud->body);
+        $this->assertStringContainsString('%EOF', $cloud->body, 'a truncated write would still start with %PDF');
     }
 
     public function test_the_url_is_reused_rather_than_re_rendered(): void
     {
-        Storage::fake('cloudinary');
+        $cloud = $this->fakeCloudinaryUpload();
 
         $invoice = $this->issuedInvoice();
         $service = app(InvoicePdfService::class);
@@ -250,9 +176,13 @@ class InvoicePdfTest extends TestCase
         // WhatsApp send would hand the customer two identical receipts.
         $this->assertSame($first, $service->urlFor($invoice));
 
-        $this->assertCount(
+        // Counted on the upload API rather than by listing a fake disk: the second
+        // call has to be answered from the cached URL, so Cloudinary must never be
+        // reached again.
+        $this->assertSame(
             1,
-            collect(Storage::disk('cloudinary')->allFiles())->filter(fn ($f) => str_contains($f, '.pdf'))
+            $cloud->uploads,
+            'a second render would leave the customer with two identical receipts at different URLs'
         );
     }
 
@@ -312,19 +242,14 @@ class InvoicePdfTest extends TestCase
         $this->assertStringStartsWith('%PDF', $output);
     }
 
-    public function test_a_broken_disk_does_not_throw(): void
+    public function test_an_upload_that_reports_no_url_does_not_throw(): void
     {
-        // The shape of a staging box where CLOUDINARY_URL has been filled in with
-        // something that cannot be written to. Pointed *inside* a file rather than
-        // at a nonexistent path, because "a directory that does not exist" is
-        // quietly creatable on some platforms and not others, and this test is not
-        // about filesystems.
-        config([
-            'filesystems.disks.cloudinary' => [
-                'driver' => 'local',
-                'root' => storage_path('logs/laravel.log/impossible'),
-            ],
-        ]);
+        // A 200 from Cloudinary carrying neither secure_url nor public_id is the
+        // shape of a misconfigured account — wrong API secret, wrong cloud, or a
+        // signed-upload profile with no delivery. Storing an empty pdf_url would
+        // be worse than storing none: urlFor() short-circuits on a filled value,
+        // so the invoice would be cached as "already done" and never retried.
+        $this->fakeCloudinaryUpload('');
 
         $invoice = $this->issuedInvoice();
 
@@ -332,6 +257,7 @@ class InvoicePdfTest extends TestCase
         // to produce a PDF is a thing to log and report — never a reason to fail
         // the booking that caused it.
         $this->assertNull(app(InvoicePdfService::class)->urlFor($invoice));
+        $this->assertNull($invoice->refresh()->pdf_url);
     }
 
     // ------------------------------------------------------------- fixtures
