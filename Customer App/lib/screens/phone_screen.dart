@@ -2,7 +2,6 @@ import 'main_screen.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
-import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../utils/auth_errors.dart';
 import '../utils/auth_motion.dart';

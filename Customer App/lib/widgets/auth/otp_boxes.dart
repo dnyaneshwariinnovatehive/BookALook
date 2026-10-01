@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../theme/app_theme.dart';
 import '../../utils/auth_motion.dart';
 import '../../theme/app_colors.dart';
 

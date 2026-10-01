@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/phone_screen.dart';
 import '../services/http_client.dart' show loginRouteName;
-import '../theme/app_theme.dart';
 
 class GuestRestrictedView extends StatelessWidget {
   final String title;

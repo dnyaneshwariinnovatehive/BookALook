@@ -5,7 +5,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:customer_app/services/http_client.dart' as http;
 
-import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
 
 /// Two dependent dropdowns: the city, then the locality inside it.
