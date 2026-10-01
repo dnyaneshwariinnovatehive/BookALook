@@ -7,6 +7,8 @@ import '../theme/app_theme.dart';
 import '../widgets/category_grid.dart';
 import 'category_salons_screen.dart';
 import '../theme/app_colors.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 /// Every category the platform has, as a grid.
 ///
@@ -79,18 +81,37 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? Center(
-                child: CircularProgressIndicator(color: AppTheme.accentColor),
-              )
-            : GridView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _columns,
-                  crossAxisSpacing: _gap,
-                  mainAxisSpacing: _gap,
-                  // Square icon box plus one line of label underneath.
-                  childAspectRatio: 1 / 1.32,
+            ? Skeleton(
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                  gridDelegate: _gridDelegate,
+                  itemCount: 12,
+                  itemBuilder: (_, _) => const CategoryTileSkeleton(),
                 ),
+              )
+            : Column(
+                children: [
+                  // The service returns an empty list on failure, so an empty
+                  // catalogue is the only sign a load went wrong. Without this
+                  // the screen showed Combo alone and said nothing.
+                  if (_categories.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                      child: InlineStatus(
+                        message: 'Could not load the categories. Only Combo is shown.',
+                        kind: StatusKind.warning,
+                        onRetry: _retry,
+                      ),
+                    ),
+                  Expanded(
+                    child: RefreshIndicator(
+                      color: AppTheme.accentColor,
+                      onRefresh: _fetchCategories,
+                      child: GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                gridDelegate: _gridDelegate,
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final category = items[index];
@@ -103,8 +124,26 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   );
                 },
               ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
+  }
+
+  /// Square icon box plus one line of label underneath; shared by the grid
+  /// and its skeleton so the placeholder lands where the tiles will.
+  static const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: _columns,
+    crossAxisSpacing: _gap,
+    mainAxisSpacing: _gap,
+    childAspectRatio: 1 / 1.32,
+  );
+
+  void _retry() {
+    setState(() => _isLoading = true);
+    _fetchCategories();
   }
 
   static const (Color, Color) _comboTint = (Color(0xFFF3EBFE), Color(0xFF9C54F2));
