@@ -92,6 +92,62 @@ class InvoicePdfTest extends TestCase
         );
     }
 
+    public function test_a_logo_url_carrying_control_characters_is_dropped(): void
+    {
+        // Found in production: a SuperAdmin-authored logo URL containing a null
+        // byte reached dompdf, which passes it to fopen()/curl. Both refuse such a
+        // path by throwing, and dompdf does not catch that, so the render died —
+        // and because the PDF is the WhatsApp attachment, the customer message
+        // died with it. The provider reported the send as "Media URL Missing",
+        // which points at AISensy rather than at the logo, so this is easy to
+        // misread as a messaging problem.
+        //
+        // Asserted on the sanitiser rather than through a render: the failure is
+        // that the value escapes at all, and a render-level test would pass or
+        // fail on the machine's GD build instead of on the behaviour.
+        foreach ([
+            "https://cdn.example.com/logo.jpg\0",
+            "https://cdn.example.com/lo\0go.jpg",
+            "https://cdn.example.com/logo.jpg\0.php",
+            "https://cdn.example.com/logo.jpg\n",
+            "https://cdn.example.com/logo.jpg\r\n",
+            "https://cdn.example.com/logo.jpg\t",
+        ] as $hostile) {
+            $sanitised = InvoiceTemplate::sanitise(['invoice_logo_url' => $hostile]);
+
+            $this->assertSame('', $sanitised['invoice_logo_url'], 'A logo URL containing a control character must not survive sanitisation.');
+        }
+
+        // The scheme check is still a prefix check, so make sure tightening it did
+        // not turn into something that rejects real URLs.
+        $legitimate = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
+        $this->assertSame(
+            $legitimate,
+            InvoiceTemplate::sanitise(['invoice_logo_url' => $legitimate])['invoice_logo_url']
+        );
+    }
+
+    public function test_an_invoice_with_a_hostile_logo_url_still_renders(): void
+    {
+        $invoice = $this->issuedInvoice();
+        $invoice->template = array_merge($invoice->template ?? [], [
+            'invoice_show_logo' => true,
+            'invoice_logo_url' => "https://cdn.example.com/logo.jpg\0",
+        ]);
+
+        $output = Pdf::loadView('invoices.pdf', [
+            'invoice' => $invoice,
+            'settings' => InvoiceTemplate::sanitise($invoice->template),
+        ])->setOptions([
+            'isRemoteEnabled' => true,
+            'isPhpEnabled' => false,
+            'isJavascriptEnabled' => false,
+            'isHtml5ParserEnabled' => false,
+        ])->output();
+
+        $this->assertStringStartsWith('%PDF', $output);
+    }
+
     public function test_a_broken_disk_does_not_throw(): void
     {
         // The shape of a staging box where CLOUDINARY_URL has been filled in with

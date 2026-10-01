@@ -77,8 +77,21 @@ class InvoiceTemplate
 
         // An <img src> is an injection point as much as a URL is, so only the
         // schemes that can actually serve an image are allowed through.
+        //
+        // The whole string has to be free of control characters, not just have
+        // the right prefix. dompdf hands this value to fopen() and curl, and both
+        // refuse a path containing a null byte by throwing — which is not caught
+        // inside dompdf, so one stored logo URL with a stray byte anywhere in it
+        // takes down the render of every invoice that carries it, and with it the
+        // WhatsApp send, because the PDF is the attachment. A control character
+        // has no legitimate place in an image URL, so it is rejected outright
+        // rather than stripped: trimming would silently "fix" a value whose
+        // real problem is that it was never a URL.
         $logo = (string) ($template['invoice_logo_url'] ?? '');
-        $out['invoice_logo_url'] = preg_match('#^(https?://|/)#i', $logo) ? $logo : '';
+        $out['invoice_logo_url'] = preg_match('#\A(?:https?://|/)#i', $logo)
+            && preg_match('/[\x00-\x1F\x7F]/', $logo) !== 1
+                ? $logo
+                : '';
 
         return $out;
     }
