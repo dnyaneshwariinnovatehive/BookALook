@@ -7,6 +7,8 @@ import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import 'feedback_states.dart';
 
 /// The horizontally scrolling services of one category inside a salon card.
 ///
@@ -74,6 +76,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
       setState(() {
         _added[serviceId] = (_added[serviceId] ?? 0) + 1;
       });
+      setState(() => _error = null);
       _toast('${service['name'] ?? 'Service'} added to cart');
     } on CartConflictException catch (e) {
       if (!mounted) return;
@@ -82,7 +85,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      _toast(e.toString().replaceFirst('Exception: ', ''));
+      setState(() => _error = describeError(e, fallback: 'Could not add that to your cart.'));
     } finally {
       if (mounted) setState(() => _adding.remove(serviceId));
     }
@@ -123,7 +126,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
                 await _cartService.clearGlobalCart();
               } catch (_) {
                 if (!mounted) return;
-                _toast('Could not clear your cart.');
+                setState(() => _error = 'Could not clear your cart. Please try again.');
                 return;
               }
               if (!mounted) return;
@@ -141,6 +144,10 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
       ),
     );
   }
+
+  /// A failed add, shown under the strip. Confirmations ("added to cart")
+  /// stay as a SnackBar via [_toast].
+  String? _error;
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
@@ -209,6 +216,13 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
             },
           ),
         ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          InlineStatus(
+            message: _error!,
+            onDismiss: () => setState(() => _error = null),
+          ),
+        ],
       ],
     );
   }
