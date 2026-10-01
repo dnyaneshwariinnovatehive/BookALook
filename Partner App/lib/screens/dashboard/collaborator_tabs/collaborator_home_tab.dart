@@ -180,6 +180,11 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
 
           const SizedBox(height: 22),
           _buildHowItWorks(),
+
+          if (_alerts.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            _buildRenewalStrip(),
+          ],
         ],
       ),
     );
@@ -359,6 +364,158 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------- renewals
+
+  /// A short horizontal run of the salons whose plans are running out.
+  ///
+  /// The alerts section above this says the same thing in a paragraph. This one
+  /// exists because renewal work is per-salon and you approach it as a queue:
+  /// you want to see how many, glance at which, and work down them — not read
+  /// about them. Both read the same [CollaboratorApi.alerts] payload, so they
+  /// cannot disagree about who is on the list.
+  Widget _buildRenewalStrip() {
+    final palette = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.event_busy_outlined, size: 17, color: palette.danger),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Renewals coming up',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'A collaborator cannot renew a plan — only the owner can pay. These are '
+          'the calls worth making first.',
+          style: TextStyle(
+            fontSize: 11.5,
+            height: 1.4,
+            color: palette.textTertiary,
+          ),
+        ),
+        const SizedBox(height: 11),
+        SizedBox(
+          height: 148,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            itemCount: _alerts.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) => _buildRenewalMiniCard(
+              Map<String, dynamic>.from(_alerts[i] as Map),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRenewalMiniCard(Map<String, dynamic> alert) {
+    final lapsed = alert['severity'] == 'lapsed';
+    final days = (alert['days_left'] as num?)?.toInt();
+    final colour = lapsed ? context.colors.danger : context.colors.warning;
+    final palette = context.colors;
+
+    final countdown = lapsed
+        ? 'Offline'
+        : days == null
+        ? '—'
+        : days <= 0
+        ? 'Ends today'
+        : days == 1
+        ? '1 day left'
+        : '$days days left';
+
+    return SizedBox(
+      width: 172,
+      child: CollaboratorCard(
+        color: lapsed ? palette.dangerBg : palette.warningBg,
+        borderColor: colour.withValues(alpha: 0.3),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  lapsed ? Icons.wifi_off_rounded : Icons.timer_outlined,
+                  size: 14,
+                  color: colour,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    countdown,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: colour,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              alert['salon_name']?.toString() ?? 'Salon',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.bold,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              [alert['owner_name'], alert['city']]
+                  .where((p) => p != null && p.toString().isNotEmpty)
+                  .join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: palette.textSecondary),
+            ),
+            const Spacer(),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => _callOwner(
+                  alert['owner_phone']?.toString(),
+                  alert['salon_name']?.toString() ?? 'the salon',
+                ),
+                icon: const Icon(Icons.call, size: 14),
+                label: const Text(
+                  'Call owner',
+                  style: TextStyle(fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: colour,
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -127,6 +127,19 @@ class Salon extends Model
         return $this->hasOne(SalonSubscription::class)->where('status', 'active')->latest('start_date');
     }
 
+    /**
+     * The most recent subscription of any status.
+     *
+     * [self::currentSubscription] alone cannot tell "never had a plan" apart
+     * from "had one and let it lapse" — both answer null. Those are opposite
+     * things to say to a collaborator about a salon they set up, so anything
+     * reporting on subscription health needs both relations.
+     */
+    public function latestSubscription()
+    {
+        return $this->hasOne(SalonSubscription::class)->latestOfMany('start_date');
+    }
+
     public function commissionRates()
     {
         return $this->hasMany(SalonCommissionRate::class)->orderByDesc('effective_from');

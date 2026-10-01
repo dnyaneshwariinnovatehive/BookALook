@@ -91,9 +91,22 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   }
 
   Future<void> _logout() async {
+    // Grabbed before anything is awaited. The root navigator is an ancestor of
+    // the whole shell and outlives this tab, so holding on to it is safe — and it
+    // is what lets the sign-out complete even if the Profile tab is disposed
+    // while the dialog is open. Guarding on `mounted` instead would leave the
+    // collaborator signed-in-but-stranded on a blank panel.
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+
+    // The dialog must be popped with its OWN context. [showDialog] puts its
+    // route on the root navigator, but this tab sits inside a [TabNavigator] —
+    // so `Navigator.pop(context)` on the tab's context pops the tab's only
+    // route instead of the dialog. The dialog then stays on screen forever and
+    // `confirmed` never resolves, which reads to the user as a dead button.
+    // Every collaborator tab is nested this way, so this is not a one-off.
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Log out?'),
         content: const Text(
           'Any salon drafts saved on this device will be cleared. Send anything '
@@ -101,12 +114,16 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Stay'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: context.colors.danger),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).brightness == Brightness.dark
+                  ? AppTheme.darkDanger
+                  : AppTheme.lightDanger,
+            ),
             child: const Text('Log out'),
           ),
         ],
@@ -115,15 +132,19 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
 
     if (confirmed != true) return;
 
-    await PushNotificationService().unregisterDevice();
+    // The token has to go whether or not the device unregisters. A throw from
+    // Firebase in here would otherwise leave the collaborator signed in with a
+    // button that appears to do nothing, and no explanation.
+    try {
+      await PushNotificationService().unregisterDevice();
+    } catch (e) {
+      debugPrint('Could not unregister device on logout: $e');
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
-    if (!mounted) return;
-    // Must bypass the shell's per-tab navigators. Each tab is a [TabNavigator],
-    // so a plain push here would put the login screen inside the Profile tab and
-    // leave the bottom bar sitting under it. See lib/widgets/tab_navigator.dart.
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+    rootNavigator.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const PhoneScreen()),
       (route) => false,
     );
