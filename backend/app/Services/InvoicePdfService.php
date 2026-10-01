@@ -70,7 +70,41 @@ class InvoicePdfService
             // Written under a random name on purpose. The invoice number is the
             // predictable part, and a guessable object path is a document
             // anyone can walk through the media library and read.
-            if (! $disk->put($path, $pdf)) {
+            //
+            // Handed over as a stream rather than as a string of bytes. put() takes
+            // a string and every other disk in the app wants contents, but the
+            // Cloudinary adapter forwards that string straight into its upload API,
+            // which reads a bare string as a *local file path* and calls fopen() on
+            // it. A PDF is binary and carries null bytes throughout, so fopen()
+            // refuses it and the upload dies with "Argument #1 ($filename) must not
+            // contain any null bytes" — an error that reads like a corrupt file
+            // rather than a contract mismatch between two libraries, and which
+            // mentions nothing about Cloudinary or PDF generation.
+            //
+            // A resource takes the writeStream() path instead, which the adapter
+            // forwards as-is and Cloudinary streams without ever naming a path.
+            // The stream is faked from the bytes we already hold, so nothing is
+            // spooled to disk in between.
+            $stream = fopen('php://temp', 'r+b');
+
+            if ($stream === false) {
+                Log::warning('Could not open a stream for the invoice PDF', ['invoice_id' => $invoice->id]);
+
+                return null;
+            }
+
+            try {
+                fwrite($stream, $pdf);
+                rewind($stream);
+
+                $stored = $disk->put($path, $stream);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
+
+            if (! $stored) {
                 Log::warning('Invoice PDF upload returned false', [
                     'invoice_id' => $invoice->id,
                     'path' => $path,

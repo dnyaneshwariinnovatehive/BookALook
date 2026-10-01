@@ -72,6 +72,170 @@ class InvoicePdfTest extends TestCase
         $this->assertStringEndsWith('/'.basename($files[0]), $url);
     }
 
+    public function test_the_pdf_reaches_cloudinary_as_a_stream_rather_than_a_string(): void
+    {
+        // Found in production. Storage::fake() swaps in a local disk, and a local
+        // disk is happy to be handed the PDF as a string of bytes, so the faked
+        // disk proves nothing about the real Cloudinary adapter.
+        //
+        // The adapter forwards a bare string into Cloudinary's upload API, which
+        // reads a string as a *local file path* and calls fopen() on it. A PDF is
+        // binary and full of null bytes, so fopen() refuses it and the upload
+        // throws "Argument #1 ($filename) must not contain any null bytes" — which
+        // names neither Cloudinary nor PDF generation, and so read as a corrupt
+        // file rather than a contract mismatch. Because the catch in urlFor()
+        // swallows it into a log line, the customer simply never received a
+        // message.
+        //
+        // This drives a real Laravel FilesystemAdapter over a recording Flysystem
+        // adapter, so what is asserted is the contract between the two libraries
+        // rather than the behaviour of a substitute disk. The recorded value is
+        // the last thing that crossed into the adapter — the same position the
+        // real Cloudinary adapter occupies.
+        $recorded = new class implements \League\Flysystem\FilesystemAdapter
+        {
+            public mixed $received = null;
+
+            public function fileExists(string $path): bool
+            {
+                return true;
+            }
+
+            public function directoryExists(string $path): bool
+            {
+                return true;
+            }
+
+            public function write(string $path, string $contents, \League\Flysystem\Config $config): void
+            {
+                $this->received = ['type' => 'string', 'value' => $contents];
+            }
+
+            public function writeStream(string $path, $contents, \League\Flysystem\Config $config): void
+            {
+                // Read it here rather than after the call returns: the caller owns
+                // the handle and closes it, which is correct of it and is exactly
+                // why a stream is a one-shot thing to test against.
+                $this->received = ['type' => 'stream', 'value' => $contents];
+                $this->body = (string) stream_get_contents($contents);
+            }
+
+            public function read(string $path): string
+            {
+                return '';
+            }
+
+            public function readStream(string $path)
+            {
+                return null;
+            }
+
+            public function delete(string $path): void {}
+
+            public function deleteDirectory(string $path): void {}
+
+            public function createDirectory(string $path, \League\Flysystem\Config $config): void {}
+
+            public function setVisibility(string $path, string $visibility): void {}
+
+            public function listContents(string $path, bool $deep): iterable
+            {
+                return [];
+            }
+
+            public function move(string $source, string $destination, \League\Flysystem\Config $config): void {}
+
+            public function copy(string $source, string $destination, \League\Flysystem\Config $config): void {}
+
+            /** The real adapter answers this; url() falls through to it. */
+            public function getUrl(string $path): string
+            {
+                return 'https://res.cloudinary.com/demo/image/upload/'.$path;
+            }
+
+            public function visibility(string $path): \League\Flysystem\FileAttributes
+            {
+                return new \League\Flysystem\FileAttributes($path);
+            }
+
+            public function mimeType(string $path): \League\Flysystem\FileAttributes
+            {
+                return new \League\Flysystem\FileAttributes($path);
+            }
+
+            public function lastModified(string $path): \League\Flysystem\FileAttributes
+            {
+                return new \League\Flysystem\FileAttributes($path);
+            }
+
+            public function fileSize(string $path): \League\Flysystem\FileAttributes
+            {
+                return new \League\Flysystem\FileAttributes($path);
+            }
+        };
+
+        Storage::extend('recording', fn () => new \Illuminate\Filesystem\FilesystemAdapter(
+            new \League\Flysystem\Filesystem($recorded),
+            $recorded
+        ));
+
+        config([
+            'filesystems.disks.cloudinary' => [
+                'driver' => 'recording',
+                'url' => 'https://res.cloudinary.com/demo/image/upload',
+            ],
+        ]);
+
+        $invoice = $this->issuedInvoice();
+
+        $this->assertNotNull(
+            app(InvoicePdfService::class)->urlFor($invoice),
+            'the PDF should have been produced'
+        );
+
+        $this->assertIsArray($recorded->received, 'nothing reached the upload adapter');
+        $this->assertSame(
+            'stream',
+            $recorded->received['type'],
+            'Cloudinary must receive a stream; a string is treated as a local file path and fopen() is called on the PDF itself'
+        );
+        $this->assertIsResource($recorded->received['value']);
+
+        // The stream has to hold the PDF itself, not a path to it. Read inside the
+        // adapter, because the caller closes the handle once it is done.
+        $this->assertStringStartsWith('%PDF', $recorded->body);
+        $this->assertStringContainsString('%EOF', $recorded->body, 'a truncated write would still start with %PDF');
+    }
+
+    public function test_the_stored_pdf_is_byte_identical_to_the_rendered_one(): void
+    {
+        // Guards the seam this fix introduced. The bytes now travel through a
+        // stream rather than being handed over directly, and a stream can be read
+        // once — so a rewrite that forgets to rewind, or that reads the handle
+        // after the upload consumed it, would store an empty file that still
+        // satisfies a "does it start with %PDF" check on the wrong side of the
+        // read.
+        Storage::fake('cloudinary');
+
+        $invoice = $this->issuedInvoice();
+
+        $url = app(InvoicePdfService::class)->urlFor($invoice);
+        $this->assertNotNull($url);
+
+        $files = Storage::disk('cloudinary')->allFiles();
+        $this->assertCount(1, $files);
+
+        $stored = Storage::disk('cloudinary')->get($files[0]);
+
+        $this->assertStringStartsWith('%PDF', $stored, 'the stored file must be the PDF itself');
+        $this->assertStringContainsString('%EOF', $stored, 'the stored file must be complete, not a truncated stream');
+        $this->assertGreaterThan(
+            1000,
+            strlen($stored),
+            'a PDF this small means the stream was consumed rather than copied'
+        );
+    }
+
     public function test_the_url_is_reused_rather_than_re_rendered(): void
     {
         Storage::fake('cloudinary');
