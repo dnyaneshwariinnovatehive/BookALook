@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/category.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// The category picker on the home screen.
 ///
@@ -198,7 +199,7 @@ class _CategoryTile extends StatelessWidget {
             aspectRatio: 1,
             child: Container(
               decoration: BoxDecoration(
-                color: isDark ? foreground.withOpacity(0.16) : background,
+                color: isDark ? foreground.withValues(alpha: 0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
               padding: const EdgeInsets.all(14),
@@ -215,7 +216,7 @@ class _CategoryTile extends StatelessWidget {
                         if (progress == null) return child;
                         return Icon(
                           CategoryGrid.fallbackIcon(label),
-                          color: foreground.withOpacity(0.35),
+                          color: foreground.withValues(alpha: 0.35),
                           size: 26,
                         );
                       },
@@ -237,7 +238,7 @@ class _CategoryTile extends StatelessWidget {
               fontSize: 12,
               height: 1.25,
               fontWeight: FontWeight.w600,
-              color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+              color: context.colors.textPrimary,
             ),
           ),
         ],
@@ -267,7 +268,7 @@ class _ViewMoreTile extends StatelessWidget {
             aspectRatio: 1,
             child: Container(
               decoration: BoxDecoration(
-                color: isDark ? accent.withOpacity(0.16) : AppTheme.lightAccentSoft,
+                color: isDark ? accent.withValues(alpha: 0.16) : context.colors.accentSoft,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(Icons.grid_view_rounded, color: accent, size: 26),
@@ -283,7 +284,7 @@ class _ViewMoreTile extends StatelessWidget {
               fontSize: 12,
               height: 1.25,
               fontWeight: FontWeight.w600,
-              color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+              color: context.colors.textPrimary,
             ),
           ),
         ],
