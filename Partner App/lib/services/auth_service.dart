@@ -3,15 +3,33 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 
 class AuthService {
+  /// [client] is for tests. Null uses the package-level http functions, which
+  /// is what every call did before it existed.
+  AuthService({http.Client? client}) : _client = client;
+
+  final http.Client? _client;
+
   static String get baseUrl => ApiConfig.baseUrl;
 
+  /// Long enough for a slow mobile connection, short enough that a dead one
+  /// ends in a message the screen can show instead of a spinner forever.
+  static const Duration requestTimeout = Duration(seconds: 20);
+
+  Future<http.Response> _post(String path, Map<String, String> body) {
+    final url = Uri.parse('$baseUrl$path');
+    const headers = {'Content-Type': 'application/json', 'Accept': 'application/json'};
+    final encoded = jsonEncode(body);
+    final client = _client;
+    final request = client != null
+        ? client.post(url, headers: headers, body: encoded)
+        : http.post(url, headers: headers, body: encoded);
+    return request.timeout(requestTimeout);
+  }
+
+  /// 'success', or a message explaining why the code was not sent.
   Future<String> sendOtp(String phone) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/partner/auth/send-otp'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode({'phone': phone}),
-      );
+      final response = await _post('/partner/auth/send-otp', {'phone': phone});
 
       final decoded = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -25,11 +43,7 @@ class AuthService {
 
   Future<Map<String, dynamic>> verifyOtp(String phone, String otp) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/partner/auth/verify-otp'),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode({'phone': phone, 'otp': otp}),
-      );
+      final response = await _post('/partner/auth/verify-otp', {'phone': phone, 'otp': otp});
 
       final decoded = jsonDecode(response.body);
       if (response.statusCode == 200) {
