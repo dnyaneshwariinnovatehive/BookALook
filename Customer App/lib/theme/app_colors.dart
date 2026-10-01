@@ -57,6 +57,17 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Icons drawn on [success]. Dark mode's success green is pale enough that
+  /// white on it loses contrast.
+  final Color onSuccess;
+
+  /// Label on [segmentKnob].
+  final Color segmentKnobLabel;
+
+  /// The sliding knob of a segmented control: a white pill in light mode, the
+  /// brand accent in dark mode where a dark pill would not stand off the track.
+  final Color segmentKnob;
+
   /// Soft shadow under cards and docked bars: the text colour at 4% (light)
   /// or 20% (dark), baked in to match the old withOpacity values exactly.
   final Color cardShadow;
@@ -88,6 +99,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.onSuccess,
+    required this.segmentKnobLabel,
+    required this.segmentKnob,
     required this.cardShadow,
     required this.raisedOutline,
     required this.navIdle,
@@ -113,6 +127,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    onSuccess: Colors.white,
+    segmentKnobLabel: AppTheme.accentColor,
+    segmentKnob: AppTheme.lightSurface,
     cardShadow: Color(0x0A1C1726),
     raisedOutline: Color(0x00000000),
     navIdle: Color(0xFF9E98AE),
@@ -138,6 +155,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    onSuccess: AppTheme.darkBg,
+    segmentKnobLabel: Colors.white,
+    segmentKnob: AppTheme.accentColor,
     cardShadow: Color(0x33F3F0FA),
     raisedOutline: AppTheme.darkBorder,
     navIdle: AppTheme.darkTextBody,
@@ -169,6 +189,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? onSuccess,
+    Color? segmentKnobLabel,
+    Color? segmentKnob,
     Color? cardShadow,
     Color? raisedOutline,
     Color? navIdle,
@@ -193,6 +216,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      onSuccess: onSuccess ?? this.onSuccess,
+      segmentKnobLabel: segmentKnobLabel ?? this.segmentKnobLabel,
+      segmentKnob: segmentKnob ?? this.segmentKnob,
       cardShadow: cardShadow ?? this.cardShadow,
       raisedOutline: raisedOutline ?? this.raisedOutline,
       navIdle: navIdle ?? this.navIdle,
@@ -223,6 +249,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
+      segmentKnobLabel: Color.lerp(segmentKnobLabel, other.segmentKnobLabel, t)!,
+      segmentKnob: Color.lerp(segmentKnob, other.segmentKnob, t)!,
       cardShadow: Color.lerp(cardShadow, other.cardShadow, t)!,
       raisedOutline: Color.lerp(raisedOutline, other.raisedOutline, t)!,
       navIdle: Color.lerp(navIdle, other.navIdle, t)!,

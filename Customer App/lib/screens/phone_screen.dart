@@ -7,6 +7,7 @@ import '../utils/app_haptics.dart';
 import '../utils/auth_errors.dart';
 import '../utils/auth_motion.dart';
 import '../widgets/auth/otp_boxes.dart';
+import '../theme/app_colors.dart';
 
 class PhoneScreen extends StatefulWidget {
   final bool isModal;
@@ -100,13 +101,14 @@ class _PhoneScreenState extends State<PhoneScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Track and knob come from AppTheme so the switch follows the app palette
-    // rather than carrying its own hardcoded tints.
-    final track = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
-    final knob = isDark ? theme.colorScheme.primary : AppTheme.lightSurface;
-    final activeText = isDark ? Colors.white : theme.colorScheme.primary;
+    // Track and knob come from the theme tokens so the switch follows the app
+    // palette rather than carrying its own hardcoded tints. isDark only tunes
+    // the knob's shadow below, which is depth, not colour.
+    final track = context.colors.accentSoft;
+    final knob = context.colors.segmentKnob;
+    final activeText = context.colors.segmentKnobLabel;
     final idleText =
-        isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+        context.colors.textSecondary;
 
     Widget tab(String label, bool selected, VoidCallback onTap) {
       return Expanded(
@@ -194,7 +196,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final muted = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final muted = context.colors.textSecondary;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -218,9 +220,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                         'Premium Grooming & Beauty Discovery',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isDark
-                              ? AppTheme.darkTextBody
-                              : AppTheme.lightTextBody,
+                          color: context.colors.textSecondary,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
