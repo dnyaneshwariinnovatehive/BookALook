@@ -7,6 +7,10 @@ import 'category_service_strip.dart';
 import '../theme/app_colors.dart';
 
 class DiscoverySalonCard extends StatelessWidget {
+  /// Transparent padding that grows the 26dp favourite heart to a 48dp
+  /// target ((48 - 26) / 2).
+  static const double _favouriteSlop = 11;
+
   final Map<String, dynamic> salon;
   final bool isFavourited;
   final bool showFavourite;
@@ -112,11 +116,23 @@ class DiscoverySalonCard extends StatelessWidget {
                               ),
                             ),
                             if (showFavourite)
+                              // 48dp to tap, drawn exactly where the 26dp
+                              // heart always was: the extra is transparent
+                              // padding, offset by the same amount.
                               Positioned(
-                                top: 6,
-                                right: 6,
-                                child: GestureDetector(
+                                top: 6 - _favouriteSlop,
+                                right: 6 - _favouriteSlop,
+                                child: Semantics(
+                                  button: true,
+                                  label: isFavourited
+                                      ? 'Remove from favourites'
+                                      : 'Add to favourites',
+                                  excludeSemantics: true,
+                                  child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
                                   onTap: onToggleFavourite,
+                                  child: Padding(
+                                  padding: const EdgeInsets.all(_favouriteSlop),
                                   child: Container(
                                     padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
@@ -134,6 +150,8 @@ class DiscoverySalonCard extends StatelessWidget {
                                           : context.colors.iconIdle,
                                     ),
                                   ),
+                                  ),
+                                ),
                                 ),
                               ),
                           ],
