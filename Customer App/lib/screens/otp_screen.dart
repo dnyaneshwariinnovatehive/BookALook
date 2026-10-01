@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../utils/auth_motion.dart';
 import '../widgets/auth/otp_boxes.dart';
+import '../theme/app_colors.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -181,8 +182,7 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final muted = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final muted = context.colors.textSecondary;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -208,7 +208,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
                 child: _verified
                     ? _buildVerified(theme, muted)
-                    : _buildForm(theme, isDark, muted),
+                    : _buildForm(theme, muted),
               ),
             ),
           ),
@@ -241,7 +241,7 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  Widget _buildForm(ThemeData theme, bool isDark, Color muted) {
+  Widget _buildForm(ThemeData theme, Color muted) {
     return StaggeredReveal(
       children: [
         Column(
@@ -250,9 +250,7 @@ class _OtpScreenState extends State<OtpScreen> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDark
-                    ? AppTheme.darkAccentSoft
-                    : AppTheme.lightAccentSoft,
+                color: context.colors.accentSoft,
               ),
               child: Icon(Icons.sms_rounded,
                   size: 26, color: theme.colorScheme.primary),
