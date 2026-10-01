@@ -12,6 +12,10 @@ import 'appointment_details_screen.dart';
 import 'qr_code_screen.dart';
 import 'reschedule_screen.dart';
 import '../theme/app_colors.dart';
+import '../services/explore_request_bus.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -65,7 +69,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = describeError(e, fallback: 'We could not load your bookings.');
         _isLoading = false;
       });
     }
@@ -162,24 +166,26 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       final refund = result['refund'] ?? {};
       final refunded = _toDouble(refund['refundable']);
 
-      _showMessage(
-        refunded > 0
-            ? 'Booking cancelled. ₹${refunded.toStringAsFixed(2)} will be refunded.'
-            : 'Booking cancelled.',
-      );
+      final cancelled = refunded > 0
+          ? 'Booking cancelled. ₹${refunded.toStringAsFixed(2)} will be refunded.'
+          : 'Booking cancelled.';
 
-      // Warn when the same-day change penalty has kicked in.
+      // One confirmation, not two stacked SnackBars where the second hides
+      // the first. The same-day penalty is the half that matters.
       final requirement = result['payment_requirement'];
       if (requirement != null && requirement['full_upfront'] == true) {
-        _showMessage(
-          'You have changed ${requirement['changes_used']} bookings for that day. '
-          'Further bookings that day need full payment upfront.',
+        _toast(
+          '$cancelled You have changed ${requirement['changes_used']} bookings for that day, '
+          'so further bookings that day need full payment upfront.',
         );
+      } else {
+        _toast(cancelled);
       }
 
       _loadBookings();
     } catch (e) {
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      AppHaptics.error();
+      _setCardMessage(booking, describeError(e, fallback: 'Could not cancel this booking. Please try again.'));
       _loadBookings();
     }
   }
@@ -209,7 +215,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     // Dialled verbatim, so anything but a real number is refused here rather
     // than handed to the dialer.
     if (raw.isEmpty || !RegExp(r'^\+?[\d\s\-()]{6,20}$').hasMatch(raw)) {
-      _showMessage('This salon has not published a contact number.');
+      _setCardMessage(booking, 'This salon has not published a contact number.', kind: StatusKind.info);
       return;
     }
 
@@ -218,10 +224,10 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     try {
       if (!await canLaunchUrl(uri) ||
           !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        _showMessage('Could not open the dialler.');
+        _setCardMessage(booking, 'Could not open the dialler.');
       }
     } catch (_) {
-      _showMessage('Could not open the dialler.');
+      _setCardMessage(booking, 'Could not open the dialler.');
     }
   }
 
@@ -250,10 +256,10 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     try {
       if (!await canLaunchUrl(uri) ||
           !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        _showMessage('Could not open maps.');
+        _setCardMessage(booking, 'Could not open maps.');
       }
     } catch (_) {
-      _showMessage('Could not open maps.');
+      _setCardMessage(booking, 'Could not open maps.');
     }
   }
 
@@ -423,9 +429,26 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     ],
   );
 
-  void _showMessage(String text) {
+  /// Confirmations only, e.g. "Booking cancelled." — they may vanish.
+  void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// A problem with one booking's action (cancel, call, directions), shown
+  /// inside that booking's card, above its buttons — not in a SnackBar over
+  /// the bottom of the list, which may be nowhere near the card that was
+  /// tapped. Keyed by booking id; dismissed by the customer or replaced by
+  /// the next message for the same card.
+  final Map<String, ({String text, StatusKind kind})> _cardMessages = {};
+
+  void _setCardMessage(
+    Map<String, dynamic> booking,
+    String text, {
+    StatusKind kind = StatusKind.error,
+  }) {
+    if (!mounted) return;
+    setState(() => _cardMessages[booking['id'].toString()] = (text: text, kind: kind));
   }
 
   double _toDouble(dynamic value) => double.tryParse('${value ?? 0}') ?? 0.0;
@@ -450,8 +473,10 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
         centerTitle: false,
       ),
       body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(color: AppTheme.accentColor),
+          ? SkeletonList(
+              count: 3,
+              padding: EdgeInsets.fromLTRB(20, 84, 20, 140),
+              itemBuilder: (_) => const BookingCardSkeleton(),
             )
           : _error.isNotEmpty
           ? _buildError()
@@ -506,22 +531,20 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
-  Widget _buildError() => Center(
-    child: Padding(
-      padding: EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline, size: 56, color: context.colors.textTertiary),
-          SizedBox(height: 12),
-          Text(
-            _error,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: context.colors.textSecondary),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(onPressed: _loadBookings, child: Text('Try again')),
-        ],
+  Widget _buildError() => RefreshIndicator(
+    color: AppTheme.accentColor,
+    onRefresh: _loadBookings,
+    child: ScrollableState(
+      bottomInset: 140,
+      child: ErrorState(
+        title: 'Could not load your bookings',
+        message: _error,
+        onRetry: () {
+          // Back to the skeleton while it retries, so the tap visibly does
+          // something even on a slow connection.
+          setState(() => _isLoading = true);
+          _loadBookings();
+        },
       ),
     ),
   );
@@ -531,24 +554,21 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadBookings,
-        child: ListView(
-          physics: AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(height: 140),
-            Icon(Icons.event_busy, size: 72, color: context.colors.textSecondary),
-            SizedBox(height: 16),
-            Center(
-              child: Text(
-                isUpcoming
-                    ? 'No upcoming appointments.'
-                    : 'No past appointments.',
-                style: GoogleFonts.outfit(
-                  color: context.colors.textSecondary,
-                  fontSize: 16,
+        child: ScrollableState(
+          bottomInset: 140,
+          child: isUpcoming
+              ? EmptyState(
+                  icon: Icons.event_available_outlined,
+                  title: 'No upcoming appointments',
+                  message: 'When you book a salon, it shows up here.',
+                  actionLabel: 'Explore salons',
+                  onAction: ExploreRequestBus.instance.showAll,
+                )
+              : const EmptyState(
+                  icon: Icons.history_rounded,
+                  title: 'No past appointments',
+                  message: 'Visits you have completed or cancelled appear here.',
                 ),
-              ),
-            ),
-          ],
         ),
       );
     }
@@ -883,6 +903,15 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                           ),
                         ],
                       ),
+                    ),
+                  ],
+
+                  if (_cardMessages[booking['id'].toString()] case final note?) ...[
+                    SizedBox(height: 12),
+                    InlineStatus(
+                      message: note.text,
+                      kind: note.kind,
+                      onDismiss: () => setState(() => _cardMessages.remove(booking['id'].toString())),
                     ),
                   ],
 
