@@ -547,12 +547,26 @@
   .commissionFacts,
   .formGrid,
   .checkGrid,
-  .modelChoice,
-  /* This three-up summary was missed by the collapse list above, so it stayed
-     three columns on a phone and squeezed. */
-  .infoStats {
+  .modelChoice {
     grid-template-columns: 1fr;
   }
+
+  /* The Staff / Services / Combos summary stays two-up, matching the KPI
+     cards on the dashboard and reports pages. It used to collapse to a
+     single column, which stacked three tiles into a tall strip for what is
+     only a count each. These tiles are much smaller than those KPI cards —
+     an 11.5px label over a 15px number — so they need no type scaling, just
+     a little less padding to keep the narrower column comfortable.
+     Note this block sits after the .infoStats/.fact base rules, so it wins on
+     source order at equal specificity. */
+  .infoStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .infoStats .fact {
+    padding: 9px 12px;
+  }
+
   .sortSelect {
     width: 100%;
   }

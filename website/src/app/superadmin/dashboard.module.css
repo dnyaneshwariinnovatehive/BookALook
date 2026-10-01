@@ -795,7 +795,38 @@
 }
 
 @media (max-width: 720px) {
-  .kpiGrid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  /* The four KPIs stay two-up on phones. They used to drop to a single
+     column here, which pushed the charts a full screen further down for no
+     benefit — each card only holds a short label, one number and a caption.
+     Everything inside is scaled to suit the narrower column so the value,
+     label and caption stay readable without ever colliding. */
+  .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kpiCard { padding: 13px 12px; border-radius: 14px; }
+  .kpiHeader { margin-bottom: 9px; }
+  .kpiIcon { width: 32px; height: 32px; border-radius: 10px; }
+  /* Icon takes its size as SVG attributes; CSS overrides those. */
+  .kpiIcon svg { width: 17px; height: 17px; }
+  .kpiArrow { width: 14px; height: 14px; }
+  .kpiLabel { font-size: 11px; line-height: 1.35; }
+  /* Scales with the viewport so a long rupee figure still fits one line. */
+  .kpiValue { font-size: clamp(17px, 5.2vw, 22px); margin: 2px 0 6px; }
+  .kpiTrend {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px 6px;
+    font-size: 11px;
+    min-height: 0;
+  }
+  .deltaChip { height: 19px; font-size: 11px; padding: 0 6px; }
+  /* Full-width basis drops the caption onto its own line instead of letting
+     it fight the delta chip for the same row. */
+  .trendSub {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.35;
+  }
   .tablesGrid { grid-template-columns: minmax(0, 1fr); }
   .tablesGrid > :last-child { grid-column: auto; }
   .controlsBar,

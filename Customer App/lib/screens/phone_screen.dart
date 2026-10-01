@@ -4,10 +4,23 @@ import '../services/auth_service.dart';
 import 'otp_screen.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
+import '../utils/auth_motion.dart';
+import '../widgets/auth/otp_boxes.dart';
 
 class PhoneScreen extends StatefulWidget {
   final bool isModal;
   final int returnIndex;
+
+  /// Keys for the Login / Sign-Up indicator.
+  ///
+  /// Public so tests can measure where the knob is actually painted rather
+  /// than reading AnimatedAlign.alignment, which only reports the destination
+  /// and would make a jump look identical to a real slide.
+  ///
+  /// modeKnobKey sits on the pill itself, not on the AnimatedAlign: an
+  /// alignment widget fills its parent, so keying it would measure the rail.
+  static const Key modeRailKey = Key('auth-mode-rail');
+  static const Key modeKnobKey = Key('auth-mode-knob');
 
   const PhoneScreen({Key? key, this.isModal = false, this.returnIndex = 0}) : super(key: key);
 
@@ -39,7 +52,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
       AppHaptics.success();
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (context) => OtpScreen(phone: phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
+            authRoute<bool>(builder: (context) => OtpScreen(phone: phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
       );
       if (loggedIn == true && widget.isModal) {
         if (mounted) Navigator.pop(context, true);
@@ -54,242 +67,268 @@ class _PhoneScreenState extends State<PhoneScreen> {
 
   bool _isLogin = true;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Logo Section
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 60,
-                  fit: BoxFit.contain,
+
+  /// Sliding Login / Sign-Up control. The indicator sits behind both labels in
+  /// a Stack and animates between them, so the switch reads as one piece
+  /// moving rather than two colours swapping.
+  Widget _modeSwitch(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final track = isDark ? AppTheme.darkSurface : const Color(0xFFF3F0FF);
+    final knob = isDark ? AppTheme.accentColor : Colors.white;
+    final activeText = isDark ? Colors.white : AppTheme.accentColor;
+    final idleText = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+
+    Widget tab(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: SizedBox(
+            height: 48,
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: AuthMotion.base,
+                curve: AuthMotion.curve,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: selected ? activeText : idleText,
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Premium Grooming & Beauty Discovery',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                child: Text(label),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: track,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      // Sized from the rail itself rather than the window, so the knob still
+      // lines up in split-screen and on tablets.
+      child: LayoutBuilder(
+        builder: (context, rail) {
+          return Stack(
+            key: PhoneScreen.modeRailKey,
+            children: [
+              AnimatedAlign(
+                duration: AuthMotion.base,
+                curve: AuthMotion.curve,
+                alignment:
+                    _isLogin ? Alignment.centerLeft : Alignment.centerRight,
+                child: Container(
+                  key: PhoneScreen.modeKnobKey,
+                  width: (rail.maxWidth - 8) / 2,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: knob,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.onSurface.withOpacity(0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 40),
+              ),
+              Row(
+                children: [
+                  tab('Login', _isLogin, () {
+                    AppHaptics.selectionClick();
+                    if (!_isLogin) setState(() => _isLogin = true);
+                  }),
+                  tab('Sign Up', !_isLogin, () {
+                    AppHaptics.selectionClick();
+                    if (_isLogin) setState(() => _isLogin = false);
+                  }),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-                  // Login / Sign Up Toggle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? AppTheme.darkSurface
-                          : const Color(0xFFF3F0FF),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              AppHaptics.selectionClick();
-                              setState(() => _isLogin = true);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _isLogin 
-                                    ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(26),
-                                boxShadow: _isLogin
-                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                    : [],
-                              ),
-                              child: Text(
-                                'Login',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: _isLogin 
-                                      ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
-                                      : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
-                                ),
-                              ),
-                            ),
-                          ),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AuthShell(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: StaggeredReveal(
+                children: [
+                  // Logo Section
+                  Column(
+                    children: [
+                      Image.asset(
+                        'assets/images/logo.png',
+                        height: 60,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Premium Grooming & Beauty Discovery',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              AppHaptics.selectionClick();
-                              setState(() => _isLogin = false);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: !_isLogin 
-                                    ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.accentColor : Colors.white) 
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(26),
-                                boxShadow: !_isLogin
-                                    ? [BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
-                                    : [],
-                              ),
-                              child: Text(
-                                'Sign Up',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: !_isLogin 
-                                      ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.accentColor)
-                                      : (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
-                                ),
-                              ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+
+                  _modeSwitch(context),
+                  const SizedBox(height: 30),
+
+                  // Phone Number Input
+                  Text(
+                    'Phone Number',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: 'Enter your mobile no.',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.dividerColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.dividerColor),
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // Continue Button
+                  SweepButton(
+                    label: _isLogin ? 'Continue' : 'Create account',
+                    leading: Icons.arrow_forward,
+                    loading: _isLoading,
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            AppHaptics.lightImpact();
+                            _sendOtp();
+                          },
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Register Link (shown only in Login mode)
+                  if (_isLogin)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'New to BookALook? ',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            AppHaptics.selectionClick();
+                            setState(() => _isLogin = false);
+                          },
+                          child: Text(
+                            'Register',
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  SizedBox(height: 32),
 
-                // Phone Number Input
-                Text(
-                  'Phone Number',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  style: TextStyle(fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Enter your mobile no.',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-                SizedBox(height: 24),
+                  const SizedBox(height: 28),
+                  Divider(color: theme.dividerColor),
+                  const SizedBox(height: 18),
 
-                // Continue Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : () {
-                    AppHaptics.lightImpact();
-                    _sendOtp();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward, size: 20),
-                          ],
-                        ),
-                ),
-                SizedBox(height: 24),
-
-                // Register Link (shown only in Login mode)
-                if (_isLogin)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('New to BookALook? ', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
-                      GestureDetector(
-                        onTap: () {
-                          AppHaptics.selectionClick();
-                          setState(() => _isLogin = false);
-                        },
-                        child: Text(
-                          'Register',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  // Explore as Guest
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        AppHaptics.lightImpact();
+                        if (widget.isModal) {
+                          Navigator.pop(context, false);
+                        } else {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MainScreen(
+                                  isGuest: true,
+                                  initialIndex: widget.returnIndex),
+                            ),
+                            (route) => false,
+                          );
+                        }
+                      },
+                      icon: Icon(Icons.visibility,
+                          color: theme.colorScheme.primary, size: 20),
+                      label: Text(
+                        'Explore as Guest',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                
-                SizedBox(height: 32),
-                Divider(color: Theme.of(context).dividerColor),
-                SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
-                // Explore as Guest
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () {
-                      AppHaptics.lightImpact();
-                      if (widget.isModal) {
-                        Navigator.pop(context, false);
-                      } else {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (context) => MainScreen(isGuest: true, initialIndex: widget.returnIndex)),
-                          (route) => false,
-                        );
-                      }
-                    },
-                    icon: Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary, size: 20),
+                  // Register Your Salon (Outline Button)
+                  OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: Icon(Icons.storefront,
+                        color: theme.colorScheme.primary, size: 20),
                     label: Text(
-                      'Explore as Guest',
+                      'Register Your Salon',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
-                  ),
-                ),
-                SizedBox(height: 16),
-
-                // Register Your Salon (Outline Button)
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: Icon(Icons.storefront, color: Theme.of(context).colorScheme.primary, size: 20),
-                  label: Text(
-                    'Register Your Salon',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(
+                          color: theme.colorScheme.primary.withOpacity(0.5)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

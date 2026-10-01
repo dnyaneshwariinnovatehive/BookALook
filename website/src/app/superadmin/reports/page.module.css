@@ -172,10 +172,16 @@
 }
 
 @media (max-width: 900px) {
-  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+  .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* Stay two-up on phones. A single column here turned six KPI cards into a
+   full screen of scrolling before any chart appeared.
+   Only the grid is set here. The per-card scaling lives in the responsive
+   section at the end of this file, because .kpi/.kpiAccent/.kpiLabel/.kpiValue/
+   .kpiSub are declared *below* this point and would win on source order at
+   equal specificity, silently leaving desktop-sized text in a half-width card. */
 @media (max-width: 560px) {
-  .kpiGrid { grid-template-columns: 1fr; }
+  .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
 }
 
 .kpi {
@@ -668,6 +674,26 @@
     gap: 12px;
     margin-bottom: 16px;
   }
+}
+
+@media (max-width: 560px) {
+  /* KPI cards sit two-up on phones, so each one is roughly half the viewport
+     wide. These overrides come after the base .kpi* rules so they actually
+     apply: same specificity, later source order wins. The type scale is
+     viewport-relative so a long rupee figure still fits on a single line, and
+     line-heights are set explicitly so wrapped labels and captions keep a
+     comfortable rhythm instead of colliding. */
+  .kpi { padding: 13px 12px; border-radius: 14px; }
+  .kpiAccent { border-left-width: 3px; }
+  .kpiLabel {
+    font-size: 0.66rem;
+    letter-spacing: 0.04em;
+    gap: 5px;
+    margin-bottom: 6px;
+    line-height: 1.35;
+  }
+  .kpiValue { font-size: clamp(1rem, 4.6vw, 1.3rem); letter-spacing: -0.02em; }
+  .kpiSub { font-size: 0.68rem; margin-top: 6px; line-height: 1.35; }
 }
 
 @media (max-width: 420px) {
