@@ -5,8 +5,10 @@ import 'package:customer_app/screens/otp_screen.dart';
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/widgets/auth/otp_boxes.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-      theme: AppTheme.lightTheme,
+Widget _wrap(Widget child) => _wrapIn(AppTheme.lightTheme, child);
+
+Widget _wrapIn(ThemeData theme, Widget child) => MaterialApp(
+      theme: theme,
       home: child,
     );
 
@@ -99,5 +101,27 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1200));
     // The old screen printed "(For testing, use 123456)" to everyone.
     expect(find.textContaining('123456'), findsNothing);
+  });
+
+  testWidgets('dark mode resolves the OTP boxes from the theme',
+      (tester) async {
+    await tester.pumpWidget(_wrapIn(
+      AppTheme.darkTheme,
+      const OtpScreen(phone: '9876543210'),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    // Idle boxes used to carry hardcoded light-mode border and label colours.
+    final boxes = tester
+        .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+        .toList();
+    expect(boxes, isNotEmpty);
+
+    final idle = boxes
+        .map((b) => b.decoration as BoxDecoration)
+        .firstWhere((d) => d.border != null);
+    expect((idle.border as Border).top.color, AppTheme.darkBorder,
+        reason: 'idle box border must follow the dark theme');
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../theme/app_theme.dart';
 import '../../utils/auth_motion.dart';
 
 /// OTP entry drawn as six boxes, driven by a single real [TextField].
@@ -119,8 +120,10 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
     final isDark = theme.brightness == Brightness.dark;
     final accent = theme.colorScheme.primary;
     final error = theme.colorScheme.error;
-    final borderIdle = isDark ? const Color(0xFF2B2738) : const Color(0xFFECEAF2);
-    final label = isDark ? const Color(0xFFF3F0FA) : const Color(0xFF1C1726);
+    final borderIdle =
+        isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final label =
+        isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
     final surface = theme.colorScheme.surface;
 
     final text = widget.controller.text;
@@ -195,7 +198,7 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                     final borderColor = widget.hasError
                         ? error
                         : hasDigit
-                            ? accent.withOpacity(0.55)
+                            ? accent.withValues(alpha: isDark ? 0.65 : 0.55)
                             : isActive
                                 ? accent
                                 : borderIdle;
@@ -212,7 +215,9 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: hasDigit
-                                ? accent.withOpacity(isDark ? 0.14 : 0.06)
+                                ? (isDark
+                                    ? AppTheme.darkAccentSoft
+                                    : AppTheme.lightAccentSoft)
                                 : surface,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
@@ -222,7 +227,8 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                             boxShadow: isActive
                                 ? [
                                     BoxShadow(
-                                      color: accent.withOpacity(0.18),
+                                      color: accent.withValues(
+                                          alpha: isDark ? 0.26 : 0.18),
                                       blurRadius: 14,
                                       offset: const Offset(0, 4),
                                     ),
@@ -251,7 +257,8 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                                                 -0.9 + 3.2 * _shimmer.value, 0),
                                             colors: [
                                               Colors.transparent,
-                                              accent.withOpacity(0.16),
+                                              accent.withValues(
+                                                  alpha: isDark ? 0.24 : 0.16),
                                               Colors.transparent,
                                             ],
                                           ),
@@ -330,11 +337,17 @@ class _SuccessTickState extends State<SuccessTick>
 
   @override
   Widget build(BuildContext context) {
-    final success = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    // Semantic success, not the accent: the tick means "verified", and a purple
+    // ring would read as another step rather than a confirmed state.
+    final success = theme.brightness == Brightness.dark
+        ? AppTheme.darkSuccess
+        : AppTheme.lightSuccess;
     return ScaleTransition(
       scale: CurvedAnimation(parent: _c, curve: Curves.elasticOut),
       child: FadeTransition(
-        opacity: CurvedAnimation(parent: _c, curve: const Interval(0, 0.4, curve: Curves.easeOut)),
+        opacity: CurvedAnimation(
+            parent: _c, curve: const Interval(0, 0.4, curve: Curves.easeOut)),
         child: Container(
           width: widget.size,
           height: widget.size,
@@ -350,13 +363,21 @@ class _SuccessTickState extends State<SuccessTick>
             ),
             boxShadow: [
               BoxShadow(
-                color: success.withOpacity(0.35),
+                color: success.withValues(alpha: 0.35),
                 blurRadius: 30,
                 offset: const Offset(0, 12),
               ),
             ],
           ),
-          child: Icon(Icons.check_rounded, size: widget.size * 0.55, color: Colors.white),
+          child: Icon(
+            Icons.check_rounded,
+            size: widget.size * 0.55,
+            // Dark mode's success green is light enough that white on top of it
+            // loses contrast; the light-mode one needs white to stay readable.
+            color: theme.brightness == Brightness.dark
+                ? AppTheme.darkBg
+                : Colors.white,
+          ),
         ),
       ),
     );
@@ -379,6 +400,8 @@ class StatusNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 260),
@@ -390,9 +413,12 @@ class StatusNote extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: tone.withOpacity(0.08),
+          // Dark needs a stronger wash: 0.08 of a pastel tone over a near-black
+          // surface is invisible.
+          color: tone.withValues(alpha: isDark ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: tone.withOpacity(0.28)),
+          border: Border.all(
+              color: tone.withValues(alpha: isDark ? 0.40 : 0.28)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -447,7 +473,9 @@ class ResendCountdown extends StatelessWidget {
               'Resend in 0:${s.toString().padLeft(2, '0')}',
               key: ValueKey(s),
               style: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.55),
+                color: theme.brightness == Brightness.dark
+                    ? AppTheme.darkTextBody
+                    : AppTheme.lightTextBody,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -457,20 +485,34 @@ class ResendCountdown extends StatelessWidget {
 
 /// Shared entrance used by the two auth screens: the drifting backdrop behind
 /// whatever the screen wants to put on top.
+///
+/// Paints an opaque themed base before the washes. Without it the auth routes
+/// are see-through, which lets the previous screen's text ghost underneath the
+/// incoming screen for the length of the transition.
 class AuthShell extends StatelessWidget {
   const AuthShell({
     super.key,
     required this.child,
-    this.accent = const Color(0xFF9C54F2),
+    this.accent,
   });
 
   final Widget child;
-  final Color accent;
+
+  /// Wash tint. Null resolves to the theme's primary.
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Stack(
       children: [
+        Positioned.fill(
+          child: ColoredBox(
+            color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+          ),
+        ),
         Positioned.fill(child: AmbientBackdrop(color: accent)),
         child,
       ],

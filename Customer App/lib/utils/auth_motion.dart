@@ -1,12 +1,31 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// Shared motion vocabulary for the login / OTP flow.
 ///
 /// Every duration and curve used by the auth screens lives here so the two
 /// screens feel like one product rather than two that happen to be adjacent.
 class AuthMotion {
   AuthMotion._();
+
+  /// The brand fill, resolved from AppTheme so the auth screens can never drift
+  /// away from the palette the rest of the app uses.
+  static const LinearGradient brandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
+  );
+
+  /// Extra mid-tone used only while the sheen sweeps.
+  static const Color sheenMidTone = AppTheme.accentGradientLightEnd;
+
+  /// The opaque backdrop [authRoute] paints outside its fade.
+  ///
+  /// Keyed so tests can assert the previous route is covered rather than
+  /// showing through.
+  static const Key routeBackdropKey = Key('auth-route-backdrop');
 
   static const fast = Duration(milliseconds: 180);
   static const base = Duration(milliseconds: 260);
@@ -188,7 +207,7 @@ class SweepButton extends StatefulWidget {
     this.leading,
     this.height = 56,
     this.gradient,
-    this.foreground = Colors.white,
+    this.foreground,
     this.textSize = 16,
   });
 
@@ -202,7 +221,10 @@ class SweepButton extends StatefulWidget {
   /// can read back what is actually being painted.
   final Gradient? gradient;
 
-  final Color foreground;
+  /// Label colour. Null means "whatever the theme puts on primary", so the
+  /// button stays legible if the brand colour ever changes.
+  final Color? foreground;
+
   final double textSize;
 
   @override
@@ -241,18 +263,14 @@ class _SweepButtonState extends State<SweepButton>
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null && !widget.loading;
     final radius = BorderRadius.circular(widget.height / 2);
+    final foreground = widget.foreground ?? Theme.of(context).colorScheme.onPrimary;
 
     return AnimatedBuilder(
       animation: _c,
       builder: (context, child) {
         // The brand fill must always be present, idle or loading: defaulting
         // it only on the loading path would leave the idle button transparent.
-        final base = widget.gradient ??
-            const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF9C54F2), Color(0xFF7B32EC)],
-            );
+        final base = widget.gradient ?? AuthMotion.brandGradient;
 
         // Sweeping the gradient's own begin/end is cheaper than overlaying a
         // second gradient, and it never leaves a hard seam at either edge.
@@ -293,13 +311,13 @@ class _SweepButtonState extends State<SweepButton>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.leading != null) ...[
-            Icon(widget.leading, size: 20, color: widget.foreground),
+            Icon(widget.leading, size: 20, color: foreground),
             const SizedBox(width: 10),
           ],
           Text(
             widget.label,
             style: TextStyle(
-              color: widget.foreground,
+              color: foreground,
               fontSize: widget.textSize,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.1,
@@ -314,21 +332,35 @@ class _SweepButtonState extends State<SweepButton>
     if (g is LinearGradient && g.colors.isNotEmpty) {
       return g.colors;
     }
-    return const [Color(0xFF9C54F2), Color(0xFFB088FF), Color(0xFF7B32EC)];
+    return const [
+      AppTheme.accentGradientStart,
+      AuthMotion.sheenMidTone,
+      AppTheme.accentGradientEnd,
+    ];
   }
 }
 
 /// Two very slow drifting radial washes. Costs one repeating controller and two
 /// gradients, and it stops the auth screens reading as a flat white box.
+///
+/// The wash is transparent by design; [AuthShell] is what paints the opaque
+/// themed base underneath it.
 class AmbientBackdrop extends StatefulWidget {
   const AmbientBackdrop({
     super.key,
-    this.color = const Color(0xFF9C54F2),
+    this.color,
     this.enabled = true,
+    this.intensityLight = 0.14,
+    this.intensityDark = 0.22,
   });
 
-  final Color color;
+  /// Wash tint. Null resolves to the theme's primary at build time.
+  final Color? color;
   final bool enabled;
+
+  /// Peak alpha per wash. Dark needs a stronger wash to read at all.
+  final double intensityLight;
+  final double intensityDark;
 
   @override
   State<AmbientBackdrop> createState() => _AmbientBackdropState();
@@ -350,6 +382,11 @@ class _AmbientBackdropState extends State<AmbientBackdrop>
   Widget build(BuildContext context) {
     if (!widget.enabled) return const SizedBox.shrink();
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final tint = widget.color ?? theme.colorScheme.primary;
+    final peak = isDark ? widget.intensityDark : widget.intensityLight;
+
     final turn = _c.value * 2 * math.pi;
     return IgnorePointer(
       child: RepaintBoundary(
@@ -365,7 +402,7 @@ class _AmbientBackdropState extends State<AmbientBackdrop>
                           -0.85 + 0.12 * math.cos(turn)),
                       radius: 0.95,
                       colors: [
-                        widget.color.withOpacity(0.14),
+                        tint.withValues(alpha: peak),
                         Colors.transparent,
                       ],
                     ),
@@ -380,7 +417,7 @@ class _AmbientBackdropState extends State<AmbientBackdrop>
                           0.95 + 0.12 * math.sin(turn)),
                       radius: 0.9,
                       colors: [
-                        widget.color.withOpacity(0.10),
+                        tint.withValues(alpha: peak * 0.72),
                         Colors.transparent,
                       ],
                     ),
@@ -397,29 +434,45 @@ class _AmbientBackdropState extends State<AmbientBackdrop>
 
 /// Fade-through push used between the auth screens and the app shell, so
 /// arriving at the app feels like a continuation rather than a hard cut.
+///
+/// The opaque backdrop sits *outside* the fade. Fading the whole route leaves
+/// the incoming screen semi-transparent while it animates, which lets the
+/// outgoing screen's text stay legible underneath it. Covering the previous
+/// route on the first frame and fading only the content keeps the motion
+/// without the ghosting.
 Route<T> authRoute<T>({
   required WidgetBuilder builder,
-  Duration duration = const Duration(milliseconds: 420),
+  Duration duration = const Duration(milliseconds: 460),
 }) {
   return PageRouteBuilder<T>(
     transitionDuration: duration,
-    reverseTransitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 340),
     pageBuilder: (context, _, _) => builder(context),
-    transitionsBuilder: (_, animation, _, child) {
-      final curved = CurvedAnimation(
+    transitionsBuilder: (context, animation, _, child) {
+      final fadeIn = CurvedAnimation(
         parent: animation,
-        curve: AuthMotion.curve,
-        reverseCurve: Curves.easeInCubic,
+        curve: const Interval(0.0, 0.72, curve: AuthMotion.curve),
       );
-      return FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 0.035),
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
+
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: ColoredBox(
+              key: AuthMotion.routeBackdropKey,
+              color: Theme.of(context).scaffoldBackgroundColor,
+            ),
+          ),
+          FadeTransition(
+            opacity: fadeIn,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.03),
+                end: Offset.zero,
+              ).animate(fadeIn),
+              child: child,
+            ),
+          ),
+        ],
       );
     },
   );

@@ -182,6 +182,7 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -205,7 +206,9 @@ class _OtpScreenState extends State<OtpScreen> {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                child: _verified ? _buildVerified(theme) : _buildForm(theme, isDark),
+                child: _verified
+                    ? _buildVerified(theme, muted)
+                    : _buildForm(theme, isDark, muted),
               ),
             ),
           ),
@@ -214,7 +217,7 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  Widget _buildVerified(ThemeData theme) {
+  Widget _buildVerified(ThemeData theme, Color muted) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -232,16 +235,13 @@ class _OtpScreenState extends State<OtpScreen> {
         Text(
           'Taking you to BookALook…',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: theme.colorScheme.onSurface.withOpacity(0.65),
-          ),
+          style: TextStyle(fontSize: 14, color: muted),
         ),
       ],
     );
   }
 
-  Widget _buildForm(ThemeData theme, bool isDark) {
+  Widget _buildForm(ThemeData theme, bool isDark, Color muted) {
     return StaggeredReveal(
       children: [
         Column(
@@ -250,7 +250,9 @@ class _OtpScreenState extends State<OtpScreen> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withOpacity(0.10),
+                color: isDark
+                    ? AppTheme.darkAccentSoft
+                    : AppTheme.lightAccentSoft,
               ),
               child: Icon(Icons.sms_rounded,
                   size: 26, color: theme.colorScheme.primary),
@@ -268,11 +270,7 @@ class _OtpScreenState extends State<OtpScreen> {
             Text(
               'We sent a 6-digit code to\n+91 ${widget.phone}',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.45,
-                color: theme.colorScheme.onSurface.withOpacity(0.65),
-              ),
+              style: TextStyle(fontSize: 14, height: 1.45, color: muted),
             ),
           ],
         ),
@@ -328,13 +326,6 @@ class _OtpScreenState extends State<OtpScreen> {
         SweepButton(
           label: 'Verify & Login',
           loading: _isLoading,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isDark
-                ? const [Color(0xFF9C54F2), Color(0xFF7B32EC)]
-                : const [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
-          ),
           onPressed: _isLoading
               ? null
               : () {
@@ -353,8 +344,7 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
             Text(
               '·',
-              style: TextStyle(
-                  color: theme.colorScheme.onSurface.withOpacity(0.35)),
+              style: TextStyle(color: muted),
             ),
             TextButton(
               onPressed: () {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:customer_app/theme/app_theme.dart';
@@ -305,6 +305,78 @@ void main() {
       expect(find.byType(AmbientBackdrop), findsOneWidget);
       expect(find.text('body'), findsOneWidget);
     });
+
+    testWidgets('paints an opaque light base', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const AuthShell(child: Text('body')),
+      ));
+      await tester.pump();
+      expect(_shellBase(tester).color, AppTheme.lightBg);
+    });
+
+    testWidgets('paints an opaque dark base', (tester) async {
+      // Regression guard: the shell used to be a bare Stack, so the route
+      // underneath showed through and its text ghosted during the transition.
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: const AuthShell(child: Text('body')),
+      ));
+      await tester.pump();
+      expect(_shellBase(tester).color, AppTheme.darkBg);
+    });
+  });
+
+  group('authRoute transition', () {
+    testWidgets('covers the outgoing route on the very first frame',
+        (tester) async {
+      // The complaint this guards: a transparent incoming route let the old
+      // screen's text stay visible while the new one faded in.
+      await tester.pumpWidget(_wrap(const Text('GO')));
+      await tester.pump();
+
+      Navigator.of(tester.element(find.text('GO'))).push(
+        authRoute<void>(builder: (_) => const Text('ARRIVED')),
+      );
+
+      // One pump starts the route animation, the next builds its first frame.
+      await tester.pump();
+      await tester.pump();
+
+      final backdrop = find.byKey(AuthMotion.routeBackdropKey);
+      expect(backdrop, findsOneWidget,
+          reason: 'the transition must paint an opaque backdrop');
+      expect(tester.widget<ColoredBox>(backdrop).color.a, 1.0,
+          reason: 'backdrop must be fully opaque, otherwise the previous '
+              "screen's text shows through it");
+
+      // And it is still opaque while the content is mid-fade.
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(tester.widget<ColoredBox>(backdrop).color.a, 1.0);
+    });
+
+    testWidgets('still fades and slides the incoming content',
+        (tester) async {
+      // The opaque backdrop must not come at the cost of the entrance motion.
+      await tester.pumpWidget(_wrap(const Text('GO')));
+      await tester.pump();
+
+      Navigator.of(tester.element(find.text('GO'))).push(
+        authRoute<void>(builder: (_) => const Text('ARRIVED')),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.pump(const Duration(milliseconds: 40));
+      final mid = _renderedOpacityOf(tester, 'ARRIVED');
+      expect(mid, lessThan(1.0),
+          reason: 'content should still be mid-fade at 40ms');
+      expect(mid, greaterThan(0.0));
+
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(_renderedOpacityOf(tester, 'ARRIVED'), 1.0,
+          reason: 'content must finish fully opaque');
+    });
   });
 }
 
@@ -329,10 +401,43 @@ double _offsetX(WidgetTester tester) {
   return m.storage[12];
 }
 
+/// The opaque base AuthShell paints under the ambient washes.
+ColoredBox _shellBase(WidgetTester tester) => tester.widget<ColoredBox>(
+      find
+          .descendant(
+            of: find.byType(AuthShell),
+            matching: find.byType(ColoredBox),
+          )
+          .first,
+    );
+
 double _opacityOf(WidgetTester tester, String label) {
   final finder = find.ancestor(
     of: find.text(label),
     matching: find.byType(Opacity),
   );
   return tester.widgetList<Opacity>(finder).first.opacity;
+}
+
+double _renderedOpacityOf(WidgetTester tester, String label) {
+  // Reads the value actually painted, not the target the widget was built
+  // with, so an in-flight frame is observed rather than the destination.
+  //
+  // Walks ancestors looking for a render-level opacity: a FadeTransition builds
+  // a RenderAnimatedOpacity, not a RenderOpacity, and find.byType(Opacity) does
+  // not match it because the widget in between is the transition itself.
+  RenderObject? found;
+  tester.element(find.text(label)).visitAncestorElements((element) {
+    final render = element.findRenderObject();
+    if (render is RenderAnimatedOpacity || render is RenderOpacity) {
+      found = render;
+      return false;
+    }
+    return true;
+  });
+
+  final render = found;
+  if (render is RenderAnimatedOpacity) return render.opacity.value;
+  if (render is RenderOpacity) return render.opacity;
+  throw StateError('no rendered opacity found above "$label"');
 }

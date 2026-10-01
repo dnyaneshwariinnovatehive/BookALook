@@ -48,14 +48,22 @@ class _PhoneScreenState extends State<PhoneScreen> {
     
     if (mounted) setState(() => _isLoading = false);
 
+    if (!mounted) return;
+
     if (result == 'success') {
       AppHaptics.success();
       final loggedIn = await Navigator.push<bool>(
         context,
-            authRoute<bool>(builder: (context) => OtpScreen(phone: phone, isModal: widget.isModal, returnIndex: widget.returnIndex)),
+        authRoute<bool>(
+          builder: (context) => OtpScreen(
+            phone: phone,
+            isModal: widget.isModal,
+            returnIndex: widget.returnIndex,
+          ),
+        ),
       );
-      if (loggedIn == true && widget.isModal) {
-        if (mounted) Navigator.pop(context, true);
+      if (loggedIn == true && widget.isModal && mounted) {
+        Navigator.pop(context, true);
       }
     } else {
       AppHaptics.error();
@@ -75,10 +83,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final track = isDark ? AppTheme.darkSurface : const Color(0xFFF3F0FF);
-    final knob = isDark ? AppTheme.accentColor : Colors.white;
-    final activeText = isDark ? Colors.white : AppTheme.accentColor;
-    final idleText = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    // Track and knob come from AppTheme so the switch follows the app palette
+    // rather than carrying its own hardcoded tints.
+    final track = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+    final knob = isDark ? theme.colorScheme.primary : AppTheme.lightSurface;
+    final activeText = isDark ? Colors.white : theme.colorScheme.primary;
+    final idleText =
+        isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     Widget tab(String label, bool selected, VoidCallback onTap) {
       return Expanded(
@@ -132,9 +143,12 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     borderRadius: BorderRadius.circular(26),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.onSurface.withOpacity(0.10),
-                        blurRadius: 12,
-                        offset: const Offset(0, 3),
+                        // Dark surfaces need a tighter, deeper shadow to read as
+                        // a raised pill against an almost-black track.
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: isDark ? 0.22 : 0.10),
+                        blurRadius: isDark ? 8 : 12,
+                        offset: Offset(0, isDark ? 1 : 3),
                       ),
                     ],
                   ),
@@ -162,6 +176,8 @@ class _PhoneScreenState extends State<PhoneScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final muted = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -185,7 +201,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                         'Premium Grooming & Beauty Discovery',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          color: isDark
+                              ? AppTheme.darkTextBody
+                              : AppTheme.lightTextBody,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -250,8 +268,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                       children: [
                         Text(
                           'New to BookALook? ',
-                          style: TextStyle(
-                              color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                          style: TextStyle(color: muted),
                         ),
                         GestureDetector(
                           onTap: () {
@@ -322,7 +339,9 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       side: BorderSide(
-                          color: theme.colorScheme.primary.withOpacity(0.5)),
+                        color: theme.colorScheme.primary
+                            .withValues(alpha: isDark ? 0.65 : 0.5),
+                      ),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30)),
                     ),

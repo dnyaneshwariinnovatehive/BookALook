@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:customer_app/screens/phone_screen.dart';
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/utils/auth_motion.dart';
+import 'package:customer_app/widgets/auth/otp_boxes.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-      theme: AppTheme.lightTheme,
+Widget _wrap(Widget child) => _wrapIn(AppTheme.lightTheme, child);
+
+Widget _wrapIn(ThemeData theme, Widget child) => MaterialApp(
+      theme: theme,
       home: child,
     );
 
@@ -169,10 +172,49 @@ void main() {
 
   testWidgets('entrance reveals children progressively', (tester) async {
     await tester.pumpWidget(_wrap(const StaggeredReveal(
-      children: [const SizedBox(height: 30, child: Text('a'))],
+      children: [SizedBox(height: 30, child: Text('a'))],
     )));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1200));
     expect(find.text('a'), findsOneWidget);
+  });
+
+  testWidgets('dark mode paints an opaque shell, not the previous route',
+      (tester) async {
+    await tester.pumpWidget(_wrapIn(AppTheme.darkTheme, const PhoneScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    // A transparent shell lets the outgoing screen show through during the
+    // route transition, which is what made the old text ghost.
+    final base = tester.widget<ColoredBox>(
+      find
+          .descendant(
+            of: find.byType(AuthShell),
+            matching: find.byType(ColoredBox),
+          )
+          .first,
+    );
+    expect(base.color, AppTheme.darkBg);
+  });
+
+  testWidgets('dark mode resolves every tint from the theme', (tester) async {
+    await tester.pumpWidget(_wrapIn(AppTheme.darkTheme, const PhoneScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    // Track and knob must follow AppTheme, not a hardcoded tint.
+    final rail = tester.widget<Container>(
+      find
+          .descendant(
+            of: find.byType(PhoneScreen),
+            matching: find.byType(Container),
+          )
+          .first,
+    );
+    final knob = tester.widget<Container>(_knob);
+    expect((rail.decoration as BoxDecoration).color, AppTheme.darkAccentSoft);
+    expect((knob.decoration as BoxDecoration).color,
+        AppTheme.darkTheme.colorScheme.primary);
   });
 }
