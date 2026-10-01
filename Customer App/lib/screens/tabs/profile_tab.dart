@@ -12,6 +12,7 @@ import '../../services/profile_service.dart';
 import '../phone_screen.dart';
 import 'favourites_tab.dart';
 import '../../utils/app_haptics.dart';
+import '../../theme/app_colors.dart';
 import '../../main.dart'; // To access themeNotifier
 
 class ProfileTab extends StatefulWidget {
@@ -115,14 +116,11 @@ class _ProfileTabState extends State<ProfileTab> {
   /// Signing out ends the session and clears the token on this device, so the
   /// account being signed out of is named before it happens.
   Future<void> _logout(BuildContext context) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textHeading = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
-    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
-    final surface = isDark ? AppTheme.darkSurface : Colors.white;
+    final textHeading = context.colors.textPrimary;
+    final textBody = context.colors.textSecondary;
+    final textLight = context.colors.textTertiary;
+    final danger = context.colors.danger;
+    final surface = context.colors.surface;
 
     final name = (_userProfile?['name'] ?? '').toString().trim();
     final phone = (_userProfile?['phone'] ?? '').toString().trim();
@@ -260,14 +258,11 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dangerColor = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
-    final headingColor = isDark
-        ? AppTheme.darkTextHeading
-        : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final bgColor = isDark ? AppTheme.darkBg : const Color(0xFFFBF9FF);
+    final dangerColor = context.colors.danger;
+    final headingColor = context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final bgColor = context.colors.pageTint;
 
     if (_isLoading) {
       return Scaffold(
@@ -373,9 +368,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           joinDate,
                           style: GoogleFonts.outfit(
                             fontSize: 14,
-                            color: isDark
-                                ? AppTheme.darkTextLight
-                                : AppTheme.lightTextLight,
+                            color: context.colors.textTertiary,
                           ),
                         ),
                       ],
@@ -424,7 +417,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     BoxShadow(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.02),
+                      ).colorScheme.onSurface.withValues(alpha: 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -449,9 +442,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                  color: isDark
-                      ? AppTheme.darkTextLight
-                      : AppTheme.lightTextLight,
+                  color: context.colors.textTertiary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -466,7 +457,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     BoxShadow(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.02),
+                      ).colorScheme.onSurface.withValues(alpha: 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -529,9 +520,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                  color: isDark
-                      ? AppTheme.darkTextLight
-                      : AppTheme.lightTextLight,
+                  color: context.colors.textTertiary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -548,7 +537,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     BoxShadow(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.02),
+                      ).colorScheme.onSurface.withValues(alpha: 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -573,9 +562,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                     fontSize: 11,
-                    color: isDark
-                        ? AppTheme.darkTextLight
-                        : AppTheme.lightTextLight,
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ),
@@ -599,9 +586,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       horizontal: 24,
                       vertical: 12,
                     ),
-                    backgroundColor: isDark
-                        ? AppTheme.darkDangerBg
-                        : const Color(0xFFFEE8EA),
+                    backgroundColor: context.colors.dangerSoft,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -632,7 +617,7 @@ class _ProfileTabState extends State<ProfileTab> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.02),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -653,9 +638,7 @@ class _ProfileTabState extends State<ProfileTab> {
             label,
             style: GoogleFonts.outfit(
               fontSize: 12,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppTheme.darkTextLight
-                  : AppTheme.lightTextLight,
+              color: context.colors.textTertiary,
             ),
           ),
         ],
@@ -673,7 +656,6 @@ class _ProfileTabState extends State<ProfileTab> {
     required VoidCallback onTap,
     String? trailing,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       onTap: onTap,
@@ -681,7 +663,7 @@ class _ProfileTabState extends State<ProfileTab> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: headingColor.withOpacity(0.7)),
+            Icon(icon, size: 22, color: headingColor.withValues(alpha: 0.7)),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -697,9 +679,7 @@ class _ProfileTabState extends State<ProfileTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.darkAccentSoft
-                      : AppTheme.lightAccentSoft,
+                  color: context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -715,7 +695,7 @@ class _ProfileTabState extends State<ProfileTab> {
             Icon(
               Icons.chevron_right,
               size: 20,
-              color: headingColor.withOpacity(0.4),
+              color: headingColor.withValues(alpha: 0.4),
             ),
           ],
         ),
@@ -735,7 +715,7 @@ class _ProfileTabState extends State<ProfileTab> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: headingColor.withOpacity(0.7)),
+          Icon(icon, size: 22, color: headingColor.withValues(alpha: 0.7)),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -751,7 +731,7 @@ class _ProfileTabState extends State<ProfileTab> {
             value: value,
             onChanged: onChanged,
             activeColor: AppTheme.accentColor,
-            activeTrackColor: AppTheme.accentColor.withOpacity(0.3),
+            activeTrackColor: AppTheme.accentColor.withValues(alpha: 0.3),
           ),
         ],
       ),
