@@ -9,6 +9,8 @@ import 'checkout_screen.dart';
 import 'main_screen.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -22,6 +24,11 @@ class _CartScreenState extends State<CartScreen> {
   Map<String, dynamic>? _cart;
   bool _isLoading = true;
   String _error = '';
+
+  /// A failed add or remove, shown at the top of the cart until dismissed
+  /// or the next action succeeds. Not a SnackBar: it would cover the
+  /// checkout bar, which is exactly what the customer looks at next.
+  String? _actionError;
 
   @override
   void initState() {
@@ -42,7 +49,7 @@ class _CartScreenState extends State<CartScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = describeError(e, fallback: 'We could not load your cart.');
         _isLoading = false;
       });
     }
@@ -62,9 +69,10 @@ class _CartScreenState extends State<CartScreen> {
       AppHaptics.lightImpact();
       await _cartService.addItem(salonId, serviceId);
       await _loadCart();
+      if (mounted) setState(() => _actionError = null);
     } catch (e) {
       AppHaptics.error();
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showError(describeError(e, fallback: 'Could not add that service.'));
     } finally {
       if (mounted) setState(() => _isAdding = false);
     }
@@ -82,17 +90,18 @@ class _CartScreenState extends State<CartScreen> {
         await _cartService.addItem(salonId, id);
       }
       await _loadCart();
+      if (mounted) setState(() => _actionError = null);
     } catch (e) {
       AppHaptics.error();
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showError(describeError(e, fallback: 'Could not add that service.'));
     } finally {
       if (mounted) setState(() => _isAdding = false);
     }
   }
 
-  void _showMessage(String text) {
+  void _showError(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    setState(() => _actionError = text);
   }
 
   /// Label on the left, figure on the right — the same row style the booking
@@ -204,12 +213,11 @@ class _CartScreenState extends State<CartScreen> {
     try {
       await _cartService.removeItem(itemId);
       AppHaptics.mediumImpact();
+      if (mounted) setState(() => _actionError = null);
       _loadCart(); // Reload cart after removing item
     } catch (e) {
       AppHaptics.error();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to remove item: $e', style: Theme.of(context).snackBarTheme.contentTextStyle)),
-      );
+      _showError(describeError(e, fallback: 'Could not remove that item. Please try again.'));
     }
   }
 
@@ -252,21 +260,25 @@ class _CartScreenState extends State<CartScreen> {
       return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
     }
     if (_error.isNotEmpty) {
-      return Center(child: Text(_error, style: TextStyle(color: context.colors.danger)));
-    }
-    final textLight = context.colors.textTertiary;
-    final textHeading = context.colors.textPrimary;
-
-    if (_cart == null || (_cart!['items'] as List).isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_bag_outlined, size: 80, color: textLight),
-            SizedBox(height: 16),
-            Text('Your cart is empty', style: GoogleFonts.outfit(fontSize: 18, color: textHeading, fontWeight: FontWeight.w600)),
-          ],
+      return RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _loadCart,
+        child: ScrollableState(
+          child: ErrorState(
+            title: 'Could not load your cart',
+            message: _error,
+            onRetry: _loadCart,
+          ),
         ),
+      );
+    }
+    if (_cart == null || (_cart!['items'] as List).isEmpty) {
+      return EmptyState(
+        icon: Icons.shopping_bag_outlined,
+        title: 'Your cart is empty',
+        message: 'Add services from a salon to book them together.',
+        actionLabel: 'Browse salons',
+        onAction: () => Navigator.pop(context),
       );
     }
 
@@ -284,6 +296,13 @@ class _CartScreenState extends State<CartScreen> {
         physics: AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(16),
         children: [
+          if (_actionError != null) ...[
+            InlineStatus(
+              message: _actionError!,
+              onDismiss: () => setState(() => _actionError = null),
+            ),
+            SizedBox(height: 16),
+          ],
           // What the cart already qualifies for comes first — the customer
           // should see they are ahead before they see the bill.
           if (applied.isNotEmpty) ...[
