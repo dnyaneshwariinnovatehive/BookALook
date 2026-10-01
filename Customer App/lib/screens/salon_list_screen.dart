@@ -5,6 +5,7 @@ import '../services/location_service.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../services/salon_service.dart';
 import 'salon_detail_screen.dart';
+import '../theme/app_colors.dart';
 
 class SalonListScreen extends StatefulWidget {
   final String? initialSearch;
@@ -67,7 +68,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : _error.isNotEmpty
-              ? Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)))
+              ? Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)))
               : _salons.isEmpty
                   ? _buildEmptyOrSuggestions()
                   : ListView.separated(
@@ -90,14 +91,14 @@ class _SalonListScreenState extends State<SalonListScreen> {
               LocationService.instance.hasCity
                   ? 'No match in ${LocationService.instance.city!.name}.'
                   : 'No exact match found.',
-              style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontSize: 16, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(color: context.colors.danger, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Here are some nearby salons you might like:',
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 14),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 14),
             ),
           ),
           Expanded(
@@ -129,13 +130,13 @@ class _SalonListScreenState extends State<SalonListScreen> {
                   : 'No salons found.',
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
-                  color: AppTheme.lightTextHeading, fontWeight: FontWeight.w600),
+                  color: context.colors.textPrimary, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text(
               'Try a different search, or change your city.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 16),
             TextButton.icon(
@@ -169,11 +170,11 @@ class _SalonListScreenState extends State<SalonListScreen> {
         child: Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.lightSurface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.lightBorder),
+            border: Border.all(color: context.colors.border),
             boxShadow: [
-              BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4))
+              BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), blurRadius: 10, offset: Offset(0, 4))
             ]
           ),
           child: Row(
@@ -182,7 +183,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppTheme.lightAccentSoft,
+                  color: context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40),
@@ -192,13 +193,13 @@ class _SalonListScreenState extends State<SalonListScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.lightTextHeading)),
+                    Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
                     SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.location_on, size: 14, color: AppTheme.lightTextBody),
+                        Icon(Icons.location_on, size: 14, color: context.colors.textSecondary),
                         SizedBox(width: 4),
-                        Expanded(child: Text(salon['address'] ?? 'No address provided', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 13))),
+                        Expanded(child: Text(salon['address'] ?? 'No address provided', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 13))),
                       ],
                     ),
                     SizedBox(height: 8),
@@ -206,13 +207,13 @@ class _SalonListScreenState extends State<SalonListScreen> {
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppTheme.lightWarningBg,
+                          color: context.colors.warningBg,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           salon['unavailable_reason'] ?? 'Not taking bookings right now',
                           style: GoogleFonts.outfit(
-                              color: AppTheme.lightWarning,
+                              color: context.colors.warning,
                               fontSize: 11,
                               fontWeight: FontWeight.w600),
                         ),
@@ -227,7 +228,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
 
                           if (count == 0) {
                             return Text('New salon',
-                                style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600));
+                                style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600));
                           }
 
                           return Row(
@@ -235,7 +236,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
                               Icon(Icons.star, size: 14, color: AppTheme.starRating),
                               SizedBox(width: 4),
                               Text('${avg.toStringAsFixed(1)} ($count ${count == 1 ? 'review' : 'reviews'})',
-                                  style: GoogleFonts.outfit(color: AppTheme.lightTextBody, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                             ],
                           );
                         },
