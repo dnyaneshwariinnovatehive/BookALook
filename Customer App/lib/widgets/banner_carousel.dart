@@ -3,6 +3,7 @@ import '../models/banner.dart';
 import '../theme/app_theme.dart';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
+import '../theme/app_colors.dart';
 
 class BannerCarousel extends StatefulWidget {
   final List<PromoBanner> banners;
@@ -61,14 +62,14 @@ class _BannerCarouselState extends State<BannerCarousel> {
         width: double.infinity,
         padding: EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: AppTheme.lightAccentSoft.withOpacity(0.35),
+          color: context.colors.accentSoft.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
           children: [
             Icon(Icons.local_offer,
                 size: 44,
-                color: AppTheme.accentColor.withOpacity(0.35)),
+                color: AppTheme.accentColor.withValues(alpha: 0.35)),
             SizedBox(height: 12),
             Text(
               'No active offers right now',
@@ -81,7 +82,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
             SizedBox(height: 4),
             Text(
               'Check back later for exciting spa and salon deals!',
-              style: TextStyle(color: AppTheme.lightTextBody, fontSize: 13),
+              style: TextStyle(color: context.colors.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],
@@ -117,7 +118,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
               margin: const EdgeInsets.symmetric(horizontal: 1),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(26),
-                color: AppTheme.lightAccentSoft,
+                color: context.colors.accentSoft,
                 image: DecorationImage(
                   image: NetworkImage(banner.imageUrl),
                   fit: BoxFit.cover,
@@ -135,7 +136,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.2),
+                          Colors.black.withValues(alpha: 0.2),
                         ],
                       ),
                     ),
@@ -153,7 +154,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                               Text(
                                 banner.title,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
                                   height: 1.2,
