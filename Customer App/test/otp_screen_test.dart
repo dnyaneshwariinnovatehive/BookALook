@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:customer_app/screens/otp_screen.dart';
+import 'package:customer_app/services/http_client.dart' as api;
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/widgets/auth/otp_boxes.dart';
 
@@ -92,6 +96,41 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(OtpScreen), findsNothing);
     expect(find.text('open'), findsOneWidget);
+  });
+
+  testWidgets('resend cannot fire during the countdown, then really sends',
+      (tester) async {
+    // Auth goes through the shared client, so a mock sees every send-otp.
+    var sends = 0;
+    dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+    api.debugSetClient(MockClient((request) async {
+      if (request.url.path.endsWith('/send-otp')) sends++;
+      return http.Response('{}', 200);
+    }));
+
+    await tester.pumpWidget(_wrap(const OtpScreen(phone: '9876543210')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    // During the countdown the label is plain text: tapping it does nothing.
+    await tester.tap(find.textContaining('Resend in'), warnIfMissed: false);
+    await tester.pump();
+    expect(sends, 0);
+    expect(find.byKey(ResendCountdown.actionKey), findsNothing);
+
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(ResendCountdown.actionKey), findsOneWidget);
+
+    // This tap used to land on an inner TextButton whose onPressed was empty.
+    await tester.tap(find.byKey(ResendCountdown.actionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(sends, 1);
+    expect(find.text('A new code is on its way.'), findsOneWidget);
+    expect(_resendLabel(tester), contains('Resend in'),
+        reason: 'a successful resend relocks behind a fresh countdown');
   });
 
   testWidgets('the stale test-code hint is not shown to users',

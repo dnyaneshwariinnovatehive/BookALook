@@ -338,9 +338,9 @@ class _OtpScreenState extends State<OtpScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextButton(
-              onPressed: _isLoading ? null : () => _resend(),
-              child: ResendCountdown(seconds: _resendIn),
+            ResendCountdown(
+              seconds: _resendIn,
+              onResend: _isLoading ? null : _resend,
             ),
             Text(
               '·',

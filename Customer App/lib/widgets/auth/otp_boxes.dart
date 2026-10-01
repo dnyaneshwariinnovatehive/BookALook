@@ -445,11 +445,22 @@ class StatusNote extends StatelessWidget {
   }
 }
 
-/// Counts a countdown down from [seconds], or idles when null.
+/// "Resend in 0:24" while [seconds] counts down, then a live "Resend OTP".
+///
+/// The countdown is plain text, so there is nothing to tap until it ends. This
+/// used to render its own TextButton with an empty onPressed inside the
+/// screen's TextButton: the inner one won every tap and did nothing, and the
+/// outer one was live during the countdown, so resend was both broken and
+/// unlocked. Pass a null [onResend] to keep it disabled, e.g. while a request
+/// is in flight.
 class ResendCountdown extends StatelessWidget {
-  const ResendCountdown({super.key, this.seconds});
+  const ResendCountdown({super.key, this.seconds, this.onResend});
 
   final int? seconds;
+  final VoidCallback? onResend;
+
+  /// Key on the resend action, for tests.
+  static const Key actionKey = ValueKey('resend');
 
   @override
   Widget build(BuildContext context) {
@@ -459,8 +470,9 @@ class ResendCountdown extends StatelessWidget {
       duration: const Duration(milliseconds: 240),
       child: s == null
           ? TextButton(
-              key: const ValueKey('resend'),
-              onPressed: () {},
+              key: actionKey,
+              onPressed: onResend,
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
               child: Text(
                 'Resend OTP',
                 style: TextStyle(
