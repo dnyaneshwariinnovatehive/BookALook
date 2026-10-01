@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// The three things a cart can tell a customer about packages, in one place so
 /// the salon page and the cart page say exactly the same thing.
@@ -26,21 +27,20 @@ class AppliedComboBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (appliedCombos.isEmpty) return const SizedBox.shrink();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSuccessBg : AppTheme.lightSuccessBg,
+        color: context.colors.successBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? AppTheme.darkSuccess.withOpacity(0.3) : AppTheme.lightSuccess.withOpacity(0.3)),
+        border: Border.all(color: context.colors.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.local_offer, size: 18, color: AppTheme.lightSuccess),
+              Icon(Icons.local_offer, size: 18, color: context.colors.success),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -50,7 +50,7 @@ class AppliedComboBanner extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontSize: 14.5,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.lightSuccess,
+                    color: context.colors.success,
                   ),
                 ),
               ),
@@ -71,11 +71,11 @@ class AppliedComboBanner extends StatelessWidget {
                     style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
+                        color: context.colors.textPrimary),
                   ),
                   Text(
                     names,
-                    style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
+                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary),
                   ),
                   Row(
                     children: [
@@ -83,7 +83,7 @@ class AppliedComboBanner extends StatelessWidget {
                         '₹${_toDouble(combo['list_total']).toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
                           fontSize: 13,
-                          color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                          color: context.colors.textTertiary,
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
@@ -93,7 +93,7 @@ class AppliedComboBanner extends StatelessWidget {
                         style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
+                            color: context.colors.success),
                       ),
                     ],
                   ),
@@ -135,9 +135,9 @@ class ComboOfferCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+        color: context.colors.accentSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accentColor.withOpacity(isDark ? 0.4 : 0.3)),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: isDark ? 0.4 : 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +152,7 @@ class ComboOfferCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                       fontSize: 14.5,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
+                      color: context.colors.textPrimary),
                 ),
               ),
             ],
@@ -161,7 +161,7 @@ class ComboOfferCard extends StatelessWidget {
           Text(
             'You already have ${(offer['services_in_cart'] as List?)?.join(', ') ?? ''}. '
             'Adding the rest costs ₹${extra.toStringAsFixed(0)} more.',
-            style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody, height: 1.4),
+            style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 10),
 
@@ -187,7 +187,7 @@ class ComboOfferCard extends StatelessWidget {
                               Text('₹${listPrice.toStringAsFixed(0)}',
                                   style: GoogleFonts.outfit(
                                     fontSize: 11.5,
-                                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                                    color: context.colors.textTertiary,
                                     decoration: TextDecoration.lineThrough,
                                   )),
                               const SizedBox(width: 5),
@@ -253,11 +253,10 @@ class SuggestionStrip extends StatelessWidget {
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final textHeading = context.colors.textPrimary;
+    final textLight = context.colors.textTertiary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
 
     // The wording has to be honest about where the suggestion came from.
     final fromHistory = suggestions.any((s) => s['reason'] == 'bought_together');
@@ -290,7 +289,7 @@ class SuggestionStrip extends StatelessWidget {
                   border: Border.all(color: borderColor, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.02),
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
                       blurRadius: 10,
                       offset: Offset(0, 4),
                     ),
@@ -331,7 +330,7 @@ class SuggestionStrip extends StatelessWidget {
                             style: OutlinedButton.styleFrom(
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               foregroundColor: AppTheme.accentColor,
-                              backgroundColor: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                              backgroundColor: context.colors.accentSoft,
                               side: BorderSide.none,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
