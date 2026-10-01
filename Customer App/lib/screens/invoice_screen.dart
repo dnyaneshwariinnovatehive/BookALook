@@ -8,6 +8,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/invoice_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
 
 /// Shows a booking's invoice on screen and lets the customer keep a copy.
 ///
@@ -38,6 +40,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   String _error = '';
+
+  /// Why saving the PDF did not work, shown above the document until
+  /// dismissed. [_saveFallback] offers the browser when the device could not
+  /// build the PDF itself.
+  String? _saveProblem;
+  bool _saveFallback = false;
 
   @override
   void initState() {
@@ -108,7 +116,10 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   Future<void> _save() async {
     if (_isSaving) return;
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveProblem = null;
+    });
 
     try {
       // A missing or expired link fails here, and a browser would fail the same
@@ -116,7 +127,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       try {
         _documentHtml ??= await _invoiceService.fetchHtml(widget.url);
       } catch (e) {
-        if (mounted) _showMessage(e.toString().replaceFirst('Exception: ', ''));
+        if (mounted) {
+          setState(() {
+            _saveProblem = describeError(e, fallback: 'Could not download the invoice. Please try again.');
+            _saveFallback = false;
+          });
+        }
         return;
       }
       if (!mounted) return;
@@ -152,28 +168,20 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     }
   }
 
+  /// Used to be an 8-second SnackBar carrying the only way out ("Open in
+  /// browser"); miss it and the customer had no route to the PDF at all.
+  /// Now it stays above the document until they act on it or dismiss it.
   void _showBrowserFallback() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('Could not build the PDF here.'),
-          duration: const Duration(seconds: 8),
-          action: SnackBarAction(label: 'Open in browser', onPressed: _openExternally),
-        ),
-      );
+    setState(() {
+      _saveProblem = 'Could not build the PDF on this device. You can save it from your browser instead.';
+      _saveFallback = true;
+    });
   }
 
   Future<void> _openExternally() async {
     final uri = Uri.tryParse(widget.url.trim());
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _reload() async {
@@ -189,7 +197,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = describeError(e, fallback: 'Could not load the invoice.');
       });
     }
   }
@@ -230,7 +238,24 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: _error.isNotEmpty ? _buildError() : _buildDocument(),
+      body: _error.isNotEmpty
+          ? _buildError()
+          : Column(
+              children: [
+                if (_saveProblem != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: InlineStatus(
+                      message: _saveProblem!,
+                      kind: _saveFallback ? StatusKind.warning : StatusKind.error,
+                      onRetry: _saveFallback ? _openExternally : _save,
+                      retryLabel: _saveFallback ? 'Open in browser' : 'Try again',
+                      onDismiss: () => setState(() => _saveProblem = null),
+                    ),
+                  ),
+                Expanded(child: _buildDocument()),
+              ],
+            ),
     );
   }
 
@@ -247,38 +272,11 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Widget _buildError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.receipt_long_rounded,
-                size: 44,
-                color: context.colors.emptyIcon),
-            const SizedBox(height: 14),
-            Text(
-              _error,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                fontSize: 14,
-                height: 1.4,
-                color: context.colors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _reload,
-              icon: const Icon(Icons.refresh_rounded, size: 19),
-              label: const Text('Try again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: context.colors.actionFill,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ErrorState(
+      icon: Icons.receipt_long_rounded,
+      title: 'Could not open this invoice',
+      message: _error,
+      onRetry: _reload,
     );
   }
 }
