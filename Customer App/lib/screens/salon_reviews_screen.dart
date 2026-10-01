@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/rating_bars.dart';
+import '../theme/app_colors.dart';
 
 /// Every review a salon has, with the two filters a reader actually wants.
 ///
@@ -108,9 +109,9 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
+      backgroundColor: context.colors.surfaceMuted,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,11 +120,11 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
                 style: GoogleFonts.outfit(
                     fontSize: 16.5,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.lightTextHeading)),
+                    color: context.colors.textPrimary)),
             Text(widget.salonName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextBody)),
+                style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary)),
           ],
         ),
       ),
@@ -168,7 +169,7 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
             child: Text(
               _describeFilter(),
               style: GoogleFonts.outfit(
-                  fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.lightTextHeading),
+                  fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.textPrimary),
             ),
           ),
           GestureDetector(
@@ -180,10 +181,10 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
               decoration: BoxDecoration(
-                color: _onlyWithComment ? AppTheme.lightAccentSoft : Colors.white,
+                color: _onlyWithComment ? context.colors.accentSoft : context.colors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: _onlyWithComment ? AppTheme.accentColor : AppTheme.lightBorder),
+                    color: _onlyWithComment ? AppTheme.accentColor : context.colors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -191,14 +192,14 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
                   Icon(
                     _onlyWithComment ? Icons.check_rounded : Icons.notes_rounded,
                     size: 14,
-                    color: _onlyWithComment ? AppTheme.accentColor : AppTheme.lightTextBody,
+                    color: _onlyWithComment ? AppTheme.accentColor : context.colors.textSecondary,
                   ),
                   const SizedBox(width: 5),
                   Text('With comments',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: _onlyWithComment ? FontWeight.bold : FontWeight.normal,
-                        color: _onlyWithComment ? AppTheme.accentColor : AppTheme.lightTextBody,
+                        color: _onlyWithComment ? AppTheme.accentColor : context.colors.textSecondary,
                       )),
                 ],
               ),
@@ -216,14 +217,14 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           children: [
-            const Icon(Icons.rate_review_outlined, size: 44, color: AppTheme.lightTextLight),
+            Icon(Icons.rate_review_outlined, size: 44, color: context.colors.textTertiary),
             const SizedBox(height: 14),
             Text(
               _starFilter != null || _onlyWithComment
                   ? 'No reviews match that filter.'
                   : 'No reviews yet — be the first to rate this salon.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 13.5, color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(fontSize: 13.5, color: context.colors.textSecondary),
             ),
           ],
         ),
@@ -235,10 +236,10 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.cloud_off_outlined, size: 44, color: AppTheme.lightTextLight),
+              Icon(Icons.cloud_off_outlined, size: 44, color: context.colors.textTertiary),
               const SizedBox(height: 14),
               Text('Could not load reviews.',
-                  style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+                  style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
               const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: () => _load(reset: true),
