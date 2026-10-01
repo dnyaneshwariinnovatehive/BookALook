@@ -57,6 +57,15 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Label of a disabled button that still needs to be read (shade600 / shade400).
+  final Color disabledLabel;
+
+  /// Fill of a disabled secondary button (Colors.grey shade100 / shade800).
+  final Color disabledFillSoft;
+
+  /// Fill of a disabled primary button (Colors.grey shade200 / shade800).
+  final Color disabledFill;
+
   /// Neutral drop shadow under home-tab cards: black at 4% (light) or 20%
   /// (dark), baked to the old 8-bit alpha.
   final Color dropShadow;
@@ -145,6 +154,9 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.disabledLabel,
+    required this.disabledFillSoft,
+    required this.disabledFill,
     required this.dropShadow,
     required this.iconIdle,
     required this.serviceTileBg,
@@ -187,6 +199,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    disabledLabel: Color(0xFF757575),
+    disabledFillSoft: Color(0xFFF5F5F5),
+    disabledFill: Color(0xFFEEEEEE),
     dropShadow: Color(0x0A000000),
     iconIdle: Color(0xFF757575),
     serviceTileBg: Color(0xFFFAF9FF),
@@ -229,6 +244,9 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    disabledLabel: Color(0xFFBDBDBD),
+    disabledFillSoft: Color(0xFF424242),
+    disabledFill: Color(0xFF424242),
     dropShadow: Color(0x33000000),
     iconIdle: Color(0xFFBDBDBD),
     serviceTileBg: AppTheme.darkBg,
@@ -277,6 +295,9 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? disabledLabel,
+    Color? disabledFillSoft,
+    Color? disabledFill,
     Color? dropShadow,
     Color? iconIdle,
     Color? serviceTileBg,
@@ -318,6 +339,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      disabledLabel: disabledLabel ?? this.disabledLabel,
+      disabledFillSoft: disabledFillSoft ?? this.disabledFillSoft,
+      disabledFill: disabledFill ?? this.disabledFill,
       dropShadow: dropShadow ?? this.dropShadow,
       iconIdle: iconIdle ?? this.iconIdle,
       serviceTileBg: serviceTileBg ?? this.serviceTileBg,
@@ -365,6 +389,9 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      disabledLabel: Color.lerp(disabledLabel, other.disabledLabel, t)!,
+      disabledFillSoft: Color.lerp(disabledFillSoft, other.disabledFillSoft, t)!,
+      disabledFill: Color.lerp(disabledFill, other.disabledFill, t)!,
       dropShadow: Color.lerp(dropShadow, other.dropShadow, t)!,
       iconIdle: Color.lerp(iconIdle, other.iconIdle, t)!,
       serviceTileBg: Color.lerp(serviceTileBg, other.serviceTileBg, t)!,

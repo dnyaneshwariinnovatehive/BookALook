@@ -10,6 +10,7 @@ import 'reschedule_screen.dart';
 import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
+import '../theme/app_colors.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -61,16 +62,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           children: [
             Text(
               '${_booking['salon']['name']} · ${DateFormat('EEE, MMM d').format(DateTime.parse(_booking['appointment_date']))} at ${_booking['start_time']}',
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
             ),
             SizedBox(height: 16),
             if (advance > 0) ...[
-              _dialogRow('Advance paid', '₹${advance.toStringAsFixed(2)}', AppTheme.lightTextHeading),
+              _dialogRow('Advance paid', '₹${advance.toStringAsFixed(2)}', context.colors.textPrimary),
               SizedBox(height: 6),
-              _dialogRow('Refundable', '₹${refundable.toStringAsFixed(2)}', AppTheme.lightSuccess),
+              _dialogRow('Refundable', '₹${refundable.toStringAsFixed(2)}', context.colors.success),
               if (forfeited > 0) ...[
                 SizedBox(height: 6),
-                _dialogRow('Non-refundable', '₹${forfeited.toStringAsFixed(2)}', AppTheme.lightDanger),
+                _dialogRow('Non-refundable', '₹${forfeited.toStringAsFixed(2)}', context.colors.danger),
               ],
               SizedBox(height: 12),
               Text(
@@ -78,11 +79,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                     ? 'The salon closed this day, so your whole advance comes back. '
                         'You can also keep the booking and just pick a new time.'
                     : 'Refunds follow each service\'s own refund policy.',
-                style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.lightTextLight),
+                style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
               ),
             ] else
               Text('Nothing has been paid for this booking yet.',
-                  style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+                  style: GoogleFonts.outfit(color: context.colors.textSecondary)),
           ],
         ),
         actions: [
@@ -91,7 +92,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               AppHaptics.lightImpact();
               Navigator.pop(dialogContext, false);
             },
-            child: Text('Keep booking', style: GoogleFonts.outfit(color: AppTheme.lightTextBody)),
+            child: Text('Keep booking', style: GoogleFonts.outfit(color: context.colors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -99,7 +100,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               Navigator.pop(dialogContext, true);
             },
             child: Text('Cancel booking',
-                style: GoogleFonts.outfit(color: AppTheme.lightDanger, fontWeight: FontWeight.bold)),
+                style: GoogleFonts.outfit(color: context.colors.danger, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -172,7 +173,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Widget _dialogRow(String label, String value, Color valueColor) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
           Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
         ],
       );
@@ -181,19 +182,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     switch (status) {
       case 'scheduled':
       case 'confirmed':
-        return AppTheme.lightInfo;
+        return context.colors.info;
       case 'pending_payment':
       case 'in_progress':
       case 'rescheduled':
       case 'awaiting_reschedule':
-        return AppTheme.lightWarning;
+        return context.colors.warning;
       case 'completed':
-        return AppTheme.lightSuccess;
+        return context.colors.success;
       case 'cancelled':
       case 'no_show':
-        return AppTheme.lightDanger;
+        return context.colors.danger;
       default:
-        return AppTheme.lightTextBody;
+        return context.colors.textSecondary;
     }
   }
 
@@ -205,7 +206,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.2 : 0.1),
+        color: color.withValues(alpha: isDark ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -215,9 +216,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-  Widget _buildSection({required String title, required Widget child, required bool isDark, required Color headingColor}) {
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightPurpleBorder;
+  Widget _buildSection({required String title, required Widget child, required Color headingColor}) {
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.cardBorder;
     
     return Container(
       width: double.infinity,
@@ -229,7 +230,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accentColor.withOpacity(0.02),
+            color: AppTheme.accentColor.withValues(alpha: 0.02),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -251,7 +252,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   Widget _moneyRow(String label, double amount, Color color) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.lightTextBody)),
+          Text(label, style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
           Text('₹${amount.toStringAsFixed(2)}',
               style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
         ],
@@ -260,9 +261,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final bgColor = isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC);
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final bgColor = context.colors.pageNeutral;
 
     final date = DateTime.parse(_booking['appointment_date']);
     final services = (_booking['services'] as List?) ?? [];
@@ -323,7 +324,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               // 1. Salon & Service Summary
               _buildSection(
                 title: '',
-                isDark: isDark,
                 headingColor: headingColor,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +338,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         errorBuilder: (_, __, ___) => Container(
                           width: 60,
                           height: 60,
-                          color: const Color(0xFFF3F0FF),
+                          color: context.colors.imagePlaceholder,
                           child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 28),
                         ),
                       ),
@@ -371,7 +371,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               // 2. Appointment Details (Date/Time/Stylist)
               _buildSection(
                 title: 'Appointment',
-                isDark: isDark,
                 headingColor: headingColor,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,7 +409,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               if (_booking['salon']['address'] != null)
                 _buildSection(
                   title: 'Location',
-                  isDark: isDark,
                   headingColor: headingColor,
                   child: Text(_booking['salon']['address'], style: GoogleFonts.outfit(fontSize: 14, color: headingColor)),
                 ),
@@ -419,7 +417,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               if (services.isNotEmpty || addedServices.isNotEmpty)
                 _buildSection(
                   title: 'Payment Details',
-                  isDark: isDark,
                   headingColor: headingColor,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,7 +476,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                       ],
                       
                       SizedBox(height: 12),
-                      Divider(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                      Divider(color: context.colors.border),
                       SizedBox(height: 12),
                       
                       Row(
@@ -495,7 +492,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkBg : const Color(0xFFF9F9FC),
+                            color: context.colors.pageNeutral,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -534,7 +531,6 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               if (widget.isUpcoming && (freeReschedule || needsReschedule || !canCancel || !canReschedule || _booking['cancellation_reason'] != null))
                 _buildSection(
                   title: 'Booking Info',
-                  isDark: isDark,
                   headingColor: headingColor,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,13 +544,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         Container(
                           padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
+                            color: context.colors.warningBg,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.event_busy, size: 20, color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning),
+                              Icon(Icons.event_busy, size: 20, color: context.colors.warning),
                               SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -562,14 +558,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                                   children: [
                                     Text(
                                       needsReschedule ? 'This booking has been released — pick a new time' : 'The salon is closed on this date',
-                                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning),
+                                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: context.colors.warning),
                                     ),
                                     SizedBox(height: 6),
                                     Text(
                                       _booking['closure_reason'] != null
                                           ? '${_booking['closure_reason']}. Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.'
                                           : 'Reschedule free of cost — your ₹${advance.toStringAsFixed(0)} advance carries over, and you get all of it back if you cancel instead.',
-                                      style: GoogleFonts.outfit(fontSize: 13, color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning),
+                                      style: GoogleFonts.outfit(fontSize: 13, color: context.colors.warning),
                                     ),
                                   ],
                                 ),
@@ -604,8 +600,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           child: TextButton(
                             onPressed: canReschedule ? _openReschedule : null,
                             style: TextButton.styleFrom(
-                              backgroundColor: canReschedule ? (isDark ? AppTheme.darkButtonBg : AppTheme.accentColor) : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                              foregroundColor: canReschedule ? Colors.white : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              backgroundColor: canReschedule ? context.colors.actionFill : context.colors.disabledFill,
+                              foregroundColor: canReschedule ? Colors.white : Colors.grey.shade500,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                               padding: EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -618,8 +614,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                           child: TextButton(
                             onPressed: canCancel ? _confirmCancel : null,
                             style: TextButton.styleFrom(
-                              backgroundColor: canCancel ? (isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA)) : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
-                              foregroundColor: canCancel ? AppTheme.lightDanger : (isDark ? Colors.grey.shade500 : Colors.grey),
+                              backgroundColor: canCancel ? context.colors.dangerSoft : context.colors.disabledFillSoft,
+                              foregroundColor: canCancel ? context.colors.danger : Colors.grey.shade500,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                               padding: EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -633,8 +629,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               child: TextButton(
                                 onPressed: canCancel ? _confirmCancel : null,
                                 style: TextButton.styleFrom(
-                                  backgroundColor: canCancel ? (isDark ? AppTheme.darkDangerBg : const Color(0xFFFEE8EA)) : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
-                                  foregroundColor: canCancel ? AppTheme.lightDanger : (isDark ? Colors.grey.shade500 : Colors.grey),
+                                  backgroundColor: canCancel ? context.colors.dangerSoft : context.colors.disabledFillSoft,
+                                  foregroundColor: canCancel ? context.colors.danger : Colors.grey.shade500,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                 ),
@@ -646,8 +642,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               child: TextButton(
                                 onPressed: canReschedule ? _openReschedule : null,
                                 style: TextButton.styleFrom(
-                                  backgroundColor: canReschedule ? (isDark ? AppTheme.darkButtonBg : AppTheme.accentColor) : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                                  foregroundColor: canReschedule ? Colors.white : (isDark ? Colors.grey.shade500 : Colors.grey),
+                                  backgroundColor: canReschedule ? context.colors.actionFill : context.colors.disabledFill,
+                                  foregroundColor: canReschedule ? Colors.white : Colors.grey.shade500,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                 ),
@@ -669,7 +665,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               ),
                             ),
                             style: TextButton.styleFrom(
-                              backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+                              backgroundColor: context.colors.surface,
                               foregroundColor: AppTheme.accentColor,
                               side: const BorderSide(color: AppTheme.accentColor),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -688,8 +684,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                             onPressed: null,
                             icon: const Icon(Icons.schedule, size: 18),
                             style: TextButton.styleFrom(
-                              backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
-                              disabledForegroundColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              backgroundColor: context.colors.disabledFillSoft,
+                              disabledForegroundColor: context.colors.disabledLabel,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                               padding: EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -708,7 +704,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   child: InvoiceActionButton(booking: _booking),
                 ),
 
-              if (!widget.isUpcoming) ..._buildReviewSection(isDark, headingColor, bodyColor),
+              if (!widget.isUpcoming) ..._buildReviewSection(headingColor, bodyColor),
               
               SizedBox(height: 40),
             ],
@@ -718,7 +714,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-  List<Widget> _buildReviewSection(bool isDark, Color headingColor, Color bodyColor) {
+  List<Widget> _buildReviewSection(Color headingColor, Color bodyColor) {
     final review = _booking['review'] as Map<String, dynamic>?;
     final canReview = _booking['can_review'] == true;
     final blockedReason = _booking['review_blocked_reason']?.toString();
@@ -726,12 +722,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     if (review != null) {
       final rating = (review['rating'] as num?)?.toInt() ?? 0;
       final comment = review['comment']?.toString() ?? '';
-      final lightColor = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+      final lightColor = context.colors.textTertiary;
 
       return [
         _buildSection(
           title: 'Your Review',
-          isDark: isDark,
           headingColor: headingColor,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -764,7 +759,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               icon: Icon(Icons.star_rounded, size: 22),
               label: Text('Rate your visit', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? AppTheme.darkButtonBg : AppTheme.accentColor,
+                backgroundColor: context.colors.actionFill,
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -779,7 +774,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       return [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Text(blockedReason, style: GoogleFonts.outfit(fontSize: 13, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight)),
+          child: Text(blockedReason, style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textTertiary)),
         ),
       ];
     }
