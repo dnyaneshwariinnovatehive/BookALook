@@ -8,6 +8,7 @@ import '../widgets/cart_offers.dart';
 import 'checkout_screen.dart';
 import 'main_screen.dart';
 import '../utils/app_haptics.dart';
+import '../theme/app_colors.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -99,7 +100,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget _dialogRow(String label, String value, Color valueColor) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppTheme.lightTextBody)),
+          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
           Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
         ],
       );
@@ -112,13 +113,12 @@ class _CartScreenState extends State<CartScreen> {
     required double lineTotal,
     required bool isCombo,
   }) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
-    final danger = isDark ? AppTheme.darkDanger : AppTheme.lightDanger;
-    final dangerBg = isDark ? AppTheme.darkDangerBg : AppTheme.lightDangerBg;
-    final surface = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final textHeading = context.colors.textPrimary;
+    final textBody = context.colors.textSecondary;
+    final textLight = context.colors.textTertiary;
+    final danger = context.colors.danger;
+    final dangerBg = context.colors.dangerBg;
+    final surface = context.colors.surface;
 
     final summary = _cart?['summary'] as Map<String, dynamic>?;
     final saving = double.tryParse('${summary?['saving'] ?? 0}') ?? 0.0;
@@ -215,10 +215,8 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppTheme.darkBg : AppTheme.lightBg;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final bgColor = context.colors.surfaceMuted;
+    final textHeading = context.colors.textPrimary;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -234,7 +232,7 @@ class _CartScreenState extends State<CartScreen> {
           padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
           child: Container(
             decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+              color: context.colors.accentSoft,
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -254,11 +252,10 @@ class _CartScreenState extends State<CartScreen> {
       return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
     }
     if (_error.isNotEmpty) {
-      return Center(child: Text(_error, style: TextStyle(color: AppTheme.lightDanger)));
+      return Center(child: Text(_error, style: TextStyle(color: context.colors.danger)));
     }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final textLight = context.colors.textTertiary;
+    final textHeading = context.colors.textPrimary;
 
     if (_cart == null || (_cart!['items'] as List).isEmpty) {
       return Center(
@@ -341,12 +338,12 @@ class _CartScreenState extends State<CartScreen> {
           margin: EdgeInsets.only(bottom: 14),
           padding: EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder, width: 1.5),
+            border: Border.all(color: context.colors.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.03),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.03),
                 blurRadius: 16,
                 offset: Offset(0, 4),
               ),
@@ -358,7 +355,7 @@ class _CartScreenState extends State<CartScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                  color: context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(isCombo ? Icons.card_giftcard : Icons.spa_outlined, color: AppTheme.accentColor, size: 28),
@@ -370,11 +367,11 @@ class _CartScreenState extends State<CartScreen> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading),
+                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
                     ),
                     if (subtitle != null) ...[
                       SizedBox(height: 4),
-                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 13, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
                     ],
                     SizedBox(height: 8),
                     Text(
@@ -385,7 +382,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline, color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger),
+                icon: Icon(Icons.delete_outline, color: context.colors.danger),
                 tooltip: 'Remove from cart',
                 onPressed: () => _removeItem(
                   item['id'].toString(),
@@ -440,21 +437,22 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final surfaceColor = context.colors.surface;
+    final textBody = context.colors.textSecondary;
+    final textHeading = context.colors.textPrimary;
+    final textLight = context.colors.textTertiary;
 
     return Container(
       padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: surfaceColor,
-        border: isDark ? Border(top: BorderSide(color: AppTheme.darkBorder)) : null,
+        border: context.colors.prefersOutline
+            ? Border(top: BorderSide(color: context.colors.raisedOutline))
+            : null,
         boxShadow: [
-          if (!isDark)
+          if (!context.colors.prefersOutline)
             BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
               offset: Offset(0, -6),
               blurRadius: 24,
             )
@@ -497,7 +495,7 @@ class _CartScreenState extends State<CartScreen> {
                       style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.lightSuccess)),
+                          color: context.colors.success)),
               ],
             ),
             ElevatedButton(
