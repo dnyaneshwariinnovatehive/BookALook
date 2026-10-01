@@ -57,6 +57,44 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Background of a service tile in the category service strip.
+  final Color serviceTileBg;
+
+  /// Fill of a secondary filled action (retry): accent in light mode, the
+  /// charcoal button colour in dark mode.
+  final Color actionFill;
+
+  /// Large decorative icon in an empty or error state.
+  final Color emptyIcon;
+
+  /// Page behind a rendered document (the invoice): paper-white in light mode.
+  final Color documentBg;
+
+  /// Initials on [avatarDimmedFill].
+  final Color avatarDimmedText;
+
+  /// Fill of a dimmed (inactive) initials avatar.
+  final Color avatarDimmedFill;
+
+  /// Decorative radial glow in the corner of booking cards: lilac at 45%
+  /// (light) / deep violet at 35% (dark), baked to the old 8-bit alpha.
+  final Color cardGlow;
+
+  /// Softer danger fill for destructive buttons (cancel, log out).
+  final Color dangerSoft;
+
+  /// Fill shown where a salon photo is missing or failed to load.
+  final Color imagePlaceholder;
+
+  /// The neutral page behind booking lists and booking details.
+  final Color pageNeutral;
+
+  /// The faintly lavender page behind explore, favourites and profile.
+  final Color pageTint;
+
+  /// Outline of discovery list cards (explore, category, search results).
+  final Color listBorder;
+
   /// Icons drawn on [success]. Dark mode's success green is pale enough that
   /// white on it loses contrast.
   final Color onSuccess;
@@ -99,6 +137,18 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.serviceTileBg,
+    required this.actionFill,
+    required this.emptyIcon,
+    required this.documentBg,
+    required this.avatarDimmedText,
+    required this.avatarDimmedFill,
+    required this.cardGlow,
+    required this.dangerSoft,
+    required this.imagePlaceholder,
+    required this.pageNeutral,
+    required this.pageTint,
+    required this.listBorder,
     required this.onSuccess,
     required this.segmentKnobLabel,
     required this.segmentKnob,
@@ -127,6 +177,18 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    serviceTileBg: Color(0xFFFAF9FF),
+    actionFill: AppTheme.accentColor,
+    emptyIcon: Color(0xFFBDBDBD),
+    documentBg: Colors.white,
+    avatarDimmedText: AppTheme.lightTextLight,
+    avatarDimmedFill: AppTheme.lightBorder,
+    cardGlow: Color(0x73CBA4F2),
+    dangerSoft: Color(0xFFFEE8EA),
+    imagePlaceholder: Color(0xFFF3F0FF),
+    pageNeutral: Color(0xFFF9F9FC),
+    pageTint: Color(0xFFFBF9FF),
+    listBorder: Color(0xFFEBE8F6),
     onSuccess: Colors.white,
     segmentKnobLabel: AppTheme.accentColor,
     segmentKnob: AppTheme.lightSurface,
@@ -155,6 +217,18 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    serviceTileBg: AppTheme.darkBg,
+    actionFill: AppTheme.darkButtonBg,
+    emptyIcon: AppTheme.darkTextLight,
+    documentBg: AppTheme.darkBg,
+    avatarDimmedText: AppTheme.darkSurface,
+    avatarDimmedFill: AppTheme.darkTextLight,
+    cardGlow: Color(0x597451A4),
+    dangerSoft: AppTheme.darkDangerBg,
+    imagePlaceholder: AppTheme.darkAccentSoft,
+    pageNeutral: AppTheme.darkBg,
+    pageTint: AppTheme.darkBg,
+    listBorder: AppTheme.darkBorder,
     onSuccess: AppTheme.darkBg,
     segmentKnobLabel: Colors.white,
     segmentKnob: AppTheme.accentColor,
@@ -189,6 +263,18 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? serviceTileBg,
+    Color? actionFill,
+    Color? emptyIcon,
+    Color? documentBg,
+    Color? avatarDimmedText,
+    Color? avatarDimmedFill,
+    Color? cardGlow,
+    Color? dangerSoft,
+    Color? imagePlaceholder,
+    Color? pageNeutral,
+    Color? pageTint,
+    Color? listBorder,
     Color? onSuccess,
     Color? segmentKnobLabel,
     Color? segmentKnob,
@@ -216,6 +302,18 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      serviceTileBg: serviceTileBg ?? this.serviceTileBg,
+      actionFill: actionFill ?? this.actionFill,
+      emptyIcon: emptyIcon ?? this.emptyIcon,
+      documentBg: documentBg ?? this.documentBg,
+      avatarDimmedText: avatarDimmedText ?? this.avatarDimmedText,
+      avatarDimmedFill: avatarDimmedFill ?? this.avatarDimmedFill,
+      cardGlow: cardGlow ?? this.cardGlow,
+      dangerSoft: dangerSoft ?? this.dangerSoft,
+      imagePlaceholder: imagePlaceholder ?? this.imagePlaceholder,
+      pageNeutral: pageNeutral ?? this.pageNeutral,
+      pageTint: pageTint ?? this.pageTint,
+      listBorder: listBorder ?? this.listBorder,
       onSuccess: onSuccess ?? this.onSuccess,
       segmentKnobLabel: segmentKnobLabel ?? this.segmentKnobLabel,
       segmentKnob: segmentKnob ?? this.segmentKnob,
@@ -249,6 +347,18 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      serviceTileBg: Color.lerp(serviceTileBg, other.serviceTileBg, t)!,
+      actionFill: Color.lerp(actionFill, other.actionFill, t)!,
+      emptyIcon: Color.lerp(emptyIcon, other.emptyIcon, t)!,
+      documentBg: Color.lerp(documentBg, other.documentBg, t)!,
+      avatarDimmedText: Color.lerp(avatarDimmedText, other.avatarDimmedText, t)!,
+      avatarDimmedFill: Color.lerp(avatarDimmedFill, other.avatarDimmedFill, t)!,
+      cardGlow: Color.lerp(cardGlow, other.cardGlow, t)!,
+      dangerSoft: Color.lerp(dangerSoft, other.dangerSoft, t)!,
+      imagePlaceholder: Color.lerp(imagePlaceholder, other.imagePlaceholder, t)!,
+      pageNeutral: Color.lerp(pageNeutral, other.pageNeutral, t)!,
+      pageTint: Color.lerp(pageTint, other.pageTint, t)!,
+      listBorder: Color.lerp(listBorder, other.listBorder, t)!,
       onSuccess: Color.lerp(onSuccess, other.onSuccess, t)!,
       segmentKnobLabel: Color.lerp(segmentKnobLabel, other.segmentKnobLabel, t)!,
       segmentKnob: Color.lerp(segmentKnob, other.segmentKnob, t)!,

@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../services/invoice_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// Shows a booking's invoice on screen and lets the customer keep a copy.
 ///
@@ -195,11 +196,10 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final number = (widget.invoiceNumber ?? '').trim();
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : Colors.white,
+      backgroundColor: context.colors.documentBg,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,7 +211,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               Text(number,
                   style: GoogleFonts.outfit(
                     fontSize: 11.5,
-                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                    color: context.colors.textTertiary,
                   )),
           ],
         ),
@@ -230,7 +230,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: _error.isNotEmpty ? _buildError(isDark) : _buildDocument(),
+      body: _error.isNotEmpty ? _buildError() : _buildDocument(),
     );
   }
 
@@ -246,7 +246,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     );
   }
 
-  Widget _buildError(bool isDark) {
+  Widget _buildError() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -255,7 +255,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           children: [
             Icon(Icons.receipt_long_rounded,
                 size: 44,
-                color: isDark ? AppTheme.darkTextLight : Colors.grey.shade400),
+                color: context.colors.emptyIcon),
             const SizedBox(height: 14),
             Text(
               _error,
@@ -263,7 +263,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 14,
                 height: 1.4,
-                color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+                color: context.colors.textSecondary,
               ),
             ),
             const SizedBox(height: 20),
@@ -272,7 +272,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 19),
               label: const Text('Try again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? AppTheme.darkButtonBg : AppTheme.accentColor,
+                backgroundColor: context.colors.actionFill,
                 foregroundColor: Colors.white,
               ),
             ),
