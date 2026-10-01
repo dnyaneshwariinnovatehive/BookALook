@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:convert';
 import 'package:customer_app/services/http_client.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -33,7 +34,7 @@ class BannerService {
       }
       return [];
     } catch (e) {
-      print('Fetch banners error: $e');
+      debugPrint('Fetch banners error: $e');
       return [];
     }
   }
