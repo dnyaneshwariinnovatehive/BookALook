@@ -12,6 +12,9 @@ import '../search_screen.dart';
 import '../../utils/app_haptics.dart';
 import '../../widgets/category_grid.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/error_text.dart';
+import '../../widgets/feedback_states.dart';
+import '../../widgets/skeleton.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -162,7 +165,7 @@ class ExploreTabState extends State<ExploreTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = describeError(e, fallback: 'We could not load salons.');
         _isLoading = false;
       });
     }
@@ -201,11 +204,40 @@ class ExploreTabState extends State<ExploreTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Loading and failure keep the tab's own page colour, instead of a bare
+    // spinner or the raw exception in red on whatever is behind the tab.
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
+      return Scaffold(
+        backgroundColor: context.colors.pageTint,
+        body: SafeArea(
+          child: SkeletonList(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 140),
+            itemBuilder: (_) => const SalonCardSkeleton(),
+          ),
+        ),
+      );
     }
     if (_error.isNotEmpty) {
-      return Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)));
+      return Scaffold(
+        backgroundColor: context.colors.pageTint,
+        body: SafeArea(
+          child: RefreshIndicator(
+            color: AppTheme.accentColor,
+            onRefresh: _loadSalons,
+            child: ScrollableState(
+              bottomInset: 140,
+              child: ErrorState(
+                title: 'Could not load salons',
+                message: _error,
+                onRetry: () {
+                  setState(() => _isLoading = true);
+                  _loadSalons();
+                },
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     final filteredSalons = _filteredSalons;
@@ -214,7 +246,11 @@ class ExploreTabState extends State<ExploreTab> {
     return Scaffold(
       backgroundColor: context.colors.pageTint,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: RefreshIndicator(
+          color: AppTheme.accentColor,
+          onRefresh: _loadSalons,
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -248,6 +284,7 @@ class ExploreTabState extends State<ExploreTab> {
               SizedBox(height: 140),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -1043,7 +1080,6 @@ class ExploreTabState extends State<ExploreTab> {
     final cityName = LocationService.instance.city?.name;
     final suggestedName = _suggestedCity?['name'];
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = context.colors.surface;
     final borderColor = context.colors.listBorder;
     final headingColor = context.colors.textPrimary;
@@ -1056,52 +1092,25 @@ class ExploreTabState extends State<ExploreTab> {
 
     return Column(
       children: [
-        SizedBox(height: 40),
-        Icon(
-          isFiltered ? Icons.search_off_rounded : Icons.storefront_outlined,
-          size: 56,
-          color: isDark ? Colors.grey.shade700 : Colors.grey.shade400,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          isFiltered
+        EmptyState(
+          icon: isFiltered ? Icons.search_off_rounded : Icons.storefront_outlined,
+          title: isFiltered
               ? 'No $label salons in ${cityName ?? 'this city'} yet'
               : cityName == null
                   ? 'No salons found'
                   : 'No salons in $cityName yet',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: headingColor),
+          message: isFiltered
+              ? 'Try another category, show every salon, or check a nearby city.'
+              : 'We are adding salons all the time. Try another city in the meantime.',
+          actionLabel: isFiltered ? 'Show all salons' : 'Change city',
+          onAction: isFiltered
+              ? () {
+                  AppHaptics.lightImpact();
+                  clearCategoryFilter();
+                }
+              : _pickCity,
         ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            isFiltered
-                ? 'Try another category, show every salon, or check a nearby city.'
-                : 'We are adding salons all the time. Try another city in the meantime.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: bodyColor, fontSize: 13),
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (isFiltered)
-          FilledButton.icon(
-            onPressed: () {
-              AppHaptics.lightImpact();
-              clearCategoryFilter();
-            },
-            icon: const Icon(Icons.grid_view_rounded, size: 18),
-            label: const Text('Show all salons'),
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor, foregroundColor: Colors.white),
-          )
-        else
-          FilledButton.icon(
-            onPressed: _pickCity,
-            icon: const Icon(Icons.location_on, size: 18),
-            label: const Text('Change city'),
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentColor, foregroundColor: Colors.white),
-          ),
-        
+
         if (_suggested.isNotEmpty) ...[
           const SizedBox(height: 40),
           Text(
