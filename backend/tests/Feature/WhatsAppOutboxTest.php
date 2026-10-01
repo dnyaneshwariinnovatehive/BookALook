@@ -13,6 +13,7 @@ use App\Models\WhatsAppMessage;
 use App\Services\InvoicePdfService;
 use App\Services\Notifications\NotificationService;
 use App\Services\Notifications\WhatsAppGateway;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -207,6 +208,68 @@ class WhatsAppOutboxTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_a_confirmation_whose_pdf_cannot_be_published_is_not_sent_without_it(): void
+    {
+        // Found in production: the upload was rejected, the job sent anyway, and
+        // AISensy answered "Media URL Missing" — the only error anyone saw, and
+        // one about the wrong system. A document template cannot go out without
+        // its document, so the job must stop and say why.
+        Cloudinary::shouldReceive('uploadApi')->andThrow(new \RuntimeException('Invalid request parameters'));
+
+        config([
+            'services.whatsapp.driver' => 'aisensy',
+            'services.whatsapp.aisensy.api_key' => 'key-123',
+            'services.whatsapp.campaigns.booking_confirmed' => 'BAL_BOOKING_CONFIRMED',
+        ]);
+        Http::fake(['backend.aisensy.com/*' => Http::response([], 200)]);
+
+        $appointment = $this->appointment();
+
+        Invoice::create([
+            'appointment_id' => $appointment->id,
+            'invoice_number' => 'BAL-TEST-'.Str::upper(Str::random(8)),
+            'issued_at' => now(),
+            'bill_to_name' => 'Asha',
+            'salon_name' => 'Glow Studio',
+            'provider_name' => 'Riya',
+            'appointment_date' => $appointment->appointment_date,
+            'start_time' => $appointment->start_time,
+            'end_time' => $appointment->end_time,
+            'line_items' => [['name' => 'Haircut', 'kind' => 'service', 'price' => 500, 'duration_minutes' => 45]],
+            'subtotal' => 500,
+            'advance_paid' => 500,
+            'balance_due' => 0,
+            'total' => 500,
+            'template' => InvoiceSetting::typed(),
+        ]);
+
+        $message = WhatsAppMessage::create([
+            'to_phone' => '9876543210',
+            'template' => config('services.whatsapp.templates.booking_confirmed'),
+            'payload' => ['parameters' => ['Glow Studio'], 'attachment' => 'invoice'],
+            'related_appointment_id' => $appointment->id,
+            'status' => WhatsAppMessage::STATUS_QUEUED,
+        ]);
+
+        $job = new SendWhatsAppMessageJob($message->id);
+
+        try {
+            $job->handle(app(WhatsAppGateway::class), app(InvoicePdfService::class));
+            $this->fail('the job should stop when the invoice PDF cannot be produced');
+        } catch (\RuntimeException $e) {
+            // The queue retries once, then calls failed() with this.
+            $job->failed($e);
+        }
+
+        Http::assertNothingSent();
+
+        $message->refresh();
+        $this->assertSame(WhatsAppMessage::STATUS_FAILED, $message->status);
+        $this->assertStringContainsString('Invalid request parameters', $message->error);
+        // Still names the attachment, so a resend renders it again.
+        $this->assertSame('invoice', $message->payload['attachment']);
     }
 
     public function test_the_job_skips_a_message_that_has_already_gone_out(): void

@@ -28,5 +28,15 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!--
+            Third-party services, pinned off. The .env holds live Cloudinary and
+            AISensy credentials, and QUEUE_CONNECTION=sync above means a booking
+            test runs the WhatsApp job inline: render, upload, send. Tests that
+            need a provider switch it on in config() and fake it themselves.
+        -->
+        <env name="WHATSAPP_DRIVER" value="log"/>
+        <env name="WHATSAPP_AISENSY_API_KEY" value=""/>
+        <env name="WHATSAPP_ACCESS_TOKEN" value=""/>
+        <env name="CLOUDINARY_URL" value="cloudinary://test-key:test-secret@test-cloud"/>
     </php>
 </phpunit>

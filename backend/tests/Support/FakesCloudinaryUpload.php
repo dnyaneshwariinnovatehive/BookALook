@@ -49,12 +49,16 @@ trait FakesCloudinaryUpload
                 $this->body = is_resource($asset) ? (string) stream_get_contents($asset) : '';
 
                 $id = $options['public_id'] ?? 'unknown';
-                $format = $options['format'] ?? 'bin';
+                $type = $options['resource_type'] ?? 'image';
+
+                // Shaped like Cloudinary's: a raw file's public ID already
+                // carries its extension, anything else gets its format appended.
+                $path = $type === 'raw' ? $id : $id.'.'.($options['format'] ?? 'bin');
 
                 return new ApiResponse([
                     'public_id' => $id,
                     'secure_url' => $this->url
-                        ?? 'https://res.cloudinary.com/demo/image/upload/'.$id.'.'.$format,
+                        ?? "https://res.cloudinary.com/demo/{$type}/upload/{$path}",
                 ], []);
             }
         };

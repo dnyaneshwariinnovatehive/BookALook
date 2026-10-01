@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -82,10 +83,14 @@ class SendWhatsAppMessageJob implements ShouldQueue
      * because the invoice is issued a moment *after* the confirmation notification
      * is written. By the time a job runs, both the invoice and its PDF exist.
      *
-     * A failure to produce the PDF does not stop the send. The customer still gets
-     * their confirmation text, and if the campaign is a document template AISensy
-     * will reject the send for the missing media — which is recorded on the row,
-     * and is a far more honest outcome than a silent skip.
+     * When the document cannot be produced, nothing is sent. The booking
+     * confirmation is a document template, so a send without media is one
+     * AISensy is certain to reject — and it used to, with "Media URL Missing",
+     * which buried the real cause (a Cloudinary rejection) in the worker log.
+     * Throwing instead lets the queue retry a transient upload failure once, and
+     * failed() then writes the actual reason onto the row.
+     *
+     * @throws RuntimeException
      */
     private function attachInvoice(WhatsAppMessage $message, InvoicePdfService $pdfs): void
     {
@@ -98,13 +103,19 @@ class SendWhatsAppMessageJob implements ShouldQueue
         $invoice = $this->invoiceFor($message);
 
         if (! $invoice) {
-            return;
+            throw new RuntimeException(
+                'No invoice exists for this appointment, so there is no document to attach.'
+            );
         }
 
-        $url = $pdfs->urlFor($invoice);
-
-        if (! $url) {
-            return;
+        try {
+            $url = $pdfs->publish($invoice);
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                "Invoice {$invoice->invoice_number} PDF could not be published: ".$e->getMessage(),
+                0,
+                $e
+            );
         }
 
         unset($payload['attachment']);
@@ -134,15 +145,27 @@ class SendWhatsAppMessageJob implements ShouldQueue
     }
 
     /**
-     * A provider that is down should not fill the failed-jobs table.
+     * Every attempt failed before the provider was reached.
      *
-     * The gateway catches its own failures and records them on the row, so the
-     * only way to reach here is a worker-level fault — and the outbox row is
-     * already the audit trail. Swallowing it keeps a third-party outage from
-     * burying genuinely actionable failures under retries of the same message.
+     * The gateway records its own failures on the row, so the ways to get here
+     * are a worker-level fault or an attachment that could not be produced. In
+     * both cases the row is still `queued` and would otherwise look like a
+     * message merely waiting its turn, so the reason is written onto it. The
+     * row is the audit trail; `app:resend-whatsapp` puts it back in the queue
+     * once the cause is fixed.
      */
     public function failed(Throwable $e): void
     {
         report($e);
+
+        $message = WhatsAppMessage::whereKey($this->messageId)
+            ->where('status', WhatsAppMessage::STATUS_QUEUED)
+            ->first();
+
+        $message?->forceFill([
+            'status' => WhatsAppMessage::STATUS_FAILED,
+            'failed_at' => now(),
+            'error' => mb_substr($e->getMessage(), 0, 1000),
+        ])->save();
     }
 }

@@ -63,12 +63,11 @@ class InvoicePdfTest extends TestCase
         $this->assertNotNull($url, 'the PDF should have been produced');
         $this->assertSame($url, $invoice->refresh()->pdf_url);
 
-        // Asserted against the public ID and format actually sent, rather than by
-        // picking the path back out of the URL: what matters is that the URL handed
-        // to AISensy names the file that is actually there.
+        // Asserted against the public ID actually sent, rather than by picking
+        // the path back out of the URL: what matters is that the URL handed to
+        // AISensy names the file that is actually there.
         $this->assertStringStartsWith('invoices/', $cloud->options['public_id']);
-        $this->assertSame('pdf', $cloud->options['format']);
-        $this->assertStringEndsWith('/'.basename($url), $url);
+        $this->assertStringEndsWith('.pdf', $url, 'WhatsApp needs a URL it can recognise as a PDF');
     }
 
     public function test_the_upload_names_the_pdf_so_cloudinary_accepts_it(): void
@@ -92,12 +91,32 @@ class InvoicePdfTest extends TestCase
             'a raw stream without an explicit filename is read as a source URL and rejected'
         );
         $this->assertSame('raw', $cloud->options['resource_type'], 'a PDF is a raw resource, not an image');
-        $this->assertSame('pdf', $cloud->options['format']);
-        $this->assertStringNotContainsString(
-            '.pdf',
-            $cloud->options['public_id'],
-            'the public ID must not carry the extension as well as declaring the format, or Cloudinary stores it twice'
-        );
+
+        // A raw resource has no format for Cloudinary to append: its extension is
+        // part of the public ID. Without it the delivered URL is extensionless
+        // and WhatsApp cannot tell the document is a PDF.
+        $this->assertStringEndsWith('.pdf', $cloud->options['public_id']);
+        $this->assertArrayNotHasKey('format', $cloud->options, 'format is for images and video, not raw files');
+    }
+
+    public function test_publish_reports_why_the_pdf_could_not_be_produced(): void
+    {
+        // urlFor() swallows the failure, which is right for the in-app invoice,
+        // but the WhatsApp send has to be able to say *why* it has no document.
+        // Before publish() existed the only visible error was AISensy's "Media
+        // URL Missing", which names the wrong system entirely.
+        Cloudinary::shouldReceive('uploadApi')->andThrow(new \RuntimeException('Invalid request parameters'));
+
+        $invoice = $this->issuedInvoice();
+
+        try {
+            app(InvoicePdfService::class)->publish($invoice);
+            $this->fail('publish() should throw when the upload is rejected');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Invalid request parameters', $e->getMessage());
+        }
+
+        $this->assertNull($invoice->refresh()->pdf_url, 'a failed upload must stay retryable');
     }
 
     public function test_the_url_comes_from_the_upload_response_rather_than_being_guessed(): void
@@ -113,7 +132,7 @@ class InvoicePdfTest extends TestCase
 
         $this->assertNotNull($url);
         $this->assertSame(
-            'https://res.cloudinary.com/demo/image/upload/'.$cloud->options['public_id'].'.pdf',
+            'https://res.cloudinary.com/demo/raw/upload/'.$cloud->options['public_id'],
             $url
         );
     }
