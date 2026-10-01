@@ -8,6 +8,34 @@ import 'push_notification_service.dart';
 class AuthService {
   static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
 
+  /// Whether a session-expiry redirect is already under way.
+  ///
+  /// An expired token makes every in-flight request fail with 401 at the same
+  /// moment, and each of them would otherwise push the login screen again.
+  static bool _redirectInFlight = false;
+
+  /// Claims the right to send the customer to the login screen.
+  ///
+  /// Returns `true` for the first caller of an expiry burst and `false` for
+  /// every other, so only one navigation happens.
+  static bool beginSessionExpiryRedirect() {
+    if (_redirectInFlight) return false;
+    _redirectInFlight = true;
+    return true;
+  }
+
+  /// Releases the claim when no navigation could be performed, leaving the app
+  /// free to redirect on a later 401.
+  static void cancelSessionExpiryRedirect() {
+    _redirectInFlight = false;
+  }
+
+  /// Clears the claim once a new token is stored, so a genuine expiry later in
+  /// the session still redirects the customer.
+  static void markSessionAuthenticated() {
+    _redirectInFlight = false;
+  }
+
   /// Sends an OTP to the provided phone number.
   Future<String> sendOtp(String phone) async {
     try {
@@ -131,6 +159,7 @@ class AuthService {
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
+    markSessionAuthenticated();
   }
 
   Future<void> _removeToken() async {

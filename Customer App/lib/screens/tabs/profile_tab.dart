@@ -7,6 +7,7 @@ import '../../widgets/guest_restricted_view.dart';
 import '../../legal/legal_document_screen.dart';
 import '../../legal/legal_documents.dart';
 import '../../services/auth_service.dart';
+import '../../services/http_client.dart' show loginRouteName;
 import '../../services/profile_service.dart';
 import '../phone_screen.dart';
 import 'favourites_tab.dart';
@@ -214,7 +215,10 @@ class _ProfileTabState extends State<ProfileTab> {
 
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => PhoneScreen()),
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: loginRouteName),
+        builder: (context) => const PhoneScreen(),
+      ),
       (route) => false,
     );
   }

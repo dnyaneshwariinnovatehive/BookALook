@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/phone_screen.dart';
+import '../services/http_client.dart' show loginRouteName;
 import '../theme/app_theme.dart';
 
 class GuestRestrictedView extends StatelessWidget {
@@ -48,7 +49,10 @@ class GuestRestrictedView extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => PhoneScreen(returnIndex: tabIndex)),
+                  MaterialPageRoute<void>(
+                    settings: const RouteSettings(name: loginRouteName),
+                    builder: (context) => PhoneScreen(returnIndex: tabIndex),
+                  ),
                   (route) => false,
                 );
               },

@@ -15,6 +15,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -42,12 +43,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _animationController.forward();
 
     // Navigate after 3 seconds
-    Timer(Duration(seconds: 3), _checkAuthAndNavigate);
+    _navigationTimer = Timer(Duration(seconds: 3), _checkAuthAndNavigate);
   }
 
+  /// Cancelled on dispose so the splash cannot navigate a stack that has
+  /// already been replaced — for example by a session-expiry redirect landing
+  /// mid-splash, which would otherwise push a second copy of the login screen.
   void _checkAuthAndNavigate() async {
+    _navigationTimer = null;
     final token = await AuthService.getToken();
-    if (mounted) {
+    if (!mounted) return;
+    {
       if (token != null && token.isNotEmpty) {
         Navigator.pushReplacement(
           context,
@@ -72,6 +78,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _navigationTimer?.cancel();
+    _navigationTimer = null;
     _animationController.dispose();
     super.dispose();
   }
