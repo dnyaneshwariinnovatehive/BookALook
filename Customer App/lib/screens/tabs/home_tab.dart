@@ -17,6 +17,8 @@ import '../salon_list_screen.dart';
 import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
 import '../qr_code_screen.dart';
+import '../appointment_details_screen.dart';
+import '../../utils/check_in_window.dart';
 import '../../widgets/category_grid.dart';
 import '../categories_screen.dart';
 import '../../utils/app_haptics.dart';
@@ -149,6 +151,19 @@ class _HomeTabState extends State<HomeTab> {
         builder: (context) => RescheduleScreen(
           appointmentId: booking['id'].toString(),
           freeReschedule: booking['free_reschedule'] == true,
+        ),
+      ),
+    );
+    _fetchAlerts();
+  }
+
+  Future<void> _openBookingDetails(Map<String, dynamic> booking) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentDetailsScreen(
+          booking: booking,
+          isUpcoming: true,
         ),
       ),
     );
@@ -1138,11 +1153,26 @@ class _HomeTabState extends State<HomeTab> {
                   ],
                 ),
 
-                // CTA: dark charcoal pill — check-in QR
+                // CTA: dark charcoal pill. The check-in QR once its window is
+                // open; until then the booking's details, with a note of when
+                // the QR becomes available.
                 if (booking['id'] != null) ...[
+                  if (CheckInWindow.notYetOpenLabel(booking) case final label?) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.schedule, size: 14, color: bodyColor),
+                        const SizedBox(width: 6),
+                        Text(label,
+                            style: TextStyle(fontSize: 12, color: bodyColor)),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   ElevatedButton(
-                    onPressed: () => _openCheckInQr(booking),
+                    onPressed: () => CheckInWindow.canShowQr(booking)
+                        ? _openCheckInQr(booking)
+                        : _openBookingDetails(booking),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.darkButtonBg,
                       foregroundColor: Colors.white,
@@ -1154,8 +1184,11 @@ class _HomeTabState extends State<HomeTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('View Details & Get Directions',
-                            style: TextStyle(
+                        Text(
+                            CheckInWindow.canShowQr(booking)
+                                ? 'Show Check-in QR'
+                                : 'View Details & Get Directions',
+                            style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 12)),
                       ],
                     ),

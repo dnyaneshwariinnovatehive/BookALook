@@ -88,11 +88,71 @@ class BookingPolicyService
         return (int) PlatformPolicySetting::value('same_day_change_abuse_threshold');
     }
 
+    /** SuperAdmin's "Early start allowance" (Settings → Policy). */
+    public function earlyStartMinutes(): int
+    {
+        return max(0, (int) PlatformPolicySetting::value('appointment_start_early_minutes'));
+    }
+
     public function startsAt(Appointment $appointment): Carbon
     {
         return Carbon::parse(
             Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
         );
+    }
+
+    /**
+     * When a booking can be checked in: the customer may generate their QR,
+     * and staff may start the appointment.
+     *
+     * Opens at the booked start time less SuperAdmin's early start allowance,
+     * and stays open until the end of the appointment's day. It deliberately
+     * runs past the booked end time: a customer who turns up late should still
+     * be able to check in, and anything left unstarted at midnight is swept to
+     * no-show by the overnight job anyway.
+     *
+     * Never opens before the appointment's own day. A large allowance is meant
+     * to let a salon start early on the day, not to hand out a code for a
+     * booking days away — and a QR from yesterday would outlive the no-show
+     * sweep that is supposed to close the booking.
+     *
+     * Decided here, once, so the customer's QR button, the QR endpoint and the
+     * partner's scan can never disagree about whether the window is open.
+     *
+     * @return array{allowed: bool, reason: ?string, opens_at: Carbon, closes_at: Carbon}
+     */
+    public function checkInWindow(Appointment $appointment): array
+    {
+        $day = Carbon::parse($appointment->appointment_date)->startOfDay();
+        $opensAt = $this->startsAt($appointment)->subMinutes($this->earlyStartMinutes())->max($day);
+        $closesAt = $day->copy()->endOfDay();
+
+        $window = ['opens_at' => $opensAt, 'closes_at' => $closesAt];
+
+        if ($appointment->status === 'pending_payment') {
+            return $window + ['allowed' => false, 'reason' => 'Complete the payment to get your check-in QR.'];
+        }
+
+        if ($appointment->status !== 'scheduled') {
+            return $window + [
+                'allowed' => false,
+                'reason' => 'This appointment is ' . str_replace('_', ' ', $appointment->status) . '.',
+            ];
+        }
+
+        if (now()->lessThan($opensAt)) {
+            $when = $opensAt->isSameDay(now())
+                ? $opensAt->format('h:i A')
+                : $opensAt->format('M d, Y \a\t h:i A');
+
+            return $window + ['allowed' => false, 'reason' => "Check-in opens at {$when}."];
+        }
+
+        if (now()->greaterThan($closesAt)) {
+            return $window + ['allowed' => false, 'reason' => 'This appointment\'s day has passed.'];
+        }
+
+        return $window + ['allowed' => true, 'reason' => null];
     }
 
     /**

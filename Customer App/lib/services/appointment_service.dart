@@ -30,7 +30,8 @@ class AppointmentService {
 
   /// 30-minute blocks for [date]. Every block is returned; unavailable ones
   /// carry `available: false` and a `reason`.
-  /// [providerId] null means "Any Available".
+  /// [providerId] is required by the server — every booking names a staff
+  /// member, because that person is the one who scans the customer in.
   Future<Map<String, dynamic>> getAvailableSlots(String salonId, String date, {String? providerId}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Appointment;
 use App\Models\AppointmentService as AppointmentLine;
+use App\Models\PlatformPolicySetting;
 use App\Models\Salon;
 use App\Models\ServiceProvider;
 use App\Models\User;
@@ -21,6 +22,30 @@ use Tests\TestCase;
 class AppointmentCheckInTest extends TestCase
 {
     use DatabaseTransactions;
+
+    /**
+     * Noon, with a 30-minute early start allowance. Check-in now depends on
+     * the clock, so the tests pin it: a 10:00 booking is open, a 15:00 one
+     * does not open until 14:30.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Carbon::setTestNow(Carbon::today()->setTime(12, 0));
+
+        PlatformPolicySetting::updateOrCreate(
+            ['setting_key' => 'appointment_start_early_minutes'],
+            ['setting_value' => '30', 'data_type' => 'integer']
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_a_provider_scans_and_starts_their_own_customer(): void
     {
@@ -201,6 +226,79 @@ class AppointmentCheckInTest extends TestCase
             ->assertStatus(403);
     }
 
+    public function test_another_provider_at_the_salon_cannot_check_in_someone_elses_customer(): void
+    {
+        [$salon, , $customer, $provider, $other] = $this->fixture(needsSecondProvider: true);
+        [$appointment, $token] = $this->givenBookingWithQr($salon, $customer, $provider);
+
+        $this->actingAs($other->user, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/check-in/resolve", ['qr_token' => $token])
+            ->assertStatus(403);
+
+        $this->actingAs($other->user, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/appointments/{$appointment->id}/start", [
+                'qr_token' => $token,
+            ])
+            ->assertStatus(403);
+
+        $this->assertSame('scheduled', $appointment->fresh()->status);
+    }
+
+    public function test_an_appointment_cannot_be_started_before_the_early_start_allowance(): void
+    {
+        [$salon, $admin, $customer, $provider] = $this->fixture();
+
+        // 15:00 less 30 minutes opens at 14:30; the clock says 12:00.
+        [$appointment, $token] = $this->givenBookingWithQr($salon, $customer, $provider, startTime: '15:00:00');
+
+        $resolved = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/check-in/resolve", ['qr_token' => $token])
+            ->assertStatus(200)
+            ->json();
+
+        $this->assertFalse($resolved['can_start']);
+        $this->assertStringContainsString('02:30 PM', $resolved['blocked_reason']);
+
+        // A manual start is held to the same window as a scan.
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/appointments/{$appointment->id}/start", [
+                'manual' => true,
+            ])
+            ->assertStatus(422);
+
+        Carbon::setTestNow(Carbon::today()->setTime(14, 30));
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/appointments/{$appointment->id}/start", [
+                'qr_token' => $token,
+            ])
+            ->assertStatus(200);
+    }
+
+    public function test_the_customer_qr_opens_at_the_early_start_allowance_and_lasts_until_midnight(): void
+    {
+        [$salon, , $customer, $provider] = $this->fixture();
+        [$appointment] = $this->givenBookingWithQr($salon, $customer, $provider, startTime: '15:00:00');
+
+        // Too early: the app is told when it opens.
+        $this->actingAs($customer, 'sanctum')
+            ->postJson("/api/customer/appointments/{$appointment->id}/generate-qr")
+            ->assertStatus(400)
+            ->assertJsonPath('available_from', Carbon::today()->setTime(14, 30)->toIso8601String());
+
+        // Long after the booked slot, but still the same day: still available,
+        // and the code never outlives the day.
+        Carbon::setTestNow(Carbon::today()->setTime(23, 30));
+
+        $response = $this->actingAs($customer, 'sanctum')
+            ->postJson("/api/customer/appointments/{$appointment->id}/generate-qr")
+            ->assertStatus(200);
+
+        $this->assertTrue(
+            Carbon::parse($response->json('expires_at'))->lessThanOrEqualTo(Carbon::today()->endOfDay())
+        );
+    }
+
     public function test_payment_cannot_be_collected_before_the_session_starts(): void
     {
         [$salon, $admin, $customer, $provider] = $this->fixture();
@@ -262,7 +360,8 @@ class AppointmentCheckInTest extends TestCase
             'customer_id' => $customer->id,
             'appointed_provider_id' => $provider->id,
             'booking_source' => 'online',
-            // Today, so the "too early to start" guard does not fire.
+            // Today. Whether it can start yet depends on the start time against
+            // the clock pinned in setUp().
             'appointment_date' => Carbon::today()->toDateString(),
             'start_time' => $startTime,
             'end_time' => '23:30:00',
@@ -273,7 +372,9 @@ class AppointmentCheckInTest extends TestCase
             'balance_amount' => 700,
             'qr_token_hash' => hash('sha256', $token),
             'qr_generated_at' => now(),
-            'qr_expires_at' => now()->addHours(2),
+            // Until midnight, so a test that moves the clock forward is testing
+            // the check-in window and not tripping over an expired code.
+            'qr_expires_at' => Carbon::today()->endOfDay(),
         ]);
 
         AppointmentLine::create([

@@ -60,6 +60,10 @@ class CheckInController extends Controller
             ], 404);
         }
 
+        if ($denied = $this->checkIn->checkInDeniedReason($appointment, $request->user())) {
+            return response()->json(['message' => $denied], 403);
+        }
+
         return response()->json([
             'appointment' => $this->present($appointment),
             'bill' => $this->checkIn->bill($appointment),
@@ -97,6 +101,10 @@ class CheckInController extends Controller
         $appointment = Appointment::with($this->checkIn->relations())
             ->where('salon_id', $salonId)
             ->findOrFail($appointmentId);
+
+        if ($denied = $this->checkIn->checkInDeniedReason($appointment, $request->user())) {
+            return response()->json(['message' => $denied], 403);
+        }
 
         if ($reason = $this->checkIn->blockedReason($appointment)) {
             return response()->json(['message' => $reason], 422);

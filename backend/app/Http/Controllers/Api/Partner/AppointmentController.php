@@ -68,38 +68,6 @@ class AppointmentController extends Controller
         return response()->json(['appointments' => $appointments]);
     }
 
-    public function verifyQrAndStartSession(Request $request, $salon_id)
-    {
-        $request->validate(['qr_token' => 'required|string']);
-        $provider = \App\Models\ServiceProvider::where('user_id', $request->user()->id)
-            ->where('salon_id', $salon_id)
-            ->first();
-        
-        $qrTokenHash = hash('sha256', $request->qr_token);
-        $appointment = Appointment::where('salon_id', $salon_id)->where('qr_token_hash', $qrTokenHash)->first();
-
-        if (!$appointment) return response()->json(['message' => 'Invalid QR Code.'], 404);
-        if ($appointment->status !== 'scheduled') return response()->json(['message' => 'Not scheduled.'], 400);
-
-        $earlyAllowance = (int) \App\Models\PlatformPolicySetting::value('appointment_start_early_minutes');
-        $appointmentStart = \Carbon\Carbon::parse(
-            \Carbon\Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
-        );
-
-        if (now()->addMinutes($earlyAllowance)->lessThan($appointmentStart)) {
-            return response()->json(['message' => 'It is too early to start this appointment.'], 400);
-        }
-
-        $appointment->status = 'in_progress';
-        $appointment->serving_provider_id = $provider->id; // Assign to whoever scanned
-        $appointment->qr_verified_at = now();
-        $appointment->qr_verified_by = $request->user()->id;
-        $appointment->started_at = now();
-        $appointment->save();
-
-        return response()->json(['message' => 'Session started', 'appointment' => $appointment]);
-    }
-
     public function markNoShow(Request $request, $id)
     {
         $appointment = Appointment::findOrFail($id);

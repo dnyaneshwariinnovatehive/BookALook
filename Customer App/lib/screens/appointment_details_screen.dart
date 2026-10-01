@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import 'qr_code_screen.dart';
+import '../utils/check_in_window.dart';
 import 'reschedule_screen.dart';
 import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
@@ -274,8 +275,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final needsReschedule = _booking['needs_reschedule'] == true;
     final canCancel = _booking['can_cancel'] == true;
     final canReschedule = _booking['can_reschedule'] == true;
-    final canGenerateQr = _booking['can_generate_qr'] == true;
-    
+    final canGenerateQr = CheckInWindow.canShowQr(_booking);
+    final qrNotYetOpen = CheckInWindow.notYetOpenLabel(_booking);
+
     final cancelBlockedReason = _booking['cancel_blocked_reason'];
     final rescheduleBlockedReason = _booking['reschedule_blocked_reason'];
 
@@ -591,7 +593,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 ),
 
               // 6. Actions (Cancel, Reschedule, QR Code)
-              if (widget.isUpcoming && (needsReschedule || canCancel || canReschedule || canGenerateQr))
+              if (widget.isUpcoming && (needsReschedule || canCancel || canReschedule || canGenerateQr || qrNotYetOpen != null))
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Column(
@@ -674,6 +676,24 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                               padding: EdgeInsets.symmetric(vertical: 16),
                             ),
                             child: Text('Show QR at salon', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ),
+                        ),
+                      ] else if (qrNotYetOpen != null) ...[
+                        // Shown disabled rather than hidden, so the customer
+                        // knows a code is coming and when.
+                        SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.schedule, size: 18),
+                            style: TextButton.styleFrom(
+                              backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                              disabledForegroundColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            label: Text(qrNotYetOpen, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
                           ),
                         ),
                       ],

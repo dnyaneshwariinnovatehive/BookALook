@@ -65,7 +65,7 @@ class AppointmentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'date' => 'required|date|after_or_equal:today',
-            'provider_id' => 'nullable|exists:service_providers,id' // null means 'Any Available'
+            'provider_id' => 'nullable|exists:service_providers,id' // required; enforced in candidateProviders()
         ]);
 
         if ($validator->fails()) {
@@ -128,7 +128,7 @@ class AppointmentController extends Controller
         $validator = Validator::make($request->all(), [
             'date' => 'required|date|after_or_equal:today',
             'time' => 'required|date_format:H:i',
-            'provider_id' => 'nullable|exists:service_providers,id' // null means 'Any Available'
+            'provider_id' => 'nullable|exists:service_providers,id' // required; enforced in candidateProviders()
         ]);
 
         if ($validator->fails()) {
@@ -507,23 +507,23 @@ class AppointmentController extends Controller
      * Resolve the requested provider into the candidate list the availability
      * engine works with, or a JSON error when the choice is invalid.
      *
+     * A provider is mandatory. There used to be an "Any Available" option, but
+     * the booked provider is the person who scans the customer's QR at the
+     * salon, so a booking has to name someone the customer actually chose.
+     * Rejected here rather than in each validator so the customer gets a
+     * readable message instead of a bare validation bag.
+     *
      * @return string[]|\Illuminate\Http\JsonResponse
      */
     private function candidateProviders(string $salonId, array $serviceIds, ?string $providerId)
     {
-        $providers = $this->availability->providersForSalon($salonId, $serviceIds);
-        $eligible = array_values(array_filter($providers, fn ($p) => $p['is_eligible']));
-
-        if ($providerId === null) {
-            // 'Any Available'
-            if (empty($eligible)) {
-                return response()->json([
-                    'message' => 'No service provider at this salon can perform all the selected services.',
-                ], 422);
-            }
-
-            return array_column($eligible, 'id');
+        if ($providerId === null || $providerId === '') {
+            return response()->json([
+                'message' => 'Please choose a service provider for this booking.',
+            ], 422);
         }
+
+        $providers = $this->availability->providersForSalon($salonId, $serviceIds);
 
         $chosen = collect($providers)->firstWhere('id', $providerId);
 
@@ -887,29 +887,37 @@ class AppointmentController extends Controller
         ]);
     }
     /**
-     * Generate QR code for same-day appointment.
+     * Issue the check-in QR the salon scans to start the appointment.
+     *
+     * Only inside the check-in window — from the booked start less SuperAdmin's
+     * early start allowance, until the end of the appointment's day. Each code
+     * still lives for `qr_validity_minutes` so a screenshot cannot be passed
+     * around all day, but never past midnight: the day's no-show sweep is what
+     * closes an unattended booking, and a code must not outlive it.
      */
     public function generateQr(Request $request, $id)
     {
         $appointment = Appointment::where('customer_id', $request->user()->id)->findOrFail($id);
 
-        if (! in_array($appointment->status, BookingPolicyService::ACTIVE_STATUSES, true)) {
-            return response()->json(['message' => 'QR can only be generated for upcoming appointments.'], 400);
+        $window = $this->policy->checkInWindow($appointment);
+
+        if (! $window['allowed']) {
+            return response()->json([
+                'message' => $window['reason'],
+                'available_from' => $appointment->status === 'scheduled'
+                    ? $window['opens_at']->toIso8601String()
+                    : null,
+            ], 400);
         }
 
-        // Ensure it's for today
-        if (Carbon::parse($appointment->appointment_date)->format('Y-m-d') !== now()->format('Y-m-d')) {
-            return response()->json(['message' => 'QR can only be generated on the day of the appointment.'], 400);
-        }
-
-        $validityMins = (int) PlatformPolicySetting::value('qr_validity_minutes');
+        $validityMins = max(1, (int) PlatformPolicySetting::value('qr_validity_minutes'));
 
         // Generate a random token
         $rawToken = Str::random(32);
 
         $appointment->qr_token_hash = hash('sha256', $rawToken);
         $appointment->qr_generated_at = now();
-        $appointment->qr_expires_at = now()->addMinutes($validityMins);
+        $appointment->qr_expires_at = now()->addMinutes($validityMins)->min($window['closes_at']);
         $appointment->save();
 
         return response()->json([
@@ -976,6 +984,7 @@ class AppointmentController extends Controller
     {
         $cancelWindow = $this->policy->cancellationWindow($appointment);
         $rescheduleWindow = $this->policy->rescheduleWindow($appointment);
+        $qrWindow = $this->policy->checkInWindow($appointment);
         $refund = $this->policy->refundBreakdown($appointment);
         $date = Carbon::parse($appointment->appointment_date)->format('Y-m-d');
 
@@ -1064,8 +1073,15 @@ class AppointmentController extends Controller
             'free_reschedule' => $rescheduleWindow['free_reschedule'],
             'refundable_advance' => $refund['refundable'],
             'forfeited_advance' => $refund['forfeited'],
-            'can_generate_qr' => in_array($appointment->status, BookingPolicyService::ACTIVE_STATUSES, true)
-                && $date === now()->format('Y-m-d'),
+            // The check-in QR. `qr_available_from` lets the app say "available
+            // at 4:30 PM" on a booking whose window has not opened yet, instead
+            // of hiding the button and leaving the customer to guess.
+            'can_generate_qr' => $qrWindow['allowed'],
+            'qr_blocked_reason' => $qrWindow['reason'],
+            'qr_available_from' => $appointment->status === 'scheduled'
+                ? $qrWindow['opens_at']->toIso8601String()
+                : null,
+            'qr_available_until' => $qrWindow['closes_at']->toIso8601String(),
         ] + $this->reviewState($appointment);
     }
 

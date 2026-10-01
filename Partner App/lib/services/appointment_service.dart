@@ -35,30 +35,6 @@ class PartnerAppointmentService {
     }
   }
 
-  Future<Map<String, dynamic>> verifyQrAndStartSession(String salonId, String qrToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-
-    final response = await http.post(
-      Uri.parse('$baseUrl/partner/salons/$salonId/appointments/verify-qr'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'qr_token': qrToken,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['message'] ?? 'Failed to verify QR Code');
-    }
-  }
-
   Future<Map<String, dynamic>> addServiceMidAppointment(String salonId, String appointmentId, String serviceId, String providerId) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

@@ -147,21 +147,10 @@ class SuperAdminAppointmentController extends Controller
             return response()->json(['message' => 'Invalid QR Code.'], 404);
         }
 
-        if ($appointment->status !== 'scheduled') {
-            return response()->json(['message' => 'Appointment is not in a scheduled state.'], 400);
-        }
-
-        if ($appointment->qr_expires_at && now()->greaterThan($appointment->qr_expires_at)) {
-            return response()->json(['message' => 'QR Code has expired.'], 400);
-        }
-
-        $earlyAllowance = (int) PlatformPolicySetting::value('appointment_start_early_minutes');
-        $appointmentStart = Carbon::parse(
-            Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
-        );
-
-        if (now()->addMinutes($earlyAllowance)->lessThan($appointmentStart)) {
-            return response()->json(['message' => 'It is too early to start this appointment.'], 400);
+        // Same status, expiry and check-in window rules the salon's own scan
+        // uses, so SuperAdmin cannot start a booking the salon could not.
+        if ($reason = app(\App\Services\AppointmentCheckInService::class)->blockedReason($appointment)) {
+            return response()->json(['message' => $reason], 400);
         }
 
         $appointment->status = 'in_progress';

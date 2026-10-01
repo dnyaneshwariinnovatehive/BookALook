@@ -35,8 +35,10 @@ class AppointmentCheckInService
     /** Used when a service template has no duration recorded. */
     public const SLOT_FALLBACK_MINUTES = 30;
 
-    public function __construct(private NotificationService $notifications)
-    {
+    public function __construct(
+        private NotificationService $notifications,
+        private BookingPolicyService $policy,
+    ) {
     }
 
     /**
@@ -55,6 +57,11 @@ class AppointmentCheckInService
 
     /**
      * Why this appointment cannot be started right now, or null when it can.
+     *
+     * The time rule is the same check-in window the customer's QR is issued
+     * under (BookingPolicyService::checkInWindow), so a code the customer could
+     * generate is always one staff can use, and a manual start cannot get round
+     * the early start allowance either.
      */
     public function blockedReason(Appointment $appointment): ?string
     {
@@ -71,12 +78,54 @@ class AppointmentCheckInService
             return 'This QR code has expired. Ask the customer to show a fresh one.';
         }
 
-        if (now()->toDateString() !== Carbon::parse($appointment->appointment_date)->toDateString()) {
-            return 'This appointment is scheduled for ' . Carbon::parse($appointment->appointment_date)->format('Y-m-d')
-                . ' and can only be started on that day.';
+        $window = $this->policy->checkInWindow($appointment);
+
+        if (now()->lessThan($window['opens_at'])) {
+            $when = $window['opens_at']->isSameDay(now())
+                ? $window['opens_at']->format('h:i A')
+                : $window['opens_at']->format('M d, Y \a\t h:i A');
+
+            return "Too early to start this appointment. Check-in opens at {$when}.";
+        }
+
+        if (now()->greaterThan($window['closes_at'])) {
+            return 'This appointment was for ' . Carbon::parse($appointment->appointment_date)->format('M d, Y')
+                . ' and can no longer be started.';
         }
 
         return null;
+    }
+
+    /**
+     * Whether this user may check this appointment in.
+     *
+     * The salon's admin (and SuperAdmin) can check in anyone. A service
+     * provider can only check in bookings made with them — the customer chose
+     * that person, so a colleague scanning the code would be serving someone
+     * else's client. The admin can still hand the job to another provider at
+     * the confirm step, which is the sanctioned way to swap.
+     *
+     * Returns the reason when not allowed, null when allowed.
+     */
+    public function checkInDeniedReason(Appointment $appointment, User $user): ?string
+    {
+        if ($user->role !== 'service_provider') {
+            return null;
+        }
+
+        $providerId = ServiceProvider::where('user_id', $user->id)
+            ->where('salon_id', $appointment->salon_id)
+            ->value('id');
+
+        if ($providerId && $providerId === $appointment->appointed_provider_id) {
+            return null;
+        }
+
+        $bookedWith = $appointment->appointedProvider->user->name ?? null;
+
+        return $bookedWith
+            ? "This booking is with {$bookedWith}. Only {$bookedWith} or the salon admin can check it in."
+            : 'Only the salon admin can check in this booking.';
     }
 
     /**

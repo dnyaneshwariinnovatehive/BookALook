@@ -7,9 +7,6 @@ import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
 
-/// Sentinel provider key for the "Any Available" option.
-const String _kAnyProvider = '__any__';
-
 /// Granularity of the booking grid the API returns. Mirrors
 /// `AvailabilityService::SLOT_MINUTES` on the server.
 const int _kSlotMinutes = 30;
@@ -29,7 +26,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isLoadingProviders = true;
   String _providersError = '';
 
-  /// null = nothing picked yet, [_kAnyProvider] = Any Available.
+  /// The chosen staff member's id, or null until one is picked. There is no
+  /// "any staff" choice: the booked provider is the one who scans the
+  /// customer's QR at the salon, so every booking names a person.
   String? _selectedProviderKey;
 
   DateTime _selectedDate = DateTime.now();
@@ -93,10 +92,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _showMessage('External Wallet Selected: ${response.walletName}');
   }
 
-  /// The id sent to the API: null for "Any Available".
-  String? get _providerIdForApi =>
-      _selectedProviderKey == _kAnyProvider ? null : _selectedProviderKey;
-
   Future<void> _loadProviders() async {
     setState(() {
       _isLoadingProviders = true;
@@ -136,7 +131,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final data = await _appointmentService.getAvailableSlots(
         widget.salonId,
         dateStr,
-        providerId: _providerIdForApi,
+        providerId: _selectedProviderKey,
       );
 
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -243,7 +238,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         widget.salonId,
         dateStr,
         _selectedTime!,
-        providerId: _providerIdForApi,
+        providerId: _selectedProviderKey,
       );
 
       setState(() => _isBooking = false);
@@ -466,19 +461,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           style: GoogleFonts.outfit(color: AppTheme.lightTextBody));
     }
 
-    final hasEligible = _providers.any((p) => p['is_eligible'] == true);
-
     return Column(
       children: [
-        if (hasEligible)
-          _providerTile(
-            key: _kAnyProvider,
-            name: 'Any Available',
-            subtitle: 'We will assign a free staff member for your slot',
-            isEligible: true,
-            icon: Icons.groups_outlined,
-            isPerson: false,
-          ),
         ..._providers.map((provider) {
           final isEligible = provider['is_eligible'] == true;
           final missing = (provider['missing_service_names'] as List?)?.cast<String>() ?? [];
@@ -490,8 +474,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? (provider['specialization'] ?? 'Available for all your services')
                 : 'Does not perform: ${missing.join(', ')}',
             isEligible: isEligible,
-            icon: Icons.person_outline,
-            isPerson: true,
           );
         }),
       ],
@@ -503,11 +485,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String name,
     required String? subtitle,
     required bool isEligible,
-    required IconData icon,
-
-    /// True for a named staff member, false for the "Any Available" row that
-    /// stands for whoever is free rather than for one person.
-    required bool isPerson,
   }) {
     final isSelected = _selectedProviderKey == key;
 
@@ -532,16 +509,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: Row(
               children: [
-                // "Any Available" stands for a group, so it keeps its icon; a
-                // named person gets their initials, since no human role has a
-                // photo and a silhouette here reads as a failed image.
-                isPerson
-                    ? InitialsAvatar(name: name, radius: 22, dimmed: !isEligible)
-                    : CircleAvatar(
-                        radius: 22,
-                        backgroundColor: isEligible ? AppTheme.lightAccentSoft : AppTheme.lightBorder,
-                        child: Icon(icon, color: isEligible ? AppTheme.accentColor : AppTheme.lightTextLight),
-                      ),
+                // Initials rather than a photo: no human role has one, and a
+                // silhouette here reads as a failed image.
+                InitialsAvatar(name: name, radius: 22, dimmed: !isEligible),
                 SizedBox(width: 14),
                 Expanded(
                   child: Column(

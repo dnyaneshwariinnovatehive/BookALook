@@ -413,7 +413,6 @@ Route::prefix('partner')->group(function () {
         Route::get('/salons/{salon_id}/walk-in/options', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'options']);
         Route::post('/salons/{salon_id}/walk-in/preview', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'preview']);
         Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'store']);
-        Route::post('/salons/{salon_id}/appointments/verify-qr', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'verifyQrAndStartSession']);
         // Dynamic bill adjustment while an appointment is in progress
         Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'addService']);
         Route::delete('/salons/{salon_id}/appointments/{id}/additions/{addition_id}', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'removeService']);
