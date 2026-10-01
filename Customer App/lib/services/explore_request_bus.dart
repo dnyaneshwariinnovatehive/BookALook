@@ -40,6 +40,14 @@ class ExploreRequestBus extends ChangeNotifier {
     return request;
   }
 
+  /// Show the Explore tab with no filter — the whole directory. Used by
+  /// empty states elsewhere ("no bookings yet") whose next step is to look
+  /// for a salon.
+  void showAll() {
+    _pending = const ExploreRequest();
+    notifyListeners();
+  }
+
   /// Show the Explore tab, filtered to one category.
   void showCategory({
     required String categoryId,
