@@ -145,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               'Please provide your details to continue.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             SizedBox(height: 32),
             TextField(
@@ -214,8 +214,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: _acceptedTerms
-                      ? AppTheme.accentColor.withOpacity(0.4)
-                      : Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+                      ? AppTheme.accentColor.withValues(alpha: 0.4)
+                      : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
               ),
               child: TermsAcceptanceRow(
@@ -242,7 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(
                 fontSize: 11,
                 height: 1.5,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
