@@ -14,6 +14,12 @@ import 'my_bookings_screen.dart';
 import '../theme/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
+  /// The floating navigation pill: 75 tall, held 20 off the sides and the
+  /// bottom. Named so tests can rebuild the same footprint; screens should
+  /// use bottomClearance() rather than these numbers.
+  static const double navPillHeight = 75;
+  static const double navPillMargin = 20;
+
   final bool isGuest;
   final int initialIndex;
 
@@ -199,8 +205,12 @@ class _MainScreenState extends State<MainScreen> {
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
-          height: 75,
+          margin: const EdgeInsets.only(
+            left: MainScreen.navPillMargin,
+            right: MainScreen.navPillMargin,
+            bottom: MainScreen.navPillMargin,
+          ),
+          height: MainScreen.navPillHeight,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(30),

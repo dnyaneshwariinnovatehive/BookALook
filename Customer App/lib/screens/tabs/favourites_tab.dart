@@ -9,6 +9,7 @@ import '../../services/explore_request_bus.dart';
 import '../../utils/error_text.dart';
 import '../../widgets/feedback_states.dart';
 import '../../widgets/skeleton.dart';
+import '../../utils/bottom_clearance.dart';
 
 class FavouritesTab extends StatefulWidget {
   final bool isGuest;
@@ -206,7 +207,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                       color: AppTheme.accentColor,
                       onRefresh: _loadFavourites,
                       child: GridView.builder(
-                        padding: EdgeInsets.fromLTRB(20, 4, 20, 140),
+                        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context)),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,

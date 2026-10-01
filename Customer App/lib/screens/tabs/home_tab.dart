@@ -26,6 +26,7 @@ import '../search_screen.dart';
 import '../category_salons_screen.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/skeleton.dart';
+import '../../utils/bottom_clearance.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -413,7 +414,7 @@ class _HomeTabState extends State<HomeTab> {
               _buildBookAgainSection(),
             ],
 
-            const SizedBox(height: 140), // Bottom navigation padding
+            SizedBox(height: bottomClearance(context)), // clears the nav pill
           ],
         ),
       ),

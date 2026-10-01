@@ -15,6 +15,7 @@ import '../../theme/app_colors.dart';
 import '../../utils/error_text.dart';
 import '../../widgets/feedback_states.dart';
 import '../../widgets/skeleton.dart';
+import '../../utils/bottom_clearance.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -211,7 +212,7 @@ class ExploreTabState extends State<ExploreTab> {
         backgroundColor: context.colors.pageTint,
         body: SafeArea(
           child: SkeletonList(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 140),
+            padding: EdgeInsets.fromLTRB(20, 24, 20, bottomClearance(context)),
             itemBuilder: (_) => const SalonCardSkeleton(),
           ),
         ),
@@ -225,7 +226,7 @@ class ExploreTabState extends State<ExploreTab> {
             color: AppTheme.accentColor,
             onRefresh: _loadSalons,
             child: ScrollableState(
-              bottomInset: 140,
+              bottomInset: bottomClearance(context),
               child: ErrorState(
                 title: 'Could not load salons',
                 message: _error,
@@ -281,7 +282,7 @@ class ExploreTabState extends State<ExploreTab> {
               else
                 _buildAllSalons(filteredSalons),
                 
-              SizedBox(height: 140),
+              SizedBox(height: bottomClearance(context)),
             ],
           ),
         ),

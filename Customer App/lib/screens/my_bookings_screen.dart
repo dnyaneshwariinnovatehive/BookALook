@@ -16,6 +16,7 @@ import '../services/explore_request_bus.dart';
 import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
+import '../utils/bottom_clearance.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -475,7 +476,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       body: _isLoading
           ? SkeletonList(
               count: 3,
-              padding: EdgeInsets.fromLTRB(20, 84, 20, 140),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, bottomClearance(context)),
               itemBuilder: (_) => const BookingCardSkeleton(),
             )
           : _error.isNotEmpty
@@ -535,7 +536,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     color: AppTheme.accentColor,
     onRefresh: _loadBookings,
     child: ScrollableState(
-      bottomInset: 140,
+      bottomInset: bottomClearance(context),
       child: ErrorState(
         title: 'Could not load your bookings',
         message: _error,
@@ -555,7 +556,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
         color: AppTheme.accentColor,
         onRefresh: _loadBookings,
         child: ScrollableState(
-          bottomInset: 140,
+          bottomInset: bottomClearance(context),
           child: isUpcoming
               ? EmptyState(
                   icon: Icons.event_available_outlined,
@@ -578,7 +579,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       onRefresh: _loadBookings,
       child: ListView.builder(
         physics: AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 140),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, bottomClearance(context)),
         itemCount: isUpcoming ? list.length + 1 : list.length,
         itemBuilder: (context, index) {
           if (isUpcoming && index == 0) {

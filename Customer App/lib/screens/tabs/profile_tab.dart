@@ -13,6 +13,7 @@ import '../phone_screen.dart';
 import 'favourites_tab.dart';
 import '../../utils/app_haptics.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/bottom_clearance.dart';
 import '../../main.dart'; // To access themeNotifier
 
 class ProfileTab extends StatefulWidget {
@@ -311,7 +312,7 @@ class _ProfileTabState extends State<ProfileTab> {
       backgroundColor: bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 140.0),
+          padding: EdgeInsets.fromLTRB(24.0, 20.0, 24.0, bottomClearance(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
