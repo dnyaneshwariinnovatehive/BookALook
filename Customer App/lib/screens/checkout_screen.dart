@@ -7,6 +7,8 @@ import '../services/appointment_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
 
 /// Granularity of the booking grid the API returns. Mirrors
 /// `AvailabilityService::SLOT_MINUTES` on the server.
@@ -75,14 +77,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       _showSuccessDialog();
     } catch (e) {
-      _showMessage('Payment confirmation failed: ${e.toString()}');
+      _setBookingError(describeError(e,
+          fallback: 'We could not confirm your booking yet. If the payment went through, '
+              'it will appear in My Bookings shortly.'));
     } finally {
       setState(() => _isBooking = false);
     }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    _showMessage('Payment failed: ${response.message}');
+    final reason = response.message?.trim() ?? '';
+    _setBookingError(reason.isNotEmpty ? reason : 'Payment did not go through. Please try again.');
     if (_pendingPaymentAppointmentId != null) {
       _appointmentService.abandonPayment(_pendingPaymentAppointmentId!);
       _pendingPaymentAppointmentId = null;
@@ -90,7 +95,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    _showMessage('External Wallet Selected: ${response.walletName}');
+    _toast('Continuing with ${response.walletName}.');
   }
 
   Future<void> _loadProviders() async {
@@ -121,6 +126,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     setState(() {
       _isLoadingSlots = true;
+      _slotsError = null;
       _selectedTime = null;
       _slots = [];
       _isClosed = false;
@@ -172,7 +178,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _slots = [];
         _isLoadingSlots = false;
       });
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(() => _slotsError = describeError(e, fallback: 'Could not load the time slots.'));
+      }
     }
   }
 
@@ -180,6 +188,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     AppHaptics.selectionClick();
     setState(() {
       _selectedProviderKey = key;
+      _providerHint = null;
+      _dateHint = null;
+      _slotHint = null;
       _selectedTime = null;
     });
     _fetchSlots();
@@ -231,7 +242,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _bookAppointment() async {
     if (_selectedTime == null || _selectedProviderKey == null) return;
 
-    setState(() => _isBooking = true);
+    setState(() {
+      _isBooking = true;
+      _bookingError = null;
+    });
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -282,7 +296,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     await _appointmentService.demoPay(appointmentId);
                     _showSuccessDialog();
                   } catch (e) {
-                    _showMessage(e.toString().replaceFirst('Exception: ', ''));
+                    _setBookingError(describeError(e, fallback: 'Payment did not go through. Please try again.'));
                   } finally {
                     setState(() => _isBooking = false);
                   }
@@ -305,7 +319,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       AppHaptics.error();
       setState(() => _isBooking = false);
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _setBookingError(describeError(e, fallback: 'We could not book that slot. Please try again.'));
       // The slot may have been taken while the customer was deciding.
       _fetchSlots();
     }
@@ -344,9 +358,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  void _showMessage(String text) {
+  /// Inline feedback, each shown next to what it is about rather than in a
+  /// SnackBar over the booking bar. A failed payment or booking sits above
+  /// the Pay button; a hint about a greyed-out provider, date or slot sits
+  /// under that section and is replaced by the next tap.
+  String? _bookingError;
+  String? _slotsError;
+  String? _providerHint;
+  String? _dateHint;
+  String? _slotHint;
+
+  void _setBookingError(String text) {
+    if (!mounted) return;
+    AppHaptics.error();
+    setState(() => _bookingError = text);
+  }
+
+  /// Confirmations only: a message that may vanish without loss.
+  void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Widget _hint(String? text, VoidCallback onDismiss) {
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: InlineStatus(message: text, kind: StatusKind.info, onDismiss: onDismiss),
+    );
   }
 
   double _toDouble(dynamic value) => double.tryParse('${value ?? 0}') ?? 0.0;
@@ -412,12 +451,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             SizedBox(height: 12),
             _buildProviderList(),
+            _hint(_providerHint, () => setState(() => _providerHint = null)),
 
             SizedBox(height: 32),
 
             _sectionTitle('2. Select Date'),
             SizedBox(height: 12),
             _buildDatePicker(),
+            _hint(_dateHint, () => setState(() => _dateHint = null)),
 
             SizedBox(height: 32),
 
@@ -431,6 +472,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
             SizedBox(height: 16),
             _buildSlots(),
+            _hint(_slotHint, () => setState(() => _slotHint = null)),
 
             SizedBox(height: 24),
           ],
@@ -495,7 +537,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(14),
         onTap: isEligible
             ? () => _selectProvider(key)
-            : () => _showMessage('$name cannot perform every service in your cart.'),
+            : () {
+                AppHaptics.error();
+                setState(() => _providerHint = '$name cannot perform every service in your cart.');
+              },
         child: Opacity(
           opacity: isEligible ? 1.0 : 0.5,
           child: Container(
@@ -554,7 +599,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     void guard(void Function() action) {
       if (!enabled) {
         AppHaptics.error();
-        _showMessage('Choose a service provider first.');
+        setState(() => _dateHint = 'Choose a service provider first.');
         return;
       }
       action();
@@ -686,6 +731,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ));
     }
 
+    if (_slotsError != null) {
+      return InlineStatus(message: _slotsError!, onRetry: _fetchSlots);
+    }
+
     if (_isClosed) {
       return _hintBox(_closedReason ?? 'No slots available for this date.');
     }
@@ -741,11 +790,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               onTap: isAvailable
                   ? () {
                       AppHaptics.selectionClick();
-                      setState(() => _selectedTime = slot['time']);
+                      setState(() {
+                        _selectedTime = slot['time'];
+                        _slotHint = null;
+                      });
                     }
                   : () {
                       AppHaptics.error();
-                      _showMessage('${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                      setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
                     },
               child: Container(
                 width: (MediaQuery.of(context).size.width - 64) / 3,
@@ -802,6 +854,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_bookingError != null) ...[
+              InlineStatus(
+                message: _bookingError!,
+                onDismiss: () => setState(() => _bookingError = null),
+              ),
+              SizedBox(height: 12),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
