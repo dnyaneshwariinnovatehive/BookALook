@@ -5,6 +5,10 @@ import '../../widgets/guest_restricted_view.dart';
 import '../../services/salon_service.dart';
 import '../salon_detail_screen.dart';
 import '../../theme/app_colors.dart';
+import '../../services/explore_request_bus.dart';
+import '../../utils/error_text.dart';
+import '../../widgets/feedback_states.dart';
+import '../../widgets/skeleton.dart';
 
 class FavouritesTab extends StatefulWidget {
   final bool isGuest;
@@ -20,6 +24,9 @@ class FavouritesTabState extends State<FavouritesTab> {
   List<dynamic> _favourites = [];
   bool _isLoading = true;
   String _error = '';
+
+  /// A failed un-favourite, shown above the grid (the card is put back).
+  String? _actionError;
 
   @override
   void initState() {
@@ -37,13 +44,14 @@ class FavouritesTabState extends State<FavouritesTab> {
       if (mounted) {
         setState(() {
           _favourites = favourites;
+          _error = '';
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = describeError(e, fallback: 'We could not load your favourites.');
           _isLoading = false;
         });
       }
@@ -64,21 +72,15 @@ class FavouritesTabState extends State<FavouritesTab> {
 
     try {
       await _salonService.toggleFavourite(salonId);
+      if (mounted && _actionError != null) setState(() => _actionError = null);
     } catch (e) {
       // Revert if failed
       if (mounted) {
         setState(() {
           _favourites.insert(index, removedItem);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to remove favourite: $e',
-              style: GoogleFonts.outfit(),
-            ),
-            backgroundColor: context.colors.danger,
-          ),
-        );
+        setState(() => _actionError = describeError(e,
+            fallback: 'Could not remove that salon from your favourites.'));
       }
     }
   }
@@ -96,18 +98,53 @@ class FavouritesTabState extends State<FavouritesTab> {
       );
     }
 
-    if (_isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: AppTheme.accentColor),
-      );
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Text(
-          _error,
-          style: GoogleFonts.outfit(color: context.colors.danger),
+    // Loading and failure get the same page and header as the list, instead
+    // of a bare widget with no Scaffold under it.
+    if (_isLoading || _error.isNotEmpty) {
+      return Scaffold(
+        backgroundColor: context.colors.pageTint,
+        appBar: AppBar(
+          backgroundColor: context.colors.pageTint,
+          title: const Text('My Favourites'),
         ),
+        body: _isLoading
+            ? Skeleton(
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: 4,
+                  itemBuilder: (_, _) => const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: SkeletonBox(height: double.infinity, radius: 16)),
+                      SizedBox(height: 10),
+                      SkeletonLine(widthFactor: 0.8, height: 14),
+                      SizedBox(height: 6),
+                      SkeletonLine(widthFactor: 0.5),
+                    ],
+                  ),
+                ),
+              )
+            : RefreshIndicator(
+                color: AppTheme.accentColor,
+                onRefresh: _loadFavourites,
+                child: ScrollableState(
+                  child: ErrorState(
+                    title: 'Could not load your favourites',
+                    message: _error,
+                    onRetry: () {
+                      setState(() => _isLoading = true);
+                      _loadFavourites();
+                    },
+                  ),
+                ),
+              ),
       );
     }
 
@@ -148,58 +185,22 @@ class FavouritesTabState extends State<FavouritesTab> {
                 ],
               ),
             ),
+            if (_actionError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: InlineStatus(
+                  message: _actionError!,
+                  onDismiss: () => setState(() => _actionError = null),
+                ),
+              ),
             Expanded(
               child: _favourites.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: surfaceColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: borderColor),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface.withValues(alpha: 0.02),
-                                    blurRadius: 12,
-                                    offset: Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.favorite_border,
-                                size: 64,
-                                color: context.colors.textTertiary,
-                              ),
-                            ),
-                            SizedBox(height: 24),
-                            Text(
-                              'No Favourites Yet',
-                              style: GoogleFonts.outfit(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: headingColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              'Tap the heart icon on salons you love to save them here.',
-                              style: GoogleFonts.outfit(
-                                fontSize: 14,
-                                color: bodyColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
+                  ? EmptyState(
+                      icon: Icons.favorite_border,
+                      title: 'No Favourites Yet',
+                      message: 'Tap the heart icon on salons you love to save them here.',
+                      actionLabel: 'Explore salons',
+                      onAction: ExploreRequestBus.instance.showAll,
                     )
                   : RefreshIndicator(
                       color: AppTheme.accentColor,
