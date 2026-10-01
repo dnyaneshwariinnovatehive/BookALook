@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../screens/invoice_screen.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// The invoice details a booking carries, if it has any.
 class InvoiceInfo {
@@ -61,7 +62,6 @@ class InvoiceLinkButton extends StatelessWidget {
     final invoice = InvoiceInfo.fromBooking(booking);
     if (invoice == null) return const SizedBox.shrink();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -88,7 +88,7 @@ class InvoiceLinkButton extends StatelessWidget {
                   invoice.number,
                   style: GoogleFonts.outfit(
                     fontSize: 11.5,
-                    color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ],
@@ -111,7 +111,6 @@ class InvoiceActionButton extends StatelessWidget {
     final invoice = InvoiceInfo.fromBooking(booking);
     if (invoice == null) return const SizedBox.shrink();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
       width: double.infinity,
@@ -125,7 +124,7 @@ class InvoiceActionButton extends StatelessWidget {
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         style: TextButton.styleFrom(
-          backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+          backgroundColor: context.colors.surface,
           foregroundColor: AppTheme.accentColor,
           side: const BorderSide(color: AppTheme.accentColor),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
