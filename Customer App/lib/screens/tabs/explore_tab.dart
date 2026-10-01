@@ -11,6 +11,7 @@ import '../cart_screen.dart';
 import '../search_screen.dart';
 import '../../utils/app_haptics.dart';
 import '../../widgets/category_grid.dart';
+import '../../theme/app_colors.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -204,15 +205,14 @@ class ExploreTabState extends State<ExploreTab> {
       return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
     }
     if (_error.isNotEmpty) {
-      return Center(child: Text(_error, style: GoogleFonts.outfit(color: AppTheme.lightDanger)));
+      return Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)));
     }
 
     final filteredSalons = _filteredSalons;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : const Color(0xFFFBF9FF),
+      backgroundColor: context.colors.pageTint,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -259,9 +259,8 @@ class ExploreTabState extends State<ExploreTab> {
   /// It stays put whether or not there is anything in it, so the icon reads as
   /// part of the header rather than something that appears and vanishes.
   Widget _buildCartButton() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final iconColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final surfaceColor = context.colors.surface;
+    final iconColor = context.colors.textPrimary;
     final count = ((_globalCart?['items'] as List?) ?? []).length;
 
     return GestureDetector(
@@ -278,7 +277,7 @@ class ExploreTabState extends State<ExploreTab> {
           borderRadius: BorderRadius.circular(100),
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+              color: context.colors.dropShadow,
               blurRadius: 15,
               offset: const Offset(0, 4),
             )
@@ -300,7 +299,7 @@ class ExploreTabState extends State<ExploreTab> {
                     color: Theme.of(context).colorScheme.error,
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: isDark ? AppTheme.darkSurface : Colors.white,
+                      color: context.colors.surface,
                       width: 1.5,
                     ),
                   ),
@@ -321,11 +320,8 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildHeader() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final headingColor = context.colors.textPrimary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -340,7 +336,7 @@ class ExploreTabState extends State<ExploreTab> {
                 borderRadius: BorderRadius.circular(100),
                 boxShadow: [
                   BoxShadow(
-                    color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                    color: context.colors.dropShadow,
                     blurRadius: 15,
                     offset: const Offset(0, 4),
                   )
@@ -348,7 +344,7 @@ class ExploreTabState extends State<ExploreTab> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.search_rounded, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, size: 22),
+                  Icon(Icons.search_rounded, color: context.colors.textTertiary, size: 22),
                   SizedBox(width: 12),
                   Expanded(
                     child: TextField(
@@ -356,7 +352,7 @@ class ExploreTabState extends State<ExploreTab> {
                       style: GoogleFonts.outfit(fontSize: 15, color: headingColor),
                       decoration: InputDecoration(
                         hintText: 'Search salons or services...',
-                        hintStyle: GoogleFonts.outfit(color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight, fontSize: 15),
+                        hintStyle: GoogleFonts.outfit(color: context.colors.textTertiary, fontSize: 15),
                         filled: false,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -379,10 +375,9 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildFilters() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final bodyColor = context.colors.textSecondary;
 
     final filters = ['All Salons', 'Open Now', 'Top Rated (4.8+)', 'Top Rated (4.5+)'];
     return SizedBox(
@@ -406,7 +401,7 @@ class ExploreTabState extends State<ExploreTab> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: borderColor, width: 1.5),
                   boxShadow: [
-                    BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
+                    BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.01), blurRadius: 4, offset: Offset(0, 2))
                   ]
                 ),
                 child: Row(
@@ -435,14 +430,14 @@ class ExploreTabState extends State<ExploreTab> {
               padding: EdgeInsets.symmetric(horizontal: 18),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected ? (isDark ? AppTheme.accentColor.withOpacity(0.15) : AppTheme.lightAccentSoft) : surfaceColor,
+                color: isSelected ? context.colors.chipSelected : surfaceColor,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected ? AppTheme.accentColor : borderColor,
                   width: 1.5,
                 ),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.01), blurRadius: 4, offset: Offset(0, 2))
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.01), blurRadius: 4, offset: Offset(0, 2))
                 ]
               ),
               child: Text(
@@ -463,10 +458,9 @@ class ExploreTabState extends State<ExploreTab> {
   /// Tells the customer the list below is not the whole directory, and gives
   /// them one tap back to it.
   Widget _buildCategoryFilterBanner() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     final label = _categoryLabel ?? 'this category';
 
@@ -475,12 +469,12 @@ class ExploreTabState extends State<ExploreTab> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+          color: context.colors.accentSoft,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -492,7 +486,7 @@ class ExploreTabState extends State<ExploreTab> {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: AppTheme.accentColor.withOpacity(0.15),
+                color: AppTheme.accentColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -546,9 +540,8 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildSectionTitle(String title, String? subtitle) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
@@ -587,11 +580,10 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildHorizontalSalonList(List<dynamic> salonsList) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     return SizedBox(
       height: 195, 
@@ -613,7 +605,7 @@ class ExploreTabState extends State<ExploreTab> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: borderColor, width: 1.5),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04), blurRadius: 12, offset: Offset(0, 4))
                 ]
               ),
               child: Column(
@@ -626,7 +618,7 @@ class ExploreTabState extends State<ExploreTab> {
                         Image.network(
                           salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
+                          errorBuilder: (_, __, ___) => Container(color: context.colors.imagePlaceholder, child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
                         ),
                         if (salon['distance_km'] != null)
                           Positioned(
@@ -634,7 +626,7 @@ class ExploreTabState extends State<ExploreTab> {
                             right: 8,
                             child: Container(
                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
+                              decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(8)),
                               child: Text(
                                 '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
                                 style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
@@ -678,9 +670,8 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildAllSalonsHeader(int count) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
@@ -711,12 +702,11 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildViewToggle() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
     final activeBg = AppTheme.accentColor;
     final activeIcon = Colors.white;
-    final inactiveIcon = isDark ? AppTheme.darkTextLight : const Color(0xFF9E98AE);
+    final inactiveIcon = context.colors.iconInactive;
 
     return Container(
       height: 36,
@@ -767,11 +757,10 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildDetailedSalonCard(dynamic salon) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
     final isServiceable = salon['is_serviceable'] != false;
     final count = (salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
@@ -793,7 +782,7 @@ class ExploreTabState extends State<ExploreTab> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: borderColor, width: 1.5),
               boxShadow: [
-                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04), blurRadius: 12, offset: Offset(0, 4))
+                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04), blurRadius: 12, offset: Offset(0, 4))
               ]
             ),
             child: Column(
@@ -807,7 +796,7 @@ class ExploreTabState extends State<ExploreTab> {
                       Image.network(
                         salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40)),
+                        errorBuilder: (_, __, ___) => Container(color: context.colors.imagePlaceholder, child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 40)),
                       ),
                       if (salon['distance_km'] != null)
                         Positioned(
@@ -815,7 +804,7 @@ class ExploreTabState extends State<ExploreTab> {
                           right: 12,
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
+                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(8)),
                             child: Text(
                               '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
                               style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
@@ -828,10 +817,10 @@ class ExploreTabState extends State<ExploreTab> {
                         child: Container(
                           padding: EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkSurface.withOpacity(0.9) : Colors.white.withOpacity(0.9),
+                            color: context.colors.surface.withValues(alpha: 0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.favorite_border, size: 18, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          child: Icon(Icons.favorite_border, size: 18, color: context.colors.iconIdle),
                         ),
                       ),
                     ],
@@ -884,12 +873,12 @@ class ExploreTabState extends State<ExploreTab> {
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
+                            color: context.colors.warningBg,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             salon['unavailable_reason'] ?? 'Not taking bookings',
-                            style: GoogleFonts.outfit(color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning, fontSize: 12, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.outfit(color: context.colors.warning, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         )
                       else
@@ -915,11 +904,10 @@ class ExploreTabState extends State<ExploreTab> {
   }
 
   Widget _buildCompactSalonCard(dynamic salon) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
     final isServiceable = salon['is_serviceable'] != false;
     final count = (salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
@@ -942,7 +930,7 @@ class ExploreTabState extends State<ExploreTab> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: borderColor, width: 1.5),
               boxShadow: [
-                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03), blurRadius: 10, offset: Offset(0, 4))
+                BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.03), blurRadius: 10, offset: Offset(0, 4))
               ]
             ),
             child: Row(
@@ -957,7 +945,7 @@ class ExploreTabState extends State<ExploreTab> {
                       Image.network(
                         salon['cover_image'] ?? salon['cover_photo_url'] ?? salon['logo_image'] ?? '',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(color: isDark ? AppTheme.darkAccentSoft : const Color(0xFFF3F0FF), child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
+                        errorBuilder: (_, __, ___) => Container(color: context.colors.imagePlaceholder, child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 30)),
                       ),
                       if (salon['distance_km'] != null)
                         Positioned(
@@ -965,7 +953,7 @@ class ExploreTabState extends State<ExploreTab> {
                           left: 8,
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75), borderRadius: BorderRadius.circular(6)),
+                            decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(6)),
                             child: Text(
                               '${salon['distance_is_approximate'] == true ? '~' : ''}${salon['distance_km']} km',
                               style: GoogleFonts.outfit(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
@@ -1026,12 +1014,12 @@ class ExploreTabState extends State<ExploreTab> {
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg,
+                              color: context.colors.warningBg,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               salon['unavailable_reason'] ?? 'Not taking bookings',
-                              style: GoogleFonts.outfit(color: isDark ? AppTheme.darkWarning : AppTheme.lightWarning, fontSize: 11, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.outfit(color: context.colors.warning, fontSize: 11, fontWeight: FontWeight.w600),
                             ),
                           )
                         else
@@ -1056,10 +1044,10 @@ class ExploreTabState extends State<ExploreTab> {
     final suggestedName = _suggestedCity?['name'];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppTheme.darkSurface : Colors.white;
-    final borderColor = isDark ? AppTheme.darkBorder : const Color(0xFFEBE8F6);
-    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final bodyColor = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.listBorder;
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
 
     // A category with no salons in this city is a different problem from a
     // city with no salons at all, and the way out differs too.
@@ -1134,7 +1122,7 @@ class ExploreTabState extends State<ExploreTab> {
                         side: BorderSide(color: borderColor),
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                        backgroundColor: context.colors.accentSoft,
                         child: Icon(Icons.storefront, color: AppTheme.accentColor, size: 20),
                       ),
                       title: Text(salon['name'] ?? 'Unnamed Salon', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: headingColor)),

@@ -57,6 +57,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Unselected icon in a small toggle group (the explore list/map switch).
+  final Color iconInactive;
+
+  /// Fill of a selected filter chip: the soft accent in light mode, the accent
+  /// at 15% in dark mode (baked to the old 8-bit alpha).
+  final Color chipSelected;
+
   /// Label of a disabled button that still needs to be read (shade600 / shade400).
   final Color disabledLabel;
 
@@ -154,6 +161,8 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.iconInactive,
+    required this.chipSelected,
     required this.disabledLabel,
     required this.disabledFillSoft,
     required this.disabledFill,
@@ -199,6 +208,8 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    iconInactive: Color(0xFF9E98AE),
+    chipSelected: AppTheme.lightAccentSoft,
     disabledLabel: Color(0xFF757575),
     disabledFillSoft: Color(0xFFF5F5F5),
     disabledFill: Color(0xFFEEEEEE),
@@ -244,6 +255,8 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    iconInactive: AppTheme.darkTextLight,
+    chipSelected: Color(0x269C54F2),
     disabledLabel: Color(0xFFBDBDBD),
     disabledFillSoft: Color(0xFF424242),
     disabledFill: Color(0xFF424242),
@@ -295,6 +308,8 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? iconInactive,
+    Color? chipSelected,
     Color? disabledLabel,
     Color? disabledFillSoft,
     Color? disabledFill,
@@ -339,6 +354,8 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      iconInactive: iconInactive ?? this.iconInactive,
+      chipSelected: chipSelected ?? this.chipSelected,
       disabledLabel: disabledLabel ?? this.disabledLabel,
       disabledFillSoft: disabledFillSoft ?? this.disabledFillSoft,
       disabledFill: disabledFill ?? this.disabledFill,
@@ -389,6 +406,8 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      iconInactive: Color.lerp(iconInactive, other.iconInactive, t)!,
+      chipSelected: Color.lerp(chipSelected, other.chipSelected, t)!,
       disabledLabel: Color.lerp(disabledLabel, other.disabledLabel, t)!,
       disabledFillSoft: Color.lerp(disabledFillSoft, other.disabledFillSoft, t)!,
       disabledFill: Color.lerp(disabledFill, other.disabledFill, t)!,
