@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import 'legal_documents.dart';
 import 'legal_document_screen.dart';
+import '../theme/app_colors.dart';
 
 /// The "I agree" row used at sign-up in both apps.
 ///
@@ -30,8 +31,7 @@ class TermsAcceptanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final body = context.colors.textSecondary;
 
     final docs = slugs.map(legalDocumentBySlug).whereType<LegalDocument>().toList();
     if (docs.isEmpty) return const SizedBox.shrink();
@@ -94,7 +94,7 @@ class TermsAcceptanceRow extends StatelessWidget {
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger,
+                color: context.colors.danger,
               ),
             ),
           ),
