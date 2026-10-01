@@ -465,10 +465,15 @@ class AppColors extends ThemeExtension<AppColors> {
 /// Shorthand for the tokens on the current [BuildContext].
 ///
 /// `context.colors.surface` instead of a brightness check at every call site.
+///
+/// Falls back to the palette matching the theme's brightness when the
+/// extension is absent — a stock ThemeData in a widget test, or an overlay
+/// built with its own theme — rather than asserting. Registration on the app's
+/// two themes is pinned by test/app_colors_test.dart instead.
 extension AppColorsContext on BuildContext {
   AppColors get colors {
-    final extension = Theme.of(this).extension<AppColors>();
-    assert(extension != null, 'AppColors is missing from this ThemeData.');
-    return extension ?? AppColors.light;
+    final theme = Theme.of(this);
+    return theme.extension<AppColors>() ??
+        (theme.brightness == Brightness.dark ? AppColors.dark : AppColors.light);
   }
 }

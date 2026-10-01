@@ -62,4 +62,27 @@ void main() {
     expect(light, same(AppColors.light));
     expect(dark, same(AppColors.dark));
   });
+
+  testWidgets('a stock theme falls back to the palette for its brightness',
+      (tester) async {
+    late AppColors light;
+    late AppColors dark;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        light = context.colors;
+        return const SizedBox();
+      }),
+    ));
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark),
+      home: Builder(builder: (context) {
+        dark = context.colors;
+        return const SizedBox();
+      }),
+    ));
+
+    expect(light, same(AppColors.light));
+    expect(dark, same(AppColors.dark));
+  });
 }
