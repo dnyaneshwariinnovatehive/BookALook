@@ -116,8 +116,12 @@ class _InfiniteLogoMarqueeState extends State<InfiniteLogoMarquee>
   @override
   Widget build(BuildContext context) {
     // Someone who has asked the platform for less motion gets a strip they can
-    // swipe instead of one that will not stop moving.
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    // swipe instead of one that will not stop moving. So does a screen-reader
+    // user: the moving strip repeats every item several times to loop, and
+    // each copy would be announced.
+    final media = MediaQuery.maybeOf(context);
+    final reduceMotion =
+        (media?.disableAnimations ?? false) || (media?.accessibleNavigation ?? false);
 
     if (widget.itemCount <= 0) {
       _requestPeriod(null);
