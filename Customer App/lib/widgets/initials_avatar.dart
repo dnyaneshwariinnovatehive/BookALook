@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// A person's initials in a circle, for anywhere the app would otherwise need
 /// a face to show.
@@ -75,16 +76,14 @@ class InitialsAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final Color background;
     final Color foreground;
 
     if (dimmed) {
-      background = isDark ? AppTheme.darkTextLight : AppTheme.lightBorder;
-      foreground = isDark ? AppTheme.darkSurface : AppTheme.lightTextLight;
+      background = context.colors.avatarDimmedFill;
+      foreground = context.colors.avatarDimmedText;
     } else {
-      background = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
+      background = context.colors.accentSoft;
       foreground = AppTheme.accentColor;
     }
 
