@@ -11,6 +11,8 @@ import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -39,7 +41,12 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
   double _toDouble(dynamic value) => double.tryParse('${value ?? 0}') ?? 0.0;
 
-  void _showMessage(String text) {
+  /// A failed action on this booking, shown at the top of the page until
+  /// dismissed. Confirmations still use a SnackBar: they are shown as the
+  /// page closes, which is exactly when a passing message is right.
+  String? _actionError;
+
+  void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -113,24 +120,30 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       final refund = result['refund'] ?? {};
       final refunded = _toDouble(refund['refundable']);
 
-      _showMessage(refunded > 0
+      final cancelled = refunded > 0
           ? 'Booking cancelled. ₹${refunded.toStringAsFixed(2)} will be refunded.'
-          : 'Booking cancelled.');
+          : 'Booking cancelled.';
       AppHaptics.mediumImpact();
 
+      // One message, not two stacked SnackBars where the second hides the
+      // first: the upfront-payment notice is the more important half.
       final requirement = result['payment_requirement'];
       if (requirement != null && requirement['full_upfront'] == true) {
-        _showMessage(
-          'You have changed ${requirement['changes_used']} bookings for that day. '
-          'Further bookings that day need full payment upfront.',
+        _toast(
+          '$cancelled You have changed ${requirement['changes_used']} bookings for that day, '
+          'so further bookings that day need full payment upfront.',
         );
+      } else {
+        _toast(cancelled);
       }
       
       _hasChanges = true;
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       AppHaptics.error();
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(() => _actionError = describeError(e, fallback: 'Could not cancel this booking. Please try again.'));
+      }
     }
   }
 
@@ -585,6 +598,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         Text('Cannot reschedule: $rescheduleBlockedReason', style: GoogleFonts.outfit(fontSize: 13, color: bodyColor)),
                       ],
                     ],
+                  ),
+                ),
+
+              // Shown right above the buttons that caused it, so it is on screen
+              // where the customer is already looking.
+              if (_actionError != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: InlineStatus(
+                    message: _actionError!,
+                    onDismiss: () => setState(() => _actionError = null),
                   ),
                 ),
 
