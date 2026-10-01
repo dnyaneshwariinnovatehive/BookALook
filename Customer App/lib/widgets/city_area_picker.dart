@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:customer_app/services/http_client.dart' as http;
 
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 
 /// Two dependent dropdowns: the city, then the locality inside it.
 ///
@@ -221,7 +222,7 @@ class _CityAreaPickerState extends State<CityAreaPicker> {
   InputDecoration _decoration(String label, IconData icon, String hint) => InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: GoogleFonts.outfit(fontSize: 13.5, color: AppTheme.lightTextLight),
+        hintStyle: GoogleFonts.outfit(fontSize: 13.5, color: context.colors.textTertiary),
         prefixIcon: Icon(icon),
         border: const OutlineInputBorder(),
       );
