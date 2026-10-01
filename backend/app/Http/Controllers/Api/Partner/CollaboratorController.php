@@ -151,30 +151,62 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $salons = Salon::with(['city:id,name,state', 'admin:id,name,phone', 'enquiry'])
+        $salons = Salon::with([
+            'city:id,name,state',
+            'admin:id,name,phone',
+            'enquiry',
+            'currentSubscription.plan:id,name',
+            // Left unconstrained: [Salon::latestSubscription] resolves through a
+            // window function that orders by start_date, and a trimmed column
+            // list would have to include it to stay valid.
+            'latestSubscription.plan:id,name',
+        ])
             ->withCount('services')
             ->where('assigned_collaborator_id', $user->id)
             ->whereNotNull('enquiry_id')
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (Salon $salon) => [
-                'id' => $salon->id,
-                'name' => $salon->name,
-                'status' => $salon->status,
-                'rejection_reason' => $salon->rejection_reason,
-                'cover_photo_url' => $salon->cover_photo_url,
-                'address' => $salon->address,
-                'city' => $salon->city?->name,
-                'services_count' => $salon->services_count,
-                'owner_name' => $salon->admin?->name,
-                'owner_phone' => $salon->admin?->phone,
-                'submitted_at' => $salon->created_at,
-                'enquiry_id' => $salon->enquiry_id,
-                'services_priced' => $salon->services_count > 0,
-                // Editable right up to approval, and never again after it. Once
-                // a salon is live it belongs to its owner.
-                'can_edit' => in_array($salon->status, ['pending_approval', 'rejected'], true),
-            ]);
+            ->map(function (Salon $salon) {
+                $subscription = $salon->currentSubscription;
+                $daysLeft = $subscription
+                    ? (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false)
+                    : null;
+
+                // A salon whose plan has run out still shows its last plan rather
+                // than nothing at all. Reading an empty capsule as "never paid"
+                // would send the collaborator after the wrong problem.
+                $lapsed = $subscription === null && $salon->latestSubscription !== null;
+
+                return [
+                    'id' => $salon->id,
+                    'name' => $salon->name,
+                    'status' => $salon->status,
+                    'rejection_reason' => $salon->rejection_reason,
+                    'cover_photo_url' => $salon->cover_photo_url,
+                    'address' => $salon->address,
+                    'city' => $salon->city?->name,
+                    'services_count' => $salon->services_count,
+                    'owner_name' => $salon->admin?->name,
+                    'owner_phone' => $salon->admin?->phone,
+                    'submitted_at' => $salon->created_at,
+                    'enquiry_id' => $salon->enquiry_id,
+                    'services_priced' => $salon->services_count > 0,
+                    'plan_name' => $subscription?->plan?->name
+                        ?? $salon->latestSubscription?->plan?->name,
+                    'days_left' => $daysLeft,
+                    // The date itself as well as the countdown, so a collaborator
+                    // reading a card in week two can say when it ends without
+                    // having to do the arithmetic.
+                    'renews_on' => $subscription?->end_date,
+                    'lapsed' => $lapsed,
+                    // Waiting on its owner to pick a first plan is onboarding,
+                    // not a lapse, and the welcome screen already handles it.
+                    'needs_plan' => $subscription === null && ! $lapsed,
+                    // Editable right up to approval, and never again after it. Once
+                    // a salon is live it belongs to its owner.
+                    'can_edit' => in_array($salon->status, ['pending_approval', 'rejected'], true),
+                ];
+            });
 
         return response()->json([
             'success' => true,

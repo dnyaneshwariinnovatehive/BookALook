@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/collaborator_api.dart';
 import '../../../services/collaborator_badges.dart';
@@ -48,6 +49,20 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   /// than being rebuilt on every switch — previously the collaborator lost
   /// their filter every time they glanced at Assigned and came back.
   String? _filter;
+
+  /// Salons whose details are currently unfolded, by id.
+  ///
+  /// Only ever holds approved salons — the editable ones open the form on tap
+  /// instead, so there is nothing here to remember for them.
+  final Set<String> _expanded = {};
+
+  /// Days remaining at which a plan is worth colouring the whole card red.
+  ///
+  /// Deliberately not the backend's reminder window. The scheduler decides when
+  /// to send somebody an email; this decides what a collaborator sees before
+  /// they have opened anything, and five days is roughly how long it takes a
+  /// phone call to land with an owner who has not already decided.
+  static const _urgentDays = 5;
 
   static const _filters = <String?, String>{
     null: 'All',
@@ -101,6 +116,21 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
 
   static int _statusCount(List<dynamic> salons, String status) =>
       salons.where((s) => (s as Map)['status'] == status).length;
+
+  /// Replaces the fetched list with [salons], for tests.
+  ///
+  /// The card's subscription capsule and its red-at-five-days treatment are the
+  /// whole point of this tab's latest change, and both are decided from the
+  /// server payload. Reaching them through a widget test needs a way in that
+  /// does not involve standing up the API.
+  @visibleForTesting
+  void seedForTest(List<Map<String, dynamic>> salons) {
+    setState(() {
+      _salons = salons;
+      _isLoading = false;
+      _firstLoad = false;
+    });
+  }
 
   List<Map<String, dynamic>> get _visible => _salons
       .map((s) => Map<String, dynamic>.from(s as Map))
@@ -186,9 +216,27 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     final (statusLabel, statusColour, statusIcon) = _statusLook(status);
     final canEdit = salon['can_edit'] == true;
     final rejectionReason = salon['rejection_reason']?.toString();
+    final subscription = _subscriptionLook(salon);
+    final urgent = _isUrgent(salon);
+    final palette = context.colors;
+
+    final id = salon['id']?.toString();
+    final expanded = expandableFor(salon) && _expanded.contains(id);
 
     return CollaboratorCard(
-      onTap: canEdit ? () => _edit(salon) : null,
+      // An editable salon spends its tap on the form, which is the fastest route
+      // to fixing it. An approved one has nothing left to edit, so the same tap
+      // is spent on the details instead.
+      onTap: canEdit
+          ? () => _edit(salon)
+          : expandableFor(salon)
+              ? () => _toggleExpanded(id)
+              : null,
+      // Whole-card red rather than a single red capsule: five days is close
+      // enough that scrolling past the card should catch it, not just looking
+      // directly at it.
+      color: urgent ? palette.dangerBg : null,
+      borderColor: urgent ? palette.danger.withValues(alpha: 0.35) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -205,7 +253,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: context.colors.textPrimary,
+                        color: palette.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -218,18 +266,45 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
-                        color: context.colors.textSecondary,
+                        color: palette.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    CollaboratorChip(
-                      label: statusLabel,
-                      colour: statusColour,
-                      icon: statusIcon,
+                    // Wrap, not Row: two capsules side by side is the normal case
+                    // now, and a long plan name must not push the approval
+                    // status off the edge of the card.
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        CollaboratorChip(
+                          label: statusLabel,
+                          colour: statusColour,
+                          icon: statusIcon,
+                        ),
+                        if (subscription != null)
+                          CollaboratorChip(
+                            label: subscription.$1,
+                            colour: subscription.$2,
+                            icon: subscription.$3,
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              // Spells out that the card opens, since a tap that expands reads
+              // as broken until you know it is meant to.
+              if (expandableFor(salon))
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: palette.textTertiary,
+                  ),
+                ),
             ],
           ),
 
@@ -239,7 +314,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
               width: double.infinity,
               padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
-                color: context.colors.dangerBg,
+                color: palette.dangerBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -248,7 +323,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                   Icon(
                     Icons.error_outline,
                     size: 15,
-                    color: context.colors.danger,
+                    color: palette.danger,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -257,7 +332,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.4,
-                        color: context.colors.danger,
+                        color: palette.danger,
                       ),
                     ),
                   ),
@@ -281,7 +356,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       '${salon['services_count'] == 1 ? 'service' : 'services'}',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: context.colors.textSecondary,
+                        color: palette.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -289,7 +364,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       'Submitted ${_submittedOn(salon['submitted_at'])}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: context.colors.textTertiary,
+                        color: palette.textTertiary,
                       ),
                     ),
                   ],
@@ -305,7 +380,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.accentColor,
-                    backgroundColor: context.colors.accentSoft,
+                    backgroundColor: palette.accentSoft,
                     side: BorderSide.none,
                     visualDensity: VisualDensity.compact,
                     shape: RoundedRectangleBorder(
@@ -322,23 +397,231 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                     Icon(
                       Icons.lock_outline,
                       size: 13,
-                      color: context.colors.textTertiary,
+                      color: palette.textTertiary,
                     ),
                     const SizedBox(width: 5),
                     Text(
                       'Handed over',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: context.colors.textTertiary,
+                        color: palette.textTertiary,
                       ),
                     ),
                   ],
                 ),
             ],
           ),
+
+          if (expanded) ...[
+            const SizedBox(height: 12),
+            _buildSalonDetails(salon),
+          ],
         ],
       ),
     );
+  }
+
+  /// The details panel an approved salon opens instead of the edit form.
+  ///
+  /// Everything here is something the collaborator can no longer change but
+  /// still has to act on, which for an approved salon is almost entirely about
+  /// reaching the owner.
+  Widget _buildSalonDetails(Map<String, dynamic> salon) {
+    final palette = context.colors;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _detailRow(
+            Icons.place_outlined,
+            'Address',
+            [salon['address'], salon['city'], salon['state']]
+                .where((p) => p != null && p.toString().isNotEmpty)
+                .join(', '),
+          ),
+          _detailRow(
+            Icons.person_outline,
+            'Owner',
+            [
+              salon['owner_name']?.toString(),
+              if (salon['owner_phone'] != null) salon['owner_phone'].toString(),
+            ].whereType<String>().join(' · '),
+          ),
+          _detailRow(
+            Icons.workspace_premium_outlined,
+            'Plan',
+            salon['plan_name']?.toString() ?? 'None on file',
+          ),
+          _detailRow(
+            Icons.event_outlined,
+            'Renews',
+            _renewsOn(salon),
+          ),
+          _detailRow(
+            Icons.spa_outlined,
+            'Menu',
+            (salon['services_count'] ?? 0) == 0
+                ? 'No services priced yet'
+                : '${salon['services_count']} '
+                      '${salon['services_count'] == 1 ? 'service' : 'services'} '
+                      'priced',
+          ),
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _callOwner(
+                salon['owner_phone']?.toString(),
+                salon['name']?.toString() ?? 'the salon',
+              ),
+              icon: const Icon(Icons.call, size: 15),
+              label: Text(
+                'Call ${salon['owner_name'] ?? 'owner'}',
+                style: const TextStyle(fontSize: 12.5),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accentColor,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    final palette = context.colors;
+    final shown = value.trim().isEmpty ? '—' : value.trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: palette.textTertiary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 10.5, color: palette.textTertiary),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  shown,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Whether this card unfolds in place rather than opening the edit form.
+  bool expandableFor(Map<String, dynamic> salon) => salon['can_edit'] != true;
+
+  void _toggleExpanded(String? id) {
+    if (id == null) return;
+    setState(() {
+      if (!_expanded.remove(id)) _expanded.add(id);
+    });
+  }
+
+  /// Whether the plan is close enough to ending to turn the whole card red.
+  ///
+  /// A lapsed plan counts even though there are no days left to count: the
+  /// salon is offline right now, which is worse than any countdown.
+  bool _isUrgent(Map<String, dynamic> salon) {
+    if (salon['status'] != 'active') return false;
+    if (salon['lapsed'] == true) return true;
+    final days = (salon['days_left'] as num?)?.toInt();
+    return days != null && days <= _urgentDays;
+  }
+
+  /// The subscription capsule for an approved salon, or null when there is
+  /// nothing worth saying.
+  ///
+  /// Only ever shown once a salon is live. A salon still sitting in SuperAdmin's
+  /// queue has no plan to run out, so a capsule there would be inventing a
+  /// deadline that nobody set.
+  (String, Color, IconData)? _subscriptionLook(Map<String, dynamic> salon) {
+    if (salon['status'] != 'active') return null;
+    final palette = context.colors;
+
+    if (salon['lapsed'] == true) {
+      return ('Plan expired', palette.danger, Icons.cloud_off_outlined);
+    }
+
+    final days = (salon['days_left'] as num?)?.toInt();
+    if (days == null) {
+      return salon['needs_plan'] == true
+          ? ('No plan chosen yet', palette.warning, Icons.help_outline)
+          : null;
+    }
+
+    if (days <= _urgentDays) {
+      return (
+        days <= 0 ? 'Ends today' : 'Ends in $days days',
+        palette.danger,
+        Icons.timer_outlined,
+      );
+    }
+
+    return ('Ends in $days days', palette.success, Icons.event_available_outlined);
+  }
+
+  /// The renewal line in the details panel, in words rather than a number.
+  static String _renewsOn(Map<String, dynamic> salon) {
+    if (salon['lapsed'] == true) return 'Expired — salon is offline';
+    if (salon['needs_plan'] == true) return 'Waiting on the owner to pick a plan';
+
+    final days = (salon['days_left'] as num?)?.toInt();
+    if (days == null) return '—';
+
+    if (days <= 0) return 'Ends today';
+
+    final parsed = DateTime.tryParse(salon['renews_on']?.toString() ?? '');
+    final date = parsed == null
+        ? ''
+        : ' on ${DateFormat('d MMM yyyy').format(parsed.toLocal())}';
+
+    return days == 1
+        ? 'Last day$date'
+        : '$days days left$date';
+  }
+
+  Future<void> _callOwner(String? phone, String salonName) async {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No phone number on file for $salonName.')),
+      );
+      return;
+    }
+
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (!await launchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not start a call. The number is $phone.')));
+    }
   }
 
   /// Salon status as the collaborator experiences it, not as the column spells

@@ -16,6 +16,8 @@ use App\Support\Notifications\NotificationAction;
 use App\Support\Notifications\NotificationType;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -297,6 +299,78 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
             ->assertStatus(403);
     }
 
+    /**
+     * My Salons carries its own countdown rather than the collaborator having to
+     * read it out of the inbox: the card turns red at five days, and the client
+     * cannot invent that number — it has to arrive with the list.
+     */
+    public function test_my_salons_reports_how_long_a_live_salon_has_left(): void
+    {
+        [$salon, , $collaborator] = $this->fixture();
+        $this->givenOnboardedSalon($salon);
+        $this->givenSubscription($salon, endsInDays: 5);
+
+        $row = $this->mySalonsRow($collaborator, $salon);
+
+        $this->assertSame(5, $row['days_left']);
+        $this->assertSame(SubscriptionPlan::first()->name, $row['plan_name']);
+        $this->assertNotNull($row['renews_on']);
+        $this->assertFalse($row['lapsed']);
+        $this->assertFalse($row['needs_plan']);
+    }
+
+    /**
+     * The one thing the old payload could not express.
+     *
+     * A salon that never chose a plan and a salon whose plan ran out both have
+     * no active subscription, so both answer null everywhere. Telling the
+     * collaborator "no plan" about a salon that is currently offline sends them
+     * chasing onboarding work for a customer who cannot even be found.
+     */
+    public function test_my_salons_tells_a_lapsed_plan_apart_from_one_never_bought(): void
+    {
+        $collaborator = $this->fixtureCollaborator();
+
+        $lapsed = $this->givenSalon();
+        $lapsed->update(['assigned_collaborator_id' => $collaborator->id]);
+        $this->givenOnboardedSalon($lapsed);
+        $this->givenSubscription($lapsed, endedDaysAgo: 2);
+
+        $neverBought = $this->givenSalon();
+        $neverBought->update(['assigned_collaborator_id' => $collaborator->id]);
+        $this->givenOnboardedSalon($neverBought);
+
+        $expired = $this->mySalonsRow($collaborator, $lapsed);
+        $this->assertTrue($expired['lapsed']);
+        $this->assertFalse($expired['needs_plan']);
+        $this->assertNull($expired['days_left']);
+        $this->assertNotNull($expired['plan_name'], 'A lapsed salon still shows what it was on.');
+
+        $waiting = $this->mySalonsRow($collaborator, $neverBought);
+        $this->assertFalse($waiting['lapsed']);
+        $this->assertTrue($waiting['needs_plan']);
+        $this->assertNull($waiting['plan_name']);
+    }
+
+    /**
+     * A salon still in SuperAdmin's queue has no plan running, so a countdown
+     * on its card would name a deadline nobody set. The fields have to come
+     * back empty rather than zero.
+     */
+    public function test_my_salons_keeps_the_queue_free_of_renewal_wording(): void
+    {
+        [$salon, , $collaborator] = $this->fixture();
+        $salon->update(['status' => 'pending_approval']);
+        $this->givenOnboardedSalon($salon);
+
+        $row = $this->mySalonsRow($collaborator, $salon);
+
+        $this->assertNull($row['days_left']);
+        $this->assertNull($row['renews_on']);
+        $this->assertTrue($row['needs_plan']);
+        $this->assertTrue($row['can_edit']);
+    }
+
     // ------------------------------------------------------------- fixtures
 
     /**
@@ -382,6 +456,46 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
             'end_date' => $end,
             'status' => $endedDaysAgo !== null ? 'expired' : 'active',
         ]);
+    }
+
+    /**
+     * My Salons only lists salons that arrived through an enquiry, so a fixture
+     * that skips one is invisible to the endpoint under test.
+     */
+    private function givenOnboardedSalon(Salon $salon): void
+    {
+        $unique = substr(bin2hex(random_bytes(6)), 0, 10);
+
+        $enquiryId = DB::table('salon_enquiries')->insertGetId([
+            'id' => (string) Str::uuid(),
+            'salon_name' => $salon->name,
+            'owner_name' => 'Owner',
+            'phone' => '9000000000',
+            'status' => 'onboarded',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $salon->update(['enquiry_id' => $enquiryId]);
+    }
+
+    /**
+     * The collaborator's own view of [Salon], exactly as the client receives it.
+     *
+     * @return array<string, mixed>
+     */
+    private function mySalonsRow(User $collaborator, Salon $salon): array
+    {
+        $rows = $this->actingAs($collaborator, 'sanctum')
+            ->getJson('/api/partner/collaborator/onboarded-salons')
+            ->assertStatus(200)
+            ->json('data');
+
+        $row = collect($rows)->firstWhere('id', $salon->id);
+
+        $this->assertNotNull($row, 'Expected the salon to appear in My Salons.');
+
+        return $row;
     }
 
     private function givenNotice(Salon $salon, User $recipient, string $type): Notification
