@@ -40,15 +40,28 @@ return [
     | WhatsApp Business
     |--------------------------------------------------------------------------
     |
-    | Set WHATSAPP_DRIVER=meta_cloud once a WhatsApp Business account exists and
-    | the phone number id and access token below are filled in. Until then the
-    | `log` driver records what would be sent and leaves the row queued in
-    | whatsapp_messages, so campaigns can be built and tested end to end
-    | without a provider — and nothing is ever mistaken for delivered.
+    | `driver` picks who actually sends the message:
+    |
+    |   log         Writes each attempt to the log and contacts nobody, leaving
+    |               the row `queued` so it can be inspected or drained later.
+    |   meta_cloud  Meta's own Cloud API, addressed by template name.
+    |   aisensy     AISensy, which sits in front of the same Meta API but
+    |               addresses sends by *campaign* name instead.
     |
     | The marketing side needs two more values than the notification side did:
     | `verify_token`, which Meta echoes back when the webhook is subscribed, and
     | `app_secret`, which signs every incoming payload.
+    |
+    | The `templates` and `campaigns` blocks are keyed by event and are meant to be
+    | read together. `templates` holds the Meta template name for an event;
+    | `campaigns` holds the name of the live AISensy API campaign built on top of
+    | that same template. A gateway joins them by event, so a send is described by
+    | what happened rather than by a template string. `meta_cloud` ignores
+    | `campaigns`; `aisensy` ignores nothing.
+    |
+    | An event with a template but no campaign is a configuration error and is
+    | reported as a failed send rather than dropped — a message that silently
+    | never arrives is the one failure nobody notices until a customer complains.
     |
     */
     'whatsapp' => [
@@ -58,9 +71,33 @@ return [
         'api_version' => env('WHATSAPP_API_VERSION', 'v21.0'),
         'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
         'app_secret' => env('WHATSAPP_APP_SECRET'),
-        'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '91'),
+        'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', 91),
+
+        // AISensy. The key is enough on its own; the endpoint and the source
+        // label are overridable so a staging run can be told apart from live.
+        'aisensy' => [
+            'api_key' => env('WHATSAPP_AISENSY_API_KEY'),
+            'base_url' => env('WHATSAPP_AISENSY_BASE_URL', 'https://backend.aisensy.com'),
+            // AISensy segments contacts by this, so it should name this platform
+            // and not the framework underneath it.
+            'source' => env('WHATSAPP_AISENSY_SOURCE', 'bookalook'),
+        ],
+
         'templates' => [
+            'booking_confirmed' => env('WHATSAPP_TEMPLATE_BOOKING_CONFIRMED', 'bookalook_booking_confirmed'),
+            'appointment_reminder' => env('WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER', 'bookalook_appointment_reminder'),
+            'appointment_cancelled' => env('WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED', 'bookalook_appointment_cancelled'),
             'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),
+        ],
+
+        // AISensy API campaign names, one per event. Blank means "not configured",
+        // and a send for a blank campaign is recorded as a failure naming the
+        // variable to set rather than being attempted.
+        'campaigns' => [
+            'booking_confirmed' => env('WHATSAPP_CAMPAIGN_BOOKING_CONFIRMED', ''),
+            'appointment_reminder' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_REMINDER', ''),
+            'appointment_cancelled' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_CANCELLED', ''),
+            'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', ''),
         ],
     ],
 

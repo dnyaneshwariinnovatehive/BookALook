@@ -33,3 +33,11 @@ Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();
 // either. withoutOverlapping because two passes at once would be two schedulers
 // racing over the same window.
 Schedule::command('app:send-appointment-reminders')->everyFifteenMinutes()->withoutOverlapping();
+
+// The WhatsApp outbox safety net. Messages are dispatched as jobs the moment they
+// are written, so in normal operation this finds nothing — it exists for the ones
+// that were written while no provider was configured, or while the queue was down.
+// The five-minute age floor is what lets it run every minute without racing a busy
+// worker, and the command claims each row before dispatching so the two cannot both
+// decide to send the same message.
+Schedule::command('app:drain-whatsapp-outbox')->everyMinute()->withoutOverlapping();

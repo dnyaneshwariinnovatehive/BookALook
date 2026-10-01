@@ -5,6 +5,7 @@ namespace App\Services\Marketing;
 use App\Models\MarketingConsent;
 use App\Models\Salon;
 use App\Models\SubscriptionPlan;
+use App\Support\PhoneNumber;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -294,35 +295,13 @@ class AudienceBuilder
      * with a +91, with a leading 0, with spaces. A number that cannot be made
      * sense of returns null and is reported as unusable rather than sent to
      * whoever the mangled digits happen to belong to.
+     *
+     * Delegated rather than reimplemented: the WhatsApp gateways normalise the
+     * same way, and an audience that filtered on one definition while a send
+     * rejected on another would quietly lose the people it just selected.
      */
     public function normalisePhone(?string $phone): ?string
     {
-        if (! $phone) {
-            return null;
-        }
-
-        $digits = preg_replace('/\D+/', '', $phone);
-        $country = (string) config('services.whatsapp.default_country_code', '91');
-
-        if ($digits === '') {
-            return null;
-        }
-
-        // 0XXXXXXXXXX — the domestic trunk prefix.
-        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
-            $digits = substr($digits, 1);
-        }
-
-        if (strlen($digits) === 10) {
-            return $country.$digits;
-        }
-
-        if (strlen($digits) === 12 && str_starts_with($digits, $country)) {
-            return $digits;
-        }
-
-        // Anything else is either already international or not a phone number;
-        // accept plausible lengths and reject the rest.
-        return strlen($digits) >= 11 && strlen($digits) <= 15 ? $digits : null;
+        return PhoneNumber::normalise($phone);
     }
 }

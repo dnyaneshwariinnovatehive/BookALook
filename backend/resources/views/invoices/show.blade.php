@@ -13,12 +13,9 @@
 @php
     $accent = $settings['invoice_accent_color'];
     $currency = fn ($n) => '₹' . number_format((float) $n, 2);
-    $slot = \Carbon\Carbon::parse($invoice->appointment_date . ' ' . $invoice->start_time)
-        ->format('D, d M Y');
-    $time = \Carbon\Carbon::parse($invoice->appointment_date . ' ' . $invoice->start_time)
-        ->format('g:i A');
-    $endTime = \Carbon\Carbon::parse($invoice->appointment_date . ' ' . $invoice->end_time)
-        ->format('g:i A');
+    $slot = $invoice->appointmentDateLabel();
+    $time = $invoice->startTimeLabel();
+    $endTime = $invoice->endTimeLabel();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -178,7 +175,7 @@
                         @endif
                     </td>
                     @if ($settings['invoice_show_duration_column'])
-                        <td class="right">{{ $line['duration_minutes'] }} min</td>
+                        <td class="right">{{ ! empty($line['duration_minutes']) ? intval($line['duration_minutes']).' min' : '—' }}</td>
                     @endif
                     <td class="right">{{ $currency($line['price']) }}</td>
                 </tr>

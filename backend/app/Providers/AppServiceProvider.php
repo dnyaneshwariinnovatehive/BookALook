@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\DB;
 
+use App\Services\Notifications\AisensyWhatsAppGateway;
 use App\Services\Notifications\FcmAccessTokenProvider;
 use App\Services\Notifications\FcmCredentials;
 use App\Services\Notifications\FcmPushGateway;
@@ -24,9 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Meta's Cloud API when it is configured, the log driver otherwise.
-        // Falling back on missing credentials rather than throwing is
-        // deliberate: a half-configured environment should queue messages for
+        // The configured WhatsApp provider, or the log driver when it is absent or
+        // not configured. Falling back on missing credentials rather than throwing
+        // is deliberate: a half-configured environment should queue messages for
         // inspection, not fail every booking that tries to notify someone.
         $this->app->bind(WhatsAppGateway::class, function () {
             $config = config('services.whatsapp');
@@ -37,6 +38,14 @@ class AppServiceProvider extends ServiceProvider
                         $config['phone_number_id'],
                         $config['access_token'],
                         $config['api_version'] ?? 'v21.0',
+                    )
+                    : new LogWhatsAppGateway(),
+                'aisensy' => filled($config['aisensy']['api_key'] ?? null)
+                    ? new AisensyWhatsAppGateway(
+                        $config['aisensy']['api_key'],
+                        $config['campaigns'] ?? [],
+                        $config['aisensy']['base_url'] ?? 'https://backend.aisensy.com',
+                        $config['aisensy']['source'] ?? 'bookalook',
                     )
                     : new LogWhatsAppGateway(),
                 default => new LogWhatsAppGateway(),

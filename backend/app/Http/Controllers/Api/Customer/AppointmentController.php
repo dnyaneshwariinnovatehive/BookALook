@@ -445,8 +445,6 @@ class AppointmentController extends Controller
         $salonName = $appointment->salon?->name ?? 'the salon';
         $dateLabel = $this->dateTimeLabel($appointment);
 
-        $this->notifications->bookingConfirmed($appointment, $salonName, $dateLabel);
-
         // The salon side of the same event. The provider is told the slot is
         // theirs; the owner is told the salon has a booking, because otherwise
         // they find out by opening the app.
@@ -466,6 +464,17 @@ class AppointmentController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
+
+        // And only now the customer's confirmation, because it is the message that
+        // carries the receipt.
+        //
+        // The ordering here is load-bearing, not incidental. This notification
+        // writes an outbox row and hands it straight to a queue worker, and there
+        // is no transaction open at this point for `afterCommit` to wait on — so
+        // the worker can start rendering the PDF before `issueFor` above has run.
+        // It would find no invoice, send the confirmation text with no document,
+        // and AISensy would reject the whole send for the missing media.
+        $this->notifications->bookingConfirmed($appointment, $salonName, $dateLabel);
     }
 
     /**

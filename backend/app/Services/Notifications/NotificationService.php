@@ -3,6 +3,7 @@
 namespace App\Services\Notifications;
 
 use App\Jobs\SendPushNotificationJob;
+use App\Jobs\SendWhatsAppMessageJob;
 use App\Models\Appointment;
 use App\Models\Notification;
 use App\Models\Salon;
@@ -36,9 +37,14 @@ class NotificationService
 {
     public const TYPE_SALON_CLOSED = NotificationType::SALON_CLOSURE;
 
-    public function __construct(private WhatsAppGateway $whatsapp)
-    {
-    }
+    /**
+     * Names the attachment a WhatsApp message wants resolved to a real file.
+     *
+     * Written into the payload rather than a URL, because the document is not
+     * rendered when the booking happens — the queued job does it, by which time
+     * the invoice exists and the caller is no longer on the request path.
+     */
+    public const ATTACHMENT_INVOICE = 'invoice';
 
     /**
      * The single entry point. Writes the inbox row and schedules the push.
@@ -137,12 +143,22 @@ class NotificationService
         );
 
         if ($notification) {
+            // Positional, like every other mirror here, because that is the only
+            // shape either gateway reads — both build their request body from
+            // `parameters`. This one was written as named keys, so it went out
+            // with an empty body and every placeholder in the approved template
+            // rendered blank.
+            //
+            // The reason is the last placeholder with actual content rather than
+            // the fourth: a closure with no stated reason should read as a closure,
+            // not as a message with a hole in it.
             $this->mirrorToWhatsApp($appointment, [
-                'salon_name' => $salonName,
-                'appointment_date' => $dateLabel,
-                'reason' => $reason,
-                'reschedule_link' => $this->rescheduleDeeplink($appointment->id),
-            ]);
+                'parameters' => [
+                    $salonName,
+                    $dateLabel,
+                    $reason ?: 'The salon is closed',
+                ],
+            ], 'salon_closure');
         }
 
         return $notification;
@@ -174,10 +190,16 @@ class NotificationService
 
     /**
      * The advance cleared, so the salon has a confirmed booking.
+     *
+     * The only event that carries an attachment: the invoice PDF. It is named by
+     * event rather than resolved here because this is called a moment before the
+     * invoice is issued, and the PDF is rendered by the queued job anyway — by then
+     * both exist, and neither the request nor this method has to wait on a
+     * document render.
      */
     public function bookingConfirmed(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
     {
-        return $this->send(
+        $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_CONFIRMED,
             title: 'Booking confirmed',
@@ -189,6 +211,19 @@ class NotificationService
             ],
             appointment: $appointment,
         );
+
+        if ($notification) {
+            $this->mirrorToWhatsApp($appointment, [
+                'parameters' => [
+                    $salonName,
+                    $dateLabel,
+                    $this->currency($appointment->advance_paid ?? 0),
+                ],
+                'attachment' => self::ATTACHMENT_INVOICE,
+            ], 'booking_confirmed');
+        }
+
+        return $notification;
     }
 
     /**
@@ -196,7 +231,7 @@ class NotificationService
      */
     public function bookingCancelled(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
     {
-        return $this->send(
+        $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_CANCELLED,
             title: 'Booking cancelled',
@@ -208,6 +243,18 @@ class NotificationService
             ],
             appointment: $appointment,
         );
+
+        if ($notification) {
+            $this->mirrorToWhatsApp($appointment, [
+                'parameters' => [
+                    $salonName,
+                    $dateLabel,
+                    $appointment->cancellation_reason ?: 'No reason given',
+                ],
+            ], 'appointment_cancelled');
+        }
+
+        return $notification;
     }
 
     /**
@@ -236,6 +283,11 @@ class NotificationService
      * Idempotent by construction: the caller passes a dedupe key built from the
      * appointment and the reminder window, so a scheduler that runs twice, or
      * two workers that race, still produce exactly one reminder.
+     *
+     * The WhatsApp mirror hangs off the returned notification rather than firing
+     * unconditionally, so it inherits the same dedupe key. A scheduler running
+     * four times inside the reminder window produces one message on WhatsApp for
+     * the same reason it produces one push.
      */
     public function appointmentReminder(
         Appointment $appointment,
@@ -243,7 +295,7 @@ class NotificationService
         string $dateLabel,
         string $dedupeKey
     ): ?Notification {
-        return $this->send(
+        $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::APPOINTMENT_REMINDER,
             title: 'Reminder: your appointment is coming up',
@@ -256,6 +308,24 @@ class NotificationService
             appointment: $appointment,
             dedupeKey: $dedupeKey,
         );
+
+        if ($notification) {
+            $this->mirrorToWhatsApp($appointment, [
+                'parameters' => [
+                    $salonName,
+                    $dateLabel,
+                    // A salon with no address on file is allowed, and `address` is
+                    // a nullable column. Sending the null through would have
+                    // AISensy reject the whole message on parameter count and
+                    // type, and would put the literal word "null" in the address
+                    // slot for Meta — so the placeholder is given something that
+                    // reads as an answer rather than a gap.
+                    $appointment->salon?->address ?: 'Address in the app',
+                ],
+            ], 'appointment_reminder');
+        }
+
+        return $notification;
     }
 
     /**
@@ -539,8 +609,20 @@ class NotificationService
     /**
      * Queue the WhatsApp mirror. Never throws: a notification run for a whole
      * day of bookings must not stop because one row failed.
+     *
+     * Queued rather than sent inline, for the same reason [mirrorToPush] is — and
+     * now also because one of these messages carries an invoice PDF, which means
+     * rendering a document and uploading it before the provider can be called.
+     * That is far too slow to hold the caller's transaction open for. Sending it
+     * here is also why this method used to differ from the push mirror, which has
+     * always waited for the commit; SalonClosureService wraps itself in a
+     * transaction and the message row would not exist yet for a worker that
+     * picked the job up in between.
+     *
+     * The row is written now so the outbox has the audit trail even if the
+     * dispatch throws, and the drain command picks up anything left behind.
      */
-    private function mirrorToWhatsApp(Appointment $appointment, array $payload): void
+    private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event): void
     {
         try {
             $phone = $this->phoneFor($appointment);
@@ -552,20 +634,47 @@ class NotificationService
             $message = WhatsAppMessage::create([
                 'user_id' => $appointment->customer_id,
                 'to_phone' => $phone,
-                'template' => config('services.whatsapp.templates.salon_closure', 'salon_closure_reschedule'),
+                'template' => $this->templateFor($event),
                 'payload' => $payload,
                 'related_appointment_id' => $appointment->id,
                 'related_salon_id' => $appointment->salon_id,
                 'status' => WhatsAppMessage::STATUS_QUEUED,
             ]);
 
-            $this->whatsapp->send($message);
+            SendWhatsAppMessageJob::dispatch($message->id)->afterCommit();
         } catch (\Throwable $e) {
             Log::warning('Could not queue WhatsApp notification', [
                 'appointment_id' => $appointment->id,
+                'event' => $event,
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * The provider's template name for an event.
+     *
+     * Read through one method so the event key — the thing this class and the
+     * AISensy campaign config agree on — is translated to a template name in
+     * exactly one place.
+     */
+    private function templateFor(string $event): string
+    {
+        $template = config("services.whatsapp.templates.{$event}");
+
+        return is_string($template) && $template !== '' ? $template : $event;
+    }
+
+    /**
+     * A money amount as it should appear inside a message.
+     *
+     * Same symbol and grouping the in-app notification uses, so a customer who
+     * reads both is not left wondering whether they are two different amounts.
+     */
+    private function currency(float|int|string|null $amount): string
+    {
+        return config('app.currency_symbol', '₹')
+            .number_format((float) $amount, 2);
     }
 
     /*
