@@ -9,6 +9,8 @@ import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../widgets/discovery_salon_card.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 import '../theme/app_colors.dart';
 
 /// Salons that offer a service in one category, in the city the customer picked.
@@ -32,6 +34,9 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   List<Map<String, dynamic>> _salons = [];
   bool _isLoading = true;
   bool _loadFailed = false;
+
+  /// A failed favourite toggle, shown above the list (the heart is put back).
+  String? _actionError;
 
   bool _signedIn = false;
   Set<String> _favouritedIds = {};
@@ -120,6 +125,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       final nowFavourite = await _salonService.toggleFavourite(salonId);
       if (!mounted) return;
       setState(() {
+        _actionError = null;
         nowFavourite
             ? _favouritedIds.add(salonId)
             : _favouritedIds.remove(salonId);
@@ -131,9 +137,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
             ? _favouritedIds.add(salonId)
             : _favouritedIds.remove(salonId);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not update favourite.')),
-      );
+      setState(() => _actionError = 'Could not update your favourites. Please try again.');
     }
   }
 
@@ -327,41 +331,48 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
   Widget _buildPanelBody() {
     if (_isLoading) {
-      return Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            color: AppTheme.accentColor,
+      return SkeletonList(
+        count: 4,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        itemBuilder: (_) => const SalonCardSkeleton(),
+      );
+    }
+
+    if (_loadFailed) {
+      return RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _loadSalons,
+        child: ScrollableState(
+          child: ErrorState(
+            title: 'Could not load salons',
+            onRetry: () {
+              setState(() => _isLoading = true);
+              _loadSalons();
+            },
           ),
         ),
       );
     }
 
-    if (_loadFailed) {
-      return _buildMessage(
-        icon: Icons.wifi_off_rounded,
-        title: 'Could not load salons',
-        detail: 'Check your connection and try again.',
-        actionLabel: 'Retry',
-        onAction: _loadSalons,
-      );
-    }
-
     if (_salons.isEmpty) {
-      return _buildMessage(
-        icon: Icons.search_off_rounded,
-        title: 'No salons found',
-        detail: _isCombo
-            ? 'No salons near ${LocationService.instance.city?.name ?? 'you'} offer combo packages yet.'
-            : 'No salons near ${LocationService.instance.city?.name ?? 'you'} currently offer $_categoryName.',
-        actionLabel: 'Change city',
-        onAction: _pickCity,
+      return RefreshIndicator(
+        color: AppTheme.accentColor,
+        onRefresh: _loadSalons,
+        child: ScrollableState(
+          child: EmptyState(
+            icon: Icons.search_off_rounded,
+            title: 'No salons found',
+            message: _isCombo
+                ? 'No salons near ${LocationService.instance.city?.name ?? 'you'} offer combo packages yet.'
+                : 'No salons near ${LocationService.instance.city?.name ?? 'you'} currently offer $_categoryName.',
+            actionLabel: 'Change city',
+            onAction: _pickCity,
+          ),
+        ),
       );
     }
 
-    return RefreshIndicator(
+    final list = RefreshIndicator(
       color: AppTheme.accentColor,
       onRefresh: _loadSalons,
       child: ListView.separated(
@@ -385,85 +396,19 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
         },
       ),
     );
-  }
 
-  Widget _buildMessage({
-    required IconData icon,
-    required String title,
-    required String detail,
-    required String actionLabel,
-    required Future<void> Function() onAction,
-  }) {
-    final headingColor =
-        context.colors.textPrimary;
-    final bodyColor = context.colors.textSecondary;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: context.colors.accentSoft,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 38,
-                color: AppTheme.accentColor.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: headingColor,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              detail,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 13.5, color: bodyColor),
-            ),
-            const SizedBox(height: 18),
-            OutlinedButton.icon(
-              onPressed: () => onAction(),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(
-                  color: context.colors.listBorder,
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              icon: Icon(
-                actionLabel == 'Retry'
-                    ? Icons.refresh_rounded
-                    : Icons.location_on_outlined,
-                size: 18,
-                color: AppTheme.accentColor,
-              ),
-              label: Text(
-                actionLabel,
-                style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.accentColor,
-                ),
-              ),
-            ),
-          ],
+    if (_actionError == null) return list;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+          child: InlineStatus(
+            message: _actionError!,
+            onDismiss: () => setState(() => _actionError = null),
+          ),
         ),
-      ),
+        Expanded(child: list),
+      ],
     );
   }
 }
