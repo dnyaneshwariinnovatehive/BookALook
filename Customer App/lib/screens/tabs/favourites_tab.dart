@@ -167,6 +167,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                   // Reached from the profile rather than from the footer, so it
                   // carries its own way back.
                   IconButton(
+                    tooltip: 'Back',
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.arrow_back,

@@ -324,6 +324,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           backgroundColor: bgColor,
           elevation: 0,
           leading: IconButton(
+            tooltip: 'Back',
             icon: Icon(Icons.arrow_back, color: headingColor),
             onPressed: () => Navigator.pop(context, _hasChanges),
           ),

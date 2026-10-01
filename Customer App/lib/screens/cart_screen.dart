@@ -244,6 +244,7 @@ class _CartScreenState extends State<CartScreen> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
+              tooltip: 'Back',
               icon: Icon(Icons.arrow_back, color: textHeading, size: 20),
               onPressed: () => Navigator.pop(context),
             ),

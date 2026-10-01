@@ -173,6 +173,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       child: Row(
         children: [
           IconButton(
+            tooltip: 'Back',
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.arrow_back, color: AppTheme.accentColor),
           ),

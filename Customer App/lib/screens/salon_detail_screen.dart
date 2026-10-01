@@ -584,6 +584,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             shape: BoxShape.circle,
           ),
           child: IconButton(
+            tooltip: 'Back',
             icon: Icon(Icons.arrow_back, color: Colors.white, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
@@ -599,6 +600,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
+              tooltip: _isFavourited ? 'Remove from favourites' : 'Add to favourites',
               icon: Icon(_isFavourited ? Icons.favorite : Icons.favorite_border, size: 20),
               color: _isFavourited ? Colors.redAccent : Colors.white,
               onPressed: _toggleFavourite,
@@ -615,6 +617,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
+              tooltip: 'Open cart',
               icon: Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
               onPressed: _openCart,
             ),
