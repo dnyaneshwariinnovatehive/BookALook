@@ -57,6 +57,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color infoBg;
   final Color notesBg;
 
+  /// Soft shadow under cards and docked bars: the text colour at 4% (light)
+  /// or 20% (dark), baked in to match the old withOpacity values exactly.
+  final Color cardShadow;
+
   /// Outline for floating surfaces. Light mode lifts them with a shadow alone;
   /// a shadow does not read on a dark page, so dark mode adds a hairline.
   final Color raisedOutline;
@@ -84,6 +88,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.info,
     required this.infoBg,
     required this.notesBg,
+    required this.cardShadow,
     required this.raisedOutline,
     required this.navIdle,
   });
@@ -108,6 +113,7 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.lightInfo,
     infoBg: AppTheme.lightInfoBg,
     notesBg: AppTheme.lightNotesBg,
+    cardShadow: Color(0x0A1C1726),
     raisedOutline: Color(0x00000000),
     navIdle: Color(0xFF9E98AE),
   );
@@ -132,9 +138,15 @@ class AppColors extends ThemeExtension<AppColors> {
     info: AppTheme.darkInfo,
     infoBg: AppTheme.darkInfoBg,
     notesBg: AppTheme.darkNotesBg,
+    cardShadow: Color(0x33F3F0FA),
     raisedOutline: AppTheme.darkBorder,
     navIdle: AppTheme.darkTextBody,
   );
+
+  /// Whether surfaces separate from the page with an outline rather than a
+  /// shadow. True in dark mode, where a shadow on a near-black page does not
+  /// read. For the few places that choose between a border and a shadow.
+  bool get prefersOutline => raisedOutline.a > 0;
 
   @override
   AppColors copyWith({
@@ -157,6 +169,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? info,
     Color? infoBg,
     Color? notesBg,
+    Color? cardShadow,
     Color? raisedOutline,
     Color? navIdle,
   }) {
@@ -180,6 +193,7 @@ class AppColors extends ThemeExtension<AppColors> {
       info: info ?? this.info,
       infoBg: infoBg ?? this.infoBg,
       notesBg: notesBg ?? this.notesBg,
+      cardShadow: cardShadow ?? this.cardShadow,
       raisedOutline: raisedOutline ?? this.raisedOutline,
       navIdle: navIdle ?? this.navIdle,
     );
@@ -209,6 +223,7 @@ class AppColors extends ThemeExtension<AppColors> {
       info: Color.lerp(info, other.info, t)!,
       infoBg: Color.lerp(infoBg, other.infoBg, t)!,
       notesBg: Color.lerp(notesBg, other.notesBg, t)!,
+      cardShadow: Color.lerp(cardShadow, other.cardShadow, t)!,
       raisedOutline: Color.lerp(raisedOutline, other.raisedOutline, t)!,
       navIdle: Color.lerp(navIdle, other.navIdle, t)!,
     );

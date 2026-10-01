@@ -12,6 +12,7 @@ import '../widgets/cart_offers.dart';
 import '../widgets/initials_avatar.dart';
 import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
+import '../theme/app_colors.dart';
 
 /// Which reviews the inline Ratings & reviews preview is showing.
 enum _ReviewFilter { topRated, five, fourPlus, threePlus }
@@ -298,7 +299,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 AppHaptics.lightImpact();
                 Navigator.pop(ctx);
               },
-              child: Text('Cancel', style: GoogleFonts.outfit(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+              child: Text('Cancel', style: GoogleFonts.outfit(color: context.colors.textSecondary)),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -341,7 +342,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           .join(', ');
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: AppTheme.lightSuccess,
+        backgroundColor: context.colors.success,
         duration: const Duration(seconds: 4),
         content: Text(
           'That completes "$names" — you save ₹${saving.toStringAsFixed(0)}',
@@ -375,7 +376,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             20 + MediaQuery.of(sheetContext).viewInsets.bottom,
           ),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBg : AppTheme.lightBg,
+            color: context.colors.surfaceMuted,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -386,13 +387,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppTheme.lightBorder,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               Text('$label added',
                   style: GoogleFonts.outfit(
-                      fontSize: 15, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                      fontSize: 15, color: context.colors.textSecondary)),
               SizedBox(height: 14),
               ComboOfferCard(
                 offer: offer,
@@ -409,7 +410,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               TextButton(
                 onPressed: () => Navigator.pop(sheetContext),
                 child: Text('No thanks',
-                    style: GoogleFonts.outfit(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                    style: GoogleFonts.outfit(color: context.colors.textSecondary)),
               ),
             ],
           ),
@@ -456,10 +457,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppTheme.darkBg : AppTheme.lightBg;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final bgColor = context.colors.surfaceMuted;
+    final textBody = context.colors.textSecondary;
+    final textLight = context.colors.textTertiary;
 
     if (_isLoading) {
       return Scaffold(
@@ -524,13 +524,12 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _buildAppBar() {
     final gallery = (_salon!['gallery'] as List?) ?? [];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SliverAppBar(
       expandedHeight: 280,
       pinned: true,
-      backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
-      foregroundColor: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+      backgroundColor: context.colors.surface,
+      foregroundColor: context.colors.textPrimary,
       elevation: 0,
       title: Text(_salon!['name'] ?? 'Salon',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -538,7 +537,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
             shape: BoxShape.circle,
           ),
           child: IconButton(
@@ -553,7 +552,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: Container(
             width: 44,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -569,7 +568,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: Container(
             width: 44,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -605,9 +604,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.45),
+                    Colors.black.withValues(alpha: 0.45),
                     Colors.transparent,
-                    Colors.black.withOpacity(0.55),
+                    Colors.black.withValues(alpha: 0.55),
                   ],
                   stops: [0.0, 0.45, 1.0],
                 ),
@@ -642,7 +641,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       width: _galleryPage == i ? 18 : 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(_galleryPage == i ? 1 : 0.5),
+                        color: Colors.white.withValues(alpha: _galleryPage == i ? 1 : 0.5),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -663,13 +662,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             colors: [AppTheme.accentGradientLightEnd, AppTheme.accentGradientEnd],
           ),
         ),
-        child: Center(child: Icon(Icons.storefront, size: 90, color: Colors.white.withOpacity(0.45))),
+        child: Center(child: Icon(Icons.storefront, size: 90, color: Colors.white.withValues(alpha: 0.45))),
       );
 
   Widget _glassChip(String text) => Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(text,
@@ -687,7 +686,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: count > 0 ? AppTheme.lightSuccess : Colors.black.withOpacity(0.45),
+          color: count > 0 ? context.colors.success : Colors.black.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -726,7 +725,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         children: [
           Text(_salon!['name'] ?? 'Salon',
               style: GoogleFonts.outfit(
-                  fontSize: 22, fontWeight: FontWeight.bold, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                  fontSize: 22, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
           SizedBox(height: 10),
 
           Row(
@@ -735,7 +734,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isOpen ? AppTheme.lightSuccess : AppTheme.lightDanger,
+                  color: isOpen ? context.colors.success : context.colors.danger,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -746,7 +745,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isOpen ? AppTheme.lightSuccess : AppTheme.lightDanger,
+                    color: isOpen ? context.colors.success : context.colors.danger,
                   ),
                 ),
               ),
@@ -758,11 +757,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.location_on_outlined, size: 18, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
+                Icon(Icons.location_on_outlined, size: 18, color: context.colors.textSecondary),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(address,
-                      style: GoogleFonts.outfit(fontSize: 14, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                      style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
                 ),
               ],
             ),
@@ -773,7 +772,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           if ((_salon!['description'] ?? '').toString().isNotEmpty) ...[
             SizedBox(height: 14),
             Text(_salon!['description'],
-                style: GoogleFonts.outfit(fontSize: 14, height: 1.5, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                style: GoogleFonts.outfit(fontSize: 14, height: 1.5, color: context.colors.textSecondary)),
           ],
 
           SizedBox(height: 16),
@@ -802,15 +801,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _statTile(IconData icon, String value, String label) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Icon(icon, size: 20, color: AppTheme.accentColor),
         SizedBox(height: 6),
         Text(value,
             style: GoogleFonts.outfit(
-                fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight)),
+                fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary)),
       ],
     );
   }
@@ -825,8 +823,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         if (!_isBookable)
           _noticeBox(
             icon: Icons.event_busy,
-            color: AppTheme.lightDanger,
-            background: AppTheme.lightDangerBg,
+            color: context.colors.danger,
+            background: context.colors.dangerBg,
             title: 'Temporarily unavailable',
             body: _salon!['unavailable_reason'] ??
                 'This salon is not accepting online bookings right now.',
@@ -834,8 +832,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         if (closures.isNotEmpty)
           _noticeBox(
             icon: Icons.info_outline,
-            color: AppTheme.lightWarning,
-            background: AppTheme.lightWarningBg,
+            color: context.colors.warning,
+            background: context.colors.warningBg,
             title: 'Closed on ${closures.map((c) => c['label']).join(', ')}',
             body: 'Pick another date for these days when you book.',
           ),
@@ -895,7 +893,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           leading: Icon(Icons.schedule, color: AppTheme.accentColor),
           title: Text('Opening hours',
               style: GoogleFonts.outfit(
-                  fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                  fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
           children: week.map<Widget>((day) {
             final isToday = day['is_today'] == true;
             final closed = day['is_closed'] == true;
@@ -909,7 +907,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                        color: isToday ? AppTheme.accentColor : AppTheme.lightTextBody,
+                        color: isToday ? AppTheme.accentColor : context.colors.textSecondary,
                       )),
                   Text(
                     closed ? 'Closed' : '${day['open_time']} – ${day['close_time']}',
@@ -917,8 +915,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       fontSize: 14,
                       fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                       color: closed
-                          ? AppTheme.lightTextLight
-                          : (isToday ? AppTheme.accentColor : AppTheme.lightTextHeading),
+                          ? context.colors.textTertiary
+                          : (isToday ? AppTheme.accentColor : context.colors.textPrimary),
                     ),
                   ),
                 ],
@@ -957,13 +955,12 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Widget _comboCard(Map<String, dynamic> combo) {
     final savings = _toDouble(combo['savings']);
     final lines = (combo['services'] as List?) ?? [];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    final bgColor = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
-    final borderColor = isDark ? AppTheme.darkAccentSoftHover : AppTheme.lightAccentSoftHover;
-    final textHeading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final textBody = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final textLight = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
+    final bgColor = context.colors.accentSoft;
+    final borderColor = context.colors.accentSoftHover;
+    final textHeading = context.colors.textPrimary;
+    final textBody = context.colors.textSecondary;
+    final textLight = context.colors.textTertiary;
 
     return Container(
       width: 280,
@@ -989,7 +986,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppTheme.lightSuccess,
+                    color: context.colors.success,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text('SAVE ₹${savings.toStringAsFixed(0)}',
@@ -1065,7 +1062,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Widget _buildCategoryTabs() {
     final categories = (_salon!['categories'] as List?) ?? [];
     final allCount = (_salon!['services'] as List?)?.length ?? 0;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (allCount == 0) return _sectionHeader('Services', 'Nothing published yet');
 
@@ -1090,7 +1086,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               final isSelected = _selectedCategoryId == tab['id'];
               final textColor = isSelected 
                   ? AppTheme.accentColor 
-                  : (isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody);
+                  : (context.colors.textSecondary);
 
               return GestureDetector(
                 onTap: () => setState(() => _selectedCategoryId = tab['id'] as String?),
@@ -1139,7 +1135,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Center(
             child: Text('No services in this category.',
-                style: GoogleFonts.outfit(color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight)),
+                style: GoogleFonts.outfit(color: context.colors.textTertiary)),
           ),
         ),
       );
@@ -1160,7 +1156,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final hasStaff = (service['provider_count'] ?? 0) > 0;
     final canAdd = _isBookable && hasStaff;
     final description = (service['description'] ?? '').toString();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Highlight came-from-category service: matched on the real template_id so
     // the salon + service relationship stays exact, never a name guess.
@@ -1183,9 +1178,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withOpacity(0.12),
+                  color: AppTheme.accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppTheme.accentColor.withOpacity(0.35)),
+                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.35)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1210,7 +1205,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+                    color: context.colors.accentSoft,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(Icons.spa_outlined, color: AppTheme.accentColor, size: 28),
@@ -1224,7 +1219,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                           style: GoogleFonts.outfit(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                              color: context.colors.textPrimary)),
                       SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -1248,17 +1243,17 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               SizedBox(height: 16),
               Text(description,
                   style: GoogleFonts.outfit(
-                      fontSize: 14, height: 1.5, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                      fontSize: 14, height: 1.5, color: context.colors.textSecondary)),
             ],
 
             if (!hasStaff) ...[
               SizedBox(height: 12),
               Text('No staff available for this service right now',
-                  style: GoogleFonts.outfit(fontSize: 13, color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger)),
+                  style: GoogleFonts.outfit(fontSize: 13, color: context.colors.danger)),
             ],
 
             SizedBox(height: 16),
-            Divider(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder, height: 1),
+            Divider(color: context.colors.border, height: 1),
             SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1282,26 +1277,24 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _metaChip(IconData icon, String text) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+        color: context.colors.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody),
+          Icon(icon, size: 14, color: context.colors.textSecondary),
           SizedBox(width: 6),
-          Text(text, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+          Text(text, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: context.colors.textSecondary)),
         ],
       ),
     );
   }
 
   Widget _addButton({required bool enabled, required VoidCallback onTap}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ElevatedButton.icon(
       onPressed: enabled ? onTap : null,
       icon: Icon(Icons.add, size: 18),
@@ -1309,8 +1302,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.accentColor,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-        disabledForegroundColor: isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+        disabledBackgroundColor: context.colors.border,
+        disabledForegroundColor: context.colors.textTertiary,
         elevation: 0,
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1347,7 +1340,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundColor: AppTheme.lightAccentSoft,
+                      backgroundColor: context.colors.accentSoft,
                       child: Text(
                         InitialsAvatar.initialsOf(name),
                         style: GoogleFonts.outfit(
@@ -1361,13 +1354,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                            color: context.colors.textPrimary)),
                     SizedBox(height: 2),
                     Text(
                       member['specialization'] ?? '${member['service_count']} services',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 11, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight),
+                      style: GoogleFonts.outfit(fontSize: 11, color: context.colors.textTertiary),
                     ),
                   ],
                 ),
@@ -1461,7 +1454,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.accentColor,
                   padding: EdgeInsets.symmetric(vertical: 13),
-                  side: BorderSide(color: AppTheme.lightBorder),
+                  side: BorderSide(color: context.colors.border),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Text(
@@ -1477,10 +1470,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _buildReviewFilterCapsules() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final idleBg = isDark ? AppTheme.darkSurface : Colors.white;
-    final idleText = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final borderColor = context.colors.border;
+    final idleBg = context.colors.surface;
+    final idleText = context.colors.textSecondary;
 
     Widget pill(_ReviewFilter filter, String label) {
       final selected = _reviewFilter == filter;
@@ -1526,15 +1518,13 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _buildNoFilteredReviews() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+        border: Border.all(color: context.colors.border),
       ),
       child: Text(
         'No reviews found',
@@ -1542,7 +1532,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         style: GoogleFonts.outfit(
           fontSize: 13.5,
           fontWeight: FontWeight.w600,
-          color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+          color: context.colors.textSecondary,
         ),
       ),
     );
@@ -1598,16 +1588,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       count = (summary['item_count'] ?? count) as int;
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.colors;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        border: isDark ? Border(top: BorderSide(color: AppTheme.darkBorder)) : null,
+        border: colors.prefersOutline ? Border(top: BorderSide(color: colors.raisedOutline)) : null,
         boxShadow: [
-          if (!isDark)
-            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05), offset: Offset(0, -4), blurRadius: 20),
+          if (!colors.prefersOutline)
+            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), offset: Offset(0, -4), blurRadius: 20),
         ],
       ),
       child: SafeArea(
@@ -1620,7 +1610,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('$count ${count == 1 ? 'item' : 'items'}',
-                    style: GoogleFonts.outfit(fontSize: 12, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextBody : AppTheme.lightTextBody)),
+                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary)),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -1628,7 +1618,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         style: GoogleFonts.outfit(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                            color: context.colors.textPrimary)),
                     if (saving > 0) ...[
                       SizedBox(width: 6),
                       Padding(
@@ -1636,7 +1626,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         child: Text('₹${listTotal.toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(
                               fontSize: 13,
-                              color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight,
+                              color: context.colors.textTertiary,
                               decoration: TextDecoration.lineThrough,
                             )),
                       ),
@@ -1648,7 +1638,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.lightSuccess)),
+                          color: context.colors.success)),
               ],
             ),
             ElevatedButton.icon(
@@ -1679,34 +1669,33 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           children: [
             Text(title,
                 style: GoogleFonts.outfit(
-                    fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading)),
+                    fontSize: 20, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
             if (subtitle != null) ...[
               SizedBox(height: 2),
               Text(subtitle,
-                  style: GoogleFonts.outfit(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkTextLight : AppTheme.lightTextLight)),
+                  style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textTertiary)),
             ],
           ],
         ),
       );
 
   BoxDecoration _cardDecoration({bool accentBorder = false}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(24),
       border: accentBorder
           ? Border.all(color: AppTheme.accentColor, width: 1.8)
-          : Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+          : Border.all(color: context.colors.border),
       boxShadow: accentBorder
           ? [
               BoxShadow(
-                color: AppTheme.accentColor.withOpacity(0.18),
+                color: AppTheme.accentColor.withValues(alpha: 0.18),
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ]
           : [
-              BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.04), blurRadius: 16, offset: Offset(0, 4)),
+              BoxShadow(color: context.colors.cardShadow, blurRadius: 16, offset: Offset(0, 4)),
             ],
     );
   }
