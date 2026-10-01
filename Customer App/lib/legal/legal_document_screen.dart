@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import 'legal_documents.dart';
+import '../theme/app_colors.dart';
 
 /// Read-only view of one of the policy documents in `legal_documents.dart`.
 ///
@@ -29,7 +30,7 @@ class LegalDocumentScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             child: Text(
               'That document could not be found.',
-              style: GoogleFonts.outfit(color: AppTheme.lightTextBody),
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
             ),
           ),
         ),
@@ -56,10 +57,9 @@ class LegalDocumentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
-    final border = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final heading = context.colors.textPrimary;
+    final body = context.colors.textSecondary;
+    final border = context.colors.border;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
@@ -178,7 +178,7 @@ class LegalDocumentBody extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: body.withOpacity(0.05),
+        color: body.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: border),
       ),
@@ -234,9 +234,8 @@ class LegalDocumentTile extends StatelessWidget {
     final doc = legalDocumentBySlug(slug);
     if (doc == null) return const SizedBox.shrink();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
-    final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
+    final heading = context.colors.textPrimary;
+    final body = context.colors.textSecondary;
 
     // When [onTap] is given the row is a switcher, not a link, and a check mark
     // says which document is on screen. Left to itself it navigates.
@@ -249,12 +248,12 @@ class LegalDocumentTile extends StatelessWidget {
             MaterialPageRoute(builder: (_) => LegalDocumentScreen(slug: slug)),
           ),
       child: Container(
-        color: selected ? AppTheme.accentColor.withOpacity(0.08) : null,
+        color: selected ? AppTheme.accentColor.withValues(alpha: 0.08) : null,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 20, color: heading.withOpacity(0.7)),
+              Icon(icon, size: 20, color: heading.withValues(alpha: 0.7)),
               const SizedBox(width: 14),
             ],
             Expanded(
@@ -278,7 +277,7 @@ class LegalDocumentTile extends StatelessWidget {
             Icon(
               isSwitcher ? (selected ? Icons.radio_button_checked : Icons.radio_button_unchecked) : Icons.chevron_right,
               size: 20,
-              color: selected ? AppTheme.accentColor : body.withOpacity(0.6),
+              color: selected ? AppTheme.accentColor : body.withValues(alpha: 0.6),
             ),
           ],
         ),
