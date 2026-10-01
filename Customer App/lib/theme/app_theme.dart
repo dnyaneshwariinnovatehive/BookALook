@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'app_colors.dart';
+
 class AppTheme {
   // Brand Colors
   static const Color accentColor = Color(0xFF9C54F2);
@@ -74,6 +76,7 @@ class AppTheme {
 
   static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
+    extensions: const [AppColors.light],
     scaffoldBackgroundColor: lightBg,
     primaryColor: accentColor,
     dividerColor: lightBorder,
@@ -162,6 +165,7 @@ class AppTheme {
 
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
+    extensions: const [AppColors.dark],
     scaffoldBackgroundColor: darkBg,
     primaryColor: accentColor,
     dividerColor: darkBorder,
