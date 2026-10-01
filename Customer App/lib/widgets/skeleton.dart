@@ -208,6 +208,45 @@ class SalonCardSkeleton extends StatelessWidget {
   }
 }
 
+/// The shape of the compact salon row on the search-results list: 16px
+/// padding, radius 16, an 80x80 tile and two lines beside it.
+class CompactSalonCardSkeleton extends StatelessWidget {
+  const CompactSalonCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: const Row(
+          children: [
+            SkeletonBox(width: 80, height: 80, radius: 12),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonLine(widthFactor: 0.7, height: 16),
+                  SizedBox(height: 10),
+                  SkeletonLine(widthFactor: 0.9),
+                  SizedBox(height: 10),
+                  SkeletonLine(widthFactor: 0.3),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The shape of a booking card on My Bookings: radius 26, a thumbnail and two
 /// lines of salon detail, the date row, and the action buttons.
 class BookingCardSkeleton extends StatelessWidget {

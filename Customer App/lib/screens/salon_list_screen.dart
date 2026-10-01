@@ -6,6 +6,9 @@ import '../widgets/city_picker_sheet.dart';
 import '../services/salon_service.dart';
 import 'salon_detail_screen.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_text.dart';
+import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 class SalonListScreen extends StatefulWidget {
   final String? initialSearch;
@@ -45,14 +48,17 @@ class _SalonListScreenState extends State<SalonListScreen> {
         gender: widget.initialGender,
         categoryId: widget.initialCategoryId,
       );
+      if (!mounted) return;
       setState(() {
         _salons = response['salons'] ?? [];
         _suggestedSalons = response['suggested_salons'] ?? [];
+        _error = '';
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = describeError(e, fallback: 'We could not load salons.');
         _isLoading = false;
       });
     }
@@ -66,18 +72,40 @@ class _SalonListScreenState extends State<SalonListScreen> {
         centerTitle: true,
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
-          : _error.isNotEmpty
-              ? Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)))
-              : _salons.isEmpty
-                  ? _buildEmptyOrSuggestions()
-                  : ListView.separated(
-                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                      itemCount: _salons.length,
-                      separatorBuilder: (context, index) => SizedBox(height: 16),
-                      itemBuilder: (context, index) => _buildSalonItem(_salons[index]),
-                    ),
+          ? SkeletonList(
+              padding: const EdgeInsets.all(20),
+              itemBuilder: (_) => const CompactSalonCardSkeleton(),
+            )
+          // Prices and availability change while someone browses; pulling
+          // down is the obvious way to ask for the latest.
+          : RefreshIndicator(
+              color: AppTheme.accentColor,
+              onRefresh: _loadSalons,
+              child: _error.isNotEmpty
+                  ? ScrollableState(
+                      child: ErrorState(
+                        title: 'Could not load salons',
+                        message: _error,
+                        onRetry: _retry,
+                      ),
+                    )
+                  : _salons.isEmpty
+                      ? _buildEmptyOrSuggestions()
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          itemCount: _salons.length,
+                          separatorBuilder: (context, index) => SizedBox(height: 16),
+                          itemBuilder: (context, index) => _buildSalonItem(_salons[index]),
+                        ),
+            ),
     );
+  }
+
+  /// Back to the skeleton, then reload: a retry should look like one.
+  void _retry() {
+    setState(() => _isLoading = true);
+    _loadSalons();
   }
 
   Widget _buildEmptyOrSuggestions() {
@@ -103,6 +131,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
           ),
           Expanded(
             child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               itemCount: _suggestedSalons.length,
               separatorBuilder: (context, index) => SizedBox(height: 16),
@@ -116,42 +145,18 @@ class _SalonListScreenState extends State<SalonListScreen> {
     // Naming the city matters here: searching is city-scoped, so "nothing
     // found" without it reads as "this salon does not exist" rather than
     // "not in the city you are looking at".
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(
-              LocationService.instance.hasCity
-                  ? 'No salons found in ${LocationService.instance.city!.name}.'
-                  : 'No salons found.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                  color: context.colors.textPrimary, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Try a different search, or change your city.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: context.colors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextButton.icon(
-              onPressed: () async {
-                final changed = await showCityPicker(context);
-                if (changed && mounted) {
-                  setState(() => _isLoading = true);
-                  _loadSalons();
-                }
-              },
-              icon: const Icon(Icons.location_on, size: 18),
-              label: const Text('Change city'),
-            ),
-          ],
-        ),
+    return ScrollableState(
+      child: EmptyState(
+        icon: Icons.search_off,
+        title: LocationService.instance.hasCity
+            ? 'No salons found in ${LocationService.instance.city!.name}.'
+            : 'No salons found.',
+        message: 'Try a different search, or change your city.',
+        actionLabel: 'Change city',
+        onAction: () async {
+          final changed = await showCityPicker(context);
+          if (changed && mounted) _retry();
+        },
       ),
     );
   }
