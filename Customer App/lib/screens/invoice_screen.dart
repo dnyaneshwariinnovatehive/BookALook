@@ -9,6 +9,7 @@ import '../services/invoice_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
+import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 
 /// Shows a booking's invoice on screen and lets the customer keep a copy.
@@ -262,7 +263,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   Widget _buildDocument() {
     return Stack(
       children: [
-        WebViewWidget(controller: _controller),
+        // The PDF fills the page, but the last of it has to stay readable: the
+        // system navigation bar sits on top of whatever the WebView paints.
+        Padding(
+          padding: EdgeInsets.only(bottom: bottomClearance(context)),
+          child: WebViewWidget(controller: _controller),
+        ),
         if (_isLoading)
           Center(
             child: CircularProgressIndicator(color: AppTheme.accentColor),

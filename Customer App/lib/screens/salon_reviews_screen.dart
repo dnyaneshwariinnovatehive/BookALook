@@ -5,6 +5,7 @@ import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/rating_bars.dart';
 import '../theme/app_colors.dart';
+import '../utils/bottom_clearance.dart';
 
 /// Every review a salon has, with the two filters a reader actually wants.
 ///
@@ -136,7 +137,7 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
                   onRefresh: () => _load(reset: true),
                   child: ListView(
                     controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, bottomClearance(context)),
                     children: [
                       RatingSummaryCard(
                         summary: _summary ?? const {},

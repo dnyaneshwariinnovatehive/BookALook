@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import 'reschedule_screen.dart';
 import '../theme/app_colors.dart';
+import '../utils/bottom_clearance.dart';
 
 /// The customer's message inbox. A salon-closure notice is actionable: tapping
 /// it goes straight to picking a new slot.
@@ -100,7 +101,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       onRefresh: _load,
                       child: ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          16 + bottomClearance(context),
+                        ),
                         itemCount: _notifications.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) =>

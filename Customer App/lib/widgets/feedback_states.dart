@@ -242,23 +242,30 @@ class _CentredState extends StatelessWidget {
 /// Wraps a centred state so it can sit inside a RefreshIndicator: the
 /// indicator needs a scrollable child even when there is nothing to scroll,
 /// or pulling down does nothing on an error or empty screen.
-class ScrollableState extends StatelessWidget {
-  const ScrollableState({super.key, required this.child, this.bottomInset = 0});
+class ScrollableStateView extends StatelessWidget {
+  const ScrollableStateView({super.key, required this.child, this.bottomInset});
 
   final Widget child;
 
   /// Extra space at the bottom, e.g. for the floating navigation pill.
-  final double bottomInset;
+  ///
+  /// Left null, the space is whatever is below the view: the system navigation
+  /// bar, or the shell's nav pill on a page that has not already been wrapped in
+  /// a SafeArea. A state that overflows at a large text scale can then be
+  /// scrolled clear of it rather than ending flush against it.
+  final double? bottomInset;
 
   @override
   Widget build(BuildContext context) {
+    final inset = bottomInset ?? MediaQuery.paddingOf(context).bottom;
+
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(bottom: bottomInset),
+        padding: EdgeInsets.only(bottom: inset),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: (constraints.maxHeight - bottomInset).clamp(0, double.infinity),
+            minHeight: (constraints.maxHeight - inset).clamp(0, double.infinity),
           ),
           child: child,
         ),

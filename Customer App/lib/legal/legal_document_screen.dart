@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import 'legal_documents.dart';
 import '../theme/app_colors.dart';
+import '../utils/bottom_clearance.dart';
 
 /// Read-only view of one of the policy documents in `legal_documents.dart`.
 ///
@@ -62,7 +63,7 @@ class LegalDocumentBody extends StatelessWidget {
     final border = context.colors.border;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, bottomClearance(context, gap: 16)),
       children: [
         Text(
           doc.kicker.toUpperCase(),

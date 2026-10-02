@@ -12,6 +12,7 @@ import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
+import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
@@ -731,7 +732,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
               if (!widget.isUpcoming) ..._buildReviewSection(headingColor, bodyColor),
               
-              SizedBox(height: 40),
+              SizedBox(height: bottomClearance(context, gap: 16)),
             ],
           ),
         ),

@@ -14,6 +14,7 @@ import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
+import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 
@@ -369,19 +370,19 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   /// A near-miss package, shown as a sheet so the missing services can be added
   /// without leaving the salon page.
+  ///
+  /// On the root navigator, so it sits over the navigation pill rather than
+  /// behind it: this sheet's whole job is to be read and acted on, and the pill
+  /// is still there the moment it is dismissed.
   void _showComboOfferSheet(Map<String, dynamic> offer, String label) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            12,
-            20,
-            20 + MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + sheetBottomInset(sheetContext)),
           decoration: BoxDecoration(
             color: context.colors.surfaceMuted,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

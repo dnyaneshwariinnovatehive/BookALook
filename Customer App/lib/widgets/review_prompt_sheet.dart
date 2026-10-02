@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
+import '../utils/bottom_clearance.dart';
 
 /// Asks a customer how their visit went, the moment they next open the app.
 ///
@@ -124,7 +125,7 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
       child: Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
         decoration: BoxDecoration(

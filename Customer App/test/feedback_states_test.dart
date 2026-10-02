@@ -103,12 +103,12 @@ void main() {
     });
   });
 
-  group('ScrollableState', () {
+  group('ScrollableStateView', () {
     testWidgets('lets pull-to-refresh work on an empty screen', (tester) async {
       var refreshes = 0;
       await tester.pumpWidget(_app(RefreshIndicator(
         onRefresh: () async => refreshes++,
-        child: const ScrollableState(
+        child: const ScrollableStateView(
           child: EmptyState(icon: Icons.inbox, title: 'Nothing here'),
         ),
       )));

@@ -7,6 +7,7 @@ import '../services/salon_service.dart';
 import 'salon_detail_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
+import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 
@@ -73,7 +74,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
       ),
       body: _isLoading
           ? SkeletonList(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, bottomClearance(context)),
               itemBuilder: (_) => const CompactSalonCardSkeleton(),
             )
           // Prices and availability change while someone browses; pulling
@@ -82,7 +83,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
               color: AppTheme.accentColor,
               onRefresh: _loadSalons,
               child: _error.isNotEmpty
-                  ? ScrollableState(
+                  ? ScrollableStateView(
                       child: ErrorState(
                         title: 'Could not load salons',
                         message: _error,
@@ -93,7 +94,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
                       ? _buildEmptyOrSuggestions()
                       : ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+padding: EdgeInsets.fromLTRB(20, 20, 20, bottomClearance(context)),
                           itemCount: _salons.length,
                           separatorBuilder: (context, index) => SizedBox(height: 16),
                           itemBuilder: (context, index) => _buildSalonItem(_salons[index]),
@@ -132,7 +133,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
           Expanded(
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              padding: EdgeInsets.fromLTRB(20, 20, 20, bottomClearance(context)),
               itemCount: _suggestedSalons.length,
               separatorBuilder: (context, index) => SizedBox(height: 16),
               itemBuilder: (context, index) => _buildSalonItem(_suggestedSalons[index]),
@@ -145,7 +146,7 @@ class _SalonListScreenState extends State<SalonListScreen> {
     // Naming the city matters here: searching is city-scoped, so "nothing
     // found" without it reads as "this salon does not exist" rather than
     // "not in the city you are looking at".
-    return ScrollableState(
+    return ScrollableStateView(
       child: EmptyState(
         icon: Icons.search_off,
         title: LocationService.instance.hasCity

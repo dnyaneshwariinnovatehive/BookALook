@@ -112,7 +112,7 @@ class FavouritesTabState extends State<FavouritesTab> {
             ? Skeleton(
                 child: GridView.builder(
                   physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                  padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context)),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
@@ -135,7 +135,8 @@ class FavouritesTabState extends State<FavouritesTab> {
             : RefreshIndicator(
                 color: AppTheme.accentColor,
                 onRefresh: _loadFavourites,
-                child: ScrollableState(
+                child: ScrollableStateView(
+                  bottomInset: bottomClearance(context),
                   child: ErrorState(
                     title: 'Could not load your favourites',
                     message: _error,

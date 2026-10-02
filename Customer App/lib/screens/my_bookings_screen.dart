@@ -535,7 +535,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
   Widget _buildError() => RefreshIndicator(
     color: AppTheme.accentColor,
     onRefresh: _loadBookings,
-    child: ScrollableState(
+    child: ScrollableStateView(
       bottomInset: bottomClearance(context),
       child: ErrorState(
         title: 'Could not load your bookings',
@@ -555,7 +555,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadBookings,
-        child: ScrollableState(
+        child: ScrollableStateView(
           bottomInset: bottomClearance(context),
           child: isUpcoming
               ? EmptyState(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/bottom_clearance.dart';
 import 'feedback_states.dart';
 
 /// Where the customer chooses which city they are shopping in.
@@ -13,6 +14,9 @@ Future<bool> showCityPicker(BuildContext context) async {
   final changed = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    // Over the navigation pill, not behind it: the city list runs to the bottom
+    // of the sheet and the last rows have to stay tappable.
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     builder: (_) => const _CityPickerSheet(),
   );
@@ -235,7 +239,7 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
 
     return ListView.separated(
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: EdgeInsets.fromLTRB(12, 0, 12, 24 + sheetBottomInset(context)),
       itemCount: cities.length,
       separatorBuilder: (context, index) => const Divider(height: 1, indent: 60),
       itemBuilder: (context, i) {

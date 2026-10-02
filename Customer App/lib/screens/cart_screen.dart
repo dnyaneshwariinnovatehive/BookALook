@@ -264,7 +264,7 @@ class _CartScreenState extends State<CartScreen> {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadCart,
-        child: ScrollableState(
+        child: ScrollableStateView(
           child: ErrorState(
             title: 'Could not load your cart',
             message: _error,

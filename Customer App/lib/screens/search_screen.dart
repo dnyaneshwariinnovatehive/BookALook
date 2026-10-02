@@ -8,12 +8,13 @@ import '../theme/app_theme.dart';
 import 'salon_detail_screen.dart';
 import 'category_salons_screen.dart';
 import '../theme/app_colors.dart';
+import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 
 /// Search, answered the way a customer asks it.
 ///
-/// People search for what they want done, not for who does it — "haircut", not
+/// People search for what they want done, not for who does it â€” "haircut", not
 /// the name of a salon three streets away they have never heard of. So a
 /// service match leads the results and carries its salon with it: the price,
 /// the rating and where it is, all on the one row, so the choice can be made
@@ -217,7 +218,7 @@ class _SearchScreenState extends State<SearchScreen> {
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'Search haircut, facial, salon…',
+                hintText: 'Search haircut, facial, salonâ€¦',
                 hintStyle: TextStyle(
                   fontSize: 14.5,
                   color: context.colors.textTertiary,
@@ -247,7 +248,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _rerun,
-        child: ScrollableState(
+        child: ScrollableStateView(
           child: ErrorState(title: 'Could not search', message: _error!, onRetry: _rerun),
         ),
       );
@@ -264,7 +265,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_searching && _results == null) {
       return SkeletonList(
         count: 6,
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        padding: EdgeInsets.fromLTRB(20, 12, 20, bottomClearance(context)),
         itemBuilder: (_) => const ResultRowSkeleton(),
       );
     }
@@ -276,7 +277,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _rerun,
-        child: ScrollableState(
+        child: ScrollableStateView(
           child: EmptyState(
             icon: Icons.search_off,
             title: 'Nothing found for "${_controller.text.trim()}"',
@@ -293,7 +294,7 @@ class _SearchScreenState extends State<SearchScreen> {
       onRefresh: _rerun,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 28),
+        padding: EdgeInsets.only(bottom: bottomClearance(context)),
         children: [
           // Shown above the results rather than instead of them: the customer's
           // spelling may well have been right, so the results stay and the
@@ -324,7 +325,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// The current query, again — for retry and pull-to-refresh.
+  /// The current query, again â€” for retry and pull-to-refresh.
   Future<void> _rerun() => _run(_controller.text);
 
   Widget _didYouMean(String suggestion) => Padding(
@@ -446,7 +447,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     Row(
                       children: [
                         Text(
-                          '₹${hit.price.toStringAsFixed(0)}',
+                          'â‚¹${hit.price.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -454,7 +455,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                         ),
                         if (hit.durationMinutes > 0) ...[
-                          Text(' · ${hit.durationMinutes} min',
+                          Text(' Â· ${hit.durationMinutes} min',
                               style: TextStyle(
                                   fontSize: 12.5,
                                   color: context.colors.textSecondary)),
@@ -563,7 +564,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   fontSize: 12.5,
                                   color: context.colors.textTertiary)),
                         if (hit.area != null) ...[
-                          Text(' · ${hit.area}',
+                          Text(' Â· ${hit.area}',
                               style: TextStyle(
                                   fontSize: 12.5,
                                   color: context.colors.textSecondary)),

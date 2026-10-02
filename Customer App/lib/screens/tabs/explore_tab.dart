@@ -225,7 +225,7 @@ class ExploreTabState extends State<ExploreTab> {
           child: RefreshIndicator(
             color: AppTheme.accentColor,
             onRefresh: _loadSalons,
-            child: ScrollableState(
+            child: ScrollableStateView(
               bottomInset: bottomClearance(context),
               child: ErrorState(
                 title: 'Could not load salons',

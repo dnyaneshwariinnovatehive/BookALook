@@ -343,7 +343,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadSalons,
-        child: ScrollableState(
+        child: ScrollableStateView(
           child: ErrorState(
             title: 'Could not load salons',
             onRetry: () {
@@ -359,7 +359,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadSalons,
-        child: ScrollableState(
+        child: ScrollableStateView(
           child: EmptyState(
             icon: Icons.search_off_rounded,
             title: 'No salons found',
