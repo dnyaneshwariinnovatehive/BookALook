@@ -106,8 +106,27 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         providerId: _selectedProviderKey,
       );
 
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final isToday = dateStr == todayStr;
+      final nowTime = TimeOfDay.now();
+
+      final processedSlots = (data['slots'] as List? ?? []).where((slot) {
+        if (isToday) {
+           final timeStr = slot['time'] as String;
+           final parts = timeStr.split(':');
+           if (parts.length >= 2) {
+             final hour = int.tryParse(parts[0]) ?? 0;
+             final minute = int.tryParse(parts[1]) ?? 0;
+             if (hour < nowTime.hour || (hour == nowTime.hour && minute <= nowTime.minute)) {
+                return false;
+             }
+           }
+        }
+        return true;
+      }).toList();
+
       setState(() {
-        _slots = data['slots'] ?? [];
+        _slots = processedSlots;
         _isClosed = data['closed'] == true;
         _closedReason = data['closed_reason'];
         _isLoadingSlots = false;
@@ -647,7 +666,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       AppHaptics.error();
                       setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
                     },
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 width: (MediaQuery.of(context).size.width - 64) / 3,
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
@@ -658,13 +679,22 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           : context.colors.border,
                   border: Border.all(color: isSelected ? AppTheme.accentColor : context.colors.border),
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.accentColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : [],
                 ),
                 child: Center(
-                  child: Text(
-                    slot['time'],
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
                     style: GoogleFonts.outfit(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                       color: isSelected
                           ? Colors.white
                           : isAvailable
@@ -672,6 +702,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                               : context.colors.textTertiary,
                       decoration: isAvailable ? TextDecoration.none : TextDecoration.lineThrough,
                     ),
+                    child: Text(slot['time']),
                   ),
                 ),
               ),

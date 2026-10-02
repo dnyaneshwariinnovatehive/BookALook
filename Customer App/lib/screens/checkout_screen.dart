@@ -145,23 +145,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final isToday = dateStr == todayStr;
       final nowTime = TimeOfDay.now();
 
-      final processedSlots = (data['slots'] as List? ?? []).map((slot) {
-        if (slot['available'] == true && isToday) {
+      final processedSlots = (data['slots'] as List? ?? []).where((slot) {
+        if (isToday) {
            final timeStr = slot['time'] as String;
            final parts = timeStr.split(':');
            if (parts.length >= 2) {
              final hour = int.tryParse(parts[0]) ?? 0;
              final minute = int.tryParse(parts[1]) ?? 0;
              if (hour < nowTime.hour || (hour == nowTime.hour && minute <= nowTime.minute)) {
-                return {
-                  ...slot as Map<String, dynamic>,
-                  'available': false,
-                  'reason': 'past',
-                };
+                return false;
              }
            }
         }
-        return slot;
+        return true;
       }).toList();
 
       setState(() {
@@ -799,25 +795,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       AppHaptics.error();
                       setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
                     },
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 width: (MediaQuery.of(context).size.width - 64) / 3,
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: background,
                   border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.accentColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : [],
                 ),
                 child: Center(
-                  child: Text(
-                    slot['time'],
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
                     style: GoogleFonts.outfit(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                       color: textColor,
                       decoration: isAvailable || isOccupied
                           ? TextDecoration.none
                           : TextDecoration.lineThrough,
                     ),
+                    child: Text(slot['time']),
                   ),
                 ),
               ),

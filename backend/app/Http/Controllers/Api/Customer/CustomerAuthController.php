@@ -228,4 +228,35 @@ class CustomerAuthController extends Controller
             'fav_salons_count' => $user->favouriteSalons()->count(),
         ]);
     }
+
+    /**
+     * Delete the customer account.
+     * Anonymizes PII to allow future re-registration while maintaining structural
+     * integrity for financial records (appointments, payments).
+     */
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+
+        // 1. Revoke all active sessions/tokens
+        $user->tokens()->delete();
+
+        // 2. Anonymize PII. Phone is limited to 15 chars, so 'del_' + 11 random chars = 15
+        $user->update([
+            'name' => 'Deleted User',
+            'phone' => 'del_' . str()->random(11),
+            'email' => $user->email ? 'del_' . str()->random(10) . '@example.com' : null,
+            'address' => null,
+            'pincode' => null,
+            'date_of_birth' => null,
+            'is_active' => false,
+        ]);
+
+        // 3. Soft delete the user
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Account deleted successfully.'
+        ]);
+    }
 }

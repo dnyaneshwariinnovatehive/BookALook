@@ -275,6 +275,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     required bool canCancel,
     required bool canReschedule,
     required bool freeReschedule,
+    String? cancelBlockedReason,
+    String? rescheduleBlockedReason,
   }) {
     final salon = booking['salon'] as Map<String, dynamic>? ?? const {};
     final hasPhone = (salon['phone']?.toString().trim() ?? '').isNotEmpty;
@@ -291,6 +293,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 label: 'Call',
                 enabled: hasPhone,
                 onTap: () => _callSalon(booking),
+                onDisabledTap: () => _toast('This salon has no phone number.'),
               ),
             ),
             const SizedBox(width: 10),
@@ -300,6 +303,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 label: 'Directions',
                 enabled: canNavigate,
                 onTap: () => _openDirections(booking),
+                onDisabledTap: () => _toast('This salon has no address.'),
               ),
             ),
           ],
@@ -313,6 +317,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 label: freeReschedule ? 'Reschedule Free' : 'Reschedule',
                 enabled: canReschedule,
                 onTap: () => _openReschedule(booking),
+                onDisabledTap: () {
+                  if (rescheduleBlockedReason != null) {
+                    _toast(rescheduleBlockedReason);
+                  }
+                },
               ),
             ),
             const SizedBox(width: 10),
@@ -323,6 +332,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 enabled: canCancel,
                 danger: true,
                 onTap: () => _confirmCancel(booking),
+                onDisabledTap: () {
+                  if (cancelBlockedReason != null) {
+                    _toast(cancelBlockedReason);
+                  }
+                },
               ),
             ),
           ],
@@ -340,6 +354,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     required String label,
     required bool enabled,
     required VoidCallback onTap,
+    VoidCallback? onDisabledTap,
     bool danger = false,
   }) {
     final borderColor = context.colors.cardBorder;
@@ -369,7 +384,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                   AppHaptics.lightImpact();
                   onTap();
                 }
-              : null,
+              : (onDisabledTap ?? () {}),
           borderRadius: BorderRadius.circular(16),
           child: Container(
             height: 78,
@@ -978,6 +993,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       canCancel: canCancel,
                       canReschedule: canReschedule,
                       freeReschedule: freeReschedule,
+                      cancelBlockedReason: cancelBlockedReason,
+                      rescheduleBlockedReason: rescheduleBlockedReason,
                     ),
                   ],
 

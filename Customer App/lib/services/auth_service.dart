@@ -176,4 +176,32 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
   }
+
+  /// Deletes the customer account securely.
+  Future<bool> deleteAccount() async {
+    final token = await getToken();
+    if (token == null) return false;
+    
+    try {
+      final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+      final response = await http.delete(
+        Uri.parse('$apiBaseUrl/customer/account'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        await PushNotificationService().unregisterDevice();
+        await _removeToken();
+        return true;
+      }
+      debugPrint('Delete Account failed: ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Delete Account error: $e');
+      return false;
+    }
+  }
 }

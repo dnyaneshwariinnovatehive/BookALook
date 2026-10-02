@@ -222,6 +222,94 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  Future<void> _deleteAccount(BuildContext context) async {
+    final textHeading = context.colors.textPrimary;
+    final textBody = context.colors.textSecondary;
+    final danger = context.colors.danger;
+    final surface = context.colors.surface;
+
+    AppHaptics.lightImpact();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: surface,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+        title: Text(
+          'Delete Account?',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: danger,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This action is permanent and cannot be undone.',
+              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: textHeading),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'You will be logged out and your profile will be removed. However, past transaction records (appointments and payments) will be securely retained for financial compliance.',
+              style: GoogleFonts.outfit(fontSize: 14, color: textBody),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        actions: [
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, false);
+            },
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.outfit(color: textBody),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              AppHaptics.lightImpact();
+              Navigator.pop(dialogContext, true);
+            },
+            child: Text(
+              'Delete',
+              style: GoogleFonts.outfit(
+                color: danger,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final authService = AuthService();
+    final success = await authService.deleteAccount();
+
+    if (!context.mounted) return;
+    
+    if (success) {
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          settings: const RouteSettings(name: loginRouteName),
+          builder: (context) => const PhoneScreen(),
+        ),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete account. Please try again.')),
+      );
+    }
+  }
+
   /// Favourites is a page pushed inside the profile tab, so the footer stays put
   /// and the tab's own back gesture still works. The count is refreshed on the
   /// way back, because un-favouriting on that page changes it.
@@ -590,6 +678,22 @@ class _ProfileTabState extends State<ProfileTab> {
                     backgroundColor: context.colors.dangerSoft,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton(
+                  onPressed: () => _deleteAccount(context),
+                  child: Text(
+                    'Delete Account',
+                    style: GoogleFonts.outfit(
+                      color: dangerColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      decoration: TextDecoration.underline,
+                      decorationColor: dangerColor,
                     ),
                   ),
                 ),

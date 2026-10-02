@@ -35,6 +35,7 @@ Route::prefix('customer')->group(function () {
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
         // Switching market happens from the home screen, not the profile form.
         Route::put('/profile/city', [CustomerAuthController::class, 'updateCity']);
+        Route::delete('/account', [CustomerAuthController::class, 'deleteAccount']);
 
         // The only place marketing consent can be switched on, and it is the
         // customer who switches it.

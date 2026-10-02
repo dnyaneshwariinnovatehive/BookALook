@@ -1,9 +1,7 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-
 import 'package:customer_app/theme/app_colors.dart';
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/utils/error_text.dart';
