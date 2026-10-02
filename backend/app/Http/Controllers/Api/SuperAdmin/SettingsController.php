@@ -74,6 +74,10 @@ class SettingsController extends Controller
             // allowance in the way.
             'marketing_daily_cap_per_salon' => 'sometimes|integer|min:0|max:100000',
             'marketing_require_explicit_opt_in' => 'sometimes|boolean',
+            'whatsapp_booking_confirmed_enabled' => 'sometimes|boolean',
+            'whatsapp_appointment_reminder_enabled' => 'sometimes|boolean',
+            'whatsapp_appointment_cancelled_enabled' => 'sometimes|boolean',
+            'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -139,6 +143,27 @@ class SettingsController extends Controller
                     'updated_by' => $user->id,
                 ]
             );
+        }
+
+        $booleanSettings = [
+            'whatsapp_booking_confirmed_enabled' => 'Enable WhatsApp messages for booking confirmations',
+            'whatsapp_appointment_reminder_enabled' => 'Enable WhatsApp messages for appointment reminders',
+            'whatsapp_appointment_cancelled_enabled' => 'Enable WhatsApp messages for cancelled appointments',
+            'whatsapp_salon_closure_enabled' => 'Enable WhatsApp messages when a salon closes for a day',
+        ];
+
+        foreach ($booleanSettings as $key => $description) {
+            if ($request->has($key)) {
+                PlatformPolicySetting::updateOrCreate(
+                    ['setting_key' => $key],
+                    [
+                        'setting_value' => $request->boolean($key) ? '1' : '0',
+                        'data_type' => 'boolean',
+                        'description' => $description,
+                        'updated_by' => $user->id,
+                    ]
+                );
+            }
         }
 
         $urlSettings = [

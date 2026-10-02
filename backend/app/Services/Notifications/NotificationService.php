@@ -625,6 +625,10 @@ class NotificationService
      */
     private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event): void
     {
+        if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {
+            return;
+        }
+
         try {
             $phone = $this->phoneFor($appointment);
 

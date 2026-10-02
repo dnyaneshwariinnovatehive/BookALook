@@ -279,3 +279,48 @@
     flex: 1 1 100%;
   }
 }
+
+/* Checkbox Toggle Styling */
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.85rem 1.15rem;
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.checkboxLabel:hover {
+  background: var(--surface-color);
+  border-color: var(--text-body);
+}
+
+.checkbox {
+  margin-top: 0.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.checkboxText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.checkboxTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.checkboxHint {
+  font-size: 0.85rem;
+  color: var(--text-body);
+  opacity: 0.85;
+}

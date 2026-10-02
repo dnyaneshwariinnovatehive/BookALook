@@ -56,6 +56,12 @@ class PlatformPolicySetting extends Model
         'ios_app_url' => '',
         // A direct build, for handing the app out before the stores approve it.
         'android_apk_url' => '',
+
+        // Global toggles for WhatsApp notifications. SuperAdmin can turn them off.
+        'whatsapp_booking_confirmed_enabled' => true,
+        'whatsapp_appointment_reminder_enabled' => true,
+        'whatsapp_appointment_cancelled_enabled' => true,
+        'whatsapp_salon_closure_enabled' => true,
     ];
 
     /** Settings that hold a URL rather than a number. */

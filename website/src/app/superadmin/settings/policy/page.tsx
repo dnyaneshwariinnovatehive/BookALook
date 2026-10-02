@@ -180,6 +180,10 @@ interface FormState {
   androidAppUrl: string;
   iosAppUrl: string;
   androidApkUrl: string;
+  waBookingConfirmed: boolean;
+  waAppointmentReminder: boolean;
+  waAppointmentCancelled: boolean;
+  waSalonClosure: boolean;
 }
 
 const EMPTY: FormState = {
@@ -195,6 +199,10 @@ const EMPTY: FormState = {
   androidAppUrl: '',
   iosAppUrl: '',
   androidApkUrl: '',
+  waBookingConfirmed: true,
+  waAppointmentReminder: true,
+  waAppointmentCancelled: true,
+  waSalonClosure: true,
 };
 
 export default function PlatformPolicyPage() {
@@ -240,6 +248,10 @@ export default function PlatformPolicyPage() {
         androidAppUrl: s.android_app_url || '',
         iosAppUrl: s.ios_app_url || '',
         androidApkUrl: s.android_apk_url || '',
+        waBookingConfirmed: s.whatsapp_booking_confirmed_enabled ?? true,
+        waAppointmentReminder: s.whatsapp_appointment_reminder_enabled ?? true,
+        waAppointmentCancelled: s.whatsapp_appointment_cancelled_enabled ?? true,
+        waSalonClosure: s.whatsapp_salon_closure_enabled ?? true,
       };
 
       setSaved(next);
@@ -305,7 +317,7 @@ export default function PlatformPolicyPage() {
 
   /** The API payload for one field, so "changed?" and "send" agree exactly. */
   const payloadFor = useCallback(
-    (state: FormState): Record<string, string | number> => ({
+    (state: FormState): Record<string, string | number | boolean> => ({
       subscription_expiry_warning_days: Number(state.warningDays),
       cancellation_cutoff_minutes: toMinutes(state.cancelCutoff),
       reschedule_cutoff_minutes: toMinutes(state.rescheduleCutoff),
@@ -318,6 +330,10 @@ export default function PlatformPolicyPage() {
       android_app_url: state.androidAppUrl.trim(),
       ios_app_url: state.iosAppUrl.trim(),
       android_apk_url: state.androidApkUrl.trim(),
+      whatsapp_booking_confirmed_enabled: state.waBookingConfirmed,
+      whatsapp_appointment_reminder_enabled: state.waAppointmentReminder,
+      whatsapp_appointment_cancelled_enabled: state.waAppointmentCancelled,
+      whatsapp_salon_closure_enabled: state.waSalonClosure,
     }),
     []
   );
@@ -633,6 +649,65 @@ export default function PlatformPolicyPage() {
               onChange={(e) => set('androidApkUrl', e.target.value)}
             />
           </Field>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>WhatsApp Notifications</h2>
+          <p className={styles.sectionHint}>
+            Global toggles for automated WhatsApp messages. Disabling a toggle stops all outgoing messages for that event across the entire platform.
+          </p>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.waBookingConfirmed}
+              onChange={(e) => set('waBookingConfirmed', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Booking Confirmed</span>
+              <span className={styles.checkboxHint}>Sent when a customer successfully confirms an appointment.</span>
+            </div>
+          </label>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.waAppointmentReminder}
+              onChange={(e) => set('waAppointmentReminder', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Appointment Reminder</span>
+              <span className={styles.checkboxHint}>Sent to remind the customer of an upcoming appointment.</span>
+            </div>
+          </label>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.waAppointmentCancelled}
+              onChange={(e) => set('waAppointmentCancelled', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Appointment Cancelled</span>
+              <span className={styles.checkboxHint}>Sent when an appointment is cancelled by either party.</span>
+            </div>
+          </label>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.waSalonClosure}
+              onChange={(e) => set('waSalonClosure', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Salon Closure (Reschedule)</span>
+              <span className={styles.checkboxHint}>Sent when a salon admin cancels a day, including a link to reschedule.</span>
+            </div>
+          </label>
         </section>
 
         {/* Stays in view on a long form, and says what is about to happen. */}
