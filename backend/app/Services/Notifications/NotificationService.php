@@ -157,6 +157,7 @@ class NotificationService
                     $salonName,
                     $dateLabel,
                     $reason ?: 'The salon is closed',
+                    $this->rescheduleDeeplink($appointment->id),
                 ],
             ], 'salon_closure');
         }
