@@ -223,6 +223,5 @@ class _CityAreaPickerState extends State<CityAreaPicker> {
         hintText: hint,
         hintStyle: GoogleFonts.outfit(fontSize: 13.5, color: context.colors.textTertiary),
         prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
       );
 }

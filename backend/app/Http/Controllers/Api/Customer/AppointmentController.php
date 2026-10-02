@@ -1019,6 +1019,11 @@ class AppointmentController extends Controller
             ->filter(fn ($addition) => $addition->isLive())
             ->sum('price_at_addition');
 
+        $providerPhone = null;
+        if ($appointment->status === 'scheduled' && now()->greaterThanOrEqualTo($qrWindow['opens_at']) && now()->lessThanOrEqualTo($qrWindow['closes_at'])) {
+            $providerPhone = $appointment->appointedProvider?->user?->phone;
+        }
+
         return [
             'id' => $appointment->id,
             'status' => $appointment->status,
@@ -1039,6 +1044,7 @@ class AppointmentController extends Controller
                     : null,
             ],
             'provider_name' => $appointment->appointedProvider->user->name ?? 'Any available staff',
+            'provider_phone' => $providerPhone,
             'appointment_date' => $date,
             'start_time' => substr($appointment->start_time, 0, 5),
             'end_time' => substr($appointment->end_time, 0, 5),

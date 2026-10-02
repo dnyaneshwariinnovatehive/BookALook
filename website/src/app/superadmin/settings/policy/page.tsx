@@ -438,7 +438,7 @@ export default function PlatformPolicyPage() {
 
           <DurationField
             label="Early start allowance"
-            hint="How early a salon may start an appointment before its booked time."
+            hint="How early a salon may start an appointment before its booked time. Also dictates when the service provider's contact details become available to the customer."
             duration={form.startEarly}
             onChange={(d) => set('startEarly', d)}
             error={errors.startEarly}

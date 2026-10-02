@@ -205,31 +205,97 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     if (changed == true) _loadBookings();
   }
 
-  /// Dials the salon, if it published a number to call.
-  ///
-  /// The appointment payload's salon phone is the business line, so this is a
-  /// call to the shop. A salon with none gets a plain refusal rather than a
-  /// button that silently does nothing.
-  Future<void> _callSalon(Map<String, dynamic> booking) async {
-    final raw = booking['salon']?['phone']?.toString().trim() ?? '';
+  /// Shows a modal to call the service provider if their number is available.
+  Future<void> _callProvider(Map<String, dynamic> booking) async {
+    final raw = booking['provider_phone']?.toString().trim() ?? '';
+    final name = booking['provider_name']?.toString().trim() ?? 'Your provider';
 
     // Dialled verbatim, so anything but a real number is refused here rather
     // than handed to the dialer.
     if (raw.isEmpty || !RegExp(r'^\+?[\d\s\-()]{6,20}$').hasMatch(raw)) {
-      _setCardMessage(booking, 'This salon has not published a contact number.', kind: StatusKind.info);
+      _setCardMessage(booking, 'Provider contact details are not available yet.', kind: StatusKind.info);
       return;
     }
 
-    final uri = Uri(scheme: 'tel', path: raw.replaceAll(RegExp(r'[^\d+]'), ''));
-
-    try {
-      if (!await canLaunchUrl(uri) ||
-          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        _setCardMessage(booking, 'Could not open the dialler.');
-      }
-    } catch (_) {
-      _setCardMessage(booking, 'Could not open the dialler.');
-    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Icon(Icons.person, size: 48, color: AppTheme.accentColor),
+              const SizedBox(height: 16),
+              Text(
+                name,
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                raw,
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.phone),
+                  label: Text(
+                    'Call Now',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final uri = Uri(scheme: 'tel', path: raw.replaceAll(RegExp(r'[^\d+]'), ''));
+                    try {
+                      if (!await canLaunchUrl(uri) ||
+                          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                        _setCardMessage(booking, 'Could not open the dialler.');
+                      }
+                    } catch (_) {
+                      _setCardMessage(booking, 'Could not open the dialler.');
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// Opens turn-by-turn navigation to the salon.
@@ -279,9 +345,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     String? rescheduleBlockedReason,
   }) {
     final salon = booking['salon'] as Map<String, dynamic>? ?? const {};
-    final hasPhone = (salon['phone']?.toString().trim() ?? '').isNotEmpty;
+    final salonPhone = salon['phone']?.toString().trim() ?? '';
+    final providerPhone = booking['provider_phone']?.toString().trim() ?? '';
+    final hasPhone = providerPhone.isNotEmpty;
     final canNavigate =
-        hasPhone || (salon['address']?.toString().trim() ?? '').isNotEmpty;
+        salonPhone.isNotEmpty || (salon['address']?.toString().trim() ?? '').isNotEmpty;
 
     return Column(
       children: [
@@ -292,8 +360,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 icon: Icons.phone_outlined,
                 label: 'Call',
                 enabled: hasPhone,
-                onTap: () => _callSalon(booking),
-                onDisabledTap: () => _toast('This salon has no phone number.'),
+                onTap: () => _callProvider(booking),
+                onDisabledTap: () => _toast('Provider details will be available shortly before your appointment.'),
               ),
             ),
             const SizedBox(width: 10),

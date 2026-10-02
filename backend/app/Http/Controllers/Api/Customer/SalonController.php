@@ -614,7 +614,7 @@ class SalonController extends Controller
         foreach ($rows as $service) {
             $salonId = (string) $service->salon_id;
 
-            if (($bySalon[$salonId] ?? 0) >= $limit) {
+            if (isset($bySalon[$salonId]) && count($bySalon[$salonId]) >= $limit) {
                 continue;
             }
 

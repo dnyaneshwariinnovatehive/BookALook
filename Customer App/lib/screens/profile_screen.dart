@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../legal/terms_acceptance_row.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../widgets/city_area_picker.dart';
 import '../widgets/feedback_states.dart';
 import 'main_screen.dart';
@@ -123,22 +125,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Complete Profile')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
+      backgroundColor: context.colors.pageNeutral,
+      appBar: AppBar(
+        backgroundColor: context.colors.pageNeutral,
+        elevation: 0,
+        title: Text(
+          'Complete Profile',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: context.colors.textPrimary,
+          ),
+        ),
+        iconTheme: IconThemeData(color: context.colors.textPrimary),
+      ),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: context.colors.surface,
+            labelStyle: GoogleFonts.outfit(color: context.colors.textSecondary),
+            prefixIconColor: AppTheme.accentColor.withValues(alpha: 0.6),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: context.colors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: context.colors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.accentColor, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: context.colors.danger, width: 1),
+            ),
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'Welcome!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 8),
             Text(
               'Please provide your details to continue.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+              style: GoogleFonts.outfit(fontSize: 15, color: context.colors.textSecondary),
             ),
             SizedBox(height: 32),
             TextField(
@@ -151,7 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: InputDecoration(
                 labelText: 'Full Name *',
                 errorText: _nameError,
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person),
               ),
             ),
@@ -160,14 +198,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value: _selectedGender,
               decoration: InputDecoration(
                 labelText: 'Gender',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.group),
               ),
               items: [
-                DropdownMenuItem(value: 'unspecified', child: Text('Prefer not to say')),
-                DropdownMenuItem(value: 'male', child: Text('Male')),
-                DropdownMenuItem(value: 'female', child: Text('Female')),
-                DropdownMenuItem(value: 'other', child: Text('Other')),
+                DropdownMenuItem(value: 'unspecified', child: Text('Prefer not to say', style: GoogleFonts.outfit())),
+                DropdownMenuItem(value: 'male', child: Text('Male', style: GoogleFonts.outfit())),
+                DropdownMenuItem(value: 'female', child: Text('Female', style: GoogleFonts.outfit())),
+                DropdownMenuItem(value: 'other', child: Text('Other', style: GoogleFonts.outfit())),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -201,7 +238,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: InputDecoration(
                 labelText: 'Date of Birth (YYYY-MM-DD) *',
                 errorText: _dobError,
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.calendar_today),
               ),
             ),
@@ -210,7 +246,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: _addressController,
               decoration: InputDecoration(
                 labelText: 'Address',
-                border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.home),
               ),
               maxLines: 3,
@@ -219,13 +254,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _acceptedTerms
-                      ? AppTheme.accentColor.withValues(alpha: 0.4)
-                      : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
               ),
               child: TermsAcceptanceRow(
                 slugs: _consentDocuments,
@@ -248,21 +278,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ElevatedButton(
               onPressed: (_isLoading || !_acceptedTerms) ? null : _completeProfile,
               style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 padding: EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
               ),
               child: _isLoading 
-                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Theme.of(context).colorScheme.surface, strokeWidth: 2))
-                : Text('Complete & Login', style: TextStyle(fontSize: 18)),
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text('Complete & Login', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               'By completing your profile you are creating a BooKalook account. '
               'We use your phone number, name and location to show you salons near you.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
+              style: GoogleFonts.outfit(
+                fontSize: 11.5,
                 height: 1.5,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                color: context.colors.textTertiary,
               ),
             ),
           ],

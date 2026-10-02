@@ -217,7 +217,7 @@ class NotificationService
                 'parameters' => [
                     $salonName,
                     $dateLabel,
-                    $this->currency($appointment->advance_paid ?? 0),
+                    $this->currency($appointment->advance_amount ?? 0),
                 ],
                 'attachment' => self::ATTACHMENT_INVOICE,
             ], 'booking_confirmed');
