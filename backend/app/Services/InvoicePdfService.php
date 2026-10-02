@@ -95,72 +95,24 @@ class InvoicePdfService
     }
 
     /**
-     * Upload the PDF bytes to Cloudinary as a raw file and return its URL.
+     * Store the PDF on the local public disk and return its URL.
      *
-     * Three things here are load-bearing, each found in production:
+     * We bypass Cloudinary entirely because many newer Cloudinary accounts strictly
+     * block Raw (PDF) deliveries by default and omit the toggle from the UI,
+     * which causes AISensy to fail with "Media upload error" (401 Unauthorized).
      *
-     * 1. The bytes go up as a stream, never as a string. The SDK's
-     *    FileUtils::handleFile() treats any string that is not a URL or a
-     *    data: URI as a *local file path* and fopen()s it, so PDF bytes fail
-     *    with "must not contain any null bytes".
-     *
-     * 2. The upload carries an explicit `filename`. The SDK names the multipart
-     *    file part only from `$options['filename']`, or from basename($file)
-     *    when $file is a local path (ApiClient::postFileAsync()). A stream has
-     *    no path, and Guzzle will not name a part after a `php://temp` stream,
-     *    so without this the PDF goes up as a plain *form field* called `file`.
-     *    Cloudinary reads a non-file `file` field as a remote source URL and
-     *    rejects it ("Unsupported source URL: %PDF-1.4…" / "Invalid request
-     *    parameters"). This is why uploading from a local path works and the
-     *    same bytes as a stream do not.
-     *
-     * 3. The public ID keeps its `.pdf`. For `raw` resources Cloudinary stores
-     *    the extension as part of the public ID and has no `format` to add one;
-     *    stripping it produced an extensionless URL, which WhatsApp cannot
-     *    recognise as a PDF document.
-     *
-     * Written under a random name. The invoice number is the predictable part,
-     * and a guessable object path is a document anyone can walk through the
-     * media library and read.
-     *
-     * Through the SDK rather than Storage::put(): the disk adapter classifies
-     * application/pdf as raw, ignores its $options argument (so no filename can
-     * be passed), and returns no URL.
+     * Stored on the 'public' disk so it's accessible via the local domain.
+     * The URL uses APP_URL from .env, which must be correct for AISensy to reach it.
      */
     private function upload(string $pdf, string $invoiceNumber): string
     {
-        $stream = fopen('php://temp', 'r+b');
+        $path = self::PREFIX.'/'.$invoiceNumber.'-'.Str::lower(Str::random(8)).'.pdf';
+        
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf);
 
-        if ($stream === false) {
-            throw new RuntimeException('Could not open a temporary stream for the invoice PDF.');
-        }
-
-        try {
-            fwrite($stream, $pdf);
-            rewind($stream);
-
-            $response = Cloudinary::uploadApi()->upload($stream, [
-                'public_id' => self::PREFIX.'/'.$invoiceNumber.'-'.Str::lower(Str::random(8)).'.pdf',
-                'resource_type' => 'raw',
-                'filename' => $invoiceNumber.'.pdf',
-            ]);
-        } finally {
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-        }
-
-        $url = $response['secure_url'] ?? null;
-
-        // A 200 carrying no URL is the shape of a misconfigured account. Storing
-        // an empty pdf_url would cache the invoice as "done" and it would never
-        // be retried, so it is a failure like any other.
-        if (! is_string($url) || $url === '') {
-            throw new RuntimeException('Cloudinary accepted the invoice PDF but returned no URL.');
-        }
-
-        return $url;
+        return asset('storage/'.$path);
     }
+
 
     /**
      * dompdf options, narrowed from its defaults.

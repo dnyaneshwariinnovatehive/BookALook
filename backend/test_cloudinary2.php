@@ -8,8 +8,8 @@ $stream = fopen('php://temp', 'r+b');
 fwrite($stream, 'Dummy PDF content');
 rewind($stream);
 $response = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($stream, [
-    'public_id' => 'test-invoice.pdf',
-    'resource_type' => 'raw',
-    'filename' => 'test-invoice.pdf',
+    'public_id' => 'test-invoice-image',
+    'resource_type' => 'image',
+    'format' => 'pdf',
 ]);
 echo $response['secure_url'];
