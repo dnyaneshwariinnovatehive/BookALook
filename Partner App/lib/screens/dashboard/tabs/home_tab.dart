@@ -17,6 +17,7 @@ import 'staff/add_staff_screen.dart';
 import 'settings/salon_timings_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../services/salon_settings_api.dart';
+import '../../../services/insights_api.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -47,6 +48,7 @@ class _HomeTabState extends State<HomeTab> {
   List<StaffMember> _staff = [];
   Map<String, int> _providerLoads = {};
   bool _needsWorkingHours = false;
+  SalonInsights? _insights;
 
   int _unreadNotifications = 0;
 
@@ -109,6 +111,11 @@ class _HomeTabState extends State<HomeTab> {
         SalonClosureApi.upcomingClosures(widget.salonId),
         SalonSettingsApi.fetchWorkingHours(widget.salonId),
       ]);
+      
+      SalonInsights? insights;
+      try {
+        insights = await InsightsApi.fetch(widget.salonId);
+      } catch (_) {}
 
       final appointments = responses[0] as List<dynamic>;
       final staff = responses[1] as List<StaffMember>;
@@ -179,6 +186,7 @@ class _HomeTabState extends State<HomeTab> {
         _staff = staff;
         _providerLoads = providerLoads;
         _needsWorkingHours = workingHoursResponse['is_default'] == true;
+        _insights = insights;
         _isLoading = false;
       });
 
@@ -381,6 +389,14 @@ class _HomeTabState extends State<HomeTab> {
                        _buildScanCard(),
                        const SizedBox(height: 24),
                        _buildTopStats(isDark),
+                       if (_insights != null) ...[
+                         const SizedBox(height: 24),
+                         _buildBasicAnalytics(isDark),
+                         if (_insights!.advanced && _insights!.peakHours != null) ...[
+                           const SizedBox(height: 24),
+                           _buildPeakHoursInsights(isDark),
+                         ],
+                       ],
                        const SizedBox(height: 24),
                        _buildQuickActions(isDark),
                        const SizedBox(height: 24),
@@ -639,6 +655,147 @@ class _HomeTabState extends State<HomeTab> {
           Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textColor)),
         ],
       ),
+    );
+  }
+
+  Widget _buildBasicAnalytics(bool isDark) {
+    final titleColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final accent = AppTheme.accentColor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Performance Overview (30d)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                blurRadius: 10, offset: const Offset(0, 4)
+              )
+            ]
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildAnalyticsMetric('Revenue', '₹${_insights!.overview.revenue.toStringAsFixed(0)}', accent, isDark),
+              Container(width: 1, height: 40, color: isDark ? Colors.white24 : Colors.grey[200]),
+              _buildAnalyticsMetric('Visits', '${_insights!.overview.totalVisits}', Colors.blue, isDark),
+              Container(width: 1, height: 40, color: isDark ? Colors.white24 : Colors.grey[200]),
+              _buildAnalyticsMetric('Avg. Bill', '₹${_insights!.overview.averageBill.toStringAsFixed(0)}', Colors.orange, isDark),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildAnalyticsMetric(String label, String value, Color color, bool isDark) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
+      ],
+    );
+  }
+
+  Widget _buildPeakHoursInsights(bool isDark) {
+    final titleColor = isDark ? AppTheme.darkTextHeading : const Color(0xFF1A1A1A);
+    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
+    final accentBg = isDark ? const Color(0xFF3B285E) : const Color(0xFFF5F3FF);
+    final accentText = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF7C3AED);
+    
+    final busiest = _insights!.peakHours!.busiest ?? 'Unknown';
+    final quietestDay = _insights!.peakHours!.quietestDay ?? 'Unknown';
+    final quietestTime = _insights!.peakHours!.quietest ?? 'Unknown';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Peak Hour Insights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: titleColor)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('GROWTH PLAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber)),
+            )
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+                blurRadius: 10, offset: const Offset(0, 4)
+              )
+            ]
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: accentBg, shape: BoxShape.circle),
+                    child: Icon(Icons.insights, color: accentText),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Your Busiest Time', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                        const SizedBox(height: 4),
+                        Text(busiest, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor)),
+                        const SizedBox(height: 12),
+                        Text('Your Quietest Time', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
+                        const SizedBox(height: 4),
+                        Text('$quietestDay at $quietestTime', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor)),
+                      ],
+                    ),
+                  )
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE0F2FE),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.lightbulb_outline, color: Color(0xFF0284C7), size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Tip: Try creating a discount or happy hour on $quietestDay around $quietestTime to drive more bookings.',
+                        style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7)),
+                      ),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+        )
+      ],
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../../../models/service_models.dart';
 import '../../../../services/service_management_api.dart';
+import '../../../../services/insights_api.dart';
 
 class AddServiceFlow extends StatefulWidget {
   final String salonId;
@@ -32,6 +33,10 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
 
+  List<SalonService> _allServices = [];
+  List<String> _linkedServiceIds = [];
+  SalonInsights? _insights;
+
   @override
   void initState() {
     super.initState();
@@ -44,9 +49,31 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       _error = null;
     });
     try {
-      final categories = await ServiceManagementApi.getMasterCatalog(widget.salonId);
+      final futures = await Future.wait([
+        ServiceManagementApi.getMasterCatalog(widget.salonId),
+        ServiceManagementApi.getSalonServices(widget.salonId),
+      ]);
+      final categories = futures[0] as List<ServiceCategory>;
+      final groupedServices = futures[1] as List<Map<String, dynamic>>;
+      
+      final List<SalonService> flatServices = [];
+      for (var group in groupedServices) {
+        if (group['services'] != null) {
+          for (var s in group['services']) {
+             flatServices.add(SalonService.fromJson(s));
+          }
+        }
+      }
+
+      SalonInsights? insights;
+      try {
+        insights = await InsightsApi.fetch(widget.salonId);
+      } catch (_) {}
+
       setState(() {
         _masterCategories = categories;
+        _allServices = flatServices;
+        _insights = insights;
         if (_selectedCategory == null && _masterCategories.isNotEmpty) {
           _selectedCategory = _masterCategories.first;
           if (_selectedCategory!.templates != null && _selectedCategory!.templates!.isNotEmpty) {
@@ -86,6 +113,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
         advancePercentage: _advanceController.text.isNotEmpty ? double.tryParse(_advanceController.text) : null,
         genderFocus: _genderFocus,
         willRefundAdvanceIfCancelled: _refundAdvance,
+        linkedServiceIds: _linkedServiceIds.isNotEmpty ? _linkedServiceIds : null,
       );
 
       if (mounted) {
@@ -307,6 +335,9 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
               Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
             ],
           ),
+          const SizedBox(height: 24),
+          
+          _buildLinkedAddonsSection(),
           const SizedBox(height: 32),
           
           ElevatedButton(
@@ -363,6 +394,122 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
         ),
       ),
       validator: (v) => v!.isEmpty ? 'Required' : null,
+    );
+  }
+
+  Widget _buildLinkedAddonsSection() {
+    final theme = Theme.of(context);
+    final isAdvanced = _insights?.advanced == true;
+    
+    // Find smart suggestions
+    final List<UpsellTip> smartTips = [];
+    if (isAdvanced && _insights != null && _selectedTemplate != null) {
+      smartTips.addAll(_insights!.upsell.where((u) => u.from.toLowerCase() == _selectedTemplate!.name.toLowerCase()));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Linked Add-ons (Upsell)'),
+        Text(
+          'Recommend these services to customers when they book this one.',
+          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+        ),
+        const SizedBox(height: 12),
+        
+        if (isAdvanced && smartTips.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 16),
+                    const SizedBox(width: 8),
+                    const Text('Smart Suggestions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6D28D9), fontSize: 13)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...smartTips.map((tip) {
+                  // Find the service id if we have it in all services
+                  final matchingService = _allServices.where((s) => (s.template?.name.toLowerCase() == tip.to.toLowerCase())).firstOrNull;
+                  if (matchingService == null) return const SizedBox.shrink();
+                  
+                  final isSelected = _linkedServiceIds.contains(matchingService.id);
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    title: Text(tip.to, style: const TextStyle(fontSize: 14)),
+                    subtitle: Text('Usually boosts revenue by ${(tip.uplift * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    trailing: isSelected 
+                      ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
+                      : OutlinedButton(
+                          onPressed: () => setState(() => _linkedServiceIds.add(matchingService.id)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF8B5CF6),
+                            side: const BorderSide(color: Color(0xFF8B5CF6)),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text('Add'),
+                        ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+          
+        // Manual selection
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.6)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              hint: const Text('Select manual add-ons...'),
+              value: null,
+              items: _allServices.where((s) => !_linkedServiceIds.contains(s.id)).map((s) {
+                return DropdownMenuItem(
+                  value: s.id,
+                  child: Text(s.template?.name ?? 'Custom Service'),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _linkedServiceIds.add(val));
+                }
+              },
+            ),
+          ),
+        ),
+        
+        if (_linkedServiceIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _linkedServiceIds.map((id) {
+                final s = _allServices.firstWhere((s) => s.id == id, orElse: () => SalonService(id: id, salonId: '', templateId: '', price: 0));
+                return Chip(
+                  label: Text(s.template?.name ?? 'Unknown', style: const TextStyle(fontSize: 12)),
+                  onDeleted: () => setState(() => _linkedServiceIds.remove(id)),
+                  backgroundColor: theme.colorScheme.surface,
+                  side: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.2)),
+                );
+              }).toList(),
+            ),
+          )
+      ],
     );
   }
 }

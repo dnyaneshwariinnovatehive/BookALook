@@ -19,6 +19,7 @@ import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
+import '../more/whatsapp_stats_screen.dart';
 
 class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -354,6 +355,18 @@ class _MoreTabState extends State<MoreTab> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => WalletScreen(salonId: salonData['id'].toString())),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, indent: 56),
+                  _buildOptionTile(context, 
+                    icon: Icons.mark_chat_read,
+                    iconColor: Colors.green,
+                    title: 'WhatsApp Marketing',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => WhatsappStatsScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),

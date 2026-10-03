@@ -12,6 +12,7 @@ import '../../../services/push_notification_service.dart';
 import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/push_notification_toggle.dart';
+import '../../../widgets/initials_avatar.dart';
 
 /// The collaborator's own page: who they are, what they have done, and out.
 ///
@@ -156,35 +157,68 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     await prefs.setBool('isDarkMode', value);
   }
 
+
   @override
   Widget build(BuildContext context) {
     if (_firstLoad && _loading) {
       return const CollaboratorLoadingState();
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: AppTheme.accentColor,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          if (_failed)
-            _buildOfflineNote()
-          else ...[
-            _buildHeaderCard(),
-            const SizedBox(height: 18),
-            _buildStatsCard(),
-            const SizedBox(height: 18),
-            _buildDetailsCard(),
-            const SizedBox(height: 18),
-            _buildAppearanceCard(),
-          ],
-          const SizedBox(height: 24),
-          const PushNotificationToggle(),
-          const SizedBox(height: 24),
-          _buildLogoutButton(),
-          const SizedBox(height: 20),
-        ],
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        color: AppTheme.accentColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_failed)
+                _buildOfflineNote()
+              else ...[
+                _buildHeaderCard(),
+                const SizedBox(height: 24),
+                
+                // Options List
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildStatsCard(),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                      _buildDetailsCard(),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                      _buildAppearanceCard(),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                      const PushNotificationToggle(),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                _buildLogoutButton(),
+                const SizedBox(height: 40),
+              ]
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -195,193 +229,107 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   /// A collaborator who set dark mode while signed in as another role got a
   /// light-coloured app on every one of these four tabs, with no way to change
   /// it back without logging out.
+
   Widget _buildAppearanceCard() {
-    final palette = context.colors;
-
-    return CollaboratorCard(
-      child: ValueListenableBuilder<ThemeMode>(
-        valueListenable: themeNotifier,
-        builder: (context, mode, _) {
-          final isDark = mode == ThemeMode.dark;
-
-          return Row(
-            children: [
-              Icon(
-                isDark ? Icons.dark_mode : Icons.light_mode_outlined,
-                size: 20,
-                color: palette.textSecondary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Dark mode',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isDark ? 'On' : 'Off',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: isDark,
-                onChanged: _toggleDarkMode,
-                activeThumbColor: AppTheme.accentColor,
-              ),
-            ],
-          );
-        },
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, mode, _) {
+        final isDark = mode == ThemeMode.dark;
+        return SwitchListTile(
+          value: isDark,
+          onChanged: _toggleDarkMode,
+          secondary: Icon(
+            isDark ? Icons.dark_mode : Icons.light_mode,
+            color: isDark ? Colors.yellow : Colors.orange,
+          ),
+          title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        );
+      },
     );
   }
 
   // ---------------------------------------------------------------- header
 
+
   Widget _buildHeaderCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final name = _profile!['name']?.toString() ?? 'Collaborator';
 
-    // The gradient runs to [AppTheme.accentGradientEnd] in both modes. That is
-    // deliberate: it is the brand mark, it carries white text, and a darker
-    // variant for dark mode would read as a different brand rather than the
-    // same one. Only the text on top of it needed checking for contrast.
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.accentGradientStart, AppTheme.accentGradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            InitialsAvatar(
+              name: name,
+              radius: 36,
             ),
-            child: Center(
-              child: Text(
-                _initials(name),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Collaborator',
+                    style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _profile!['phone']?.toString() ?? '',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _profile!['phone']?.toString() ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Text(
-                    'Collaborator',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  static String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
-  }
-
   // ----------------------------------------------------------------- stats
+
 
   Widget _buildStatsCard() {
     final stats = Map<String, dynamic>.from(_profile!['stats'] as Map? ?? {});
     final palette = context.colors;
 
-    return CollaboratorCard(
-      margin: EdgeInsets.zero,
-      radius: 16,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(Icons.bar_chart, color: AppTheme.accentColor),
+        title: const Text('Your work', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
-          Text(
-            'Your work',
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.bold,
-              color: palette.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
           Row(
             children: [
-              _stat('${stats['approved'] ?? 0}', 'Live', palette.success),
+              _stat('', 'Live', palette.success),
               _divider(),
-              _stat('${stats['pending'] ?? 0}', 'Pending', palette.warning),
+              _stat('', 'Pending', palette.warning),
               _divider(),
-              _stat('${stats['rejected'] ?? 0}', 'Sent back', palette.danger),
+              _stat('', 'Sent back', palette.danger),
               _divider(),
-              _stat('${stats['assigned'] ?? 0}', 'To do', AppTheme.accentColor),
+              _stat('', 'To do', AppTheme.accentColor),
             ],
           ),
           if ((stats['submitted'] ?? 0) > 0) ...[
             const SizedBox(height: 16),
             Text(
-              '${stats['submitted']} ${stats['submitted'] == 1 ? 'salon' : 'salons'} onboarded in total.',
+              '  onboarded in total.',
               style: TextStyle(fontSize: 12, color: palette.textSecondary),
             ),
           ],
@@ -426,47 +374,21 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   ///
   /// [AnimatedCrossFade] rather than a conditional build, so opening it grows
   /// the card in place instead of the whole list jumping under the finger.
+
   Widget _buildDetailsCard() {
     final palette = context.colors;
     final dob = DateTime.tryParse(_profile!['date_of_birth']?.toString() ?? '');
 
-    return CollaboratorCard(
-      margin: EdgeInsets.zero,
-      radius: 16,
-      onTap: () => setState(() => _detailsExpanded = !_detailsExpanded),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(Icons.contact_mail_outlined, color: Colors.blue),
+        title: const Text('Contact details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Contact details',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _detailsExpanded ? 'Tap to hide' : _detailsSummary(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Inside the capsule's own tap target, so this button has to stop
-              // the tap from bubbling — otherwise editing also folds the capsule
-              // shut behind the sheet.
               TextButton.icon(
                 onPressed: _edit,
                 icon: const Icon(Icons.edit_outlined, size: 16),
@@ -476,70 +398,15 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-              AnimatedRotation(
-                turns: _detailsExpanded ? 0.5 : 0.0,
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: palette.textTertiary,
-                ),
-              ),
             ],
           ),
-          AnimatedCrossFade(
-            crossFadeState: _detailsExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 220),
-            sizeCurve: Curves.easeOutCubic,
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _row(
-                    Icons.person_outline,
-                    'Name',
-                    _profile!['name']?.toString(),
-                  ),
-                  _row(
-                    Icons.smartphone_outlined,
-                    'Phone',
-                    _profile!['phone']?.toString(),
-                    note: 'Used to sign in',
-                  ),
-                  _row(
-                    Icons.alternate_email,
-                    'Email',
-                    _profile!['email']?.toString(),
-                  ),
-                  _row(
-                    Icons.wc_outlined,
-                    'Gender',
-                    _prettyGender(_profile!['gender']?.toString()),
-                  ),
-                  _row(
-                    Icons.cake_outlined,
-                    'Date of birth',
-                    dob == null ? null : DateFormat('d MMMM yyyy').format(dob),
-                  ),
-                  _row(
-                    Icons.home_outlined,
-                    'Address',
-                    _profile!['address']?.toString(),
-                  ),
-                  _row(
-                    Icons.pin_drop_outlined,
-                    'Pincode',
-                    _profile!['pincode']?.toString(),
-                    isLast: true,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _row(Icons.person_outline, 'Name', _profile!['name']?.toString()),
+          _row(Icons.smartphone_outlined, 'Phone', _profile!['phone']?.toString(), note: 'Used to sign in'),
+          _row(Icons.alternate_email, 'Email', _profile!['email']?.toString()),
+          _row(Icons.wc_outlined, 'Gender', _prettyGender(_profile!['gender']?.toString())),
+          _row(Icons.cake_outlined, 'Date of birth', dob == null ? null : DateFormat('d MMMM yyyy').format(dob)),
+          _row(Icons.home_outlined, 'Address', _profile!['address']?.toString()),
+          _row(Icons.pin_drop_outlined, 'Pincode', _profile!['pincode']?.toString(), isLast: true),
         ],
       ),
     );

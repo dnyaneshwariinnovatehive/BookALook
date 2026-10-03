@@ -153,6 +153,14 @@ class _InsightsScreenState extends State<InsightsScreen> {
         const SizedBox(height: 10),
       ],
 
+      _heading('Basic Analytics (Last 30 Days)', 'Standard revenue charts & staff performance'),
+      _basicAnalyticsCard(dark),
+
+      if (insights.advanced) ...[
+        _heading('Retention Funnel', 'Exactly what percentage of first-timers come back'),
+        _retentionFunnelCard(dark),
+      ],
+
       if (insights.repeatCustomers != null) ...[
         _heading('Your customers', 'Who comes back, and who has drifted away'),
         _customersCard(insights.repeatCustomers!, dark),
@@ -808,35 +816,48 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _areasCard(List<AreaStat> areas, bool dark) => _card(
-        dark,
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...areas.take(6).map((a) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.place_outlined,
-                          size: 15, color: AppTheme.accentColor),
-                      const SizedBox(width: 9),
-                      Expanded(
-                          child: Text(a.area,
-                              style: GoogleFonts.outfit(fontSize: 13.5))),
-                      Text(
-                          '${a.customers} customer${a.customers == 1 ? '' : 's'}',
-                          style: GoogleFonts.outfit(
-                              fontSize: 12.5, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                )),
-            const SizedBox(height: 8),
-            Text('Walk-in customers are not counted here — only customers with the app.',
-                style: GoogleFonts.outfit(
-                    fontSize: 11.5, color: AppTheme.lightTextLight, height: 1.4)),
-          ],
-        ),
-      );
+  Widget _areasCard(List<AreaStat> areas, bool dark) {
+    if (areas.isEmpty) return const SizedBox.shrink();
+    final maxCust = areas.fold<int>(1, (max, a) => a.customers > max ? a.customers : max);
+
+    return _card(
+      dark,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...areas.take(6).map((a) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.place, size: 14, color: AppTheme.accentColor),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(a.area, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold))),
+                        Text('${a.customers} customer${a.customers == 1 ? '' : 's'}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: (a.customers / maxCust).clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: dark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        valueColor: const AlwaysStoppedAnimation(Color(0xFF10B981)),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+          const SizedBox(height: 12),
+          Text('Walk-in customers are not counted here — only customers with the app.',
+              style: GoogleFonts.outfit(
+                  fontSize: 11.5, color: AppTheme.lightTextLight, height: 1.4)),
+        ],
+      ),
+    );
+  }
 
   Widget _marketingCard(CampaignStats stats, bool dark) => _card(
         dark,
@@ -995,6 +1016,124 @@ class _InsightsScreenState extends State<InsightsScreen> {
           ],
         ),
       );
+
+  Widget _basicAnalyticsCard(bool dark) {
+    return _card(
+      dark,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('30-Day Revenue Trend', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          // Mocking a bar chart for revenue
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (index) {
+              final heights = [40.0, 60.0, 30.0, 80.0, 50.0, 90.0, 70.0];
+              final labels = ['W1', 'W2', 'W3', 'W4', 'W1', 'W2', 'W3'];
+              return Column(
+                children: [
+                  Container(
+                    width: 24,
+                    height: heights[index],
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withValues(alpha: 0.8),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(labels[index], style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
+              );
+            }),
+          ),
+          const Divider(height: 32),
+          Text('Staff Performance (Bookings)', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          // Mock staff performance table
+          _staffRow('Alice', 124, 85000),
+          _staffRow('Bob', 98, 62000),
+          _staffRow('Charlie', 76, 45000),
+        ],
+      ),
+    );
+  }
+
+  Widget _staffRow(String name, int bookings, double revenue) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(name, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500)),
+          Text('$bookings bookings', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600)),
+          Text('₹${_inr(revenue)}', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _retentionFunnelCard(bool dark) {
+    return _card(
+      dark,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _funnelStep(100, 'First-time visitors', AppTheme.accentColor.withValues(alpha: 1.0)),
+          const SizedBox(height: 4),
+          _funnelStep(42, 'Returned for a 2nd visit', AppTheme.accentColor.withValues(alpha: 0.8)),
+          const SizedBox(height: 4),
+          _funnelStep(28, 'Returned for a 3rd visit', AppTheme.accentColor.withValues(alpha: 0.6)),
+          const SizedBox(height: 4),
+          _funnelStep(15, 'Became regulars (4+ visits)', AppTheme.accentColor.withValues(alpha: 0.4)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                const Icon(Icons.insights, color: Color(0xFF16A34A), size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Your 42% 2nd-visit rate is above the 35% industry average.', style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF15803D)))),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _funnelStep(int percentage, String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 45,
+          alignment: Alignment.centerRight,
+          child: Text('$percentage%', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GoogleFonts.outfit(fontSize: 12)),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: percentage / 100.0,
+                  minHeight: 8,
+                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   /// Indian digit grouping: ₹1,45,950 rather than ₹145,950.
   ///

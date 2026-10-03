@@ -16,6 +16,7 @@ import '../../theme/app_colors.dart';
 import '../../utils/bottom_clearance.dart';
 import '../../main.dart'; // To access themeNotifier
 import '../edit_profile_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class ProfileTab extends StatefulWidget {
   final bool isGuest;
@@ -90,24 +91,27 @@ class _ProfileTabState extends State<ProfileTab> {
       });
     }
 
+    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    bool osEnabled = settings.authorizationStatus == AuthorizationStatus.authorized || 
+                     settings.authorizationStatus == AuthorizationStatus.provisional;
+    bool apiEnabled = true;
+
     // Load Push notification preference from backend if not guest
     if (!widget.isGuest) {
       try {
         final prefsData = await _profileService.getNotificationPreferences();
-        if (mounted) {
-          setState(() {
-            _pushNotifications = prefsData['push_enabled'] ?? true;
-          });
-        }
+        apiEnabled = prefsData['push_enabled'] ?? true;
       } catch (e) {
         debugPrint('Error loading notification preferences: $e');
       }
     } else {
-      if (mounted) {
-        setState(() {
-          _pushNotifications = prefs.getBool('push_notifications') ?? true;
-        });
-      }
+      apiEnabled = prefs.getBool('push_notifications') ?? true;
+    }
+
+    if (mounted) {
+      setState(() {
+        _pushNotifications = osEnabled && apiEnabled;
+      });
     }
   }
 
@@ -622,12 +626,47 @@ class _ProfileTabState extends State<ProfileTab> {
                       icon: Icons.notifications_outlined,
                       label: 'Push Notifications',
                       value: _pushNotifications,
-                      onChanged: (val) {
+                      onChanged: (val) async {
+                        if (val) {
+                          NotificationSettings settings = await FirebaseMessaging.instance.getNotificationSettings();
+                          if (settings.authorizationStatus == AuthorizationStatus.denied ||
+                              settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+                            settings = await FirebaseMessaging.instance.requestPermission();
+                            if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+                                settings.authorizationStatus != AuthorizationStatus.provisional) {
+                              if (!mounted) return;
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Notifications Disabled'),
+                                  content: const Text('Please enable notifications for BookALook in your device settings to receive updates.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
+                          }
+                        }
+
                         setState(() => _pushNotifications = val);
                         if (!widget.isGuest) {
-                          _profileService.updateNotificationPreferences({
-                            'push_enabled': val,
-                          });
+                          try {
+                            await _profileService.updateNotificationPreferences({
+                              'push_enabled': val,
+                            });
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() => _pushNotifications = !val);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Failed to update preferences'))
+                              );
+                            }
+                          }
                         } else {
                           _toggleSetting('push_notifications', val);
                         }

@@ -465,10 +465,10 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                               
                               final workTime = isOff 
                                 ? 'Closed' 
-                                : ' - ';
+                                : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
                                 
                               final breakTime = hour['break_start'] != null 
-                                ? ' - '
+                                ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
                                 : 'No break';
 
                               return Column(

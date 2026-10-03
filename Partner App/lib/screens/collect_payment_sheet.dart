@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/check_in_api.dart';
+import '../services/insights_api.dart';
 import '../theme/app_theme.dart';
 import 'add_extra_service_sheet.dart';
 
@@ -56,6 +57,7 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _error;
+  SalonInsights? _insights;
 
   @override
   void initState() {
@@ -65,10 +67,14 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
 
   Future<void> _load() async {
     try {
-      final target = await CheckInApi.bill(widget.salonId, widget.appointmentId);
+      final futures = await Future.wait([
+        CheckInApi.bill(widget.salonId, widget.appointmentId),
+        InsightsApi.fetch(widget.salonId).catchError((_) => SalonInsights(advanced: false, overview: Overview(), services: [], campaigns: CampaignStats())),
+      ]);
       if (!mounted) return;
       setState(() {
-        _target = target;
+        _target = futures[0] as CheckInTarget;
+        _insights = futures[1] as SalonInsights;
         _isLoading = false;
       });
     } catch (e) {
@@ -284,6 +290,7 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
 
         if (!settled) ...[
           const SizedBox(height: 4),
+          _buildSmartPrompt(),
           OutlinedButton.icon(
             onPressed: _isSubmitting || apt.status != 'in_progress' ? null : _addExtra,
             icon: const Icon(Icons.add, size: 18),
@@ -438,6 +445,55 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
               icon: Icon(Icons.close, size: 18, color: AppTheme.lightDanger),
               onPressed: () => _removeExtra(line),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmartPrompt() {
+    if (_insights?.advanced != true || _target == null) return const SizedBox.shrink();
+    
+    // Find an upsell matching any booked service
+    final bookedServicesNames = _target!.bill.lines.map((l) => l.name.toLowerCase()).toList();
+    UpsellTip? tip;
+    for (var lineName in bookedServicesNames) {
+      for (var u in _insights!.upsell) {
+        if (lineName.contains(u.from.toLowerCase())) {
+          tip = u;
+          break;
+        }
+      }
+      if (tip != null) break;
+    }
+
+    if (tip == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Smart Suggestion', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFF6D28D9), fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(
+                  'This client regularly pairs ${tip.from} with ${tip.to}. Pitch a ${tip.to} today!',
+                  style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF4C1D95)),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -57,6 +57,7 @@ class ServiceManagementApi {
     double? advancePercentage,
     String? genderFocus,
     bool? willRefundAdvanceIfCancelled,
+    List<String>? linkedServiceIds,
   }) async {
     final body = {
       'is_custom': isCustom,
@@ -70,6 +71,7 @@ class ServiceManagementApi {
       if (advancePercentage != null) 'advance_percentage': advancePercentage,
       if (genderFocus != null) 'gender_focus': genderFocus,
       if (willRefundAdvanceIfCancelled != null) 'will_refund_advance_if_cancelled': willRefundAdvanceIfCancelled,
+      if (linkedServiceIds != null) 'linked_service_ids': linkedServiceIds,
     };
 
     final response = await http.post(
@@ -92,10 +94,12 @@ class ServiceManagementApi {
     required String serviceId,
     double? price,
     String? description,
+    List<String>? linkedServiceIds,
   }) async {
     final body = <String, dynamic>{};
     if (price != null) body['price'] = price;
     if (description != null) body['description'] = description;
+    if (linkedServiceIds != null) body['linked_service_ids'] = linkedServiceIds;
 
     final response = await http.put(
       Uri.parse('$baseUrl/salons/$salonId/services/$serviceId'),

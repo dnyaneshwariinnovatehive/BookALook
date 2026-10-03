@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
+import '../services/insights_api.dart';
 import '../utils/time_fmt.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
@@ -24,6 +25,20 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   late Map<String, dynamic> appointment = Map<String, dynamic>.from(widget.appointment);
   String get salonId => widget.salonId;
   bool _isBusy = false;
+  SalonInsights? _insights;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInsights();
+  }
+
+  Future<void> _loadInsights() async {
+    try {
+      final res = await InsightsApi.fetch(salonId);
+      if (mounted) setState(() => _insights = res);
+    } catch (_) {}
+  }
 
   /// Reloads the row so the buttons reflect what actually happened.
   Future<void> _refresh() async {
@@ -229,6 +244,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            
+            if (_insights != null && !isCompleted)
+              _buildSuggestedAddonsSection(serviceNames),
 
             // Financial Info
             _buildSection(
@@ -281,6 +299,66 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           Text(value, style: GoogleFonts.outfit(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 14)),
         ],
       ),
+    );
+  }
+
+  Widget _buildSuggestedAddonsSection(String serviceNames) {
+    if (_insights == null) return const SizedBox.shrink();
+    
+    // Find basic upsells (mocking manual links for basic plan, using real upsell data as placeholder)
+    List<UpsellTip> suggestions = [];
+    final lowerNames = serviceNames.toLowerCase();
+    
+    for (var u in _insights!.upsell) {
+      if (lowerNames.contains(u.from.toLowerCase())) {
+        suggestions.add(u);
+      }
+    }
+    
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSection(
+          title: 'Suggested Add-ons',
+          children: [
+            if (_insights!.advanced)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F3FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Smart Insight: This client gets a ${suggestions.first.to} regularly. Pitch it today to boost revenue by ${(suggestions.first.uplift * 100).toStringAsFixed(0)}%!',
+                        style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF6D28D9)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ...suggestions.map((s) => Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.add_circle_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Text(s.to, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            )).toList(),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }
