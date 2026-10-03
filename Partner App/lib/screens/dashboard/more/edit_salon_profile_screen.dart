@@ -20,7 +20,10 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _addressController;
   late TextEditingController _pincodeController;
+  late TextEditingController _mapUrlController;
+  late TextEditingController _advancePercentageController;
   String _selectedGenderFocus = 'Unisex';
+  bool _advanceRequired = true;
   
   final List<String> _genderOptions = ['Unisex', 'Male', 'Female'];
   
@@ -38,6 +41,10 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     _descriptionController = TextEditingController(text: widget.salonData['description']?.toString() ?? '');
     _addressController = TextEditingController(text: widget.salonData['address']?.toString() ?? '');
     _pincodeController = TextEditingController(text: widget.salonData['pincode']?.toString() ?? '');
+    _mapUrlController = TextEditingController(text: widget.salonData['map_url']?.toString() ?? '');
+    
+    _advanceRequired = widget.salonData['advance_required'] == 1 || widget.salonData['advance_required'] == true;
+    _advancePercentageController = TextEditingController(text: widget.salonData['advance_percentage_default']?.toString() ?? '25');
     
     final gender = widget.salonData['gender_focus']?.toString() ?? 'Unisex';
     if (_genderOptions.contains(gender)) {
@@ -52,6 +59,8 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     _descriptionController.dispose();
     _addressController.dispose();
     _pincodeController.dispose();
+    _mapUrlController.dispose();
+    _advancePercentageController.dispose();
     super.dispose();
   }
 
@@ -82,6 +91,9 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
         address: _addressController.text.trim(),
         pincode: _pincodeController.text.trim(),
         genderFocus: _selectedGenderFocus,
+        mapUrl: _mapUrlController.text.trim().isEmpty ? null : _mapUrlController.text.trim(),
+        advanceRequired: _advanceRequired,
+        advancePercentageDefault: _advancePercentageController.text.trim(),
         imagePath: _selectedImage?.path,
       );
       
@@ -179,11 +191,52 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
             const SizedBox(height: 20),
             _buildTextField('Pincode', _pincodeController, keyboardType: TextInputType.number),
             const SizedBox(height: 20),
+            _buildTextField('Google Maps URL', _mapUrlController, keyboardType: TextInputType.url),
+            const SizedBox(height: 20),
             _buildDropdown('Gender Focus', _selectedGenderFocus, _genderOptions, (val) {
               setState(() {
                 _selectedGenderFocus = val!;
               });
             }),
+            const SizedBox(height: 20),
+            
+            // Advance Booking Settings
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.dividerColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Booking Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Require Advance Payment', style: TextStyle(fontSize: 14)),
+                      Switch(
+                        value: _advanceRequired,
+                        activeColor: AppTheme.accentColor,
+                        onChanged: (val) {
+                          setState(() => _advanceRequired = val);
+                        },
+                      ),
+                    ],
+                  ),
+                  if (_advanceRequired) ...[
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      'Default Advance %', 
+                      _advancePercentageController, 
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true)
+                    ),
+                  ],
+                ],
+              ),
+            ),
             
             const SizedBox(height: 40),
 

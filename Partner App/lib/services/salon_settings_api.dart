@@ -59,12 +59,18 @@ class SalonSettingsApi {
     String? address,
     String? pincode,
     String? genderFocus,
+    String? mapUrl,
+    bool? advanceRequired,
+    String? advancePercentageDefault,
     String? imagePath,
   }) async {
+    final headers = await _getHeaders();
+    headers.remove('Content-Type'); // Let MultipartRequest set its own boundary
+
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl/salons/$salonId'),
-    )..headers.addAll(await _getHeaders());
+    )..headers.addAll(headers);
 
     request.fields['_method'] = 'PUT'; // Common convention for multipart PUT in PHP/Laravel
     request.fields['name'] = name;
@@ -79,6 +85,15 @@ class SalonSettingsApi {
     }
     if (genderFocus != null && genderFocus.isNotEmpty) {
       request.fields['gender_focus'] = genderFocus;
+    }
+    if (mapUrl != null) {
+      request.fields['map_url'] = mapUrl;
+    }
+    if (advanceRequired != null) {
+      request.fields['advance_required'] = advanceRequired ? '1' : '0';
+    }
+    if (advancePercentageDefault != null && advancePercentageDefault.isNotEmpty) {
+      request.fields['advance_percentage_default'] = advancePercentageDefault;
     }
 
     if (imagePath != null) {

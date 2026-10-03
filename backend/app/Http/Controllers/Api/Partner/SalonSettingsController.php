@@ -26,6 +26,9 @@ class SalonSettingsController extends Controller
             'pincode' => 'nullable|string|max:10',
             'gender_focus' => 'nullable|string',
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'map_url' => 'nullable|string|url|max:500',
+            'advance_required' => 'nullable|boolean',
+            'advance_percentage_default' => 'nullable|numeric|min:0|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -48,6 +51,18 @@ class SalonSettingsController extends Controller
         
         if ($request->has('gender_focus')) {
             $salon->gender_focus = $request->gender_focus;
+        }
+
+        if ($request->has('map_url')) {
+            $salon->map_url = $request->map_url;
+        }
+
+        if ($request->has('advance_required')) {
+            $salon->advance_required = $request->boolean('advance_required');
+        }
+
+        if ($request->has('advance_percentage_default')) {
+            $salon->advance_percentage_default = $request->advance_percentage_default;
         }
 
         if ($request->hasFile('cover_image')) {
