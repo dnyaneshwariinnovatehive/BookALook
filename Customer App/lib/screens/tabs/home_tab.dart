@@ -851,10 +851,13 @@ class _HomeTabState extends State<HomeTab> {
             ),
           )
         else
-          CategoryGrid(
-            categories: _categories,
-            onTap: _openCategoryInExplore,
-            onViewMore: _openCategoriesPage,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: CategoryGrid(
+              categories: _categories,
+              onTap: _openCategoryInExplore,
+              onViewMore: _openCategoriesPage,
+            ),
           ),
       ],
     );
@@ -923,7 +926,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -953,20 +956,20 @@ class _HomeTabState extends State<HomeTab> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Column(
                       children: [
                         Icon(Icons.calendar_today_outlined,
-                            size: 48,
+                            size: 40,
                             color: isDark ? AppTheme.accentColor.withValues(alpha: 0.4) : AppTheme.accentColor.withValues(alpha: 0.25)),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         Text(
                           widget.isGuest
                               ? 'Sign in to see your appointments'
-                              : 'No upcoming appointments',
+                              : 'No upcoming appointments ? Book Now',
                           style: TextStyle(
                               color: isDark ? Colors.white70 : const Color(0xFF756A8F),
                               fontWeight: FontWeight.w600,
