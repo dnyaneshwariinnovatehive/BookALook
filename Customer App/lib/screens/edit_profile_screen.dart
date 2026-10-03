@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_haptics.dart';
 
@@ -124,7 +125,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.colors.background,
+      backgroundColor: context.colors.surfaceMuted,
       appBar: AppBar(
         title: Text('Edit Profile', style: GoogleFonts.outfit(color: context.colors.textPrimary, fontWeight: FontWeight.bold)),
         backgroundColor: context.colors.surface,
