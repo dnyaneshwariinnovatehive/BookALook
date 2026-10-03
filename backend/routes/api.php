@@ -264,6 +264,7 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/reports/cities', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'cities']);
         Route::get('/reports/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'subAreas']);
         Route::get('/reports/services', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'services']);
+        Route::get('/reports/crowd-analysis', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'crowdAnalysis']);
     });
 });
 

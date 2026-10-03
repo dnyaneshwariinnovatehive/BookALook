@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/admin/ui';
 import styles from './page.module.css';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 /**
  * Platform Reporting — the owner's single view across the whole network.
@@ -531,12 +532,114 @@ export default function ReportsPage() {
             </>
           )}
         </Section>
+        
+        <CrowdAnalysisSection from={from} to={to} salonsReport={salons} />
       </div>
     </div>
   );
 }
 
 /* ---------------------------------------------------------------- helpers */
+
+function CrowdAnalysisSection({ from, to, salonsReport }: { from: string; to: string; salonsReport: any[] }) {
+  const [cities, setCities] = useState<any[]>([]);
+  const [cityId, setCityId] = useState('');
+  const [subAreas, setSubAreas] = useState<any[]>([]);
+  const [subAreaId, setSubAreaId] = useState('');
+  const [salonId, setSalonId] = useState('');
+
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/cities').then(r => r.json()).then(setCities).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (cityId) {
+      fetch(`/api/cities/${cityId}/sub-areas`).then(r => r.json()).then(data => setSubAreas(data.sub_areas || [])).catch(() => {});
+    } else {
+      setSubAreas([]);
+      setSubAreaId('');
+    }
+  }, [cityId]);
+
+  useEffect(() => {
+    if (!cityId) {
+      setChartData([]);
+      return;
+    }
+    setLoading(true);
+    const q = new URLSearchParams({ city_id: cityId });
+    if (subAreaId) q.append('sub_area_id', subAreaId);
+    if (salonId) q.append('salon_id', salonId);
+    if (from) q.append('from', from);
+    if (to) q.append('to', to);
+    
+    fetch(`/api/proxy/superadmin/reports/crowd-analysis?${q.toString()}`)
+      .then(r => r.json())
+      .then(data => {
+        setChartData(data.data || []);
+      })
+      .finally(() => setLoading(false));
+  }, [cityId, subAreaId, salonId, from, to]);
+
+  const selectedCityName = cities.find(c => String(c.id) === String(cityId))?.name;
+  const filteredSalons = salonsReport.filter(s => s.city === selectedCityName);
+
+  return (
+    <Section title="Crowd Analysis" desc="Visualise average crowd by timeslots." accent>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
+          <select value={cityId} onChange={e => { setCityId(e.target.value); setSubAreaId(''); setSalonId(''); }}>
+            <option value="">Select City (Required)</option>
+            {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        
+        {cityId && (
+          <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
+            <select value={subAreaId} onChange={e => { setSubAreaId(e.target.value); setSalonId(''); }}>
+              <option value="">All Sub Areas</option>
+              {subAreas.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+        
+        {cityId && (
+          <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
+            <select value={salonId} onChange={e => setSalonId(e.target.value)}>
+              <option value="">All Salons in City</option>
+              {filteredSalons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+      
+      {cityId ? (
+        <div style={{ height: '350px', width: '100%', marginTop: '24px' }}>
+          {loading ? (
+            <p className={styles.muted}>Loading data...</p>
+          ) : chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="time" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} tickMargin={10} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} tickMargin={10} />
+                <Tooltip cursor={{ fill: 'var(--surface-sunken)' }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                <Bar dataKey="count" name="Appointments" fill="var(--accent-color)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className={styles.muted}>No appointments found for these filters.</p>
+          )}
+        </div>
+      ) : (
+        <p className={styles.muted}>Please select a city to view the analysis.</p>
+      )}
+    </Section>
+  );
+}
 
 function KPI({ label, value, sub, accent, dotColor }: { label: string; value: string; sub: string; accent?: boolean; dotColor?: string }) {
   return (

@@ -1,4 +1,5 @@
 import 'package:partner_app/theme/app_theme.dart';
+import '../../../widgets/initials_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -345,48 +346,47 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
   }
 
   @override
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     final List<dynamic> services = widget.provider['services'] ?? [];
     final List<dynamic> workingHours = widget.provider['working_hours'] ?? [];
     
     workingHours.sort((a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int));
-
     final List<String> daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    final bool hasMoreServices = services.length > _maxVisibleServices;
-    final List<dynamic> visibleServices = _showAllServices 
-        ? services 
-        : (services.length > _maxVisibleServices ? services.sublist(0, _maxVisibleServices) : services);
-
     return Scaffold(
-      backgroundColor: AppTheme.lightBg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'My Profile',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                ),
-                const SizedBox(height: 32),
-                
-                // Header Profile Section
-                Row(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Card
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
                   children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.accentColor, width: 2),
-                        image: const DecorationImage(
-                          image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    InitialsAvatar(
+                      name: widget.user['name'] ?? 'Unknown',
+                      radius: 36,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -395,23 +395,16 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                         children: [
                           Text(
                             widget.user['name'] ?? 'Unknown',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'Service Provider',
-                              style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            widget.salon['name'] ?? 'Luxe Studio Salon',
+                            'Service Provider',
+                            style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.salon['name'] ?? '',
                             style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
                           ),
                         ],
@@ -419,350 +412,189 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
-
-                // Services Chips
-                if (services.isNotEmpty) ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ...visibleServices.map((s) => _buildServiceChip(_getServiceName(s))),
-                      if (hasMoreServices && !_showAllServices)
-                        GestureDetector(
-                          onTap: () => setState(() => _showAllServices = true),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '+${services.length - _maxVisibleServices} more',
-                              style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (_showAllServices && hasMoreServices) ...[
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => setState(() => _showAllServices = false),
-                      child: Text(
-                        'Show less',
-                        style: TextStyle(color: AppTheme.accentColor, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Text(
-                    'Set by salon admin',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
-                  ),
-                  const SizedBox(height: 40),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Options List
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
-
-                // Personal Information Section
-                // Personal Information Section
-                GestureDetector(
-                  onTap: () => setState(() => _showPersonalInfo = !_showPersonalInfo),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Personal Information',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      AnimatedRotation(
-                        turns: _showPersonalInfo ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          size: 28,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                AnimatedCrossFade(
-                  firstChild: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              ),
+              child: Column(
+                children: [
+                  // Personal Information
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.person_outline, color: AppTheme.accentColor),
+                      title: const Text('Personal Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      childrenPadding: const EdgeInsets.all(16),
                       children: [
-                        Icon(Icons.person_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Tap to view personal info',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 14),
-                        ),
-                      ],
-                    ),
+                        _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
+                        Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                        _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
+                        Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                        _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
+                      ]
+                    )
                   ),
-                  secondChild: Column(
-                    children: [
-                      _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
-                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                      
-                      _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
-                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                      
-                      _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
-                      Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                      
-                      _buildPhotoUploadRow(context),
-                    ],
-                  ),
-                  crossFadeState: _showPersonalInfo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 200),
-                ),
-                
-                const SizedBox(height: 40),
+                  const Divider(height: 1, indent: 56),
 
-                // Working Hours Section - Collapsible
-                GestureDetector(
-                  onTap: () => setState(() => _showWorkingHours = !_showWorkingHours),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Working Hours',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      AnimatedRotation(
-                        turns: _showWorkingHours ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          size: 28,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                AnimatedCrossFade(
-                  firstChild: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  // Working Hours
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.access_time, color: Colors.orange),
+                      title: const Text('Working Hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      childrenPadding: const EdgeInsets.all(16),
                       children: [
-                        Icon(Icons.schedule, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                        const SizedBox(width: 8),
-                        Text(
-                          workingHours.isEmpty ? 'No working hours assigned' : 'Tap to view working hours',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                  secondChild: workingHours.isEmpty
-                      ? Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
-                      : Column(
-                          children: workingHours.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final hour = entry.value;
-                            final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
-                            
-                            final workTime = isOff 
-                              ? 'Closed' 
-                              : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
+                        if (workingHours.isEmpty)
+                          Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
+                        else
+                          Column(
+                            children: workingHours.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final hour = entry.value;
+                              final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
                               
-                            final breakTime = hour['break_start'] != null 
-                              ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
-                              : 'No break';
+                              final workTime = isOff 
+                                ? 'Closed' 
+                                : ' - ';
+                                
+                              final breakTime = hour['break_start'] != null 
+                                ? ' - '
+                                : 'No break';
 
-                            return Column(
-                              children: [
-                                _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
-                                if (index < workingHours.length - 1)
-                                  Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                  crossFadeState: _showWorkingHours ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 200),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Time Off Section
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProviderLeavesScreen(salon: widget.salon),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
+                              return Column(
+                                children: [
+                                  _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
+                                  if (index < workingHours.length - 1)
+                                    Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                                ],
+                              );
+                            }).toList(),
                           ),
-                          child: Icon(Icons.calendar_today_outlined, color: AppTheme.accentColor, size: 20),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'My Leaves',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'View leaves and apply for time off',
-                                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
-                              ),
-                            ],
+                      ]
+                    )
+                  ),
+                  const Divider(height: 1, indent: 56),
+
+                  // Services
+                  if (services.isNotEmpty) ...[
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        leading: const Icon(Icons.content_cut, color: Colors.pink),
+                        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        childrenPadding: const EdgeInsets.all(16),
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: services.map((s) => _buildServiceChip(_getServiceName(s))).toList(),
                           ),
-                        ),
-                        Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
-                      ],
+                        ]
+                      )
                     ),
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
+                    const Divider(height: 1, indent: 56),
+                  ],
 
-                // Salary button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.push(
+                  // My Leaves
+                  _buildOptionTile(context, 
+                    icon: Icons.calendar_today_outlined,
+                    iconColor: Colors.purple,
+                    title: 'My Leaves',
+                    onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => MySalaryScreen(salonId: widget.salon['id'].toString()),
-                      ),
-                    ),
-                    icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
-                    label: const Text('My salary & commission'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.accentColor,
-                      side: BorderSide(color: AppTheme.accentColor.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      MaterialPageRoute(builder: (context) => ProviderLeavesScreen(salon: widget.salon)),
                     ),
                   ),
-                ),
+                  const Divider(height: 1, indent: 56),
 
-                const SizedBox(height: 16),
-                
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(12),
+                  // My Salary & Commission
+                  _buildOptionTile(context, 
+                    icon: Icons.account_balance_wallet_outlined,
+                    iconColor: Colors.green,
+                    title: 'My Salary & Commission',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => MySalaryScreen(salonId: widget.salon['id'].toString())),
+                    ),
                   ),
-                  child: const PushNotificationToggle(),
-                ),
-
-                const SizedBox(height: 16),
-                
-                // Dark Mode Toggle
-                ValueListenableBuilder<ThemeMode>(
-                  valueListenable: themeNotifier,
-                  builder: (context, currentMode, _) {
-                    final isDark = currentMode == ThemeMode.dark;
-                    return Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).dividerColor),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SwitchListTile(
-                        value: isDark,
+                  const Divider(height: 1, indent: 56),
+                  
+                  // Push Notifications
+                  const PushNotificationToggle(),
+                  const Divider(height: 1, indent: 56),
+                  
+                  // Dark Mode
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: themeNotifier,
+                    builder: (context, currentMode, _) {
+                      final isDarkMode = currentMode == ThemeMode.dark;
+                      return SwitchListTile(
+                        value: isDarkMode,
                         onChanged: (val) async {
                           themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.setBool('isDarkMode', val);
                         },
                         secondary: Icon(
-                          isDark ? Icons.dark_mode : Icons.light_mode,
-                          color: isDark ? Colors.yellow : Colors.orange,
+                          isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                          color: isDarkMode ? Colors.yellow : Colors.orange,
                         ),
                         title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                      ),
-                    );
-                  },
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Logout Button
+            GestureDetector(
+              onTap: () => _logout(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkDanger.withOpacity(0.15) : const Color(0xFFFDECEE),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-
-                const SizedBox(height: 24),
-
-                // Logout
-                SizedBox(
-                  width: double.infinity,
-                  child: GestureDetector(
-                    onTap: () => _logout(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: (Theme.of(context).brightness == Brightness.dark
-                                ? AppTheme.darkDanger
-                                : AppTheme.lightDanger)
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.logout,
-                            size: 18,
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? AppTheme.darkDanger
-                                : AppTheme.lightDanger,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Logout',
-                            style: TextStyle(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? AppTheme.darkDanger
-                                  : AppTheme.lightDanger,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
-
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
-          ),
+            
+            const SizedBox(height: 40),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOptionTile(BuildContext context, {required IconData icon, required Color iconColor, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 
@@ -811,49 +643,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
     );
   }
 
-  Widget _buildPhotoUploadRow(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'PHOTO',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.bold, letterSpacing: 0.5),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Tap to change photo',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), fontSize: 14),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Text(
-          'Upload',
-          style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildWorkingHourRow(BuildContext context, String day, String workTime, String? breakTime) {
     return Row(

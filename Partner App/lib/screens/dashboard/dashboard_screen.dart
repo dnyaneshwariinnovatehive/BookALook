@@ -61,17 +61,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _checkAccess();
+  void _buildTabs() {
     _tabs = [
       HomeTab(salonId: widget.salonData['id'].toString(), salonName: widget.salonData['name']?.toString() ?? ''),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
       StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),
-      MoreTab(salonData: widget.salonData),
+      MoreTab(
+        salonData: widget.salonData,
+        onSalonUpdated: (updatedData) {
+          setState(() {
+            widget.salonData.addAll(updatedData);
+            _buildTabs();
+          });
+        },
+      ),
     ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAccess();
+    _buildTabs();
   }
 
   void _onItemTapped(int index) {

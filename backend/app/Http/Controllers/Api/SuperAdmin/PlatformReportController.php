@@ -183,6 +183,68 @@ class PlatformReportController extends Controller
         return response()->json(['success' => true, 'services' => $rows]);
     }
 
+    public function crowdAnalysis(Request $request)
+    {
+        $request->validate([
+            'city_id' => 'required|integer',
+            'sub_area_id' => 'nullable|integer',
+            'salon_id' => 'nullable|integer',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date',
+        ]);
+
+        $query = DB::table('appointments')
+            ->join('salons', 'salons.id', '=', 'appointments.salon_id')
+            ->where('salons.city_id', $request->input('city_id'));
+
+        if ($request->filled('sub_area_id')) {
+            $query->where('salons.sub_area_id', $request->input('sub_area_id'));
+        }
+
+        if ($request->filled('salon_id')) {
+            $query->where('appointments.salon_id', $request->input('salon_id'));
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('appointments.appointment_date', '>=', $request->input('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('appointments.appointment_date', '<=', $request->input('to'));
+        }
+
+        $appointments = $query->select('appointments.start_time')->get();
+
+        $crowd = array_fill(0, 24, 0);
+        foreach ($appointments as $appt) {
+            if ($appt->start_time) {
+                $parts = explode(':', $appt->start_time);
+                if (count($parts) >= 2) {
+                    $hour = (int) $parts[0];
+                    if ($hour >= 0 && $hour < 24) {
+                        $crowd[$hour]++;
+                    }
+                }
+            }
+        }
+
+        // Format for recharts
+        $chartData = [];
+        foreach ($crowd as $hour => $count) {
+            $label = str_pad($hour, 2, '0', STR_PAD_LEFT) . ':00';
+            $chartData[] = [
+                'time' => $label,
+                'count' => $count,
+                'hour' => $hour,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $chartData,
+        ]);
+    }
+
     // ------------------------------------------------------------- internals
 
     private function appointmentCounts(Carbon $today, Carbon $week, Carbon $month): array

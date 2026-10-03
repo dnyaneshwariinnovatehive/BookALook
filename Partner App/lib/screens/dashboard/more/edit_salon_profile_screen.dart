@@ -88,7 +88,7 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     setState(() => _isLoading = true);
     
     try {
-      await SalonSettingsApi.updateSalonProfile(
+      final updatedSalon = await SalonSettingsApi.updateSalonProfile(
         salonId: widget.salonData['id'].toString(),
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -106,7 +106,7 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, updatedSalon); // Return the updated salon map
       }
     } catch (e) {
       if (mounted) {

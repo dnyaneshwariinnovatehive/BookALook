@@ -136,6 +136,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         color: AppTheme.lightBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -257,6 +258,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),

@@ -53,7 +53,7 @@ class SalonSettingsApi {
     }
   }
 
-  static Future<void> updateSalonProfile({
+  static Future<Map<String, dynamic>> updateSalonProfile({
     required String salonId,
     required String name,
     required String phone,
@@ -123,9 +123,12 @@ class SalonSettingsApi {
     }
 
     final response = await request.send();
+    final bodyStr = await response.stream.bytesToString();
     if (response.statusCode != 200 && response.statusCode != 201) {
-      final bodyStr = await response.stream.bytesToString();
       throw Exception('Failed to update salon profile: $bodyStr');
     }
+    
+    final json = jsonDecode(bodyStr);
+    return json['salon'] as Map<String, dynamic>;
   }
 }

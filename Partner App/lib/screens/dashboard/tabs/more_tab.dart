@@ -20,9 +20,24 @@ import '../more/edit_salon_profile_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
 
-class MoreTab extends StatelessWidget {
+class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
-  const MoreTab({super.key, required this.salonData});
+  final Function(Map<String, dynamic>)? onSalonUpdated;
+  
+  const MoreTab({super.key, required this.salonData, this.onSalonUpdated});
+
+  @override
+  State<MoreTab> createState() => _MoreTabState();
+}
+
+class _MoreTabState extends State<MoreTab> {
+  late Map<String, dynamic> salonData;
+
+  @override
+  void initState() {
+    super.initState();
+    salonData = Map.from(widget.salonData);
+  }
 
   /// `Switch Salon` and `Switch Account` are still standing in for this one
   /// method, so the dialog says plainly what the tap actually does instead of
@@ -147,12 +162,21 @@ class MoreTab extends StatelessWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => EditSalonProfileScreen(salonData: salonData)),
-                            );
-                          },
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => EditSalonProfileScreen(salonData: salonData)),
+                          ).then((updatedData) {
+                            if (updatedData != null && updatedData is Map<String, dynamic>) {
+                              setState(() {
+                                salonData.addAll(updatedData);
+                              });
+                              if (widget.onSalonUpdated != null) {
+                                widget.onSalonUpdated!(updatedData);
+                              }
+                            }
+                          });
+                        },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(

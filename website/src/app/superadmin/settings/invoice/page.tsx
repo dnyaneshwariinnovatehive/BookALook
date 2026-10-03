@@ -597,9 +597,10 @@ export default function InvoiceFormatPage() {
           </div>
         </div>
 
-        <div className={s.previewSticky}>
-          <Card
-            title="Preview"
+        <div style={{ minWidth: 0 }}>
+          <div className={s.previewSticky}>
+            <Card
+              title="Preview"
             /* Names the document on the preview itself. The sample is the only
                thing on this page a reader cannot infer the purpose of from the
                fields beside it, so it is labelled twice over. */
@@ -842,6 +843,7 @@ export default function InvoiceFormatPage() {
             </div>
             )}
           </Card>
+          </div>
         </div>
       </div>
     </div>

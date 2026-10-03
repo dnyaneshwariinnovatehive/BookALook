@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../../widgets/initials_avatar.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../../notifications_screen.dart';
 import '../../../services/notification_service.dart';
@@ -409,10 +410,9 @@ class _HomeTabState extends State<HomeTab> {
         Flexible(
           child: Row(
             children: [
-              const CircleAvatar(
+              const InitialsAvatar(
+                name: 'Admin',
                 radius: 24,
-                backgroundColor: Color(0xFFE0E0E0),
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11'), // Placeholder for Admin Profile
               ),
               const SizedBox(width: 12),
               Flexible(
@@ -854,7 +854,6 @@ class _HomeTabState extends State<HomeTab> {
             final activeStaff = _staff.where((s) => s.isActive).toList();
             final member = activeStaff[index];
             final load = _providerLoads[member.id] ?? 0;
-            final String avatarUrl = member.user?['avatar_url'] ?? 'https://i.pravatar.cc/150?u=${member.id}';
 
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -871,10 +870,9 @@ class _HomeTabState extends State<HomeTab> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
+                  InitialsAvatar(
+                    name: member.user?['name'] ?? 'Unknown',
                     radius: 20,
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                    backgroundImage: NetworkImage(avatarUrl),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
