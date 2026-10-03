@@ -33,6 +33,7 @@ Route::prefix('customer')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
+        Route::put('/profile/update', [CustomerAuthController::class, 'updateProfile']);
         // Switching market happens from the home screen, not the profile form.
         Route::put('/profile/city', [CustomerAuthController::class, 'updateCity']);
         Route::delete('/account', [CustomerAuthController::class, 'deleteAccount']);

@@ -265,13 +265,6 @@ class LegalDocumentTile extends StatelessWidget {
                     doc.title,
                     style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w500, color: heading),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    doc.summary,
-                    maxLines: isSwitcher ? 1 : 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontSize: 12, color: body),
-                  ),
                 ],
               ),
             ),

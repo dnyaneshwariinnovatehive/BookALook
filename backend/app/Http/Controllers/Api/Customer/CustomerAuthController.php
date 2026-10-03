@@ -175,6 +175,50 @@ class CustomerAuthController extends Controller
      * Get customer profile and stats.
      */
     /**
+     * Update customer profile.
+     */
+    public function updateProfile(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|string|max:150',
+            'phone' => 'sometimes|string|max:15',
+            'email' => 'nullable|email|max:255',
+            'gender' => 'nullable|in:male,female,other,unspecified',
+            'date_of_birth' => 'nullable|date',
+            'address' => 'nullable|string',
+            'pincode' => 'nullable|string|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $user = $request->user();
+
+        if ($request->has('phone') && $request->phone !== $user->phone) {
+            $existingUser = User::where('phone', $request->phone)->first();
+            if ($existingUser) {
+                return response()->json(['message' => 'This phone number is already registered.'], 400);
+            }
+            $user->phone = $request->phone;
+        }
+
+        if ($request->has('name')) $user->name = $request->name;
+        if ($request->has('email')) $user->email = $request->email;
+        if ($request->has('gender')) $user->gender = $request->gender;
+        if ($request->has('date_of_birth')) $user->date_of_birth = $request->date_of_birth;
+        if ($request->has('address')) $user->address = $request->address;
+        if ($request->has('pincode')) $user->pincode = $request->pincode;
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user' => $user
+        ]);
+    }
+
+    /**
      * Change the city this customer browses in.
      *
      * Separate from the rest of the profile because it is changed far more

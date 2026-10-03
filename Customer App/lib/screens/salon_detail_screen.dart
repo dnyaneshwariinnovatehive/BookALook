@@ -633,15 +633,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             if (gallery.isEmpty)
               _galleryPlaceholder()
             else
-              PageView.builder(
-                controller: _galleryController,
-                itemCount: gallery.length,
-                onPageChanged: (i) => setState(() => _galleryPage = i),
-                itemBuilder: (context, index) => Image.network(
-                  gallery[index]['url'] ?? '',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _galleryPlaceholder(),
-                ),
+              Image.network(
+                gallery.first['url'] ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _galleryPlaceholder(),
               ),
 
             // Scrim so the chips and the pinned title stay readable.
@@ -672,29 +667,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 ],
               ),
             ),
-
-            if (gallery.length > 1)
-              Positioned(
-                bottom: 6,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    gallery.length,
-                    (i) => AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      margin: EdgeInsets.symmetric(horizontal: 3),
-                      width: _galleryPage == i ? 18 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: _galleryPage == i ? 1 : 0.5),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -985,14 +957,21 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader('Value packages', 'Bundled services at a lower price'),
-        SizedBox(
-          height: 240,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            itemCount: combos.length,
-            separatorBuilder: (_, __) => SizedBox(width: 12),
-            itemBuilder: (context, index) => _comboCard(combos[index]),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: combos.asMap().entries.map((e) {
+                final index = e.key;
+                final combo = e.value;
+                return Padding(
+                  padding: EdgeInsets.only(right: index == combos.length - 1 ? 0 : 12),
+                  child: _comboCard(combo),
+                );
+              }).toList(),
+            ),
           ),
         ),
       ],
@@ -1046,32 +1025,30 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           Text('${combo['duration_minutes']} mins · ${lines.length} services',
               style: GoogleFonts.outfit(fontSize: 13, color: textBody)),
           SizedBox(height: 14),
-          Expanded(
-            child: ListView(
-              physics: const NeverScrollableScrollPhysics(),
-              children: lines
-                  .take(4)
-                  .map<Widget>((line) => Padding(
-                        padding: EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Icon(Icons.check_circle, size: 14, color: AppTheme.accentColor),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(line['name'] ?? '',
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 13, color: textBody, height: 1.3)),
-                            ),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: lines
+                .map<Widget>((line) => Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Icon(Icons.check_circle, size: 14, color: AppTheme.accentColor),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(line['name'] ?? '',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 13, color: textBody, height: 1.3)),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
           ),
+          Spacer(),
           SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

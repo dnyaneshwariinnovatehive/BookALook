@@ -10,6 +10,8 @@ import '../../widgets/city_picker_sheet.dart';
 import '../cart_screen.dart';
 import '../search_screen.dart';
 import '../../utils/app_haptics.dart';
+import '../../services/auth_service.dart';
+import '../phone_screen.dart';
 import '../../widgets/category_grid.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/error_text.dart';
@@ -118,6 +120,45 @@ class ExploreTabState extends State<ExploreTab> {
     });
 
     _loadSalons();
+  }
+
+  Future<void> _toggleFavourite(Map<String, dynamic> salon) async {
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      final loggedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+      );
+      if (loggedIn != true) return;
+    }
+
+    final salonId = salon['id'].toString();
+    try {
+      final isFavourited = await _salonService.toggleFavourite(salonId);
+      if (!mounted) return;
+      AppHaptics.lightImpact();
+      setState(() {
+        salon['is_favourited'] = isFavourited;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(describeError(e, fallback: 'Could not update your favourites.')),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _loadSalons() async {
@@ -852,13 +893,20 @@ class ExploreTabState extends State<ExploreTab> {
                       Positioned(
                         top: 12,
                         right: 12,
-                        child: Container(
-                          padding: EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: context.colors.surface.withValues(alpha: 0.9),
-                            shape: BoxShape.circle,
+                        child: GestureDetector(
+                          onTap: () => _toggleFavourite(salon),
+                          child: Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: context.colors.surface.withValues(alpha: 0.9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
+                              size: 18,
+                              color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                            ),
                           ),
-                          child: Icon(Icons.favorite_border, size: 18, color: context.colors.iconIdle),
                         ),
                       ),
                     ],

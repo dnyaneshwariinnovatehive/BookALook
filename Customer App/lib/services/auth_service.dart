@@ -140,6 +140,33 @@ class AuthService {
     }
   }
 
+  /// Update customer profile
+  Future<bool> updateProfile(Map<String, dynamic> data) async {
+    final token = await getToken();
+    if (token == null) return false;
+    try {
+      final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+      final response = await http.put(
+        Uri.parse('$apiBaseUrl/customer/profile/update'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Update Profile failed: ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Update Profile error: $e');
+      return false;
+    }
+  }
+
   /// Logs out by clearing the stored token.
   Future<void> logout() async {
     final token = await getToken();

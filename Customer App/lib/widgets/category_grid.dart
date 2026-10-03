@@ -198,15 +198,15 @@ class _CategoryTile extends StatelessWidget {
             // Square, so every tile lines up however wide the screen is.
             aspectRatio: 1,
             child: Container(
+              clipBehavior: Clip.hardEdge,
               decoration: BoxDecoration(
                 color: isDark ? foreground.withValues(alpha: 0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
-              padding: const EdgeInsets.all(14),
               child: hasIcon
                   ? Image.network(
                       iconUrl!,
-                      fit: BoxFit.contain,
+                      fit: BoxFit.cover,
                       errorBuilder: (context, error, stack) => Icon(
                         CategoryGrid.fallbackIcon(label),
                         color: foreground,

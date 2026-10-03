@@ -15,6 +15,7 @@ import '../../utils/app_haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/bottom_clearance.dart';
 import '../../main.dart'; // To access themeNotifier
+import '../edit_profile_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   final bool isGuest;
@@ -49,6 +50,7 @@ class _ProfileTabState extends State<ProfileTab> {
   // Settings states
   bool _pushNotifications = true;
   bool _locationAccess = true;
+  bool _showDeleteAccount = false;
 
   @override
   void initState() {
@@ -444,14 +446,63 @@ class _ProfileTabState extends State<ProfileTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          userName,
-                          style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: headingColor,
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _showDeleteAccount = !_showDeleteAccount;
+                            });
+                          },
+                          child: Text(
+                            userName,
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: headingColor,
+                            ),
                           ),
                         ),
+                        if (_showDeleteAccount) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => EditProfileScreen(user: _user!)),
+                                  );
+                                  if (result == true) {
+                                    _loadProfile();
+                                  }
+                                },
+                                child: Text(
+                                  'Edit Profile',
+                                  style: GoogleFonts.outfit(
+                                    color: AppTheme.accentColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppTheme.accentColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              InkWell(
+                                onTap: () => _deleteAccount(context),
+                                child: Text(
+                                  'Delete Account',
+                                  style: GoogleFonts.outfit(
+                                    color: dangerColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: dangerColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           joinDate,
@@ -678,22 +729,6 @@ class _ProfileTabState extends State<ProfileTab> {
                     backgroundColor: context.colors.dangerSoft,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: TextButton(
-                  onPressed: () => _deleteAccount(context),
-                  child: Text(
-                    'Delete Account',
-                    style: GoogleFonts.outfit(
-                      color: dangerColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      decoration: TextDecoration.underline,
-                      decorationColor: dangerColor,
                     ),
                   ),
                 ),

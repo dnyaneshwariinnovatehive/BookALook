@@ -80,7 +80,12 @@ class SalonService {
     final response = await http.get(uri, headers: headers);
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body)['salon'];
+      final json = jsonDecode(response.body);
+      final salon = json['salon'];
+      if (json.containsKey('is_favourited')) {
+        salon['is_favourited'] = json['is_favourited'];
+      }
+      return salon;
     } else if (response.statusCode == 404) {
       throw Exception('Salon not found');
     } else {

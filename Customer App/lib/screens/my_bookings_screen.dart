@@ -36,6 +36,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
   String _error = '';
   int _cancelCutoffMinutes = 90;
   int _rescheduleCutoffMinutes = 90;
+  
+  String _historyFilter = 'All';
 
   @override
   void initState() {
@@ -606,12 +608,77 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                     controller: _tabController,
                     children: [
                       _buildList(_upcoming, isUpcoming: true),
-                      _buildList(_past, isUpcoming: false),
+                      _buildHistoryList(),
                     ],
                   ),
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildHistoryList() {
+    List<dynamic> filtered = _past;
+    if (_historyFilter != 'All') {
+      filtered = _past.where((b) {
+        String status = (b['status'] ?? '').toString().toLowerCase();
+        if (_historyFilter == 'Completed' && status == 'completed') return true;
+        if (_historyFilter == 'Cancelled' && status == 'cancelled') return true;
+        if (_historyFilter == 'Rescheduled' && status == 'rescheduled') return true;
+        if (_historyFilter == 'No Show' && status == 'no_show') return true;
+        return false;
+      }).toList();
+    }
+    
+    return Column(
+      children: [
+        _buildFilterCapsules(),
+        Expanded(
+          child: _buildList(filtered, isUpcoming: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterCapsules() {
+    final filters = ['All', 'Completed', 'Cancelled', 'Rescheduled', 'No Show'];
+    return Container(
+      height: 48,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        itemCount: filters.length,
+        itemBuilder: (context, index) {
+          final filter = filters[index];
+          final isSelected = _historyFilter == filter;
+          return Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _historyFilter = filter);
+                }
+              },
+              backgroundColor: context.colors.surface,
+              selectedColor: AppTheme.accentColor.withValues(alpha: 0.1),
+              checkmarkColor: AppTheme.accentColor,
+              labelStyle: GoogleFonts.outfit(
+                color: isSelected ? AppTheme.accentColor : context.colors.textSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? AppTheme.accentColor : context.colors.border,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
