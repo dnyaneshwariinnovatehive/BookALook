@@ -457,22 +457,14 @@ class _ProfileTabState extends State<ProfileTab> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _showDeleteAccount = !_showDeleteAccount;
-                                });
-                              },
-                              child: Icon(Icons.edit, size: 20, color: AppTheme.accentColor),
-                            ),
-                          ],
-                        ),
-                        if (_showDeleteAccount) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              InkWell(
-                                onTap: () async {
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.edit, size: 20, color: AppTheme.accentColor),
+                              padding: EdgeInsets.zero,
+                              offset: const Offset(0, 40),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              color: context.colors.surface,
+                              onSelected: (value) async {
+                                if (value == 'edit') {
                                   if (_userProfile == null) return;
                                   final result = await Navigator.push(
                                     context,
@@ -481,35 +473,35 @@ class _ProfileTabState extends State<ProfileTab> {
                                   if (result == true) {
                                     _loadProfileData();
                                   }
-                                },
-                                child: Text(
-                                  'Edit Profile',
-                                  style: GoogleFonts.outfit(
-                                    color: AppTheme.accentColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: AppTheme.accentColor,
+                                } else if (value == 'delete') {
+                                  _deleteAccount(context);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.person_outline, color: context.colors.textPrimary, size: 20),
+                                      const SizedBox(width: 12),
+                                      Text('Edit Profile', style: GoogleFonts.outfit(color: context.colors.textPrimary)),
+                                    ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              InkWell(
-                                onTap: () => _deleteAccount(context),
-                                child: Text(
-                                  'Delete Account',
-                                  style: GoogleFonts.outfit(
-                                    color: dangerColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: dangerColor,
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline, color: context.colors.danger, size: 20),
+                                      const SizedBox(width: 12),
+                                      Text('Delete Account', style: GoogleFonts.outfit(color: context.colors.danger)),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           joinDate,

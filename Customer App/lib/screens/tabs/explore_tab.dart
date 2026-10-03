@@ -893,18 +893,22 @@ class ExploreTabState extends State<ExploreTab> {
                       Positioned(
                         top: 12,
                         right: 12,
-                        child: GestureDetector(
-                          onTap: () => _toggleFavourite(salon),
-                          child: Container(
-                            padding: EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: context.colors.surface.withValues(alpha: 0.9),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
-                              size: 18,
-                              color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _toggleFavourite(salon),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: context.colors.surface.withValues(alpha: 0.9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
+                                size: 18,
+                                color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                              ),
                             ),
                           ),
                         ),
@@ -968,15 +972,9 @@ class ExploreTabState extends State<ExploreTab> {
                           ),
                         )
                       else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Tap to view services',
-                              style: GoogleFonts.outfit(color: bodyColor, fontSize: 13),
-                            ),
-                            Icon(Icons.arrow_forward_ios, size: 12, color: AppTheme.accentColor),
-                          ],
+                        Text(
+                          'Tap to view services',
+                          style: GoogleFonts.outfit(color: bodyColor, fontSize: 13),
                         ),
                     ],
                   ),
@@ -1049,6 +1047,30 @@ class ExploreTabState extends State<ExploreTab> {
                     ],
                   ),
                 ),
+                // Favourite button overlay on the image in compact mode too!
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _toggleFavourite(salon),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: context.colors.surface.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
+                          size: 16,
+                          color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 // Details on the right
                 Expanded(
                   child: Padding(
@@ -1109,10 +1131,10 @@ class ExploreTabState extends State<ExploreTab> {
                             ),
                           )
                         else
-                          Text(
-                            'Tap to view services \u2192',
-                            style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
+                        Text(
+                          'Tap to view services',
+                          style: GoogleFonts.outfit(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                   ),
