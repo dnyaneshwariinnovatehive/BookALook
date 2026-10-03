@@ -61,9 +61,9 @@ class PartnerAuthController extends Controller
         $token = $user->createToken('partner-auth-token')->plainTextToken;
 
         if ($user->role === 'admin') {
-            $salons = Salon::with('city:id,name')
+            $salons = Salon::with(['city:id,name', 'admin:id,name,phone'])
                 ->where('admin_id', $user->id)
-                ->get(['id', 'name', 'cover_photo_url', 'city_id', 'status']);
+                ->get();
             
             return response()->json([
                 'success' => true,
@@ -83,7 +83,9 @@ class PartnerAuthController extends Controller
                 ], 404);
             }
 
-            $salon = Salon::with('city:id,name')->where('id', $serviceProvider->salon_id)->first(['id', 'name', 'cover_photo_url', 'city_id', 'status']);
+            $salon = Salon::with(['city:id,name', 'admin:id,name,phone'])
+                ->where('id', $serviceProvider->salon_id)
+                ->first();
 
             return response()->json([
                 'success' => true,

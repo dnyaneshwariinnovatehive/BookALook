@@ -761,9 +761,9 @@ export function DataTable<T>({
   );
 }
 
-export function DescriptionList({ items }: { items: [ReactNode, ReactNode][] }) {
+export function DescriptionList({ items, variant = 'bordered' }: { items: [ReactNode, ReactNode][]; variant?: 'bordered' | 'clean' }) {
   return (
-    <dl className={s.dl}>
+    <dl className={cx(s.dl, variant === 'clean' && s.dlClean)}>
       {items.map(([k, v], i) => (
         <div key={i} style={{ display: 'contents' }}>
           <dt>{k}</dt>
@@ -830,9 +830,11 @@ interface OverlayProps {
   children?: ReactNode;
   /** Replaces the default title block (e.g. a profile header). */
   header?: ReactNode;
+  /** Removes the bottom border from the header area. */
+  borderlessHeader?: boolean;
 }
 
-export function Modal({ open, onClose, title, description, footer, children, header, size = 'md' }: OverlayProps & { size?: 'sm' | 'md' | 'lg' }) {
+export function Modal({ open, onClose, title, description, footer, children, header, borderlessHeader, size = 'md' }: OverlayProps & { size?: 'sm' | 'md' | 'lg' }) {
   const panelRef = useOverlay(open, onClose);
   const titleId = useId();
   if (!open || typeof document === 'undefined') return null;
@@ -846,7 +848,7 @@ export function Modal({ open, onClose, title, description, footer, children, hea
         aria-labelledby={titleId}
         tabIndex={-1}
       >
-        <div className={s.overlayHead}>
+        <div className={cx(s.overlayHead, borderlessHeader && s.overlayHeadBorderless)}>
           <div className={s.overlayHeadText}>
             {header}
             <h2 id={titleId} className={s.overlayTitle} style={header ? { display: 'none' } : undefined}>{title}</h2>
@@ -862,14 +864,14 @@ export function Modal({ open, onClose, title, description, footer, children, hea
   );
 }
 
-export function Drawer({ open, onClose, title, description, footer, children, header }: OverlayProps) {
+export function Drawer({ open, onClose, title, description, footer, children, header, borderlessHeader }: OverlayProps) {
   const panelRef = useOverlay(open, onClose);
   const titleId = useId();
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
     <div className={cx(s.overlay, s.overlayRight)} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <aside ref={panelRef} className={s.drawer} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
-        <div className={s.overlayHead}>
+        <div className={cx(s.overlayHead, borderlessHeader && s.overlayHeadBorderless)}>
           <div className={s.overlayHeadText}>
             {header}
             <h2 id={titleId} className={s.overlayTitle} style={header ? { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' } : undefined}>{title}</h2>

@@ -36,7 +36,7 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.salonData['name']?.toString() ?? '');
     
-    final phone = widget.salonData['phone'] ?? widget.salonData['phone_number'] ?? widget.salonData['contact_number'] ?? '';
+    final phone = widget.salonData['admin']?['phone'] ?? widget.salonData['phone'] ?? widget.salonData['phone_number'] ?? widget.salonData['contact_number'] ?? '';
     _phoneController = TextEditingController(text: phone.toString());
     
     _descriptionController = TextEditingController(text: widget.salonData['description']?.toString() ?? '');
@@ -149,14 +149,14 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
                               image: FileImage(_selectedImage!),
                               fit: BoxFit.cover,
                             ) : null)
-                          : (widget.salonData['cover_image'] != null
+                          : (widget.salonData['cover_photo_url'] != null
                               ? DecorationImage(
-                                  image: NetworkImage(widget.salonData['cover_image']),
+                                  image: NetworkImage(widget.salonData['cover_photo_url']),
                                   fit: BoxFit.cover,
                                 )
                               : null),
                     ),
-                    child: _selectedImage == null && widget.salonData['cover_image'] == null
+                    child: _selectedImage == null && widget.salonData['cover_photo_url'] == null
                         ? Icon(Icons.storefront, size: 60, color: theme.colorScheme.onSurface.withOpacity(0.3))
                         : null,
                   ),

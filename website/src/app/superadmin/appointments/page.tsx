@@ -717,6 +717,7 @@ export default function GlobalAppointmentsDashboard() {
         open={!!liveDetails}
         onClose={() => setDetailsAppointment(null)}
         title="Appointment details"
+        borderlessHeader
         header={liveDetails && (
           <div className={styles.drawerHead}>
             <div className={styles.drawerHeadTop}>
@@ -774,6 +775,7 @@ export default function GlobalAppointmentsDashboard() {
       >
         {infoModalData && (
           <DescriptionList
+            variant="clean"
             items={[
               ['Phone', infoModalData.data.phone || '—'],
               ['Email', infoModalData.data.email || '—'],
@@ -855,6 +857,7 @@ function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: Detail
           <>
             <h3 className={ui.sectionLabel}>Customer</h3>
             <DescriptionList
+              variant="clean"
               items={[
                 ['Name', customerName(apt)],
                 ['Phone', customerPhone(apt) || '—'],
@@ -864,6 +867,7 @@ function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: Detail
             />
             <h3 className={ui.sectionLabel}>Salon &amp; staff</h3>
             <DescriptionList
+              variant="clean"
               items={[
                 ['Salon', apt.salon?.name || '—'],
                 ['Salon phone', apt.salon?.phone || '—'],
@@ -874,6 +878,7 @@ function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: Detail
             />
             <h3 className={ui.sectionLabel}>Booking</h3>
             <DescriptionList
+              variant="clean"
               items={[
                 ['Appointment ID', <span key="id" className={ui.mono}>{apt.id}</span>],
                 ['Source', sourceLabel(apt.booking_source)],
@@ -936,6 +941,7 @@ function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: Detail
 
         {tab === 'payment' && (
           <DescriptionList
+            variant="clean"
             items={[
               ['Option', apt.payment_option?.replace(/_/g, ' ') || '—'],
               ['Total', money(apt.total_amount)],

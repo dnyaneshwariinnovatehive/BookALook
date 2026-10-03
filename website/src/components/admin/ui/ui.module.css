@@ -1007,6 +1007,10 @@ textarea.control {
   border-bottom: 1px solid var(--border-color);
 }
 
+.overlayHeadBorderless {
+  border-bottom: none;
+}
+
 .overlayHeadText {
   flex: 1;
   min-width: 0;
@@ -1080,6 +1084,11 @@ textarea.control {
   overflow: hidden;
 }
 
+.dlClean {
+  border: none;
+  border-radius: 0;
+}
+
 .dl > dt,
 .dl > dd {
   padding: 10px 14px;
@@ -1087,6 +1096,12 @@ textarea.control {
   border-bottom: 1px solid var(--border-color);
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.dlClean > dt,
+.dlClean > dd {
+  border-bottom: none;
+  padding: 6px 0;
 }
 
 .dl > dt {

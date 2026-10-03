@@ -123,9 +123,9 @@ class MoreTab extends StatelessWidget {
                     child: Container(
                       height: 120,
                       color: isDark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor,
-                      child: salonData['cover_image'] != null
+                      child: salonData['cover_photo_url'] != null
                           ? Image.network(
-                              salonData['cover_image'],
+                              salonData['cover_photo_url'],
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                             )
