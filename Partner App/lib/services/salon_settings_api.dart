@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/salon_working_hour.dart';
 import 'api_config.dart';
@@ -97,7 +99,27 @@ class SalonSettingsApi {
     }
 
     if (imagePath != null) {
-      request.files.add(await http.MultipartFile.fromPath('cover_image', imagePath));
+      final fileBytes = await File(imagePath).readAsBytes();
+      String filename = imagePath.split('/').last;
+      String extension = 'jpeg';
+      if (filename.toLowerCase().endsWith('.png')) {
+        extension = 'png';
+      } else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) {
+        extension = 'jpeg';
+      } else if (filename.toLowerCase().endsWith('.webp')) {
+        extension = 'webp';
+      }
+      
+      if (!filename.contains('.')) {
+        filename = '$filename.$extension';
+      }
+      
+      request.files.add(http.MultipartFile.fromBytes(
+        'cover_image', 
+        fileBytes,
+        filename: filename,
+        contentType: MediaType('image', extension),
+      ));
     }
 
     final response = await request.send();
