@@ -51,6 +51,7 @@ export default function ReportsPage() {
   const [salons, setSalons] = useState<any[]>([]);
   const [salonTotals, setSalonTotals] = useState<any>(null);
   const [cities, setCities] = useState<any[]>([]);
+  const [subAreas, setSubAreas] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [reviewsData, setReviewsData] = useState<any>(null);
 
@@ -77,15 +78,16 @@ export default function ReportsPage() {
       if (to) q.append('to', to);
       const suffix = q.toString() ? `?${q}` : '';
 
-      const [ovRes, salRes, cityRes, svcRes, revRes] = await Promise.all([
+      const [ovRes, salRes, cityRes, subRes, svcRes, revRes] = await Promise.all([
         fetch('/api/proxy/superadmin/reports/overview', { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/salons${suffix}`, { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/cities${suffix}`, { headers: authHeaders() }),
+        fetch(`/api/proxy/superadmin/reports/sub-areas${suffix}`, { headers: authHeaders() }),
         fetch(`/api/proxy/superadmin/reports/services${suffix}`, { headers: authHeaders() }),
         fetch('/api/proxy/superadmin/reviews', { headers: authHeaders() }),
       ]);
 
-      for (const r of [ovRes, salRes, cityRes, svcRes, revRes]) {
+      for (const r of [ovRes, salRes, cityRes, subRes, svcRes, revRes]) {
         if (handleUnauthorized(r)) return;
         if (!r.ok) throw new Error('Could not load reports.');
       }
@@ -93,6 +95,7 @@ export default function ReportsPage() {
       const ov = await ovRes.json();
       const sal = await salRes.json();
       const city = await cityRes.json();
+      const sub = await subRes.json();
       const svc = await svcRes.json();
       const rev = await revRes.json();
 
@@ -100,6 +103,7 @@ export default function ReportsPage() {
       setSalons(sal.salons ?? []);
       setSalonTotals(sal.totals ?? null);
       setCities(city.cities ?? []);
+      setSubAreas(sub.sub_areas ?? []);
       setServices(svc.services ?? []);
       setReviewsData(rev);
     } catch (e: any) {
@@ -129,6 +133,13 @@ export default function ReportsPage() {
       'area-report.csv',
       ['City', 'Salons', 'Bookings', 'Completed', 'Revenue'],
       cities.map((c) => [c.city, c.salons, c.bookings, c.completed, money(c.revenue)])
+    );
+
+  const exportSubAreas = () =>
+    downloadCSV(
+      'subarea-report.csv',
+      ['Sub Area', 'City', 'Salons', 'Bookings', 'Completed', 'Revenue'],
+      subAreas.map((c) => [c.sub_area, c.city, c.salons, c.bookings, c.completed, money(c.revenue)])
     );
 
   const exportServices = () =>
@@ -204,6 +215,7 @@ export default function ReportsPage() {
   const rev = overview?.revenue ?? {};
   const topSalons = overview?.top_salons ?? [];
   const topCities = overview?.cities ?? [];
+  const topSubAreas = overview?.sub_areas ?? [];
 
   const hasBookings = (b.total ?? 0) > 0;
 
@@ -400,6 +412,47 @@ export default function ReportsPage() {
                   <span className={styles.totalsLabel}>Leading areas</span>
                   {topCities.map((c: any) => (
                     <span key={c.city}>{c.city} ({money(c.revenue)})</span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </Section>
+
+        {/* ---- sub areas ---- */}
+        <Section title="Sub Areas" desc="Breakdown of salon and booking activity by sub area." accent action={
+          <button className={styles.smallButton} onClick={exportSubAreas}>↓ CSV</button>
+        }>
+          {subAreas.length === 0 ? (
+            <p className={styles.muted}>No sub areas with booking activity in this range.</p>
+          ) : (
+            <>
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Sub Area</th><th>City</th><th>Salons</th><th>Bookings</th><th>Completed</th><th style={{ textAlign: 'right' }}>Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subAreas.map((c, i) => (
+                      <tr key={i}>
+                        <td><strong>{c.sub_area}</strong></td>
+                        <td>{c.city}</td>
+                        <td>{int(c.salons)}</td>
+                        <td>{int(c.bookings)}</td>
+                        <td>{int(c.completed)}</td>
+                        <td className={styles.textRightBold}>{money(c.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {topSubAreas.length > 0 && (
+                <div className={styles.totalsRow}>
+                  <span className={styles.totalsLabel}>Leading sub areas</span>
+                  {topSubAreas.map((c: any) => (
+                    <span key={`${c.city}-${c.sub_area}`}>{c.sub_area} ({money(c.revenue)})</span>
                   ))}
                 </div>
               )}

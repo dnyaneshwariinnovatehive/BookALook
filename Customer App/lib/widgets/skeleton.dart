@@ -1,92 +1,43 @@
 import 'package:flutter/material.dart';
 
+import 'package:shimmer/shimmer.dart';
+
 import '../theme/app_colors.dart';
 
 /// Loading placeholders in the shape of the content that is on its way.
 ///
 /// A spinner in the middle of an empty page says "wait" and nothing else; a
 /// skeleton says what is coming and where, so the page does not jump when it
-/// arrives. Every shape inside one [Skeleton] shares a single shimmer: the
-/// boxes are painted flat, and one [ShaderMask] sweeps a highlight across all
-/// of them, so a list reads as one surface loading rather than a dozen
-/// independently blinking rectangles.
+/// arrives. Every shape inside one [Skeleton] shares a single shimmer.
 ///
 /// Honours the platform's reduce-motion setting by holding still, and is
 /// announced once as "Loading" — the shapes themselves are hidden from screen
 /// readers, which would otherwise read out a stack of unlabelled boxes.
-class Skeleton extends StatefulWidget {
+class Skeleton extends StatelessWidget {
   const Skeleton({super.key, required this.child, this.semanticLabel = 'Loading'});
 
   final Widget child;
   final String semanticLabel;
 
   @override
-  State<Skeleton> createState() => _SkeletonState();
-}
-
-class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
-      _c.stop();
-    } else if (!_c.isAnimating) {
-      _c.repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 
-    final shapes = ExcludeSemantics(child: widget.child);
+    final shapes = ExcludeSemantics(child: child);
 
     return Semantics(
-      label: widget.semanticLabel,
+      label: semanticLabel,
       liveRegion: true,
       child: still
           ? shapes
-          : AnimatedBuilder(
-              animation: _c,
+          : Shimmer.fromColors(
+              baseColor: colors.border,
+              highlightColor: colors.surface.withValues(alpha: 0.9),
               child: shapes,
-              builder: (context, child) => ShaderMask(
-                // srcATop: the highlight lands only where a box is painted.
-                blendMode: BlendMode.srcATop,
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    colors.border,
-                    colors.surface.withValues(alpha: 0.9),
-                    colors.border,
-                  ],
-                  stops: const [0.35, 0.5, 0.65],
-                  transform: _Slide(_c.value),
-                ).createShader(bounds),
-                child: child,
-              ),
             ),
     );
   }
-}
-
-/// Moves the shimmer band from off the left edge to off the right.
-class _Slide extends GradientTransform {
-  const _Slide(this.t);
-
-  final double t;
-
-  @override
-  Matrix4 transform(Rect bounds, {TextDirection? textDirection}) =>
-      Matrix4.translationValues(bounds.width * (2 * t - 1), 0, 0);
 }
 
 /// One flat placeholder shape. Draws in the theme's border colour so it reads
@@ -415,6 +366,130 @@ class SalonDetailSkeleton extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class CartItemSkeleton extends StatelessWidget {
+  const CartItemSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: context.colors.border, width: 1.5),
+        ),
+        child: const Row(
+          children: [
+            SkeletonBox(width: 64, height: 64, radius: 16),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonLine(widthFactor: 0.8, height: 16),
+                  SizedBox(height: 10),
+                  SkeletonLine(widthFactor: 0.5),
+                  SizedBox(height: 12),
+                  SkeletonLine(widthFactor: 0.3, height: 18),
+                ],
+              ),
+            ),
+            SizedBox(width: 16),
+            SkeletonBox(width: 32, height: 32, radius: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class NotificationSkeleton extends StatelessWidget {
+  const NotificationSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SkeletonBox(width: 18, height: 18, radius: 4),
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonLine(widthFactor: 0.6, height: 15),
+                  SizedBox(height: 8),
+                  SkeletonLine(widthFactor: 1.0, height: 12),
+                  SizedBox(height: 6),
+                  SkeletonLine(widthFactor: 0.8, height: 12),
+                  SizedBox(height: 12),
+                  SkeletonLine(widthFactor: 0.25, height: 10),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ReviewSkeleton extends StatelessWidget {
+  const ReviewSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SkeletonBox(width: 48, height: 48, radius: 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonLine(widthFactor: 0.4, height: 16),
+                      SizedBox(height: 8),
+                      SkeletonLine(widthFactor: 0.25, height: 12),
+                    ],
+                  ),
+                ),
+                SkeletonBox(width: 40, height: 20, radius: 6),
+              ],
+            ),
+            SizedBox(height: 16),
+            SkeletonLine(widthFactor: 0.9, height: 14),
+            SizedBox(height: 8),
+            SkeletonLine(widthFactor: 0.7, height: 14),
+          ],
+        ),
       ),
     );
   }

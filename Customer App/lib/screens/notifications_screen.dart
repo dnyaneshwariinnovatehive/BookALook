@@ -6,6 +6,7 @@ import '../services/notification_service.dart';
 import 'reschedule_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/bottom_clearance.dart';
+import '../widgets/skeleton.dart';
 
 /// The customer's message inbox. A salon-closure notice is actionable: tapping
 /// it goes straight to picking a new slot.
@@ -91,7 +92,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
+          ? SkeletonList(
+              padding: const EdgeInsets.all(16),
+              itemBuilder: (_) => const NotificationSkeleton(),
+              count: 4,
+            )
           : _error.isNotEmpty
               ? Center(child: Text(_error, style: GoogleFonts.outfit(color: context.colors.danger)))
               : _notifications.isEmpty

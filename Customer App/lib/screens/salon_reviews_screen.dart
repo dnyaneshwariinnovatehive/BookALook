@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/rating_bars.dart';
 import '../theme/app_colors.dart';
 import '../utils/bottom_clearance.dart';
+import '../widgets/skeleton.dart';
 
 /// Every review a salon has, with the two filters a reader actually wants.
 ///
@@ -130,7 +131,11 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? SkeletonList(
+              padding: const EdgeInsets.all(16),
+              itemBuilder: (_) => const ReviewSkeleton(),
+              count: 4,
+            )
           : _failed
               ? _buildFailed()
               : RefreshIndicator(
@@ -154,8 +159,8 @@ class _SalonReviewsScreenState extends State<SalonReviewsScreen> {
                           ReviewTile(review: Map<String, dynamic>.from(review as Map)),
                         if (_loadingMore)
                           const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Center(child: CircularProgressIndicator()),
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: ReviewSkeleton(),
                           ),
                       ],
                     ],

@@ -11,6 +11,7 @@ import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
+import '../widgets/skeleton.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -258,7 +259,11 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppTheme.accentColor));
+      return SkeletonList(
+        itemBuilder: (context) => const CartItemSkeleton(),
+        count: 3,
+        padding: const EdgeInsets.all(16),
+      );
     }
     if (_error.isNotEmpty) {
       return RefreshIndicator(

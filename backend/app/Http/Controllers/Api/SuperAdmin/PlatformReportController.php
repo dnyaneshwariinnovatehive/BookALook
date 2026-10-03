@@ -50,6 +50,7 @@ class PlatformReportController extends Controller
         $topSalons = $this->topSalons(null, null, 5);
 
         $cityBreakdown = $this->cityBreakdown(null, null, 5);
+        $subAreaBreakdown = $this->subAreaBreakdown(null, null, 5);
 
         $topServices = $this->topServices(null, null, 5);
 
@@ -71,6 +72,7 @@ class PlatformReportController extends Controller
             ],
             'top_salons' => $topSalons,
             'cities' => $cityBreakdown,
+            'sub_areas' => $subAreaBreakdown,
             'top_services' => $topServices,
             'revenue' => $this->revenueSummary(),
         ]);
@@ -127,6 +129,7 @@ class PlatformReportController extends Controller
             'top_salons' => $this->topSalons($from, $to, 5),
             'top_services' => $this->topServices($from, $to, 5),
             'cities' => $this->cityBreakdown($from, $to, 5),
+            'sub_areas' => $this->subAreaBreakdown($from, $to, 5),
         ]);
     }
 
@@ -160,6 +163,13 @@ class PlatformReportController extends Controller
         $rows = $this->cityBreakdown($this->from($request), $this->to($request));
 
         return response()->json(['success' => true, 'cities' => $rows]);
+    }
+
+    public function subAreas(Request $request)
+    {
+        $rows = $this->subAreaBreakdown($this->from($request), $this->to($request));
+
+        return response()->json(['success' => true, 'sub_areas' => $rows]);
     }
 
     /**
@@ -362,6 +372,51 @@ class PlatformReportController extends Controller
             ->get();
 
         $result = $rows->map(fn ($c) => [
+            'city' => $c->city ?? 'Unknown',
+            'salons' => (int) $c->salons,
+            'bookings' => (int) $c->bookings,
+            'completed' => (int) $c->completed,
+            'revenue' => (float) $c->revenue,
+        ])->all();
+
+        if ($limit !== null) {
+            $result = array_slice($result, 0, $limit);
+        }
+
+        return $result;
+    }
+
+    private function subAreaBreakdown(?Carbon $from, ?Carbon $to, ?int $limit = null): array
+    {
+        $rows = DB::table('salons')
+            ->leftJoin('sub_areas', 'sub_areas.id', '=', 'salons.sub_area_id')
+            ->leftJoin('cities', 'cities.id', '=', 'sub_areas.city_id')
+            ->leftJoin('appointments', 'appointments.salon_id', '=', 'salons.id')
+            ->whereNotNull('salons.sub_area_id')
+            ->where(function ($q) use ($from, $to) {
+                if ($from) {
+                    $q->where('appointments.appointment_date', '>=', $from->toDateString());
+                } else {
+                    $q->whereNotNull('appointments.id');
+                }
+                if ($to) {
+                    $q->where('appointments.appointment_date', '<=', $to->toDateString());
+                }
+            })
+            ->selectRaw(
+                'sub_areas.name as sub_area,
+                 cities.name as city,
+                 count(distinct salons.id) as salons,
+                 count(appointments.id) as bookings,
+                 sum(case when appointments.status = \'completed\' then 1 else 0 end) as completed,
+                 round(sum(case when appointments.status = \'completed\' then appointments.final_billed_amount else 0 end), 2) as revenue'
+            )
+            ->groupBy('sub_areas.name', 'cities.name')
+            ->orderByDesc('revenue')
+            ->get();
+
+        $result = $rows->map(fn ($c) => [
+            'sub_area' => $c->sub_area,
             'city' => $c->city ?? 'Unknown',
             'salons' => (int) $c->salons,
             'bookings' => (int) $c->bookings,
