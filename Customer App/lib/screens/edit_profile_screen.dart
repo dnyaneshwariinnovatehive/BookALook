@@ -95,7 +95,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {TextInputType type = TextInputType.text, VoidCallback? onTap, bool readOnly = false}) {
+  Widget _buildTextField(String label, TextEditingController controller, {TextInputType type = TextInputType.text, VoidCallback? onTap, bool readOnly = false, Widget? suffixIcon}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
@@ -107,6 +107,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: GoogleFonts.outfit(color: context.colors.textSecondary),
+          suffixIcon: suffixIcon,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: context.colors.border),
@@ -173,7 +174,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
 
-            _buildTextField('Date of Birth', _dobController, readOnly: true, onTap: () => _selectDate(context)),
+            _buildTextField('Date of Birth', _dobController, readOnly: true, onTap: () => _selectDate(context), suffixIcon: Icon(Icons.calendar_month, color: context.colors.textSecondary)),
             _buildTextField('Address', _addressController),
             _buildTextField('Pincode', _pincodeController, type: TextInputType.number),
             

@@ -446,20 +446,26 @@ class _ProfileTabState extends State<ProfileTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _showDeleteAccount = !_showDeleteAccount;
-                            });
-                          },
-                          child: Text(
-                            userName,
-                            style: GoogleFonts.outfit(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: headingColor,
+                        Row(
+                          children: [
+                            Text(
+                              userName,
+                              style: GoogleFonts.outfit(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: headingColor,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _showDeleteAccount = !_showDeleteAccount;
+                                });
+                              },
+                              child: Icon(Icons.edit, size: 20, color: AppTheme.accentColor),
+                            ),
+                          ],
                         ),
                         if (_showDeleteAccount) ...[
                           const SizedBox(height: 6),

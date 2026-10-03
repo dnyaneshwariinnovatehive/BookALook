@@ -710,18 +710,17 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         const SizedBox(width: 12),
-        // Filter button: circular 52x52
+        // Gender filter button
         Container(
-          width: 52,
           height: 52,
           decoration: BoxDecoration(
             color: _selectedGender != 'All'
                 ? AppTheme.accentColor.withValues(alpha: 0.1)
                 : surfaceColor,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(26),
             border: _selectedGender != 'All'
                 ? Border.all(color: AppTheme.accentColor, width: 1.5)
-                : null,
+                : Border.all(color: Colors.transparent, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: context.colors.dropShadow,
@@ -730,15 +729,37 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ],
           ),
-          child: InkWell(
-            onTap: _showFilterDialog,
-            customBorder: const CircleBorder(),
-            child: Icon(
-              Icons.tune_rounded,
-              color: _selectedGender != 'All'
-                  ? AppTheme.accentColor
-                  : bodyColor,
-              size: 18,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _showFilterDialog,
+              borderRadius: BorderRadius.circular(26),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.tune_rounded,
+                      color: _selectedGender != 'All'
+                          ? AppTheme.accentColor
+                          : bodyColor,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _selectedGender != 'All' ? _selectedGender : 'Filter',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: _selectedGender != 'All'
+                            ? AppTheme.accentColor
+                            : bodyColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

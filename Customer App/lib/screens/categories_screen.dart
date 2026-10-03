@@ -31,7 +31,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   /// Columns of the grid. Narrow phones get three so the icon and its label
   /// both stay legible.
-  static const int _columns = 3;
+  static const int _columns = 4;
   static const double _gap = 12;
 
   @override
@@ -178,65 +178,56 @@ class _CategoryCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: context.colors.listBorder,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: isDark ? foreground.withValues(alpha: 0.16) : background,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: hasIcon
-                    ? Image.network(
-                        category.iconUrl!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stack) => Icon(
-                          CategoryGrid.fallbackIcon(category.name),
-                          color: foreground,
-                          size: 26,
-                        ),
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Icon(
-                            CategoryGrid.fallbackIcon(category.name),
-                            color: foreground.withValues(alpha: 0.35),
-                            size: 26,
-                          );
-                        },
-                      )
-                    : Icon(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                color: isDark ? foreground.withValues(alpha: 0.16) : background,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: hasIcon
+                  ? Image.network(
+                      category.iconUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stack) => Icon(
                         CategoryGrid.fallbackIcon(category.name),
                         color: foreground,
                         size: 26,
                       ),
-              ),
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return Icon(
+                          CategoryGrid.fallbackIcon(category.name),
+                          color: foreground.withValues(alpha: 0.35),
+                          size: 26,
+                        );
+                      },
+                    )
+                  : Icon(
+                      CategoryGrid.fallbackIcon(category.name),
+                      color: foreground,
+                      size: 26,
+                    ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              category.name,
-              maxLines: 1,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: context.colors.textPrimary,
-              ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            category.name,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
