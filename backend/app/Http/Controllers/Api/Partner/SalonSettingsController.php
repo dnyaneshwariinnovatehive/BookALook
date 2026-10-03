@@ -38,6 +38,9 @@ class SalonSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
+            if ($request->hasFile('cover_image')) {
+                \Illuminate\Support\Facades\Log::error('Upload error: ' . $request->file('cover_image')->getError() . ' - ' . $request->file('cover_image')->getErrorMessage());
+            }
             return response()->json(['errors' => $validator->errors()], 422);
         }
 

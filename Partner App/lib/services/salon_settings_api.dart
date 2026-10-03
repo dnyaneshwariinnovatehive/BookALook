@@ -100,7 +100,7 @@ class SalonSettingsApi {
 
     if (imagePath != null) {
       final fileBytes = await File(imagePath).readAsBytes();
-      String filename = imagePath.split('/').last;
+      String filename = imagePath.split(RegExp(r'[/\\]')).last;
       String extension = 'jpeg';
       if (filename.toLowerCase().endsWith('.png')) {
         extension = 'png';
