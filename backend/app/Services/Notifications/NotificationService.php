@@ -623,6 +623,48 @@ class NotificationService
      * The row is written now so the outbox has the audit trail even if the
      * dispatch throws, and the drain command picks up anything left behind.
      */
+    /**
+     * Notify the admin that the salon is deactivated, attaching the pending dues PDF.
+     */
+    public function salonDeactivated(Salon $salon, string $pdfUrl): void
+    {
+        $phone = $salon->admin->phone ?? $salon->phone_num;
+
+        if (! $phone) {
+            return;
+        }
+
+        $payload = [
+            'parameters' => [
+                $salon->name,
+            ],
+            'attachment' => [
+                'type' => 'document',
+                'link' => $pdfUrl,
+                'filename' => 'Staff_Dues.pdf',
+            ],
+        ];
+
+        // Ensure the campaign is configured. 
+        $campaign = config("services.push.whatsapp.campaigns.salon_deactivated");
+        if (! $campaign && config('services.push.whatsapp.driver') === 'aisensy') {
+            \Illuminate\Support\Facades\Log::warning("No AISensy campaign is configured for template 'salon_deactivated'.");
+            return;
+        }
+
+        $message = WhatsAppMessage::create([
+            'recipient' => $phone,
+            'template' => 'salon_deactivated',
+            'campaign' => $campaign ?? '',
+            'payload' => $payload,
+            'status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        dispatch(new SendWhatsAppMessageJob($message->id));
+    }
+
     private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event): void
     {
         if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {

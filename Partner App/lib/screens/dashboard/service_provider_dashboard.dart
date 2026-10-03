@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
+import '../../services/auth_service.dart';
 import 'tabs/provider_profile_tab.dart';
 import 'tabs/provider_home_tab.dart';
 import 'tabs/provider_walk_in_tab.dart';
@@ -124,6 +125,31 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   Widget build(BuildContext context) {
     if (_checkingAccess) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (widget.salon['status'] == 'deactivated') {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cancel_outlined, color: Colors.red, size: 80),
+                const SizedBox(height: 24),
+                Text('Salon Deactivated', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.red, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                const Text('This salon has been deactivated by the administrator. You can no longer access the service provider dashboard.', textAlign: TextAlign.center),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: () => AuthService().logout(context),
+                  child: const Text('Log Out'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     if (_access != null && _access!.isLocked) {

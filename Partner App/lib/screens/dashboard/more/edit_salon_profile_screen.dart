@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../../services/salon_settings_api.dart';
+import '../../../widgets/deactivate_salon_button.dart';
 
 class EditSalonProfileScreen extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -199,6 +200,10 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
               });
             }),
             const SizedBox(height: 20),
+            const Text('Danger Zone', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)),
+            const SizedBox(height: 12),
+            const DeactivateSalonButton(),
+            const SizedBox(height: 30),
             
             // Advance Booking Settings
             Container(

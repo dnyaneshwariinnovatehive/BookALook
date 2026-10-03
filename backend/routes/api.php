@@ -369,6 +369,7 @@ Route::prefix('partner')->group(function () {
 
         // Salon Settings (Working Hours, etc.)
         Route::put('/salons/{salon_id}', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateProfile']);
+        Route::post('/salons/{salon_id}/deactivate', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'deactivate']);
         Route::get('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'getWorkingHours']);
         Route::put('/salons/{salon_id}/working-hours', [\App\Http\Controllers\Api\Partner\SalonSettingsController::class, 'updateWorkingHours']);
         // Where the salon is. Customers see the nearest first, so an unpinned

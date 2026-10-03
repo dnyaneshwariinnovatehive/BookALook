@@ -9,6 +9,12 @@ use App\Models\SalonWorkingHour;
 use App\Services\GeoService;
 use App\Services\SalonLinkService;
 use Illuminate\Support\Facades\Validator;
+use App\Models\SalonPayout;
+use App\Models\Appointment;
+use App\Models\SalaryPayout;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
+use App\Services\Notifications\NotificationService;
 
 class SalonSettingsController extends Controller
 {
@@ -229,6 +235,82 @@ class SalonSettingsController extends Controller
             'salon_name' => $salon->name,
             'salon_slug' => $salon->slug,
             'city' => $salon->city?->name,
+        ]);
+    }
+
+    public function deactivate(Request $request, $salon_id, NotificationService $notifications)
+    {
+        $salon = Salon::where('id', $salon_id)
+            ->where('admin_id', $request->user()->id)
+            ->firstOrFail();
+
+        if ($salon->status === 'deactivated') {
+            return response()->json(['message' => 'Salon is already deactivated.'], 200);
+        }
+
+        // Check for pending payouts (platform <-> salon)
+        $hasPendingSalonPayouts = SalonPayout::where('salon_id', $salon->id)
+            ->where('status', '!=', 'distributed')
+            ->exists();
+            
+        if ($hasPendingSalonPayouts) {
+            return response()->json([
+                'error_code' => 'HAS_PENDING_PAYOUTS',
+                'message' => 'Cannot deactivate salon while platform payouts are pending settlement. Please clear your payouts first.'
+            ], 422);
+        }
+
+        // Check for upcoming appointments
+        $hasUpcomingAppointments = Appointment::where('salon_id', $salon->id)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where('appointment_date', '>=', \Carbon\Carbon::today())
+            ->exists();
+
+        if ($hasUpcomingAppointments && !$request->boolean('force_close_schedule')) {
+            return response()->json([
+                'error_code' => 'HAS_UPCOMING_APPOINTMENTS',
+                'message' => 'You have upcoming appointments scheduled. Please cancel or complete them before deactivating.'
+            ], 422);
+        }
+
+        if ($hasUpcomingAppointments && $request->boolean('force_close_schedule')) {
+            // Overwrite salon timings to closed on all days
+            \App\Models\SalonWorkingHour::where('salon_id', $salon->id)->update([
+                'is_closed' => true,
+                'open_time' => null,
+                'close_time' => null
+            ]);
+            return response()->json([
+                'error_code' => 'SCHEDULE_CLOSED',
+                'message' => 'Your salon timings have been closed for all days. No new bookings will be accepted. Please complete or cancel your upcoming appointments before trying to deactivate again.'
+            ], 422);
+        }
+
+        // Generate Staff Dues PDF
+        $pendingSalaries = SalaryPayout::with('provider.user')
+            ->where('salon_id', $salon->id)
+            ->where('status', 'pending')
+            ->get();
+
+        $pdf = Pdf::loadView('staff_dues', [
+            'salon' => $salon,
+            'salaries' => $pendingSalaries
+        ])->setOptions(['isRemoteEnabled' => true])->output();
+
+        $path = 'salons/staff_dues_' . $salon->id . '_' . Str::random(6) . '.pdf';
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf);
+        $pdfUrl = asset('storage/' . $path);
+
+        // Deactivate the salon
+        $salon->status = 'deactivated';
+        $salon->save();
+
+        // Trigger WhatsApp with the generated PDF
+        $notifications->salonDeactivated($salon, $pdfUrl);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Salon has been successfully deactivated.'
         ]);
     }
 }

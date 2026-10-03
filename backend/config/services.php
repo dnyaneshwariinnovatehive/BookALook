@@ -88,6 +88,7 @@ return [
             'appointment_reminder' => env('WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER', 'bookalook_appointment_reminder'),
             'appointment_cancelled' => env('WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED', 'bookalook_appointment_cancelled'),
             'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),
+            'salon_deactivated' => env('WHATSAPP_TEMPLATE_SALON_DEACTIVATED', 'salon_deactivated_dues'),
         ],
 
         // AISensy API campaign names, one per event. Blank means "not configured",
@@ -98,6 +99,7 @@ return [
             'appointment_reminder' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_REMINDER', ''),
             'appointment_cancelled' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_CANCELLED', ''),
             'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', ''),
+            'salon_deactivated' => env('WHATSAPP_CAMPAIGN_SALON_DEACTIVATED', ''),
         ],
     ],
 
