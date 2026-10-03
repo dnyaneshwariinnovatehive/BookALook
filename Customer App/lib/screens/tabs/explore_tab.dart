@@ -134,23 +134,27 @@ class ExploreTabState extends State<ExploreTab> {
     }
 
     final salonId = salon['id'].toString();
+    final bool currentFav = salon['is_favourited'] == true || salon['is_favourited'] == 1 || salon['is_favourited'] == '1';
+
+    // Optimistic UI update
+    setState(() {
+      salon['is_favourited'] = !currentFav;
+    });
+    AppHaptics.lightImpact();
+
     try {
       final isFavourited = await _salonService.toggleFavourite(salonId);
       if (!mounted) return;
-      AppHaptics.lightImpact();
       setState(() {
         salon['is_favourited'] = isFavourited;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
+      // Revert optimistic update on failure
+      setState(() {
+        salon['is_favourited'] = currentFav;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(describeError(e, fallback: 'Could not update your favourites.')),
@@ -843,6 +847,7 @@ class ExploreTabState extends State<ExploreTab> {
     final isServiceable = salon['is_serviceable'] != false;
     final count = (salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+    final bool isFav = salon['is_favourited'] == true || salon['is_favourited'] == 1 || salon['is_favourited'] == '1';
 
     return Padding(
       padding: EdgeInsets.only(bottom: 20),
@@ -905,9 +910,9 @@ class ExploreTabState extends State<ExploreTab> {
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
+                                isFav ? Icons.favorite : Icons.favorite_border,
                                 size: 18,
-                                color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                                color: isFav ? Colors.redAccent : context.colors.iconIdle,
                               ),
                             ),
                           ),
@@ -995,6 +1000,7 @@ class ExploreTabState extends State<ExploreTab> {
     final isServiceable = salon['is_serviceable'] != false;
     final count = (salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (salon['avg_rating'] as num?)?.toDouble() ?? 0;
+    final bool isFav = salon['is_favourited'] == true || salon['is_favourited'] == 1 || salon['is_favourited'] == '1';
 
     return Padding(
       padding: EdgeInsets.only(bottom: 16),
@@ -1063,9 +1069,9 @@ class ExploreTabState extends State<ExploreTab> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          salon['is_favourited'] == true ? Icons.favorite : Icons.favorite_border,
+                          isFav ? Icons.favorite : Icons.favorite_border,
                           size: 16,
-                          color: salon['is_favourited'] == true ? Colors.redAccent : context.colors.iconIdle,
+                          color: isFav ? Colors.redAccent : context.colors.iconIdle,
                         ),
                       ),
                     ),
