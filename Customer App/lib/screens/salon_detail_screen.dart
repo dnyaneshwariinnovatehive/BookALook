@@ -196,7 +196,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       if (!mounted) return;
       setState(() {
         _salon = data;
-        _isFavourited = data['is_favourited'] == true;
+        _isFavourited = data['is_favourited'] == true || data['is_favourited'] == 1 || data['is_favourited'] == '1';
         // Land on the category the customer came in through, so unrelated
         // categories stay out of the way until they switch tabs themselves.
         _selectedCategoryId = widget.categoryId;
@@ -238,20 +238,29 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     }
 
     if (_isTogglingFavourite) return;
-    setState(() => _isTogglingFavourite = true);
+    final bool currentFav = _isFavourited;
     
+    // Optimistic UI update
+    setState(() {
+      _isTogglingFavourite = true;
+      _isFavourited = !currentFav;
+    });
+    AppHaptics.lightImpact();
+
     try {
       final isFavourited = await _salonService.toggleFavourite(widget.salonId);
       if (!mounted) return;
-      AppHaptics.lightImpact();
       setState(() {
         _isFavourited = isFavourited;
         _actionError = null;
       });
-      _toast(isFavourited ? 'Salon added to favourites' : 'Salon removed from favourites');
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
+      // Revert optimistic update
+      setState(() {
+        _isFavourited = currentFav;
+      });
       _showError(describeError(e, fallback: 'Could not update your favourites.'));
     } finally {
       if (mounted) {

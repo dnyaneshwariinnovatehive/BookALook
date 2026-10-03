@@ -203,29 +203,37 @@ class _CategoryTile extends StatelessWidget {
                 color: isDark ? foreground.withValues(alpha: 0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: hasIcon
-                  ? Image.network(
-                      iconUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => Icon(
-                        CategoryGrid.fallbackIcon(label),
-                        color: foreground,
-                        size: 26,
+              child: label.toLowerCase().contains('combo')
+                  ? Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Image.asset(
+                        'assets/images/combo_icon.jpg',
+                        fit: BoxFit.contain,
                       ),
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return Icon(
-                          CategoryGrid.fallbackIcon(label),
-                          color: foreground.withValues(alpha: 0.35),
-                          size: 26,
-                        );
-                      },
                     )
-                  : Icon(
-                      CategoryGrid.fallbackIcon(label),
-                      color: foreground,
-                      size: 26,
-                    ),
+                  : (hasIcon
+                      ? Image.network(
+                          iconUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) => Icon(
+                            CategoryGrid.fallbackIcon(label),
+                            color: foreground,
+                            size: 26,
+                          ),
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) return child;
+                            return Icon(
+                              CategoryGrid.fallbackIcon(label),
+                              color: foreground.withValues(alpha: 0.35),
+                              size: 26,
+                            );
+                          },
+                        )
+                      : Icon(
+                          CategoryGrid.fallbackIcon(label),
+                          color: foreground,
+                          size: 26,
+                        )),
             ),
           ),
           const SizedBox(height: 7),
