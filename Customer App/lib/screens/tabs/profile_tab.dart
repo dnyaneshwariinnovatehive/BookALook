@@ -467,12 +467,13 @@ class _ProfileTabState extends State<ProfileTab> {
                             children: [
                               InkWell(
                                 onTap: () async {
+                                  if (_userProfile == null) return;
                                   final result = await Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => EditProfileScreen(user: _user!)),
+                                    MaterialPageRoute(builder: (context) => EditProfileScreen(user: _userProfile!)),
                                   );
                                   if (result == true) {
-                                    _loadProfile();
+                                    _loadProfileData();
                                   }
                                 },
                                 child: Text(
