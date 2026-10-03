@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'dart:convert';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
@@ -99,7 +100,7 @@ class DeactivateSalonButton extends StatelessWidget {
         Fluttertoast.showToast(msg: 'Salon deactivated successfully.');
         AuthService().logout(context);
       } else {
-        final data = response.data;
+        final data = jsonDecode(response.body);
         if (data != null && data['error_code'] == 'HAS_UPCOMING_APPOINTMENTS' && !forceCloseSchedule) {
           if (context.mounted) _showForceCloseDialog(context, data['message']);
         } else {

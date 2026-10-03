@@ -1,5 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../screens/phone_screen.dart';
+import 'auth_session.dart';
+import 'push_notification_service.dart';
 import 'api_config.dart';
 
 class AuthService {
@@ -53,5 +58,24 @@ class AuthService {
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
+  }
+
+  Future<Map<String, dynamic>?> getUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stateStr = prefs.getString(AuthSession.stateKey);
+    if (stateStr == null) return null;
+    return jsonDecode(stateStr);
+  }
+
+  Future<void> logout(BuildContext context) async {
+    await PushNotificationService().unregisterDevice();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const PhoneScreen()),
+      (route) => false,
+    );
   }
 }

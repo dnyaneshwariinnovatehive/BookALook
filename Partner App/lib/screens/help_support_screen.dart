@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../legal/legal_documents.dart';
+import '../legal/legal_document_screen.dart';
 import '../theme/app_theme.dart';
 import '../../widgets/deactivate_salon_button.dart';
 
