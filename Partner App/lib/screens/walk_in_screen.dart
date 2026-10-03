@@ -457,7 +457,15 @@ class _WalkInScreenState extends State<WalkInScreen> {
         else if (grouped.isEmpty)
           _notice('No services match "$_search".', Colors.grey.shade700)
         else
-          ...grouped.entries.map((entry) => Column(
+          ...(() {
+            final entries = grouped.entries.toList();
+            final hairEntry = entries.where((e) => e.key.toLowerCase() == 'hair').firstOrNull;
+            final otherEntries = entries.where((e) => e.key.toLowerCase() != 'hair').toList();
+            final sortedEntries = [
+              if (hairEntry != null) hairEntry,
+              ...otherEntries,
+            ];
+            return sortedEntries.map((entry) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
@@ -471,7 +479,8 @@ class _WalkInScreenState extends State<WalkInScreen> {
                   ),
                   ...entry.value.map(_buildServiceTile),
                 ],
-              )),
+              ));
+          })(),
       ],
     );
   }
