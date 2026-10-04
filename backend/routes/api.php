@@ -430,6 +430,8 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/appointments/{id}/collect-payment', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'collectPayment']);
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
-        
+        // Automated Messaging
+        Route::get('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'getSettings']);
+        Route::put('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'updateSettings']);
     });
 });

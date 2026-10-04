@@ -20,6 +20,7 @@ import '../more/edit_salon_profile_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
 import '../more/whatsapp_stats_screen.dart';
+import '../more/automated_messaging_screen.dart';
 
 class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -362,11 +363,11 @@ class _MoreTabState extends State<MoreTab> {
                   _buildOptionTile(context, 
                     icon: Icons.mark_chat_read,
                     iconColor: Colors.green,
-                    title: 'WhatsApp Marketing',
+                    title: 'Automated Messaging',
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => WhatsappStatsScreen(salonId: salonData['id'].toString())),
+                        MaterialPageRoute(builder: (context) => AutomatedMessagingScreen(salonId: salonData['id'].toString())),
                       );
                     },
                   ),
