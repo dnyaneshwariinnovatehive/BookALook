@@ -172,6 +172,7 @@ interface FormState {
   cancelCutoff: Duration;
   rescheduleCutoff: Duration;
   startEarly: Duration;
+  reminderLead: Duration;
   reminderHour: string;
   graceDays: string;
   welcomeBonusCoins: string;
@@ -192,6 +193,7 @@ const EMPTY: FormState = {
   cancelCutoff: { value: '90', unit: 'minutes' },
   rescheduleCutoff: { value: '90', unit: 'minutes' },
   startEarly: { value: '30', unit: 'minutes' },
+  reminderLead: { value: '120', unit: 'minutes' },
   reminderHour: '11',
   graceDays: '7',
   welcomeBonusCoins: '2300',
@@ -242,6 +244,7 @@ export default function PlatformPolicyPage() {
         cancelCutoff: toDuration(Number(s.cancellation_cutoff_minutes ?? 90)),
         rescheduleCutoff: toDuration(Number(s.reschedule_cutoff_minutes ?? 90)),
         startEarly: toDuration(Number(s.appointment_start_early_minutes ?? 30)),
+        reminderLead: toDuration(Number(s.appointment_reminder_lead_minutes ?? 120)),
         reminderHour: String(s.subscription_reminder_hour ?? 11),
         graceDays: String(s.commission_settlement_grace_days ?? 7),
         welcomeBonusCoins: String(s.welcome_bonus_coins ?? 2300),
@@ -284,7 +287,7 @@ export default function PlatformPolicyPage() {
       if (n < 1 || n > 30) out.warningDays = 'Must be between 1 and 30 days.';
     }
 
-    (['cancelCutoff', 'rescheduleCutoff', 'startEarly'] as const).forEach((key) => {
+    (['cancelCutoff', 'rescheduleCutoff', 'startEarly', 'reminderLead'] as const).forEach((key) => {
       if (!wholeNumber(form[key].value)) out[key] = 'Enter a whole number, or 0 for no cutoff.';
     });
 
@@ -325,6 +328,7 @@ export default function PlatformPolicyPage() {
       cancellation_cutoff_minutes: toMinutes(state.cancelCutoff),
       reschedule_cutoff_minutes: toMinutes(state.rescheduleCutoff),
       appointment_start_early_minutes: toMinutes(state.startEarly),
+      appointment_reminder_lead_minutes: toMinutes(state.reminderLead),
       subscription_reminder_hour: Number(state.reminderHour),
       commission_settlement_grace_days: Number(state.graceDays),
       welcome_bonus_coins: Number(state.welcomeBonusCoins),
@@ -686,6 +690,18 @@ export default function PlatformPolicyPage() {
               <span className={styles.checkboxHint}>Sent to remind the customer of an upcoming appointment.</span>
             </div>
           </label>
+
+          {form.waAppointmentReminder && (
+            <div style={{ marginLeft: '1rem', paddingLeft: '1rem', borderLeft: '2px solid var(--border-color)', marginBottom: '1.5rem' }}>
+              <DurationField
+                label="Reminder advance time"
+                hint="How much time before the appointment to send the reminder."
+                duration={form.reminderLead}
+                onChange={(d) => set('reminderLead', d)}
+                error={errors.reminderLead}
+              />
+            </div>
+          )}
 
           <label className={styles.checkboxLabel}>
             <input

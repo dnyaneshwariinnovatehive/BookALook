@@ -44,10 +44,10 @@ class SendAppointmentReminders extends Command
 
     public function handle(NotificationService $notifications): int
     {
-        $leadHours = $this->leadHours();
+        $leadMinutes = $this->leadMinutes();
 
-        if ($leadHours === null) {
-            $this->info('Appointment reminders are disabled (APPOINTMENT_REMINDER_LEAD_HOURS is 0).');
+        if ($leadMinutes === null) {
+            $this->info('Appointment reminders are disabled (appointment_reminder_lead_minutes is 0).');
 
             return self::SUCCESS;
         }
@@ -60,7 +60,7 @@ class SendAppointmentReminders extends Command
         // what stops an appointment being re-considered once it is inside the
         // window and therefore being offered as newly due forever.
         $windowStart = $now->copy();
-        $windowEnd = $now->copy()->addHours($leadHours);
+        $windowEnd = $now->copy()->addMinutes($leadMinutes);
 
         $due = Appointment::query()
             ->whereNotNull('customer_id')
@@ -151,19 +151,22 @@ class SendAppointmentReminders extends Command
     }
 
     /**
-     * The lead time in hours, or null when reminders are switched off.
+     * The lead time in minutes, or null when reminders are switched off.
      *
-     * Read from config rather than env directly so the scheduler, the tests and
-     * the deploy docs all agree on one name. A value of 0 is the documented way
-     * to turn reminders off without editing the schedule.
+     * A value of 0 is the way to turn reminders off without editing the schedule.
      */
-    private function leadHours(): ?int
+    private function leadMinutes(): ?int
     {
-        $raw = $this->option('lead') ?? config('services.push.appointment_reminder_lead_hours');
+        if ($this->option('lead')) {
+            return (int) $this->option('lead') * 60;
+        }
 
-        $hours = (int) $raw;
+        $mins = (int) \App\Models\PlatformPolicySetting::value(
+            'appointment_reminder_lead_minutes',
+            config('services.push.appointment_reminder_lead_hours') * 60
+        );
 
-        return $hours > 0 ? $hours : null;
+        return $mins > 0 ? $mins : null;
     }
 
     /**

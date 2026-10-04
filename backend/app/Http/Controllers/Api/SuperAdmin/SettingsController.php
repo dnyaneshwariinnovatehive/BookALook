@@ -46,6 +46,7 @@ class SettingsController extends Controller
             'cancellation_cutoff_minutes' => 'sometimes|integer|min:0',
             'reschedule_cutoff_minutes' => 'sometimes|integer|min:0',
             'appointment_start_early_minutes' => 'sometimes|integer|min:0',
+            'appointment_reminder_lead_minutes' => 'sometimes|integer|min:0',
             'coin_value_inr' => 'sometimes|numeric|min:0',
             // Zero is allowed and means "stop giving new salons a bonus".
             // Salons already granted one keep it either way.
@@ -95,6 +96,7 @@ class SettingsController extends Controller
             'cancellation_cutoff_minutes' => 'Number of minutes before an appointment when cancellation is blocked',
             'reschedule_cutoff_minutes' => 'Number of minutes before an appointment when rescheduling is blocked',
             'appointment_start_early_minutes' => 'Number of minutes before an appointment start time when a provider can start it',
+            'appointment_reminder_lead_minutes' => 'Number of minutes before an appointment when the reminder WhatsApp message is sent',
             'subscription_reminder_hour' => 'Hour of the day (0-23) when renewal reminders are sent to salon owners',
             'welcome_bonus_coins' => 'Free coins given to a salon when SuperAdmin approves it',
             'commission_settlement_grace_days' => 'Days after a month closes before an unsettled Commission Model salon is locked out',
