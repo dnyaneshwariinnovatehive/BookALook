@@ -310,11 +310,9 @@ class ServiceManagementController extends Controller
 
         $combo = \App\Models\Combo::where('salon_id', $salon_id)->findOrFail($combo_id);
         
-        // Detach services to clean up pivot table
-        $combo->services()->detach();
-        
-        // Hard delete the combo
-        $combo->delete();
+        // Mark as inactive instead of deleting to preserve financial/appointment history
+        $combo->is_active = false;
+        $combo->save();
 
         return response()->json(['message' => 'Combo deleted successfully']);
     }
