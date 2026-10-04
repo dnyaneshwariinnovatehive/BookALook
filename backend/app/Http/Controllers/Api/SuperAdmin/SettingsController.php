@@ -78,6 +78,7 @@ class SettingsController extends Controller
             'whatsapp_appointment_reminder_enabled' => 'sometimes|boolean',
             'whatsapp_appointment_cancelled_enabled' => 'sometimes|boolean',
             'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
+            'whatsapp_salon_deactivated_enabled' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -150,6 +151,7 @@ class SettingsController extends Controller
             'whatsapp_appointment_reminder_enabled' => 'Enable WhatsApp messages for appointment reminders',
             'whatsapp_appointment_cancelled_enabled' => 'Enable WhatsApp messages for cancelled appointments',
             'whatsapp_salon_closure_enabled' => 'Enable WhatsApp messages when a salon closes for a day',
+            'whatsapp_salon_deactivated_enabled' => 'Enable WhatsApp messages when a salon is deactivated',
         ];
 
         foreach ($booleanSettings as $key => $description) {

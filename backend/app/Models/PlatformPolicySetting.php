@@ -62,6 +62,7 @@ class PlatformPolicySetting extends Model
         'whatsapp_appointment_reminder_enabled' => true,
         'whatsapp_appointment_cancelled_enabled' => true,
         'whatsapp_salon_closure_enabled' => true,
+        'whatsapp_salon_deactivated_enabled' => true,
     ];
 
     /** Settings that hold a URL rather than a number. */

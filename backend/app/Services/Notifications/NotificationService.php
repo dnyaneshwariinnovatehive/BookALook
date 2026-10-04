@@ -628,6 +628,10 @@ class NotificationService
      */
     public function salonDeactivated(Salon $salon, string $pdfUrl): void
     {
+        if (! \App\Models\PlatformPolicySetting::value('whatsapp_salon_deactivated_enabled', true)) {
+            return;
+        }
+
         $phone = $salon->admin->phone ?? $salon->phone_num;
 
         if (! $phone) {

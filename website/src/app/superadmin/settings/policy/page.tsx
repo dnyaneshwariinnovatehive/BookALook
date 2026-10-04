@@ -184,6 +184,7 @@ interface FormState {
   waAppointmentReminder: boolean;
   waAppointmentCancelled: boolean;
   waSalonClosure: boolean;
+  waSalonDeactivated: boolean;
 }
 
 const EMPTY: FormState = {
@@ -203,6 +204,7 @@ const EMPTY: FormState = {
   waAppointmentReminder: true,
   waAppointmentCancelled: true,
   waSalonClosure: true,
+  waSalonDeactivated: true,
 };
 
 export default function PlatformPolicyPage() {
@@ -252,6 +254,7 @@ export default function PlatformPolicyPage() {
         waAppointmentReminder: s.whatsapp_appointment_reminder_enabled ?? true,
         waAppointmentCancelled: s.whatsapp_appointment_cancelled_enabled ?? true,
         waSalonClosure: s.whatsapp_salon_closure_enabled ?? true,
+        waSalonDeactivated: s.whatsapp_salon_deactivated_enabled ?? true,
       };
 
       setSaved(next);
@@ -334,6 +337,7 @@ export default function PlatformPolicyPage() {
       whatsapp_appointment_reminder_enabled: state.waAppointmentReminder,
       whatsapp_appointment_cancelled_enabled: state.waAppointmentCancelled,
       whatsapp_salon_closure_enabled: state.waSalonClosure,
+      whatsapp_salon_deactivated_enabled: state.waSalonDeactivated,
     }),
     []
   );
@@ -706,6 +710,19 @@ export default function PlatformPolicyPage() {
             <div className={styles.checkboxText}>
               <span className={styles.checkboxTitle}>Salon Closure (Reschedule)</span>
               <span className={styles.checkboxHint}>Sent when a salon admin cancels a day, including a link to reschedule.</span>
+            </div>
+          </label>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.waSalonDeactivated}
+              onChange={(e) => set('waSalonDeactivated', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Salon Deactivated (Admin)</span>
+              <span className={styles.checkboxHint}>Sent to a salon admin when their salon is deactivated, attaching pending dues.</span>
             </div>
           </label>
         </section>
