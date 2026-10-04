@@ -164,6 +164,8 @@ Route::prefix('superadmin')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
         Route::apiResource('banners', \App\Http\Controllers\Api\SuperAdmin\BannerController::class);
+        Route::post('/banners/preview', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'preview']);
+        Route::post('/banners/{id}/track', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'track']);
 
         // Subscriptions & Wallet Schemes
         Route::get('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);

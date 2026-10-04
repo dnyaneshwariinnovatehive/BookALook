@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../utils/constants.dart';
+import '../../../../services/api_config.dart';
 import '../../../../theme/app_theme.dart';
 
 class AutomatedMessagingScreen extends StatefulWidget {
@@ -36,7 +36,7 @@ class _AutomatedMessagingScreenState extends State<AutomatedMessagingScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('partner_token');
       final response = await http.get(
-        Uri.parse('${Constants.apiBaseUrl}/partner/salons/${widget.salonId}/automated-messaging'),
+        Uri.parse('${ApiConfig.baseUrl}/partner/salons/${widget.salonId}/automated-messaging'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -77,7 +77,7 @@ class _AutomatedMessagingScreenState extends State<AutomatedMessagingScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('partner_token');
       final response = await http.put(
-        Uri.parse('${Constants.apiBaseUrl}/partner/salons/${widget.salonId}/automated-messaging'),
+        Uri.parse('${ApiConfig.baseUrl}/partner/salons/${widget.salonId}/automated-messaging'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
