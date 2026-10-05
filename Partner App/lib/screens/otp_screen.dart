@@ -209,6 +209,16 @@ class _OtpScreenState extends State<OtpScreen> {
               'Please contact BookALook support.');
           return;
         }
+
+        // Start precaching salon images so they appear instantly on the selection screen
+        if (response['role'] == 'admin' && response['salons'] is List) {
+          for (final salon in response['salons']) {
+            final url = salon['cover_photo_url'];
+            if (url != null && url.toString().isNotEmpty) {
+              precacheImage(NetworkImage(url.toString()), context).catchError((_) {});
+            }
+          }
+        }
         try {
           await _session.save(response);
         } catch (_) {
