@@ -22,13 +22,15 @@ import '../../../services/insights_api.dart';
 class HomeTab extends StatefulWidget {
   final String salonId;
   final String salonName;
-  final Map<String, dynamic>? currentSubscription;
+  final String? planName;
+  final int? daysRemaining;
 
   const HomeTab({
     super.key,
     required this.salonId,
     this.salonName = '',
-    this.currentSubscription,
+    this.planName,
+    this.daysRemaining,
   });
 
   @override
@@ -383,6 +385,29 @@ class _HomeTabState extends State<HomeTab> {
                      crossAxisAlignment: CrossAxisAlignment.start,
                      children: [
                        _buildHeader(isDark),
+                       if (widget.daysRemaining != null && widget.daysRemaining! <= 7) ...[
+                         const SizedBox(height: 16),
+                         Container(
+                           padding: const EdgeInsets.all(12),
+                           decoration: BoxDecoration(
+                             color: Colors.red.withOpacity(0.1),
+                             borderRadius: BorderRadius.circular(12),
+                             border: Border.all(color: Colors.red.withOpacity(0.3)),
+                           ),
+                           child: Row(
+                             children: [
+                               const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                               const SizedBox(width: 8),
+                               Expanded(
+                                 child: Text(
+                                   'Your plan expires in ${widget.daysRemaining} days. Renew now to avoid interruption.',
+                                   style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
+                       ],
                        if (_needsWorkingHours) ...[
                          const SizedBox(height: 16),
                          _buildWorkingHoursPrompt(),
@@ -451,7 +476,7 @@ class _HomeTabState extends State<HomeTab> {
                             style: TextStyle(fontSize: 14, color: subColor),
                           ),
                         ),
-                        if (widget.currentSubscription != null) ...[
+                        if (widget.planName != null) ...[
                           const SizedBox(width: 8),
                           _buildPlanBadge(),
                         ]
@@ -533,12 +558,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildPlanBadge() {
-    final sub = widget.currentSubscription;
-    final planName = (sub != null && sub['status'] == 'active' && sub['plan'] != null)
-        ? sub['plan']['name']?.toString() ?? 'Free'
-        : 'Free';
-
-    final isGrowth = planName.toLowerCase() == 'growth';
+    final name = widget.planName ?? 'Starter';
+    final isGrowth = name.toLowerCase() == 'growth';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -550,7 +571,7 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        planName.toUpperCase(),
+        name.toUpperCase(),
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.bold,

@@ -25,8 +25,16 @@ import '../more/automated_messaging_screen.dart';
 class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
   final Function(Map<String, dynamic>)? onSalonUpdated;
+  final String? planName;
+  final int? daysRemaining;
   
-  const MoreTab({super.key, required this.salonData, this.onSalonUpdated});
+  const MoreTab({
+    super.key, 
+    required this.salonData, 
+    this.onSalonUpdated,
+    this.planName,
+    this.daysRemaining,
+  });
 
   @override
   State<MoreTab> createState() => _MoreTabState();
@@ -102,12 +110,8 @@ class _MoreTabState extends State<MoreTab> {
   }
 
   Widget _buildPlanBadge() {
-    final sub = salonData['current_subscription'];
-    final planName = (sub != null && sub['status'] == 'active' && sub['plan'] != null)
-        ? sub['plan']['name']?.toString() ?? 'Free'
-        : 'Free';
-
-    final isGrowth = planName.toLowerCase() == 'growth';
+    final name = widget.planName ?? 'Starter';
+    final isGrowth = name.toLowerCase() == 'growth';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -119,7 +123,7 @@ class _MoreTabState extends State<MoreTab> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        planName.toUpperCase(),
+        name.toUpperCase(),
         style: TextStyle(
           fontSize: 9,
           fontWeight: FontWeight.bold,
@@ -128,7 +132,6 @@ class _MoreTabState extends State<MoreTab> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

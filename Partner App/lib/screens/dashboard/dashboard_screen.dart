@@ -50,6 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _access = access;
         _checkingAccess = false;
+        _buildTabs();
       });
     } catch (_) {
       // A failed check must not lock a paying salon out of its own app.
@@ -57,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _access = null;
         _checkingAccess = false;
+        _buildTabs();
       });
     }
   }
@@ -66,13 +68,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       HomeTab(
         salonId: widget.salonData['id'].toString(), 
         salonName: widget.salonData['name']?.toString() ?? '',
-        currentSubscription: widget.salonData['current_subscription'],
+        planName: _access?.planName,
+        daysRemaining: _access?.daysRemaining,
       ),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
       StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),
       MoreTab(
         salonData: widget.salonData,
+        planName: _access?.planName,
+        daysRemaining: _access?.daysRemaining,
         onSalonUpdated: (updatedData) {
           setState(() {
             widget.salonData.addAll(updatedData);
