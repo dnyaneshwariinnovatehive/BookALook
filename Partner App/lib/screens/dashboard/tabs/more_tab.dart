@@ -319,21 +319,7 @@ class _MoreTabState extends State<MoreTab> {
                       );
                     },
                   ),
-                  Divider(height: 1, indent: 56),
-                  // Sits next to Reviews because the two answer the same
-                  // question from opposite ends: what customers think, and what
-                  // the salon can say back to them.
-                  _buildOptionTile(context,
-                    icon: Icons.campaign_outlined,
-                    iconColor: const Color(0xFF25D366),
-                    title: 'WhatsApp Marketing',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MarketingScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
+
                   Divider(height: 1, indent: 56),
                   // The poster that goes in the window. Prints to a real PNG.
                   _buildOptionTile(context,
