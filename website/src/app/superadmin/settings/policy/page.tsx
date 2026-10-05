@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Tabs } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 /**
@@ -18,6 +19,13 @@ import styles from './page.module.css';
  * Durations are now held as the raw text and unit the user actually chose, and
  * converted to minutes only when saving — so the box says what was typed into
  * it, always.
+ *
+ * The six rule groups sit on their own tabs rather than one long scroll. Six
+ * unrelated groups stacked in a column is a wall — nobody reads past the third
+ * one. One group per tab keeps the save bar useful too: it is already sticky,
+ * so switching tabs does not lose your place or your edits, and a tab carrying
+ * a validation badge points at the group that needs attention even while you
+ * are reading a different one.
  */
 
 const MINUTES_IN_HOUR = 60;
@@ -165,6 +173,36 @@ function DurationField({
   );
 }
 
+// ---------------------------------------------------------------------- tabs
+
+type PolicyTab = 'catalog' | 'bookings' | 'subscriptions' | 'coins' | 'links' | 'whatsapp';
+
+const TAB_LABELS: Record<PolicyTab, string> = {
+  catalog: 'Services',
+  bookings: 'Bookings',
+  subscriptions: 'Subscriptions',
+  coins: 'Coins',
+  links: 'Links & QR',
+  whatsapp: 'WhatsApp',
+};
+
+/** Which form fields belong to which tab, so a badge can find them. */
+const TAB_FIELDS: Record<PolicyTab, (keyof FormState)[]> = {
+  catalog: ['combosLimit'],
+  bookings: ['cancelCutoff', 'rescheduleCutoff', 'startEarly'],
+  subscriptions: ['warningDays', 'reminderHour', 'graceDays'],
+  coins: ['coinValue', 'welcomeBonusCoins'],
+  links: ['publicWebUrl', 'androidAppUrl', 'iosAppUrl', 'androidApkUrl'],
+  whatsapp: [
+    'reminderLead',
+    'waBookingConfirmed',
+    'waAppointmentReminder',
+    'waAppointmentCancelled',
+    'waSalonClosure',
+    'waSalonDeactivated',
+  ],
+};
+
 // ---------------------------------------------------------------------- page
 
 interface FormState {
@@ -226,6 +264,10 @@ export default function PlatformPolicyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [banner, setBanner] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+
+  // Editing is never lost to a tab switch — the form is one state object, and
+  // the tab only chooses what is drawn from it.
+  const [tab, setTab] = useState<PolicyTab>('catalog');
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -445,6 +487,27 @@ export default function PlatformPolicyPage() {
       )}
 
       <form onSubmit={handleSave} className={styles.form}>
+        <Tabs<PolicyTab>
+          value={tab}
+          onChange={setTab}
+          tabs={(Object.keys(TAB_LABELS) as PolicyTab[]).map((value) => {
+            // A group you cannot currently see must still be able to say it needs
+            // fixing, or the sticky bar claims errors you have no way of finding.
+            const broken = TAB_FIELDS[value].filter((key) => errors[key]).length;
+            return {
+              value,
+              label: (
+                <>
+                  {TAB_LABELS[value]}
+                  {broken > 0 && <span className={styles.tabBadge}>{broken}</span>}
+                </>
+              ),
+            };
+          })}
+        />
+
+        <div className={styles.tabBody}>
+        {tab === 'catalog' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Service Catalog</h2>
           <p className={styles.sectionHint}>Limits and rules for the services and combos salons can offer.</p>
@@ -466,7 +529,9 @@ export default function PlatformPolicyPage() {
             </div>
           </Field>
         </section>
+        )}
 
+        {tab === 'bookings' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Bookings &amp; cancellations</h2>
           <p className={styles.sectionHint}>
@@ -498,7 +563,9 @@ export default function PlatformPolicyPage() {
             error={errors.startEarly}
           />
         </section>
+        )}
 
+        {tab === 'subscriptions' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Subscriptions &amp; reminders</h2>
           <p className={styles.sectionHint}>
@@ -560,7 +627,9 @@ export default function PlatformPolicyPage() {
             </div>
           </Field>
         </section>
+        )}
 
+        {tab === 'coins' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Rewards &amp; coins</h2>
           <p className={styles.sectionHint}>
@@ -616,7 +685,9 @@ export default function PlatformPolicyPage() {
             </div>
           </Field>
         </section>
+        )}
 
+        {tab === 'links' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Salon QR codes &amp; the app</h2>
           <p className={styles.sectionHint}>
@@ -688,7 +759,9 @@ export default function PlatformPolicyPage() {
             />
           </Field>
         </section>
+        )}
 
+        {tab === 'whatsapp' && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>WhatsApp Notifications</h2>
           <p className={styles.sectionHint}>
@@ -772,6 +845,8 @@ export default function PlatformPolicyPage() {
             </div>
           </label>
         </section>
+        )}
+        </div>
 
         {/* Stays in view on a long form, and says what is about to happen. */}
         <div className={`${styles.saveBar} ${isDirty || hasErrors ? styles.saveBarActive : ''}`}>

@@ -59,6 +59,29 @@
   gap: 1.25rem;
 }
 
+.tabBody {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "2" on a tab whose group has validation errors you cannot see from here. */
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 .section {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
