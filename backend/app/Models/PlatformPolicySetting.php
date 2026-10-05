@@ -64,6 +64,9 @@ class PlatformPolicySetting extends Model
         'whatsapp_appointment_cancelled_enabled' => true,
         'whatsapp_salon_closure_enabled' => true,
         'whatsapp_salon_deactivated_enabled' => true,
+        
+        // Limit on how many combos a salon can create.
+        'combos_limit_per_salon' => 10,
     ];
 
     /** Settings that hold a URL rather than a number. */

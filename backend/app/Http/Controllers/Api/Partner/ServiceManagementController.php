@@ -219,6 +219,15 @@ class ServiceManagementController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $comboLimit = \App\Models\PlatformPolicySetting::value('combos_limit_per_salon', 10);
+        $currentCombosCount = \App\Models\Combo::where('salon_id', $salon_id)->where('is_active', true)->count();
+
+        if ($currentCombosCount >= $comboLimit) {
+            return response()->json([
+                'message' => "You have reached the maximum limit of {$comboLimit} combos allowed per salon."
+            ], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:150',
             'advance_percentage' => 'nullable|numeric|min:0|max:100',

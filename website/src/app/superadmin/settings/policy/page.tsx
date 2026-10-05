@@ -186,6 +186,7 @@ interface FormState {
   waAppointmentCancelled: boolean;
   waSalonClosure: boolean;
   waSalonDeactivated: boolean;
+  combosLimit: string;
 }
 
 const EMPTY: FormState = {
@@ -207,6 +208,7 @@ const EMPTY: FormState = {
   waAppointmentCancelled: true,
   waSalonClosure: true,
   waSalonDeactivated: true,
+  combosLimit: '10',
 };
 
 export default function PlatformPolicyPage() {
@@ -258,6 +260,7 @@ export default function PlatformPolicyPage() {
         waAppointmentCancelled: s.whatsapp_appointment_cancelled_enabled ?? true,
         waSalonClosure: s.whatsapp_salon_closure_enabled ?? true,
         waSalonDeactivated: s.whatsapp_salon_deactivated_enabled ?? true,
+        combosLimit: String(s.combos_limit_per_salon ?? 10),
       };
 
       setSaved(next);
@@ -290,6 +293,10 @@ export default function PlatformPolicyPage() {
     (['cancelCutoff', 'rescheduleCutoff', 'startEarly', 'reminderLead'] as const).forEach((key) => {
       if (!wholeNumber(form[key].value)) out[key] = 'Enter a whole number, or 0 for no cutoff.';
     });
+
+    if (!wholeNumber(form.combosLimit)) {
+      out.combosLimit = 'Enter a whole number.';
+    }
 
     if (!wholeNumber(form.graceDays) || Number(form.graceDays) > 60) {
       out.graceDays = 'Enter a whole number of days, 0 to 60.';
@@ -342,6 +349,7 @@ export default function PlatformPolicyPage() {
       whatsapp_appointment_cancelled_enabled: state.waAppointmentCancelled,
       whatsapp_salon_closure_enabled: state.waSalonClosure,
       whatsapp_salon_deactivated_enabled: state.waSalonDeactivated,
+      combos_limit_per_salon: Number(state.combosLimit),
     }),
     []
   );
@@ -437,6 +445,28 @@ export default function PlatformPolicyPage() {
       )}
 
       <form onSubmit={handleSave} className={styles.form}>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Service Catalog</h2>
+          <p className={styles.sectionHint}>Limits and rules for the services and combos salons can offer.</p>
+          <Field
+            label="Max service combos"
+            error={errors.combosLimit}
+            hint="The maximum number of service combos any single salon can create."
+          >
+            <div className={styles.suffixRow}>
+              <input
+                className={`${styles.input} ${errors.combosLimit ? styles.inputError : ''}`}
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={form.combosLimit}
+                onChange={(e) => set('combosLimit', e.target.value)}
+              />
+              <span className={styles.suffix}>combos</span>
+            </div>
+          </Field>
+        </section>
+
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Bookings &amp; cancellations</h2>
           <p className={styles.sectionHint}>

@@ -80,6 +80,7 @@ class SettingsController extends Controller
             'whatsapp_appointment_cancelled_enabled' => 'sometimes|boolean',
             'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
             'whatsapp_salon_deactivated_enabled' => 'sometimes|boolean',
+            'combos_limit_per_salon' => 'sometimes|integer|min:0|max:100',
         ]);
 
         $user = $request->user();
@@ -105,6 +106,7 @@ class SettingsController extends Controller
             'marketing_quiet_hours_start' => 'Hour of day (0-23) after which marketing messages are held until morning',
             'marketing_quiet_hours_end' => 'Hour of day (0-23) before which marketing messages are held',
             'marketing_daily_cap_per_salon' => 'Most marketing messages one salon may send in a day, whatever its plan allows for the month. 0 removes the cap',
+            'combos_limit_per_salon' => 'Maximum number of service combos a salon can create.',
         ];
 
         // Not an integer like the rest — a coin can be worth paise.
