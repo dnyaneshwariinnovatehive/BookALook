@@ -546,6 +546,8 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                     (route) => false,
                   );
+                } else {
+                  _loadCart();
                 }
               },
               style: ElevatedButton.styleFrom(

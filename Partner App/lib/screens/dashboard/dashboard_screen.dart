@@ -63,7 +63,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _buildTabs() {
     _tabs = [
-      HomeTab(salonId: widget.salonData['id'].toString(), salonName: widget.salonData['name']?.toString() ?? ''),
+      HomeTab(
+        salonId: widget.salonData['id'].toString(), 
+        salonName: widget.salonData['name']?.toString() ?? '',
+        currentSubscription: widget.salonData['current_subscription'],
+      ),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
       StaffTab(salonId: widget.salonData['id']),
       ServicesTab(salonId: widget.salonData['id']),

@@ -101,6 +101,34 @@ class _MoreTabState extends State<MoreTab> {
     }
   }
 
+  Widget _buildPlanBadge() {
+    final sub = salonData['current_subscription'];
+    final planName = (sub != null && sub['status'] == 'active' && sub['plan'] != null)
+        ? sub['plan']['name']?.toString() ?? 'Free'
+        : 'Free';
+
+    final isGrowth = planName.toLowerCase() == 'growth';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isGrowth ? Colors.purple.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+        border: Border.all(
+          color: isGrowth ? Colors.purple.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        planName.toUpperCase(),
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: isGrowth ? Colors.purple : Colors.blue,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -157,7 +185,15 @@ class _MoreTabState extends State<MoreTab> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(salonData['name']?.toString() ?? 'Salon Name', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(salonData['name']?.toString() ?? 'Salon Name', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildPlanBadge(),
+                                ],
+                              ),
                               const SizedBox(height: 4),
                               Text(salonData['city']?['name']?.toString() ?? 'City not specified', style: TextStyle(fontSize: 12, color: theme.textTheme.bodyMedium?.color)),
                             ],

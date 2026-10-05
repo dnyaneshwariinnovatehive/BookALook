@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Tabs } from '@/components/admin/ui';
+import { Badge, Button, Tabs, cx } from '@/components/admin/ui';
 import styles from './page.module.css';
 
 /**
@@ -269,6 +269,12 @@ export default function PlatformPolicyPage() {
   // the tab only chooses what is drawn from it.
   const [tab, setTab] = useState<PolicyTab>('catalog');
 
+  // Bumped after every successful save. Used as a React key on the status text
+  // so the "saved" animation replays each time instead of only on first mount —
+  // a confirmation that runs once and then sits still is easy to miss, and this
+  // is the only proof the write actually landed.
+  const [savePulse, setSavePulse] = useState(0);
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     // A "Saved." notice sitting above fields that have since been edited is
@@ -444,6 +450,7 @@ export default function PlatformPolicyPage() {
       }
 
       setSaved(form);
+      setSavePulse((n) => n + 1);
       setBanner({
         tone: 'ok',
         text: `Saved. ${changed.length} setting${changed.length === 1 ? '' : 's'} updated.`,
@@ -849,28 +856,49 @@ export default function PlatformPolicyPage() {
         </div>
 
         {/* Stays in view on a long form, and says what is about to happen. */}
-        <div className={`${styles.saveBar} ${isDirty || hasErrors ? styles.saveBarActive : ''}`}>
-          <span className={styles.saveStatus}>
-            {hasErrors
-              ? `${Object.keys(errors).length} field${Object.keys(errors).length === 1 ? '' : 's'} need fixing`
-              : isDirty
-                ? `${changed.length} unsaved change${changed.length === 1 ? '' : 's'}`
-                : 'All changes saved'}
+        <div
+          className={cx(
+            styles.saveBar,
+            isSaving && styles.saveBarBusy,
+            hasErrors && styles.saveBarError,
+            isDirty && !hasErrors && !isSaving && styles.saveBarActive,
+          )}
+        >
+          {/* One badge, three tones, so the state is readable from the shape and
+              the colour rather than from reading a line of text. The key is
+              savePulse: remounting the badge is what replays the pop after each
+              write, so a confirmation is a moment you notice, not a colour that
+              quietly changed while you were looking at a field. */}
+          <span key={savePulse} className={styles.saveStatus}>
+            <Badge
+              tone={hasErrors ? 'danger' : isSaving ? 'accent' : isDirty ? 'warning' : 'success'}
+              pulse={!hasErrors && !isDirty && !isSaving}
+            >
+              {hasErrors
+                ? `${Object.keys(errors).length} field${Object.keys(errors).length === 1 ? '' : 's'} need fixing`
+                : isSaving
+                  ? 'Saving…'
+                  : isDirty
+                    ? `${changed.length} unsaved change${changed.length === 1 ? '' : 's'}`
+                    : 'All changes saved'}
+            </Badge>
           </span>
 
           <div className={styles.saveActions}>
             {isDirty && (
-              <button type="button" className={styles.ghostButton} onClick={discard} disabled={isSaving}>
+              <Button variant="ghost" icon="refresh" onClick={discard} disabled={isSaving}>
                 Discard
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="submit"
-              className={styles.button}
-              disabled={isSaving || hasErrors || !isDirty}
+              variant="primary"
+              icon="check"
+              loading={isSaving}
+              disabled={hasErrors || !isDirty}
             >
-              {isSaving ? 'Saving…' : 'Save changes'}
-            </button>
+              Save changes
+            </Button>
           </div>
         </div>
       </form>

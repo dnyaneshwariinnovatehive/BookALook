@@ -22,11 +22,13 @@ import '../../../services/insights_api.dart';
 class HomeTab extends StatefulWidget {
   final String salonId;
   final String salonName;
+  final Map<String, dynamic>? currentSubscription;
 
   const HomeTab({
     super.key,
     required this.salonId,
     this.salonName = '',
+    this.currentSubscription,
   });
 
   @override
@@ -439,11 +441,21 @@ class _HomeTabState extends State<HomeTab> {
                       'Hi Admin 👋',
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: headingColor),
                     ),
-                    Text(
-                      widget.salonName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 14, color: subColor),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            widget.salonName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 14, color: subColor),
+                          ),
+                        ),
+                        if (widget.currentSubscription != null) ...[
+                          const SizedBox(width: 8),
+                          _buildPlanBadge(),
+                        ]
+                      ],
                     ),
                   ],
                 ),
@@ -517,6 +529,34 @@ class _HomeTabState extends State<HomeTab> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildPlanBadge() {
+    final sub = widget.currentSubscription;
+    final planName = (sub != null && sub['status'] == 'active' && sub['plan'] != null)
+        ? sub['plan']['name']?.toString() ?? 'Free'
+        : 'Free';
+
+    final isGrowth = planName.toLowerCase() == 'growth';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isGrowth ? Colors.purple.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+        border: Border.all(
+          color: isGrowth ? Colors.purple.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        planName.toUpperCase(),
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: isGrowth ? Colors.purple : Colors.blue,
+        ),
+      ),
     );
   }
 
