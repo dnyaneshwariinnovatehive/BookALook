@@ -10,12 +10,13 @@ use Carbon\Carbon;
 
 class AutomatedMessagingController extends Controller
 {
-    public function getSettings(Request $request)
+    public function getSettings(Request $request, $salon_id)
     {
-        $salon = $request->user()->adminSalon; // assuming the user is admin of a salon
+        $salon = Salon::findOrFail($salon_id);
 
-        if (!$salon) {
-            return response()->json(['success' => false, 'message' => 'Salon not found.'], 404);
+        // Verify the user is an admin or has access to this salon
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
         // We want to get analytics for "this month"
@@ -58,12 +59,12 @@ class AutomatedMessagingController extends Controller
         ]);
     }
 
-    public function updateSettings(Request $request)
+    public function updateSettings(Request $request, $salon_id)
     {
-        $salon = $request->user()->adminSalon;
+        $salon = Salon::findOrFail($salon_id);
 
-        if (!$salon) {
-            return response()->json(['success' => false, 'message' => 'Salon not found.'], 404);
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
         $request->validate([
