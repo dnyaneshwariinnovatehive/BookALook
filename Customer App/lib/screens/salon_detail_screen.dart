@@ -479,25 +479,23 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   /// The docked area: the action error, if any, above the cart bar.
   Widget? _buildBottomArea() {
-    final bar = _buildStickyBar();
     final error = _actionError;
-    if (error == null) return bar;
+    if (error == null) return null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SafeArea(
           top: false,
-          bottom: bar == null,
+          bottom: true,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bar == null ? 12 : 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: InlineStatus(
               message: error,
               onDismiss: () => setState(() => _actionError = null),
             ),
           ),
         ),
-        if (bar != null) bar,
       ],
     );
   }
@@ -1593,105 +1591,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     return 0;
   }
 
-  /// Running total for the doc's sticky "View Cart" bar. Only counts a cart
-  /// that belongs to this salon.
-  Widget? _buildStickyBar() {
-    final items = (_cart?['items'] as List?) ?? [];
-    if (_cart == null || items.isEmpty) return null;
-    if (_cart!['salon_id'].toString() != widget.salonId) return null;
-
-    // The server sends the figures the booking will actually charge; only fall
-    // back to a local sum if an older API build leaves them out.
-    final summary = _cart!['summary'] as Map<String, dynamic>?;
-
-    double total = 0;
-    int count = 0;
-    for (final item in items) {
-      count += (item['quantity'] ?? 1) as int;
-      total += _lineTotal(item);
-    }
-
-    double listTotal = total;
-    double saving = 0;
-
-    if (summary != null) {
-      total = _toDouble(summary['total_amount']);
-      listTotal = _toDouble(summary['list_total']);
-      saving = _toDouble(summary['saving']);
-      count = (summary['item_count'] ?? count) as int;
-    }
-
-    final colors = context.colors;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        border: colors.prefersOutline ? Border(top: BorderSide(color: colors.raisedOutline)) : null,
-        boxShadow: [
-          if (!colors.prefersOutline)
-            BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05), offset: Offset(0, -4), blurRadius: 20),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$count ${count == 1 ? 'item' : 'items'}',
-                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary)),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('₹${total.toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: context.colors.textPrimary)),
-                    if (saving > 0) ...[
-                      SizedBox(width: 6),
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 3),
-                        child: Text('₹${listTotal.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 13,
-                              color: context.colors.textTertiary,
-                              decoration: TextDecoration.lineThrough,
-                            )),
-                      ),
-                    ],
-                  ],
-                ),
-                if (saving > 0)
-                  Text('Package saving ₹${saving.toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.success)),
-              ],
-            ),
-            ElevatedButton.icon(
-              onPressed: _openCart,
-              icon: Icon(Icons.shopping_cart, size: 18),
-              label: Text('View Cart',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // ------------------------------------------------------------------ shared
 

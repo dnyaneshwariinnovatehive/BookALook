@@ -3,6 +3,8 @@ import 'package:customer_app/services/http_client.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'package:flutter/foundation.dart'; // Added for ValueNotifier
+
 class CartConflictException implements Exception {
   final String message;
   final String otherSalonName;
@@ -11,6 +13,8 @@ class CartConflictException implements Exception {
 
 class CartService {
   final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+
+  static final ValueNotifier<Map<String, dynamic>?> globalCartNotifier = ValueNotifier(null);
 
   Future<Map<String, dynamic>?> getGlobalCart() async {
     final prefs = await SharedPreferences.getInstance();
@@ -28,8 +32,10 @@ class CartService {
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
+      globalCartNotifier.value = json['cart'];
       return json['cart'];
     } else {
+      globalCartNotifier.value = null;
       return null;
     }
   }
@@ -49,6 +55,7 @@ class CartService {
     if (response.statusCode != 200) {
       throw Exception('Failed to clear global cart');
     }
+    globalCartNotifier.value = null;
   }
 
   Future<Map<String, dynamic>?> getCart(String salonId) async {
@@ -65,6 +72,7 @@ class CartService {
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
+      globalCartNotifier.value = json['cart'];
       return json['cart'];
     } else if (response.statusCode == 404) {
       return null;
@@ -108,7 +116,9 @@ class CartService {
       throw Exception('Failed to add item to cart');
     }
 
-    return jsonDecode(response.body)['cart'] as Map<String, dynamic>?;
+    final cart = jsonDecode(response.body)['cart'] as Map<String, dynamic>?;
+    globalCartNotifier.value = cart;
+    return cart;
   }
 
   Future<void> removeItem(String itemId) async {
@@ -126,5 +136,6 @@ class CartService {
     if (response.statusCode != 200) {
       throw Exception('Failed to remove item');
     }
+    await getGlobalCart();
   }
 }

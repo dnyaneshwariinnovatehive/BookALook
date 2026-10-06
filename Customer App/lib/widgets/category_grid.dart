@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/category.dart';
@@ -187,6 +188,7 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final (background, foreground) = tint;
     final hasIcon = iconUrl != null && iconUrl!.isNotEmpty;
+    final isCombo = label.toLowerCase().contains('combo');
 
     return InkWell(
       onTap: onTap,
@@ -195,7 +197,6 @@ class _CategoryTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           AspectRatio(
-            // Square, so every tile lines up however wide the screen is.
             aspectRatio: 1,
             child: Container(
               clipBehavior: Clip.hardEdge,
@@ -203,13 +204,10 @@ class _CategoryTile extends StatelessWidget {
                 color: isDark ? foreground.withValues(alpha: 0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: label.toLowerCase().contains('combo')
-                  ? Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Image.asset(
-                        'assets/images/combo_icon.jpg',
-                        fit: BoxFit.contain,
-                      ),
+              child: isCombo
+                  ? _AnimatedCombosIllustration(
+                      primaryColor: foreground,
+                      backgroundColor: isDark ? foreground.withValues(alpha: 0.16) : background,
                     )
                   : (hasIcon
                       ? Image.network(
@@ -252,6 +250,133 @@ class _CategoryTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _AnimatedCombosIllustration extends StatefulWidget {
+  final Color primaryColor;
+  final Color backgroundColor;
+
+  const _AnimatedCombosIllustration({
+    required this.primaryColor,
+    required this.backgroundColor,
+  });
+
+  @override
+  State<_AnimatedCombosIllustration> createState() => _AnimatedCombosIllustrationState();
+}
+
+class _AnimatedCombosIllustrationState extends State<_AnimatedCombosIllustration> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    );
+
+    _pulseAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.05).chain(CurveTween(curve: Curves.easeOut)), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 1.05, end: 0.96).chain(CurveTween(curve: Curves.easeInOut)), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 0.96, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)), weight: 30),
+    ]).animate(_controller);
+
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _BurstPainter(
+                  progress: _controller.value,
+                  primaryColor: widget.primaryColor,
+                ),
+              ),
+            ),
+            Transform.scale(
+              scale: _pulseAnim.value,
+              child: Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: Image.asset(
+                  'assets/images/combo_icon.jpg', // Uses the provided image
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BurstPainter extends CustomPainter {
+  final double progress;
+  final Color primaryColor;
+
+  _BurstPainter({required this.progress, required this.primaryColor});
+
+  void _drawStar(Canvas canvas, Offset center, double size, Paint paint) {
+    final path = Path();
+    path.moveTo(center.dx, center.dy - size);
+    path.quadraticBezierTo(center.dx, center.dy, center.dx + size, center.dy);
+    path.quadraticBezierTo(center.dx, center.dy, center.dx, center.dy + size);
+    path.quadraticBezierTo(center.dx, center.dy, center.dx - size, center.dy);
+    path.quadraticBezierTo(center.dx, center.dy, center.dx, center.dy - size);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = primaryColor
+      ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 7; i++) {
+      final angle = (i * math.pi * 2 / 7) + (progress * math.pi * 0.5);
+      final localProgress = (progress + (i * 0.14)) % 1.0;
+      final distance = 10 + (size.width * 0.7 * localProgress);
+      final alpha = (1.0 - localProgress).clamp(0.0, 1.0);
+      final particleSize = 6.0 * math.sin(localProgress * math.pi);
+      
+      if (particleSize > 0.5) {
+        paint.color = primaryColor.withValues(alpha: alpha);
+        final dx = center.dx + math.cos(angle) * distance;
+        final dy = center.dy + math.sin(angle) * distance;
+        
+        // Alternate between circles and stars
+        if (i % 2 == 0) {
+          _drawStar(canvas, Offset(dx, dy), particleSize, paint);
+        } else {
+          canvas.drawCircle(Offset(dx, dy), particleSize * 0.5, paint);
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BurstPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.primaryColor != primaryColor;
   }
 }
 

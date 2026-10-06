@@ -745,15 +745,297 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             );
           }
 
+          final booking = list[isUpcoming ? index - 1 : index];
+
+          if (!isUpcoming) {
+            return _buildCompactHistoryCard(booking);
+          }
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _buildCard(
-              list[isUpcoming ? index - 1 : index],
+              booking,
               isUpcoming: isUpcoming,
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildCompactHistoryCard(Map<String, dynamic> booking) {
+    final date = DateTime.parse(booking['appointment_date']);
+    final services = (booking['services'] as List?) ?? [];
+    final total = _toDouble(booking['total_amount']);
+
+    String serviceNames = services.map((s) => s['name']).join(', ');
+    if (serviceNames.isEmpty) serviceNames = 'Service';
+
+    final formattedDate = DateFormat('d MMM yyyy').format(date);
+    final timeStr = booking['start_time'];
+
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final borderColor = context.colors.cardBorder;
+    final surfaceColor = context.colors.surface;
+
+    final status = (booking['status'] ?? '').toString();
+    final statusText = status.replaceAll('_', ' ').split(' ').map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '').join(' ');
+    
+    final imageUrl = booking['salon']?['cover_image'] ??
+        booking['salon']?['cover_photo_url'] ??
+        booking['salon']?['logo_image'] ??
+        '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () async {
+          final changed = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AppointmentDetailsScreen(
+                booking: booking,
+                isUpcoming: false,
+              ),
+            ),
+          );
+          if (changed == true) {
+            _loadBookings();
+          }
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: context.colors.imagePlaceholder,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.storefront,
+                              color: AppTheme.accentColor,
+                              size: 20,
+                            ),
+                          )
+                        : Icon(
+                            Icons.storefront,
+                            color: AppTheme.accentColor,
+                            size: 20,
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          booking['salon']?['name'] ?? 'Salon',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: headingColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          serviceNames,
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: bodyColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              '$formattedDate • $timeStr',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: bodyColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '₹${total.toStringAsFixed(0)}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: headingColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(status).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: _getStatusColor(status),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              ..._buildCompactReviewAndInvoiceSection(booking, headingColor, bodyColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildCompactReviewAndInvoiceSection(
+    Map<String, dynamic> booking,
+    Color headingColor,
+    Color bodyColor,
+  ) {
+    final review = booking['review'] as Map<String, dynamic>?;
+    final canReview = booking['can_review'] == true;
+    final blockedReason = booking['review_blocked_reason']?.toString();
+    
+    final bool mightHaveInvoice = booking['invoice'] is Map;
+
+    if (!mightHaveInvoice && review == null && !canReview && (blockedReason == null || booking['status'] != 'completed')) {
+      return const [];
+    }
+
+    return [
+      const SizedBox(height: 12),
+      Divider(color: context.colors.border, height: 1),
+      const SizedBox(height: 4),
+      
+      InvoiceLinkButton(booking: booking),
+      
+      if (review != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: _buildCompactGivenRating(review, bodyColor, context.colors.textTertiary),
+        )
+      else if (canReview)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            onTap: () => _rateVisit(booking),
+            borderRadius: BorderRadius.circular(30),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star_outline_rounded, size: 16, color: AppTheme.accentColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Rate your visit',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
+      else if (blockedReason != null && booking['status'] == 'completed')
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            blockedReason,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: context.colors.textTertiary,
+            ),
+          ),
+        )
+    ];
+  }
+
+  Widget _buildCompactGivenRating(
+    Map<String, dynamic> review,
+    Color bodyColor,
+    Color lightColor,
+  ) {
+    final rating = (review['rating'] as num?)?.toInt() ?? 0;
+    final comment = review['comment']?.toString() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Rated',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: bodyColor,
+              ),
+            ),
+            const SizedBox(width: 8),
+            StarRow(rating: rating.toDouble(), size: 12),
+            const Spacer(),
+            Text(
+              review['age_label']?.toString() ?? '',
+              style: GoogleFonts.outfit(fontSize: 11, color: lightColor),
+            ),
+          ],
+        ),
+        if (comment.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            '“$comment”',
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              height: 1.3,
+              color: bodyColor,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
     );
   }
 

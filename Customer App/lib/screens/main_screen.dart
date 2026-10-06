@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/review_service.dart';
 import '../services/explore_request_bus.dart';
+import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../widgets/tab_navigator.dart';
+import '../widgets/persistent_cart_cta.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
@@ -203,16 +205,26 @@ class _MainScreenState extends State<MainScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(
-            left: MainScreen.navPillMargin,
-            right: MainScreen.navPillMargin,
-            bottom: MainScreen.navPillMargin,
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ValueListenableBuilder<Map<String, dynamic>?>(
+            valueListenable: CartService.globalCartNotifier,
+            builder: (context, cart, child) {
+              if (cart == null) return const SizedBox.shrink();
+              return PersistentCartCTA(cart: cart);
+            },
           ),
-          height: MainScreen.navPillHeight,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+          SafeArea(
+            child: Container(
+              margin: const EdgeInsets.only(
+                left: MainScreen.navPillMargin,
+                right: MainScreen.navPillMargin,
+                bottom: MainScreen.navPillMargin,
+              ),
+              height: MainScreen.navPillHeight,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(30),
             // Only drawn when the theme has an outline to show: a border adds
             // padding even when transparent, which would shift the bar 1px.
@@ -247,48 +259,36 @@ class _MainScreenState extends State<MainScreen> {
                 fontSize: 11,
               ),
               elevation: 0,
-              items: const [
+              items: [
                 BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.home_outlined, size: 22),
-                  ),
-                  activeIcon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.home_rounded, size: 22),
+                  icon: _AnimatedTabIcon(
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home_rounded,
+                    isSelected: _currentIndex == 0,
                   ),
                   label: 'Home',
                 ),
                 BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.explore_outlined, size: 22),
-                  ),
-                  activeIcon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.explore_rounded, size: 22),
+                  icon: _AnimatedTabIcon(
+                    icon: Icons.explore_outlined,
+                    activeIcon: Icons.explore_rounded,
+                    isSelected: _currentIndex == 1,
                   ),
                   label: 'Explore',
                 ),
                 BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.calendar_today_outlined, size: 22),
-                  ),
-                  activeIcon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.calendar_month_rounded, size: 22),
+                  icon: _AnimatedTabIcon(
+                    icon: Icons.calendar_today_outlined,
+                    activeIcon: Icons.calendar_month_rounded,
+                    isSelected: _currentIndex == 2,
                   ),
                   label: 'Bookings',
                 ),
                 BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_outline, size: 22),
-                  ),
-                  activeIcon: Padding(
-                    padding: EdgeInsets.only(bottom: 4),
-                    child: Icon(Icons.person_rounded, size: 22),
+                  icon: _AnimatedTabIcon(
+                    icon: Icons.person_outline,
+                    activeIcon: Icons.person_rounded,
+                    isSelected: _currentIndex == 3,
                   ),
                   label: 'Profile',
                 ),
@@ -297,6 +297,97 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
+        ],
+      ),
     );
   }
 }
+
+class _AnimatedTabIcon extends StatefulWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final bool isSelected;
+
+  const _AnimatedTabIcon({
+    required this.icon,
+    required this.activeIcon,
+    required this.isSelected,
+  });
+
+  @override
+  State<_AnimatedTabIcon> createState() => _AnimatedTabIconState();
+}
+
+class _AnimatedTabIconState extends State<_AnimatedTabIcon> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _yOffsetAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.easeOutCubic)), weight: 60),
+    ]).animate(_controller);
+
+    _yOffsetAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -3.0).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: -3.0, end: 0.0).chain(CurveTween(curve: Curves.easeOutCubic)), weight: 60),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedTabIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSelected && !oldWidget.isSelected) {
+      _controller.forward(from: 0.0);
+    } else if (!widget.isSelected && oldWidget.isSelected) {
+      // Rapid tap handling: immediately snap back if unselected during pop
+      _controller.value = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _yOffsetAnimation.value),
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: Icon(
+                  widget.isSelected ? widget.activeIcon : widget.icon,
+                  key: ValueKey<bool>(widget.isSelected),
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
