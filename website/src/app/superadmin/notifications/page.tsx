@@ -8,7 +8,10 @@ interface NotificationTemplate {
   id: string;
   key: string;
   type: string;
-  audience: 'customer' | 'partner' | 'superadmin';
+  audience: {
+    key: string;
+    label: string;
+  };
   name: string | null;
   description: string | null;
   category: string | null;
@@ -38,7 +41,7 @@ export default function NotificationsPage() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [audienceFilter, setAudienceFilter] = useState<'all' | 'customer' | 'partner'>('all');
+  const [audienceFilter, setAudienceFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
@@ -90,7 +93,7 @@ export default function NotificationsPage() {
 
   const filteredTemplates = useMemo(() => {
     return templates.filter(t => {
-      if (audienceFilter !== 'all' && t.audience !== audienceFilter) return false;
+      if (audienceFilter !== 'all' && t.audience.key !== audienceFilter) return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
       if (search) {
         const query = search.toLowerCase();
@@ -365,11 +368,14 @@ export default function NotificationsPage() {
         <select 
           className={styles.select}
           value={audienceFilter}
-          onChange={(e) => setAudienceFilter(e.target.value as any)}
+          onChange={(e) => setAudienceFilter(e.target.value)}
         >
-          <option value="all">All Audiences</option>
-          <option value="customer">Customer App</option>
-          <option value="partner">Partner App</option>
+          <option value="all">Who receives this? (All ▼)</option>
+          <option value="customer">Customer</option>
+          <option value="salon_admin">Salon Admin</option>
+          <option value="service_provider">Service Provider</option>
+          <option value="collaborator">Collaborator</option>
+          <option value="superadmin">SuperAdmin</option>
         </select>
       </div>
 
@@ -396,8 +402,8 @@ export default function NotificationsPage() {
                 {t.category && <span className={styles.categoryPill}>{t.category}</span>}
               </td>
               <td>
-                <span className={`${styles.audienceBadge} ${t.audience === 'customer' ? styles.audienceCustomer : styles.audiencePartner}`}>
-                  {t.audience}
+                <span className={styles.audienceBadge}>
+                  👤 {t.audience.label}
                 </span>
               </td>
               <td>
@@ -428,7 +434,7 @@ export default function NotificationsPage() {
             <div className={styles.drawerHeader}>
               <div>
                 <h2>{editingTemplate.name || editingTemplate.active_title}</h2>
-                <p>{editingTemplate.audience.charAt(0).toUpperCase() + editingTemplate.audience.slice(1)} notification • {editingTemplate.description}</p>
+                <p>👤 {editingTemplate.audience.label} • {editingTemplate.description || 'System Event'}</p>
               </div>
               <button className={styles.closeBtn} onClick={() => setEditingTemplate(null)}>&times;</button>
             </div>
@@ -436,6 +442,26 @@ export default function NotificationsPage() {
             <div className={styles.drawerBody}>
               
               <div className={styles.editorSection}>
+                {/* Audience Info */}
+                <div className={styles.sectionBox} style={{ backgroundColor: '#f8fafc', marginBottom: '24px' }}>
+                  <h3 style={{ marginBottom: 4 }}>Who receives this?</h3>
+                  <div style={{ fontWeight: 600, fontSize: 16, color: '#0f172a', marginBottom: 4 }}>
+                    👤 {editingTemplate.audience.label}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+                    {(() => {
+                      switch (editingTemplate.audience.key) {
+                        case 'customer': return 'Person who books and receives salon services.';
+                        case 'salon_admin': return 'Person who manages the salon and its bookings.';
+                        case 'service_provider': return 'Staff member who provides services to customers.';
+                        case 'collaborator': return 'Person who onboards/manages assigned salons.';
+                        case 'superadmin': return 'BookALook administrator.';
+                        default: return '';
+                      }
+                    })()}
+                  </p>
+                </div>
+
                 {/* General */}
                 <div className={styles.sectionBox} style={{ borderLeft: '4px solid #10b981' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

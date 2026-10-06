@@ -577,49 +577,62 @@ class NotificationService
      */
     public function notifySalonOfNewBooking(Appointment $appointment, string $salonName, string $dateLabel): void
     {
-        $recipients = [];
-
         $providerId = $appointment->appointedProvider?->user_id;
-
-        if ($providerId) {
-            $recipients[] = $providerId;
-        }
-
         $adminId = $appointment->salon?->admin_id;
-
-        if ($adminId && ! in_array($adminId, $recipients, true)) {
-            $recipients[] = $adminId;
-        }
-
         $customerName = $appointment->customer?->name ?? $appointment->walk_in_customer_name;
-
-        $resolved = $this->templates->resolve('new_booking_partner', [
+        
+        $variables = [
             'customer_name' => $customerName,
             'date_label' => $dateLabel,
             'salon_name' => $salonName,
-        ]);
+        ];
 
-        if (!$resolved) {
-            return;
+        // 1. Service Provider
+        if ($providerId) {
+            $resolvedProvider = $this->templates->resolve('new_appointment_service_provider', $variables);
+            
+            if ($resolvedProvider) {
+                $this->send(
+                    recipient: $providerId,
+                    type: NotificationType::NEW_BOOKING, // Keep technical type for Flutter
+                    title: $resolvedProvider['title'],
+                    message: $resolvedProvider['message'],
+                    pushTitle: $resolvedProvider['push_title'] ?? null,
+                    pushMessage: $resolvedProvider['push_message'] ?? null,
+                    pushImageUrl: $resolvedProvider['push_image_url'] ?? null,
+                    actionConfig: $resolvedProvider['action_config'] ?? null,
+                    templateChannels: $resolvedProvider['template']?->channels ?? null,
+                    data: [
+                        'action' => NotificationAction::VIEW_APPOINTMENT,
+                        'appointment_id' => $appointment->id,
+                    ],
+                    appointment: $appointment,
+                );
+            }
         }
 
-        foreach (array_unique($recipients) as $recipientId) {
-            $this->send(
-                recipient: $recipientId,
-                type: NotificationType::NEW_BOOKING,
-                title: $resolved['title'],
-                message: $resolved['message'],
-            pushTitle: $resolved['push_title'] ?? null,
-            pushMessage: $resolved['push_message'] ?? null,
-            pushImageUrl: $resolved['push_image_url'] ?? null,
-            actionConfig: $resolved['action_config'] ?? null,
-            templateChannels: $resolved['template']?->channels ?? null,
-                data: [
-                    'action' => NotificationAction::VIEW_APPOINTMENT,
-                    'appointment_id' => $appointment->id,
-                ],
-                appointment: $appointment,
-            );
+        // 2. Salon Admin (only if different from Provider, or if no provider exists)
+        if ($adminId && $adminId !== $providerId) {
+            $resolvedAdmin = $this->templates->resolve('new_booking_salon_admin', $variables);
+            
+            if ($resolvedAdmin) {
+                $this->send(
+                    recipient: $adminId,
+                    type: NotificationType::NEW_BOOKING,
+                    title: $resolvedAdmin['title'],
+                    message: $resolvedAdmin['message'],
+                    pushTitle: $resolvedAdmin['push_title'] ?? null,
+                    pushMessage: $resolvedAdmin['push_message'] ?? null,
+                    pushImageUrl: $resolvedAdmin['push_image_url'] ?? null,
+                    actionConfig: $resolvedAdmin['action_config'] ?? null,
+                    templateChannels: $resolvedAdmin['template']?->channels ?? null,
+                    data: [
+                        'action' => NotificationAction::VIEW_APPOINTMENT,
+                        'appointment_id' => $appointment->id,
+                    ],
+                    appointment: $appointment,
+                );
+            }
         }
     }
 

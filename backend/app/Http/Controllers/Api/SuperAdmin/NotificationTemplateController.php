@@ -15,9 +15,37 @@ class NotificationTemplateController extends Controller
     {
     }
 
+    private function formatAudience($template)
+    {
+        $labels = [
+            'customer' => 'Customer',
+            'salon_admin' => 'Salon Admin',
+            'service_provider' => 'Service Provider',
+            'collaborator' => 'Collaborator',
+            'superadmin' => 'SuperAdmin',
+        ];
+        
+        $key = $template->audience;
+        // Check if it's already an array to prevent double formatting
+        if (is_array($key)) {
+            return $template;
+        }
+
+        $template->audience = [
+            'key' => $key,
+            'label' => $labels[$key] ?? 'Partner',
+        ];
+        
+        return $template;
+    }
+
     public function index()
     {
-        return response()->json($this->repository->all());
+        $templates = $this->repository->all()->map(function ($template) {
+            return $this->formatAudience($template);
+        });
+        
+        return response()->json($templates);
     }
 
     public function update(Request $request, string $key)
@@ -42,7 +70,7 @@ class NotificationTemplateController extends Controller
 
         $this->repository->update($template, $validated);
 
-        return response()->json($template->fresh());
+        return response()->json($this->formatAudience($template->fresh()));
     }
 
     public function reset(string $key)
