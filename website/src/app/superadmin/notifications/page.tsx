@@ -34,7 +34,7 @@ export default function NotificationsPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  const confirm = useConfirm();
+  const [confirm, confirmDialog] = useConfirm();
 
   const fetchTemplates = async () => {
     try {
@@ -108,7 +108,7 @@ export default function NotificationsPage() {
   const handleReset = async () => {
     if (!editingTemplate) return;
     
-    if (await confirm('Reset to default?', 'This will remove your custom wording and restore the default text.')) {
+    if (await confirm({ title: 'Reset to default?', body: 'This will remove your custom wording and restore the default text.', confirmLabel: 'Reset', tone: 'danger' })) {
       setSaving(true);
       try {
         const res = await fetch(`/api/superadmin/notification-templates/${editingTemplate.key}/reset`, {
@@ -368,6 +368,8 @@ export default function NotificationsPage() {
           </div>
         </div>
       )}
+      
+      {confirmDialog}
     </div>
   );
 }
