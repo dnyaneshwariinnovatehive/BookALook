@@ -183,7 +183,7 @@ class AppointmentCheckInService
     ): Appointment {
         $servingProviderId ??= $appointment->appointed_provider_id;
 
-        return DB::transaction(function () use ($appointment, $servingProviderId, $actor, $method, $note) {
+        $result = DB::transaction(function () use ($appointment, $servingProviderId, $actor, $method, $note) {
             $appointment->status = 'in_progress';
             $appointment->serving_provider_id = $servingProviderId;
             $appointment->verification_method = $method;
@@ -208,6 +208,16 @@ class AppointmentCheckInService
 
             return $appointment->fresh($this->relations());
         });
+
+        // Notify customer that the appointment has started.
+        $this->notifications->appointmentStarted(
+            $result,
+            $result->salon?->name ?? 'the salon',
+            $result->servingProvider->user->name ?? null,
+            'appointment_started:'.$result->id
+        );
+
+        return $result;
     }
 
     /**

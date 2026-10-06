@@ -102,6 +102,26 @@ class AppointmentService {
     }
   }
 
+  Future<Map<String, dynamic>> getAppointment(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/customer/appointments/$id'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Failed to load appointment');
+    }
+  }
+
   /// Cancels a booking. Returns the refund breakdown the server computed from
   /// each service's own refund setting.
   Future<Map<String, dynamic>> cancelAppointment(String id, {String? reason}) async {
