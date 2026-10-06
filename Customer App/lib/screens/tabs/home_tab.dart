@@ -1018,6 +1018,13 @@ class _HomeTabState extends State<HomeTab> {
             .join(', ') ??
         'Services';
 
+    String statusLabel = 'YOUR NEXT APPOINTMENT';
+    if (booking['status'] == 'in_progress') {
+      statusLabel = 'IN PROGRESS';
+    } else if (booking['status'] == 'completed') {
+      statusLabel = 'DONE WITH TODAY\'S APPOINTMENT';
+    }
+
     final bodyColor = context.colors.textSecondary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1115,9 +1122,9 @@ class _HomeTabState extends State<HomeTab> {
                     children: [
                       Icon(Icons.calendar_month_rounded, size: 14, color: AppTheme.accentColor),
                       const SizedBox(width: 6),
-                      const Text(
-                        'YOUR NEXT APPOINTMENT',
-                        style: TextStyle(
+                      Text(
+                        statusLabel,
+                        style: const TextStyle(
                             color: AppTheme.accentColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
