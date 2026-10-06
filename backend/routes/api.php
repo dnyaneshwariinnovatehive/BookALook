@@ -170,6 +170,8 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/notification-templates', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'index']);
         Route::put('/notification-templates/{key}', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'update']);
         Route::post('/notification-templates/{key}/reset', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'reset']);
+        Route::post('/notification-templates/{key}/test', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'test']);
+        Route::post('/notification-templates/upload-image', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'uploadImage']);
 
         // Subscriptions & Wallet Schemes
         Route::get('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);

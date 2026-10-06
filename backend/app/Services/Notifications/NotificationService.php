@@ -71,7 +71,11 @@ class NotificationService
         array $data = [],
         ?Appointment $appointment = null,
         ?Salon $salon = null,
-        ?string $dedupeKey = null
+        ?string $dedupeKey = null,
+        ?string $pushTitle = null,
+        ?string $pushMessage = null,
+        ?string $pushImageUrl = null,
+        ?array $actionConfig = null
     ): ?Notification {
         $userId = $recipient instanceof User ? $recipient->id : $recipient;
 
@@ -79,9 +83,27 @@ class NotificationService
             return null;
         }
 
+        if ($pushTitle !== null) {
+            $data['push_title'] = $pushTitle;
+        }
+        if ($pushMessage !== null) {
+            $data['push_message'] = $pushMessage;
+        }
+        if ($pushImageUrl !== null) {
+            $data['push_image_url'] = $pushImageUrl;
+        }
+
+        if ($actionConfig !== null && isset($actionConfig['type'])) {
+            if ($actionConfig['type'] === 'none') {
+                unset($data['action']);
+            } else {
+                $data['action'] = $actionConfig['type'];
+            }
+        }
+
         // A payload that arrives without an action still routes sensibly: the
         // type knows what it would normally open.
-        if (! isset($data['action'])) {
+        if (! isset($data['action']) && (!isset($actionConfig) || $actionConfig['type'] !== 'none')) {
             $default = NotificationType::defaultActionFor($type);
 
             if ($default !== null) {
@@ -143,6 +165,10 @@ class NotificationService
             type: NotificationType::SALON_CLOSURE,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::RESCHEDULE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -197,6 +223,10 @@ class NotificationService
             type: NotificationType::BOOKING_CREATED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::PAY_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -233,6 +263,10 @@ class NotificationService
             type: NotificationType::BOOKING_CONFIRMED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -275,6 +309,10 @@ class NotificationService
             type: NotificationType::BOOKING_CANCELLED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -316,6 +354,10 @@ class NotificationService
             type: NotificationType::BOOKING_RESCHEDULED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -358,6 +400,10 @@ class NotificationService
             type: NotificationType::APPOINTMENT_REMINDER,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -407,6 +453,10 @@ class NotificationService
             type: NotificationType::APPOINTMENT_NO_SHOW,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -440,6 +490,10 @@ class NotificationService
             type: NotificationType::APPOINTMENT_COMPLETED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::RATE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -485,6 +539,10 @@ class NotificationService
             type: NotificationType::PROVIDER_APPOINTMENT_RESCHEDULED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -532,6 +590,10 @@ class NotificationService
                 type: NotificationType::NEW_BOOKING,
                 title: $resolved['title'],
                 message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
                 data: [
                     'action' => NotificationAction::VIEW_APPOINTMENT,
                     'appointment_id' => $appointment->id,
@@ -600,6 +662,10 @@ class NotificationService
             type: NotificationType::ASSIGNED_SALON_EXPIRING,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::CALL_OWNER,
                 'salon_id' => $salon->id,
@@ -659,6 +725,10 @@ class NotificationService
             type: NotificationType::ASSIGNED_SALON_RENEWED,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => NotificationAction::VIEW_SALON,
                 'salon_id' => $salon->id,
@@ -691,6 +761,10 @@ class NotificationService
             type: 'subscription_expiring',
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
             salon: $salon,
         );
@@ -710,6 +784,10 @@ class NotificationService
             type: 'subscription_expired',
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
             salon: $salon,
         );
@@ -728,6 +806,10 @@ class NotificationService
             type: 'salon_reinstated',
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: ['salon_id' => $salon->id],
             salon: $salon,
         );
@@ -748,6 +830,10 @@ class NotificationService
             type: $type,
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'complaint_id' => $complaintId,
                 'salon_id' => $salon->id,
@@ -770,6 +856,10 @@ class NotificationService
             type: 'complaint_raised',
             title: $resolved['title'],
             message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
             data: [
                 'action' => 'review_complaint',
                 'complaint_id' => $complaintId,

@@ -24,18 +24,23 @@ class NotificationTemplateResolver
 
         $title = $template ? $template->active_title : '';
         $message = $template ? $template->active_message : '';
-
-        // If template doesn't exist, we fallback to an empty string here,
-        // but normally the seeder ensures it exists. The callers should
-        // still provide a fallback in their codebase if needed, or we just
-        // rely on the DB. Let's do interpolation.
+        $pushTitle = $template ? $template->active_push_title : '';
+        $pushMessage = $template ? $template->active_push_message : '';
+        $pushImageUrl = $template ? $template->push_image_url : null;
+        $actionConfig = $template ? $template->action_config : null;
 
         $title = $this->interpolate($title, $variables);
         $message = $this->interpolate($message, $variables);
+        $pushTitle = $this->interpolate($pushTitle, $variables);
+        $pushMessage = $this->interpolate($pushMessage, $variables);
 
         return [
             'title' => $title,
             'message' => $message,
+            'push_title' => $pushTitle,
+            'push_message' => $pushMessage,
+            'push_image_url' => $pushImageUrl,
+            'action_config' => $actionConfig,
             'template' => $template,
         ];
     }

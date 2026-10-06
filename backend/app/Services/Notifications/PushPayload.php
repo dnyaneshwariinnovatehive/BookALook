@@ -36,13 +36,13 @@ final class PushPayload
         return new self(
             notificationId: (string) $notification->id,
             type: (string) $notification->type,
-            title: (string) $notification->title,
-            message: (string) $notification->message,
+            title: isset($data['push_title']) ? (string) $data['push_title'] : (string) $notification->title,
+            message: isset($data['push_message']) ? (string) $data['push_message'] : (string) $notification->message,
             data: $data,
             action: $notification->action,
             appointmentId: $notification->related_appointment_id,
             salonId: $notification->related_salon_id,
-            imageUrl: isset($data['image_url']) ? (string) $data['image_url'] : null,
+            imageUrl: isset($data['push_image_url']) ? (string) $data['push_image_url'] : (isset($data['image_url']) ? (string) $data['image_url'] : null),
         );
     }
 
