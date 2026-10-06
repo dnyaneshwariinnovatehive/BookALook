@@ -485,6 +485,49 @@ class NotificationService
     }
 
     /**
+     * The appointment was started by the salon.
+     */
+    public function appointmentStarted(Appointment $appointment, string $salonName, ?string $providerName = null, ?string $dedupeKey = null): ?Notification
+    {
+        $resolved = $this->templates->resolve('appointment_started_customer', [
+            'salon_name' => $salonName,
+            'provider_name' => $providerName ?? 'A staff member',
+        ]);
+
+        if (!$resolved) {
+            $title = 'Your appointment has started';
+            $message = "Your appointment at {$salonName} has started. " . ($providerName ? "{$providerName} is ready for you." : "We are ready for you.");
+            
+            $resolved = [
+                'title' => $title,
+                'message' => $message,
+                'push_title' => $title,
+                'push_message' => $message,
+                'template' => null,
+            ];
+        }
+
+        return $this->send(
+            recipient: $appointment->customer_id,
+            type: NotificationType::APPOINTMENT_STARTED,
+            title: $resolved['title'],
+            message: $resolved['message'],
+            pushTitle: $resolved['push_title'] ?? null,
+            pushMessage: $resolved['push_message'] ?? null,
+            pushImageUrl: $resolved['push_image_url'] ?? null,
+            actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
+            data: [
+                'action' => NotificationAction::VIEW_APPOINTMENT,
+                'appointment_id' => $appointment->id,
+                'deeplink' => $this->appointmentDeeplink($appointment->id),
+            ],
+            appointment: $appointment,
+            dedupeKey: $dedupeKey,
+        );
+    }
+
+    /**
      * The salon finished the appointment. The prompt for a rating follows.
      *
      * Takes a dedupe key because "collect payment and complete" is reachable

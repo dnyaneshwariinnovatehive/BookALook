@@ -46,6 +46,9 @@ final class NotificationType
     /** An appointment passed its window untouched and was swept to no-show. */
     public const APPOINTMENT_NO_SHOW = 'appointment_no_show';
 
+    /** The salon started the appointment. */
+    public const APPOINTMENT_STARTED = 'appointment_started';
+
     /** The salon finished the appointment. */
     public const APPOINTMENT_COMPLETED = 'appointment_completed';
 
@@ -176,6 +179,11 @@ final class NotificationType
             'category' => self::CATEGORY_TRANSACTIONAL,
             'action' => NotificationAction::VIEW_APPOINTMENT,
             'label' => 'Marked as missed',
+        ],
+        self::APPOINTMENT_STARTED => [
+            'category' => self::CATEGORY_TRANSACTIONAL,
+            'action' => NotificationAction::VIEW_APPOINTMENT,
+            'label' => 'Appointment started',
         ],
         self::APPOINTMENT_COMPLETED => [
             'category' => self::CATEGORY_TRANSACTIONAL,
@@ -352,6 +360,7 @@ final class NotificationType
             self::BOOKING_RESCHEDULED,
             self::APPOINTMENT_REMINDER,
             self::APPOINTMENT_NO_SHOW,
+            self::APPOINTMENT_STARTED,
             self::APPOINTMENT_COMPLETED => 'customer_app',
 
             self::NEW_BOOKING,

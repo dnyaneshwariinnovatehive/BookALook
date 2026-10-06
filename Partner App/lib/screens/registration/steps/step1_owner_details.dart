@@ -23,6 +23,9 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
   @override
   void initState() {
     super.initState();
@@ -106,7 +109,13 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
                 controller: _passwordController,
                 hint: 'Password',
                 icon: Icons.lock_outline,
-                obscureText: true,
+                obscureText: _obscurePassword,
+                isPassword: true,
+                onToggleVisibility: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
                 validator: (v) => v!.length < 6 ? 'Minimum 6 characters' : null,
               ),
               const SizedBox(height: 16),
@@ -118,7 +127,13 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
                 controller: _confirmPasswordController,
                 hint: 'Confirm password',
                 icon: Icons.lock_outline,
-                obscureText: true,
+                obscureText: _obscureConfirmPassword,
+                isPassword: true,
+                onToggleVisibility: () {
+                  setState(() {
+                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                  });
+                },
                 validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
               ),
               const SizedBox(height: 32),
@@ -174,6 +189,8 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
     required String hint,
     required IconData icon,
     bool obscureText = false,
+    bool isPassword = false,
+    VoidCallback? onToggleVisibility,
     bool readOnly = false,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
@@ -191,6 +208,15 @@ class _Step1OwnerDetailsState extends State<Step1OwnerDetails> {
         hintText: hint,
         hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38),
+                ),
+                onPressed: onToggleVisibility,
+              )
+            : null,
         filled: true,
         fillColor: Theme.of(context).colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
