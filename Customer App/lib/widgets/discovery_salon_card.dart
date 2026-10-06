@@ -53,9 +53,7 @@ class DiscoverySalonCard extends StatelessWidget {
             .whereType<Map<String, dynamic>>()
             .toList();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: InkWell(
+    return InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
           Navigator.push(
@@ -73,7 +71,7 @@ class DiscoverySalonCard extends StatelessWidget {
         child: Opacity(
           opacity: isServiceable ? 1.0 : 0.65,
           child: Container(
-            padding: const EdgeInsets.all(12),
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
               color: surfaceColor,
               borderRadius: BorderRadius.circular(20),
@@ -92,14 +90,12 @@ class DiscoverySalonCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: SizedBox(
-                        width: 100,
-                        height: 114,
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: 125,
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
@@ -129,40 +125,40 @@ class DiscoverySalonCard extends StatelessWidget {
                                       : 'Add to favourites',
                                   excludeSemantics: true,
                                   child: GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onTap: onToggleFavourite,
-                                  child: Padding(
-                                  padding: const EdgeInsets.all(_favouriteSlop),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: context.colors.surface
-                                          .withValues(alpha: 0.85),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      isFavourited
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      size: 16,
-                                      color: isFavourited
-                                          ? context.colors.danger
-                                          : context.colors.iconIdle,
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: onToggleFavourite,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(_favouriteSlop),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: BoxDecoration(
+                                          color: context.colors.surface
+                                              .withValues(alpha: 0.85),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          isFavourited
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          size: 16,
+                                          color: isFavourited
+                                              ? context.colors.danger
+                                              : context.colors.iconIdle,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  ),
-                                ),
                                 ),
                               ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -280,11 +276,13 @@ class DiscoverySalonCard extends StatelessWidget {
                                   ),
                               ],
                             ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
+              ),
                 // Full width below the card's own row, so the strip is not
                 // squeezed into the column beside the photo.
                 if (categoryServices.isNotEmpty)
@@ -297,7 +295,6 @@ class DiscoverySalonCard extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 }
