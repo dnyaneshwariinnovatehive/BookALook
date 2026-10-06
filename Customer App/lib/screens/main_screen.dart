@@ -189,33 +189,66 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          for (var i = 0; i < _tabs.length; i++)
-            // IndexedStack keeps every tab alive and does not mute its tickers,
-            // so anything animating on a hidden tab — the category marquee, the
-            // banner carousel — would keep running off screen.
-            TickerMode(
-              enabled: i == _currentIndex,
-              child: TabNavigator(
-                navigatorKey: _navigatorKeys[i],
-                root: _tabs[i],
+      body: ValueListenableBuilder<Map<String, dynamic>?>(
+        valueListenable: CartService.globalCartNotifier,
+        builder: (context, cart, _) {
+          final bool hasItems = cart != null && ((cart['items'] as List?)?.isNotEmpty ?? false);
+          
+          return Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              Builder(
+                builder: (context) {
+                  final mediaQuery = MediaQuery.of(context);
+                  // Approximate CTA capsule height (48) + padding (12) + buffer (8) = 68
+                  final extraPadding = hasItems ? 68.0 : 0.0;
+                  
+                  return MediaQuery(
+                    data: mediaQuery.copyWith(
+                      padding: mediaQuery.padding.copyWith(
+                        bottom: mediaQuery.padding.bottom + extraPadding,
+                      ),
+                    ),
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: [
+                        for (var i = 0; i < _tabs.length; i++)
+                          TickerMode(
+                            enabled: i == _currentIndex,
+                            child: TabNavigator(
+                              navigatorKey: _navigatorKeys[i],
+                              root: _tabs[i],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }
               ),
-            ),
-        ],
+              SafeArea(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: hasItems
+                      ? PersistentCartCTA(key: const ValueKey('cart_cta'), cart: cart)
+                      : const SizedBox.shrink(key: ValueKey('empty_cta')),
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ValueListenableBuilder<Map<String, dynamic>?>(
-            valueListenable: CartService.globalCartNotifier,
-            builder: (context, cart, child) {
-              if (cart == null) return const SizedBox.shrink();
-              return PersistentCartCTA(cart: cart);
-            },
-          ),
-          SafeArea(
+      bottomNavigationBar: SafeArea(
             child: Container(
               margin: const EdgeInsets.only(
                 left: MainScreen.navPillMargin,
@@ -296,8 +329,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
         ),
-      ),
-        ],
       ),
     );
   }
