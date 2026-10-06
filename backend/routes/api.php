@@ -161,11 +161,15 @@ Route::prefix('superadmin')->group(function () {
     Route::post('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'store']);
 
     // Protected superadmin routes
-    Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
         Route::apiResource('banners', \App\Http\Controllers\Api\SuperAdmin\BannerController::class);
         Route::post('/banners/preview', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'preview']);
         Route::post('/banners/{id}/track', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'track']);
+
+        Route::get('/notification-templates', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'index']);
+        Route::put('/notification-templates/{key}', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'update']);
+        Route::post('/notification-templates/{key}/reset', [\App\Http\Controllers\Api\SuperAdmin\NotificationTemplateController::class, 'reset']);
 
         // Subscriptions & Wallet Schemes
         Route::get('/subscriptions/plans', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'index']);

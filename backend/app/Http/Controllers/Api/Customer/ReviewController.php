@@ -138,19 +138,13 @@ class ReviewController extends Controller
         $salonName = Salon::where('id', $appointment->salon_id)->value('name') ?? 'a salon';
 
         foreach (\App\Models\User::where('role', 'superadmin')->pluck('id') as $superAdminId) {
-            Notification::create([
-                'user_id' => $superAdminId,
-                'type' => 'complaint_raised',
-                'title' => "Complaint about {$salonName}",
-                'message' => $complaint->subject,
-                'data' => [
-                    'action' => 'review_complaint',
-                    'complaint_id' => $complaint->id,
-                    'salon_id' => $appointment->salon_id,
-                ],
-                'related_salon_id' => $appointment->salon_id,
-                'is_read' => false,
-            ]);
+            app(\App\Services\Notifications\NotificationService::class)->complaintRaised(
+                $superAdminId,
+                $salonName,
+                $complaint->subject,
+                $complaint->id,
+                $appointment->salon_id
+            );
         }
 
         return $complaint;

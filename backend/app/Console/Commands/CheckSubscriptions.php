@@ -115,15 +115,7 @@ class CheckSubscriptions extends Command
             // the loop above is for the collaborator, and must not pull the
             // owner's inbox into the seven-day rung they were never shown.
             if ($salon->admin_id && $daysLeft <= $ownerWarningDays) {
-                $this->notifyOnce($salon->admin_id, $salon, self::TYPE_EXPIRING, [
-                    'title' => $daysLeft <= 0
-                        ? 'Your plan ends today'
-                        : "Your plan ends in {$daysLeft} day" . ($daysLeft === 1 ? '' : 's'),
-                    'message' => sprintf(
-                        '%s stops taking online bookings when the plan ends. Renew now to stay listed.',
-                        $salon->name
-                    ),
-                ], ['action' => 'renew_subscription', 'salon_id' => $salon->id]);
+                $this->notifyOnce($salon->admin_id, $salon, self::TYPE_EXPIRING, ['days_left' => $daysLeft], []);
             }
 
             $rung = $this->rungFor($daysLeft);
@@ -219,14 +211,7 @@ class CheckSubscriptions extends Command
 
             $daysDown = (int) Carbon::parse($last->end_date)->diffInDays(Carbon::today());
 
-            $this->notifyOnce($salon->admin_id, $salon, self::TYPE_EXPIRED, [
-                'title' => 'Your salon is offline',
-                'message' => sprintf(
-                    '%s has been hidden from customers for %s. Your staff cannot use the app either. Renew to go back online.',
-                    $salon->name,
-                    $daysDown <= 1 ? 'a day' : "{$daysDown} days"
-                ),
-            ], ['action' => 'renew_subscription', 'salon_id' => $salon->id]);
+            $this->notifyOnce($salon->admin_id, $salon, self::TYPE_EXPIRED, ['days_down' => $daysDown], []);
 
             $this->alertCollaborator(
                 $notifications,
@@ -245,30 +230,10 @@ class CheckSubscriptions extends Command
      */
     private function notifyOnce(?string $userId, Salon $salon, string $type, array $content, array $data): void
     {
-        if (! $userId) {
-            return;
+        if ($type === self::TYPE_EXPIRING) {
+            app(NotificationService::class)->ownerSubscriptionExpiring($salon, $content['days_left']);
+        } elseif ($type === self::TYPE_EXPIRED) {
+            app(NotificationService::class)->ownerSubscriptionExpired($salon, $content['days_down']);
         }
-
-        $alreadySentToday = Notification::where('user_id', $userId)
-            ->where('type', $type)
-            ->where('related_salon_id', $salon->id)
-            ->whereDate('created_at', Carbon::today())
-            ->exists();
-
-        if ($alreadySentToday) {
-            return;
-        }
-
-        Notification::create([
-            'user_id' => $userId,
-            'type' => $type,
-            'title' => $content['title'],
-            'message' => $content['message'],
-            'data' => $data,
-            'related_salon_id' => $salon->id,
-            'is_read' => false,
-        ]);
-
-        $this->info("Reminded {$salon->name} ({$type}).");
     }
 }
