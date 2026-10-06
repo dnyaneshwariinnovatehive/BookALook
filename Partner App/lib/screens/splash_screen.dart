@@ -48,14 +48,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     if (token != null && token.isNotEmpty && authStateStr != null && mounted) {
       final response = jsonDecode(authStateStr);
-      if (response['role'] == 'admin' && response['salons'] is List) {
-        for (final salon in response['salons']) {
-          final url = salon['cover_photo_url'];
-          if (url != null && url.toString().isNotEmpty) {
-            precacheImage(NetworkImage(url.toString()), context).catchError((_) {});
-          }
-        }
-      }
+      // Removed precacheImage to prevent network congestion on low networks
     }
 
     await Future.delayed(const Duration(seconds: 3));

@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 class CheckInWindow {
   /// The customer can show their QR right now.
   static bool canShowQr(Map<String, dynamic> booking) =>
-      booking['can_generate_qr'] == true;
+      booking['can_generate_qr'] == true && booking['status'] == 'scheduled';
 
   /// "QR available at 4:30 PM" (or "on 3 Oct at 4:30 PM" for a later day)
   /// while the window has not opened yet; null once it is open or when the
