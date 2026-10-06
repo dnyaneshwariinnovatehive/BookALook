@@ -682,7 +682,7 @@ export default function NotificationsPage() {
                     <div className={styles.previewHeader}>Lock Screen</div>
                     <div className={styles.previewNotification}>
                       <div className={styles.previewApp}>
-                        <span style={{ fontSize: 16 }}>⌘</span> BookALook {editingTemplate.audience === 'partner' ? 'Partner' : ''}
+                        <span style={{ fontSize: 16 }}>⌘</span> BookALook {['salon_admin', 'service_provider', 'collaborator'].includes(editingTemplate.audience.key) ? 'Partner' : ''}
                       </div>
                       <div className={styles.previewTitle}>
                         {renderPreview(editForm.push_title)}
