@@ -25,6 +25,8 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
   static final PushNotificationService _instance = PushNotificationService._internal();
+  static String? suppressedAppointmentStartedId;
+  
   factory PushNotificationService() => _instance;
   PushNotificationService._internal();
 
@@ -107,6 +109,12 @@ class PushNotificationService {
     AndroidNotification? android = message.notification?.android;
 
     if (notification != null && android != null) {
+      if (suppressedAppointmentStartedId != null && 
+          message.data['type'] == 'appointment_started' &&
+          message.data['appointment_id']?.toString() == suppressedAppointmentStartedId) {
+        return;
+      }
+
       StyleInformation? styleInformation;
       String? imageUrl = android.imageUrl;
       
