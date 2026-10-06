@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useConfirm } from '@/components/admin/ui';
-import api from '@/lib/api';
 import styles from './notifications.module.css';
 
 interface NotificationTemplate {
@@ -39,8 +38,10 @@ export default function NotificationsPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await api.get('/superadmin/notification-templates');
-      setTemplates(res.data);
+      const res = await fetch('/api/superadmin/notification-templates');
+      if (!res.ok) throw new Error('Failed to load templates');
+      const data = await res.json();
+      setTemplates(data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -83,12 +84,18 @@ export default function NotificationsPage() {
     if (!editingTemplate) return;
     setSaving(true);
     try {
-      const res = await api.put(`/superadmin/notification-templates/${editingTemplate.key}`, {
-        title: editForm.title === editingTemplate.default_title ? null : editForm.title,
-        message: editForm.message === editingTemplate.default_message ? null : editForm.message,
-        is_enabled: editForm.is_enabled
+      const res = await fetch(`/api/superadmin/notification-templates/${editingTemplate.key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title === editingTemplate.default_title ? null : editForm.title,
+          message: editForm.message === editingTemplate.default_message ? null : editForm.message,
+          is_enabled: editForm.is_enabled
+        })
       });
-      setTemplates(templates.map(t => t.key === editingTemplate.key ? res.data : t));
+      if (!res.ok) throw new Error('Failed to update template');
+      const data = await res.json();
+      setTemplates(templates.map(t => t.key === editingTemplate.key ? data : t));
       setEditingTemplate(null);
     } catch (e) {
       console.error(e);
@@ -104,8 +111,12 @@ export default function NotificationsPage() {
     if (await confirm('Reset to default?', 'This will remove your custom wording and restore the default text.')) {
       setSaving(true);
       try {
-        const res = await api.post(`/superadmin/notification-templates/${editingTemplate.key}/reset`);
-        setTemplates(templates.map(t => t.key === editingTemplate.key ? res.data : t));
+        const res = await fetch(`/api/superadmin/notification-templates/${editingTemplate.key}/reset`, {
+          method: 'POST'
+        });
+        if (!res.ok) throw new Error('Failed to reset template');
+        const data = await res.json();
+        setTemplates(templates.map(t => t.key === editingTemplate.key ? data : t));
         setEditingTemplate(null);
       } catch (e) {
         console.error(e);
@@ -118,10 +129,16 @@ export default function NotificationsPage() {
 
   const handleToggleList = async (template: NotificationTemplate) => {
     try {
-      const res = await api.put(`/superadmin/notification-templates/${template.key}`, {
-        is_enabled: !template.is_enabled
+      const res = await fetch(`/api/superadmin/notification-templates/${template.key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_enabled: !template.is_enabled
+        })
       });
-      setTemplates(templates.map(t => t.key === template.key ? res.data : t));
+      if (!res.ok) throw new Error('Failed to toggle template');
+      const data = await res.json();
+      setTemplates(templates.map(t => t.key === template.key ? data : t));
     } catch (e) {
       console.error(e);
       alert('Failed to toggle template');
