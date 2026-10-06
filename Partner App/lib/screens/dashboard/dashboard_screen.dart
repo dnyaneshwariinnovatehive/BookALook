@@ -72,8 +72,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         daysRemaining: _access?.daysRemaining,
       ),
       AppointmentsTab(salonId: widget.salonData['id'].toString()),
-      StaffTab(salonId: widget.salonData['id']),
-      ServicesTab(salonId: widget.salonData['id']),
+      StaffTab(salonId: widget.salonData['id'].toString()),
+      ServicesTab(salonId: widget.salonData['id'].toString()),
       MoreTab(
         salonData: widget.salonData,
         planName: _access?.planName,
