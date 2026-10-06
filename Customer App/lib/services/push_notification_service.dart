@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'deep_link_service.dart';
 import '../screens/salon_detail_screen.dart';
+import 'package:path_provider/path_provider.dart';
 
 // Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -87,18 +88,56 @@ class PushNotificationService {
     }
   }
 
+  Future<String?> _downloadAndSaveImage(String url, String fileName) async {
+    try {
+      final Directory directory = await getTemporaryDirectory();
+      final String filePath = '${directory.path}/$fileName';
+      final http.Response response = await http.get(Uri.parse(url));
+      final File file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+      return filePath;
+    } catch (e) {
+      debugPrint('Error downloading push image: $e');
+      return null;
+    }
+  }
+
   Future<void> _showLocalNotification(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
 
     if (notification != null && android != null) {
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      StyleInformation? styleInformation;
+      String? imageUrl = android.imageUrl;
+      
+      // Fallback if not mapped directly
+      if (imageUrl == null && message.data.containsKey('push_image_url')) {
+        imageUrl = message.data['push_image_url'];
+      }
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        // Must use https to avoid cleartext HTTP issues on Android 9+
+        if (imageUrl.startsWith('http://localhost') || imageUrl.startsWith('http://127.0.0.1')) {
+           debugPrint('Cannot download localhost image on device: $imageUrl');
+        } else {
+           final String? downloadedPath = await _downloadAndSaveImage(imageUrl, 'push_image_${notification.hashCode}.png');
+           if (downloadedPath != null) {
+             styleInformation = BigPictureStyleInformation(
+               FilePathAndroidBitmap(downloadedPath),
+               hideExpandedLargeIcon: true,
+             );
+           }
+        }
+      }
+
+      AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'bookalook_customer_channel', // id
         'Customer Notifications', // title
         importance: Importance.max,
         priority: Priority.high,
+        styleInformation: styleInformation,
       );
-      const NotificationDetails platformDetails =
+      NotificationDetails platformDetails =
           NotificationDetails(android: androidDetails);
 
       await _localNotifications.show(
