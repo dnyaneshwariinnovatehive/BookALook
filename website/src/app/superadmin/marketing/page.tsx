@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Container } from "@/components/ui/Container";
+import React, { useEffect, useState, useMemo } from 'react';
+import { PageHeader, Alert } from '@/components/admin/ui';
+import Icon from '@/components/admin/Icon';
+import styles from '../notifications/notifications.module.css';
 
 interface Variable {
     key: string;
@@ -28,253 +28,422 @@ interface Automation {
         last_run_at: string | null;
         last_success_at: string | null;
         last_failure_at: string | null;
-        recent_success_count?: number;
-        recent_failure_count?: number;
     };
 }
 
 export default function WhatsappAutomationsPage() {
     const [automations, setAutomations] = useState<Automation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [editingKey, setEditingKey] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    // Editing State
+    const [editingAutomation, setEditingAutomation] = useState<Automation | null>(null);
     const [editData, setEditData] = useState<{
         is_enabled: boolean;
         aisensy_campaign_name: string;
         lead_time_minutes: number | null;
     } | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-    const [testPhone, setTestPhone] = useState("");
-    const [testingKey, setTestingKey] = useState<string | null>(null);
-    const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    // Test State
+    const [testPhone, setTestPhone] = useState('');
+    const [isTesting, setIsTesting] = useState(false);
+
+    // Toast System
+    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     useEffect(() => {
         fetchAutomations();
     }, []);
 
     const fetchAutomations = async () => {
+        setIsLoading(true);
+        setError(null);
         try {
-            const response = await axios.get("/api/proxy/superadmin/whatsapp-automations");
-            if (response.data.success) {
-                setAutomations(response.data.data);
+            const response = await fetch('/api/proxy/superadmin/whatsapp-automations');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    setAutomations(data.data || []);
+                } else {
+                    setError(data.message || 'Failed to load automations.');
+                }
+            } else {
+                setError(`API error: ${response.status} ${response.statusText}`);
             }
-        } catch (error) {
-            console.error("Failed to load automations", error);
+        } catch (err: any) {
+            console.error('Failed to load automations', err);
+            setError(err.message || 'Failed to load automations');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleEdit = (automation: Automation) => {
-        setEditingKey(automation.key);
-        setEditData({
-            is_enabled: automation.is_enabled,
-            aisensy_campaign_name: automation.aisensy_campaign_name || "",
-            lead_time_minutes: automation.lead_time_minutes,
-        });
+    const showToast = (type: 'success' | 'error', message: string) => {
+        setToast({ type, message });
+        setTimeout(() => setToast(null), 5000);
     };
 
-    const handleSave = async (key: string) => {
-        if (!editData) return;
+    const handleEdit = (automation: Automation) => {
+        setEditingAutomation(automation);
+        setEditData({
+            is_enabled: automation.is_enabled,
+            aisensy_campaign_name: automation.aisensy_campaign_name || '',
+            lead_time_minutes: automation.lead_time_minutes,
+        });
+        setTestPhone('');
+    };
 
+    const closeDrawer = () => {
+        setEditingAutomation(null);
+        setEditData(null);
+    };
+
+    const handleSave = async () => {
+        if (!editingAutomation || !editData) return;
+        setIsSaving(true);
         try {
-            const response = await axios.put(`/api/proxy/superadmin/whatsapp-automations/${key}`, editData);
-            if (response.data.success) {
-                setEditingKey(null);
-                setEditData(null);
-                fetchAutomations();
+            const response = await fetch(`/api/proxy/superadmin/whatsapp-automations/${editingAutomation.key}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editData),
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                await fetchAutomations();
+                showToast('success', `${editingAutomation.name} updated successfully.`);
+                closeDrawer();
+            } else {
+                showToast('error', data.message || 'Failed to update automation.');
             }
-        } catch (error: any) {
-            alert(error.response?.data?.message || "Failed to update automation.");
+        } catch (err: any) {
+            showToast('error', 'Failed to update automation.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    const handleTest = async (key: string) => {
-        if (!testPhone) {
-            alert("Please enter a phone number to test.");
+    const handleTest = async () => {
+        if (!editingAutomation || !testPhone) {
+            showToast('error', 'Please enter a phone number to test.');
             return;
         }
 
-        setTestingKey(key);
-        setTestStatus(null);
+        setIsTesting(true);
         try {
-            const response = await axios.post(`/api/proxy/superadmin/whatsapp-automations/${key}/test`, {
-                phone: testPhone,
+            const response = await fetch(`/api/proxy/superadmin/whatsapp-automations/${editingAutomation.key}/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: testPhone }),
             });
-            if (response.data.success) {
-                setTestStatus({ type: 'success', message: 'Test message sent successfully.' });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                showToast('success', 'Test message queued successfully.');
+            } else {
+                showToast('error', data.message || 'Failed to queue test message.');
             }
-        } catch (error: any) {
-            setTestStatus({ type: 'error', message: error.response?.data?.message || 'Failed to send test message.' });
+        } catch (err: any) {
+            showToast('error', 'Failed to send test message.');
         } finally {
-            setTestingKey(null);
+            setIsTesting(false);
         }
     };
 
-    const getStatusBadge = (status: string) => {
+    const getStatusLabel = (status: string) => {
         switch (status) {
-            case 'WORKING': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">🟢 Working</span>;
-            case 'READY': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">🟢 Ready</span>;
-            case 'DISABLED': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">⚪ Disabled</span>;
-            case 'NOT_CONFIGURED': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Not Configured</span>;
-            case 'NEEDS_ATTENTION': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Needs Attention</span>;
-            case 'FAILING': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Failing</span>;
-            default: return <span>{status}</span>;
+            case 'NOT_CONFIGURED': return 'Not Configured';
+            case 'NEEDS_ATTENTION': return 'Needs Attention';
+            default: return status.charAt(0) + status.slice(1).toLowerCase();
         }
     };
 
-    if (isLoading) {
-        return <div className="p-8 text-center text-gray-500">Loading automations...</div>;
-    }
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'WORKING': return { bg: '#dcfce7', text: '#166534' };
+            case 'READY': return { bg: '#e0e7ff', text: '#3730a3' };
+            case 'DISABLED': return { bg: '#f1f5f9', text: '#475569' };
+            case 'NOT_CONFIGURED': return { bg: '#fee2e2', text: '#991b1b' };
+            case 'NEEDS_ATTENTION': return { bg: '#fef3c7', text: '#92400e' };
+            case 'FAILING': return { bg: '#fee2e2', text: '#991b1b' };
+            default: return { bg: '#f1f5f9', text: '#475569' };
+        }
+    };
+
+    const activeCount = useMemo(() => automations.filter(a => a.is_enabled).length, [automations]);
 
     return (
-        <Container>
-            <PageHeader
-                title="WhatsApp Automations"
-                description="Manage automated system WhatsApp messages sent by BookALook."
-            />
+        <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+            {toast && (
+                <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999 }}>
+                    <Alert tone={toast.type} onClose={() => setToast(null)}>{toast.message}</Alert>
+                </div>
+            )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-                {automations.map((automation) => (
-                    <div key={automation.key} className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                            <h3 className="text-lg font-medium text-gray-900">{automation.name}</h3>
-                            <div className="flex items-center">
-                                {getStatusBadge(automation.health.status)}
-                            </div>
+            <div className={styles.header} style={{ marginBottom: 32 }}>
+                <div>
+                    <h1 style={{ fontSize: 24, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>WhatsApp Automations</h1>
+                    <p style={{ color: '#64748b', margin: 0 }}>Manage automated system WhatsApp messages sent by BookALook.</p>
+                </div>
+                {!isLoading && automations.length > 0 && (
+                    <div style={{ fontSize: 13, color: '#475569', background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        {automations.length} Automations &middot; <span style={{ fontWeight: 600, color: activeCount > 0 ? '#10b981' : '#475569' }}>{activeCount} Active</span> &middot; {automations.length - activeCount} Disabled
+                    </div>
+                )}
+            </div>
+
+            {isLoading ? (
+                <div className={styles.dashboardCards} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className={styles.card} style={{ minHeight: 200, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div style={{ background: '#f1f5f9', height: 24, width: '40%', borderRadius: 4 }} />
+                            <div style={{ background: '#f1f5f9', height: 16, width: '80%', borderRadius: 4 }} />
+                            <div style={{ background: '#f1f5f9', height: 48, width: '100%', borderRadius: 4 }} />
                         </div>
-
-                        <div className="p-6">
-                            <p className="text-sm text-gray-600 mb-6">{automation.description}</p>
-
-                            <div className="grid grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Who</h4>
-                                    <p className="text-sm text-gray-900">{automation.audience}</p>
+                    ))}
+                </div>
+            ) : error ? (
+                <Alert tone="error">
+                    <strong>Error loading automations</strong><br />
+                    {error}
+                    <div style={{ marginTop: 12 }}>
+                        <button className={styles.testBtn} onClick={fetchAutomations}>Retry</button>
+                    </div>
+                </Alert>
+            ) : automations.length === 0 ? (
+                <div className={styles.card} style={{ textAlign: 'center', padding: '64px 20px' }}>
+                    <Icon name="info" size={32} style={{ color: '#94a3b8', marginBottom: 16 }} />
+                    <h3 style={{ fontSize: 18, color: '#0f172a', margin: '0 0 8px 0' }}>No automations configured</h3>
+                    <p style={{ color: '#64748b', margin: 0 }}>System WhatsApp messages will appear here once properly seeded in the database.</p>
+                </div>
+            ) : (
+                <div className={styles.dashboardCards} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
+                    {automations.map((automation) => {
+                        const statusColor = getStatusColor(automation.health.status);
+                        return (
+                            <div key={automation.key} className={styles.card} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                                    <div style={{ fontWeight: 600, fontSize: 16, color: '#0f172a' }}>{automation.name}</div>
+                                    <span style={{ 
+                                        padding: '4px 10px', 
+                                        borderRadius: 9999, 
+                                        fontSize: 12, 
+                                        fontWeight: 500,
+                                        background: statusColor.bg,
+                                        color: statusColor.text
+                                    }}>
+                                        {getStatusLabel(automation.health.status)}
+                                    </span>
                                 </div>
-                                <div>
-                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">When</h4>
-                                    <p className="text-sm text-gray-900">{automation.frequency_label}</p>
+                                
+                                <p style={{ fontSize: 14, color: '#475569', marginBottom: 24, flex: 1 }}>
+                                    {automation.description}
+                                </p>
+                                
+                                <div style={{ marginBottom: 16 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <Icon name="users" size={14} style={{ color: '#64748b' }} /> {automation.audience}
+                                    </div>
+                                    <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <Icon name="clock" size={14} style={{ color: '#94a3b8' }} /> {automation.frequency_label}
+                                    </div>
+                                    <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Icon name="checkCircle" size={14} style={{ color: automation.aisensy_campaign_name ? '#10b981' : '#cbd5e1' }} />
+                                        Campaign: {automation.aisensy_campaign_name ? <span style={{ color: '#0f172a', fontWeight: 500 }}>{automation.aisensy_campaign_name}</span> : <span style={{ fontStyle: 'italic' }}>Not configured</span>}
+                                    </div>
+                                </div>
+                                
+                                <div style={{ borderTop: '1px solid #e2e8f0', margin: '0 -20px 0 -20px', padding: '16px 20px 0 20px', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <button className={styles.editBtn} onClick={() => handleEdit(automation)}>Configure &rarr;</button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Editor Drawer */}
+            {editingAutomation && editData && (
+                <div className={styles.drawerOverlay}>
+                    <div className={styles.drawerContent} style={{ maxWidth: 640 }}>
+                        <div className={styles.drawerHeader}>
+                            <div>
+                                <h2>{editingAutomation.name}</h2>
+                                <p>System WhatsApp Automation</p>
+                            </div>
+                            <button className={styles.closeBtn} onClick={closeDrawer}>&times;</button>
+                        </div>
+                        
+                        <div className={styles.drawerBody} style={{ flexDirection: 'column', gap: 24 }}>
+                            
+                            {/* Automation Status */}
+                            <div className={styles.sectionBox} style={{ borderLeft: editingAutomation.is_enabled ? '4px solid #10b981' : '4px solid #cbd5e1' }}>
+                                <h3 style={{ marginBottom: 16 }}>Automation</h3>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <div>
+                                        <div style={{ fontWeight: 500, fontSize: 14, color: '#0f172a', marginBottom: 4 }}>Status</div>
+                                        {editingAutomation.key === 'whatsapp_otp' ? (
+                                            <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <Icon name="info" size={14} /> WhatsApp OTP is currently disabled during development.
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: 13, color: '#64748b' }}>Allow the system to send WhatsApp messages when this event occurs.</div>
+                                        )}
+                                    </div>
+                                    <label className={styles.toggleSwitch} style={{ opacity: editingAutomation.key === 'whatsapp_otp' ? 0.5 : 1, cursor: editingAutomation.key === 'whatsapp_otp' ? 'not-allowed' : 'pointer' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editData.is_enabled}
+                                            disabled={editingAutomation.key === 'whatsapp_otp'}
+                                            onChange={(e) => setEditData({...editData, is_enabled: e.target.checked})}
+                                        />
+                                        <span className={styles.slider}></span>
+                                    </label>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: 48, borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                                    <div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Audience</div>
+                                        <div style={{ fontSize: 14, color: '#0f172a' }}>{editingAutomation.audience}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Trigger</div>
+                                        <div style={{ fontSize: 14, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            {editingAutomation.frequency_label}
+                                            {(editingAutomation.key === 'whatsapp_customer_birthday' || editingAutomation.key === 'whatsapp_25_day_reminder') && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 11, color: '#64748b' }}>
+                                                    <Icon name="info" size={10} /> System rule
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="mb-6 bg-gray-50 rounded-md p-4 border border-gray-200">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">AiSensy Campaign</h4>
-                                {editingKey === automation.key ? (
+                            {/* AiSensy Configuration */}
+                            <div className={styles.sectionBox}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <h3 style={{ margin: 0 }}>AiSensy</h3>
+                                    {editData.aisensy_campaign_name ? (
+                                        <span style={{ fontSize: 12, fontWeight: 500, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <div style={{ width: 6, height: 6, borderRadius: 3, background: '#10b981' }} /> Configured
+                                        </span>
+                                    ) : (
+                                        <span style={{ fontSize: 12, fontWeight: 500, color: editingAutomation.is_enabled ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <div style={{ width: 6, height: 6, borderRadius: 3, background: editingAutomation.is_enabled ? '#ef4444' : '#64748b' }} /> No campaign configured
+                                        </span>
+                                    )}
+                                </div>
+                                
+                                <div className={styles.formGroup}>
+                                    <label>Campaign Name</label>
                                     <input 
                                         type="text" 
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                                        value={editData?.aisensy_campaign_name} 
-                                        onChange={e => setEditData(prev => prev ? {...prev, aisensy_campaign_name: e.target.value} : null)}
-                                        placeholder="e.g. BAL_CUSTOMER_BIRTHDAY"
+                                        className={styles.input}
+                                        value={editData.aisensy_campaign_name}
+                                        onChange={(e) => setEditData({...editData, aisensy_campaign_name: e.target.value})}
+                                        placeholder="e.g. bal_apt_reminder"
                                     />
-                                ) : (
-                                    <div className="flex items-center">
-                                        <p className="text-sm font-medium text-gray-900 mr-3">
-                                            {automation.aisensy_campaign_name || <span className="text-gray-400 italic">Not configured</span>}
-                                        </p>
-                                        {automation.aisensy_campaign_name && (
-                                            <span className="text-green-600 text-xs flex items-center">
-                                                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                                Configured
-                                            </span>
-                                        )}
+                                    <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>This must be an approved AiSensy campaign name exactly as it appears in the AiSensy dashboard.</p>
+                                </div>
+
+                                {editingAutomation.key === 'whatsapp_appointment_reminder' && (
+                                    <div className={styles.formGroup} style={{ marginTop: 20 }}>
+                                        <label>Reminder timing (Minutes)</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <input 
+                                                type="number" 
+                                                className={styles.input}
+                                                style={{ width: 100 }}
+                                                value={editData.lead_time_minutes || ''}
+                                                onChange={(e) => setEditData({...editData, lead_time_minutes: parseInt(e.target.value) || 0})}
+                                                min="1"
+                                            />
+                                            <span style={{ fontSize: 14, color: '#334155' }}>minutes before appointment</span>
+                                        </div>
+                                        <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>Customers will receive the reminder within the existing scheduler window (typically batched).</p>
                                     </div>
                                 )}
                             </div>
 
-                            {automation.key === 'whatsapp_appointment_reminder' && editingKey === automation.key && (
-                                <div className="mb-6">
-                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Lead Time (Minutes)</h4>
-                                    <input 
-                                        type="number" 
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
-                                        value={editData?.lead_time_minutes || ''} 
-                                        onChange={e => setEditData(prev => prev ? {...prev, lead_time_minutes: parseInt(e.target.value)} : null)}
-                                        min="1"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500">E.g., 120 for 2 hours before appointment.</p>
-                                </div>
-                            )}
+                            {/* Variables */}
+                            <div className={styles.sectionBox}>
+                                <h3 style={{ marginBottom: 16 }}>Variables</h3>
+                                {editingAutomation.variables.length === 0 ? (
+                                    <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>No variables are required for this automation.</p>
+                                ) : (
+                                    <>
+                                        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>Required variables &middot; exact order</p>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            {editingAutomation.variables.map((v, i) => (
+                                                <div key={v.key} style={{ display: 'flex', gap: 12, padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                                    <div style={{ fontWeight: 600, color: '#94a3b8', fontSize: 13 }}>{i + 1}.</div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                                            <code style={{ background: 'white', padding: '2px 6px', borderRadius: 4, fontSize: 13, border: '1px solid #cbd5e1', color: '#0f172a', fontWeight: 500 }}>
+                                                                {v.key}
+                                                            </code>
+                                                        </div>
+                                                        <div style={{ fontSize: 13, color: '#475569', marginBottom: 4 }}>{v.description}</div>
+                                                        <div style={{ fontSize: 12, color: '#64748b' }}>
+                                                            Example: <span style={{ color: '#0f172a', fontWeight: 500 }}>{v.key} &rarr; {v.example}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
-                            {automation.variables.length > 0 && (
-                                <div className="mb-6">
-                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Required Variables (in exact order)</h4>
-                                    <ul className="text-sm text-gray-700 space-y-2">
-                                        {automation.variables.map((v, idx) => (
-                                            <li key={v.key} className="flex flex-col">
-                                                <span className="font-mono bg-gray-100 px-1 rounded inline-block w-max mb-1">{idx + 1}. {`{{${v.key}}}`}</span>
-                                                <span className="text-gray-500 text-xs ml-4">E.g. {v.example} ({v.label})</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {editingKey === automation.key ? (
-                                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                                    <div className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            id={`enable-${automation.key}`}
-                                            checked={editData?.is_enabled}
-                                            disabled={automation.key === 'whatsapp_otp'}
-                                            onChange={e => setEditData(prev => prev ? {...prev, is_enabled: e.target.checked} : null)}
-                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                            {/* Test Campaign */}
+                            <div className={styles.sectionBox}>
+                                <h3 style={{ marginBottom: 16 }}>Test</h3>
+                                <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>
+                                    Send a test WhatsApp to verify the campaign. Test uses the configured AiSensy approved template and backend-supported variables.
+                                </p>
+                                
+                                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                    <div style={{ flex: 1 }} className={styles.formGroup}>
+                                        <input 
+                                            type="text" 
+                                            className={styles.input}
+                                            value={testPhone}
+                                            onChange={(e) => setTestPhone(e.target.value)}
+                                            placeholder="+91XXXXXXXXXX"
+                                            disabled={!editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp'}
                                         />
-                                        <label htmlFor={`enable-${automation.key}`} className="ml-2 block text-sm text-gray-900">
-                                            Enable Automation
-                                        </label>
                                     </div>
-                                    <div className="flex space-x-3">
-                                        <button onClick={() => setEditingKey(null)} className="px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                            Cancel
-                                        </button>
-                                        <button onClick={() => handleSave(automation.key)} className="px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                                            Save Changes
+                                    <div style={{ marginTop: '-20px' }}>
+                                        <button 
+                                            className={styles.testBtn} 
+                                            onClick={handleTest}
+                                            disabled={isTesting || !editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp'}
+                                            style={{ opacity: (!editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp') ? 0.5 : 1 }}
+                                        >
+                                            {isTesting ? 'Sending...' : 'Send Test'}
                                         </button>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="mt-6 pt-4 border-t border-gray-200">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <button onClick={() => handleEdit(automation)} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
-                                            Edit Configuration
-                                        </button>
-                                        <div className="text-xs text-gray-500 text-right">
-                                            {automation.health.last_run_at ? `Last run: ${new Date(automation.health.last_run_at).toLocaleString()}` : 'Never run'}
-                                        </div>
-                                    </div>
-
-                                    {automation.key !== 'whatsapp_otp' && automation.is_enabled && automation.aisensy_campaign_name && (
-                                        <div className="bg-blue-50 p-4 rounded-md flex items-center space-x-3">
-                                            <input 
-                                                type="text"
-                                                placeholder="+91XXXXXXXXXX"
-                                                className="block w-full sm:text-sm border-gray-300 rounded-md"
-                                                value={testPhone}
-                                                onChange={e => setTestPhone(e.target.value)}
-                                            />
-                                            <button 
-                                                onClick={() => handleTest(automation.key)} 
-                                                disabled={testingKey === automation.key}
-                                                className="whitespace-nowrap px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                                            >
-                                                {testingKey === automation.key ? 'Sending...' : 'Send Test'}
-                                            </button>
-                                        </div>
-                                    )}
-                                    {testStatus && testingKey === null && automation.key !== 'whatsapp_otp' && automation.is_enabled && (
-                                        <p className={`mt-2 text-xs ${testStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                                            {testStatus.message}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                                
+                                {(!editingAutomation.is_enabled || !editData.aisensy_campaign_name) && editingAutomation.key !== 'whatsapp_otp' && (
+                                    <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0 0' }}>
+                                        Enable the automation and configure a campaign name to test.
+                                    </p>
+                                )}
+                            </div>
 
                         </div>
+                        
+                        <div className={styles.drawerFooter}>
+                            <button className={styles.editBtn} onClick={closeDrawer}>Cancel</button>
+                            <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
                     </div>
-                ))}
-            </div>
-        </Container>
+                </div>
+            )}
+        </div>
     );
 }

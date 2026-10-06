@@ -20,7 +20,6 @@ class WhatsappVariableCatalog
                 'available_for' => [
                     'whatsapp_customer_birthday',
                     'whatsapp_25_day_reminder',
-                    'whatsapp_appointment_reminder',
                 ],
             ],
             'salon_name' => [
@@ -36,9 +35,9 @@ class WhatsappVariableCatalog
             ],
             'date_label' => [
                 'key' => 'date_label',
-                'label' => 'Date Label',
-                'description' => 'A friendly date string for the appointment (e.g. Tomorrow at 10 AM).',
-                'example' => 'Tomorrow at 10:00 AM',
+                'label' => 'Appointment date & time',
+                'description' => 'A friendly date string for the appointment.',
+                'example' => 'October 7, 2026 at 4:30 PM',
                 'available_for' => [
                     'whatsapp_appointment_reminder',
                 ],
@@ -47,7 +46,7 @@ class WhatsappVariableCatalog
                 'key' => 'salon_address',
                 'label' => 'Salon Address',
                 'description' => 'The full address of the salon.',
-                'example' => '123 High Street',
+                'example' => '123 MG Road, Pune',
                 'available_for' => [
                     'whatsapp_appointment_reminder',
                 ],

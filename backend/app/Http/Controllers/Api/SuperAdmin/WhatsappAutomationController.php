@@ -96,7 +96,6 @@ class WhatsappAutomationController extends Controller
 
         $message = WhatsAppMessage::create([
             'to_phone' => $request->phone,
-            'recipient_phone' => $request->phone,
             'template' => 'test_' . $automation->key,
             'campaign' => $automation->aisensy_campaign_name,
             'payload' => ['parameters' => $payloadParams],

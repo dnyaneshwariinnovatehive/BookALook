@@ -92,7 +92,6 @@ class SendAutomatedMessages extends Command
             $message = WhatsAppMessage::create([
                 'user_id' => $customer->id,
                 'to_phone' => $customer->phone,
-                'recipient_phone' => $customer->phone, // some code uses to_phone, some uses recipient_phone. Using both to be safe depending on DB schema.
                 'related_salon_id' => $salon->id,
                 'related_appointment_id' => $appointment->id,
                 'template' => $automation->key,
@@ -165,7 +164,6 @@ class SendAutomatedMessages extends Command
             $message = WhatsAppMessage::create([
                 'user_id' => $user->id,
                 'to_phone' => $user->phone,
-                'recipient_phone' => $user->phone,
                 'related_salon_id' => $lastAppointment ? $lastAppointment->salon_id : null,
                 'template' => $automation->key,
                 'campaign' => $automation->aisensy_campaign_name,

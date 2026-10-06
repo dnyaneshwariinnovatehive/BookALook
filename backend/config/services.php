@@ -96,7 +96,7 @@ return [
         // variable to set rather than being attempted.
         'campaigns' => [
             'booking_confirmed' => env('WHATSAPP_CAMPAIGN_BOOKING_CONFIRMED', ''),
-            'appointment_reminder' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_REMINDER', ''),
+            'appointment_reminder' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_REMINDER', 'BAL_apt_reminder'),
             'appointment_cancelled' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_CANCELLED', ''),
             'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', ''),
             'salon_deactivated' => env('WHATSAPP_CAMPAIGN_SALON_DEACTIVATED', ''),

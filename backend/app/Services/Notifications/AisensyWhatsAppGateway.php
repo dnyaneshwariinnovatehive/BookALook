@@ -68,9 +68,16 @@ class AisensyWhatsAppGateway implements WhatsAppGateway
     {
         $message->increment('attempts');
 
-        $campaign = $this->campaignByTemplate[$message->template] ?? null;
+        $campaign = null;
+        if (!empty($message->campaign)) {
+            $campaign = trim($message->campaign);
+        }
+        
+        if (empty($campaign)) {
+            $campaign = $this->campaignByTemplate[$message->template] ?? null;
+        }
 
-        if ($campaign === null) {
+        if ($campaign === null || $campaign === '') {
             $this->recordFailure(
                 $message,
                 "No AISensy campaign is configured for template '{$message->template}'. "
