@@ -1018,7 +1018,6 @@ class _HomeTabState extends State<HomeTab> {
             .join(', ') ??
         'Services';
 
-    final headingColor = context.colors.textPrimary;
     final bodyColor = context.colors.textSecondary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1026,15 +1025,21 @@ class _HomeTabState extends State<HomeTab> {
       width: double.infinity,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
-          colors: [
-            Color(0xFFEBE1FA),
-            Color(0xFFE8DBFA),
-            Color(0xFFE1CEF8),
-          ],
-          stops: [0.0, 0.5, 1.0],
+          colors: isDark
+              ? [
+                  const Color(0xFF3B2A56),
+                  const Color(0xFF382650),
+                  const Color(0xFF332047),
+                ]
+              : [
+                  const Color(0xFFEBE1FA),
+                  const Color(0xFFE8DBFA),
+                  const Color(0xFFE1CEF8),
+                ],
+          stops: const [0.0, 0.5, 1.0],
         ),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: context.colors.cardBorder, width: 1.0),
@@ -1066,6 +1071,28 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ),
+          // Decorative background icons
+          Positioned(
+            right: -20,
+            bottom: 30,
+            child: Transform.rotate(
+              angle: -0.5,
+              child: Icon(
+                Icons.content_cut,
+                size: 160,
+                color: AppTheme.accentColor.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 80,
+            bottom: 140,
+            child: Icon(
+              Icons.star_rounded,
+              size: 40,
+              color: AppTheme.accentColor.withValues(alpha: 0.08),
+            ),
+          ),
 
           Padding(
             padding: const EdgeInsets.all(18),
@@ -1086,7 +1113,7 @@ class _HomeTabState extends State<HomeTab> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.calendar_month_rounded, size: 12, color: AppTheme.accentColor),
+                      Icon(Icons.calendar_month_rounded, size: 14, color: AppTheme.accentColor),
                       const SizedBox(width: 6),
                       const Text(
                         'YOUR NEXT APPOINTMENT',
@@ -1099,53 +1126,87 @@ class _HomeTabState extends State<HomeTab> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                // Salon name
-                Text(
-                  salonName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: headingColor,
-                  ),
+                // Salon name and Time
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        salonName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF140D20),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.accentColor.withValues(alpha: 0.15) : AppTheme.accentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.access_time, size: 14, color: AppTheme.accentColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${booking['start_time']} – ${booking['end_time']}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : const Color(0xFF140D20),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+
+                const SizedBox(height: 16),
 
                 // Address
                 if (address.isNotEmpty) ...[
-                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on_outlined,
+                      Icon(Icons.location_on,
                           size: 14, color: bodyColor.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           address,
                           style: TextStyle(
                             fontSize: 13,
-                            color: bodyColor.withValues(alpha: 0.75),
+                            fontWeight: FontWeight.w500,
+                            color: bodyColor.withValues(alpha: 0.8),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
                 ],
 
                 // Services
-                const SizedBox(height: 9),
                 Row(
                   children: [
                     Icon(Icons.content_cut,
                         size: 14,
-                        color: AppTheme.accentColor.withValues(alpha: 0.75)),
-                    const SizedBox(width: 6),
+                        color: AppTheme.accentColor),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         services,
                         style: TextStyle(
                           fontSize: 13,
+                          fontWeight: FontWeight.w500,
                           color: bodyColor.withValues(alpha: 0.8),
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1155,50 +1216,45 @@ class _HomeTabState extends State<HomeTab> {
                 ),
 
                 // Divider
-                const SizedBox(height: 14),
-                _DashedDivider(),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
+                Container(
+                  height: 1,
+                  color: AppTheme.accentColor.withValues(alpha: 0.15),
+                ),
+                const SizedBox(height: 16),
 
-                // Date & time
+                // Date
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined,
-                        size: 15, color: AppTheme.accentColor),
-                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.accentColor.withValues(alpha: 0.2) : AppTheme.accentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.accentColor),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         date != null
                             ? DateFormat('EEE, MMM d, yyyy').format(date)
                             : '',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: headingColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF140D20),
                         ),
                         overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.access_time,
-                        size: 15, color: AppTheme.accentColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${booking['start_time']} – ${booking['end_time']}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: headingColor,
                       ),
                     ),
                   ],
                 ),
 
-                // CTA: dark charcoal pill. The check-in QR once its window is
-                // open; until then the booking's details, with a note of when
-                // the QR becomes available.
+                // CTA: dark charcoal pill
                 if (booking['id'] != null) ...[
                   if (CheckInWindow.notYetOpenLabel(booking) case final label?) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Icon(Icons.schedule, size: 14, color: bodyColor),
@@ -1208,28 +1264,38 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                   ],
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () => CheckInWindow.canShowQr(booking)
                         ? _openCheckInQr(booking)
                         : _openBookingDetails(booking),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.darkButtonBg,
+                      backgroundColor: isDark ? const Color(0xFF3B2A56) : const Color(0xFF261D32),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22)),
+                          borderRadius: BorderRadius.circular(24)),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        Icon(
+                          CheckInWindow.canShowQr(booking)
+                              ? Icons.qr_code
+                              : Icons.map_outlined,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
                         Text(
-                            CheckInWindow.canShowQr(booking)
-                                ? 'Show Check-in QR'
-                                : 'View Details & Get Directions',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 12)),
+                          CheckInWindow.canShowQr(booking)
+                              ? 'Show Check-in QR'
+                              : 'View details & Get direction',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 12),
+                        ),
+                        const Spacer(),
+                        const Icon(Icons.chevron_right, size: 16),
                       ],
                     ),
                   ),

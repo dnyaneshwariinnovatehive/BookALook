@@ -44,12 +44,16 @@ export default function NotificationsPage() {
   const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
   const [editForm, setEditForm] = useState({
     is_enabled: true,
+    in_app_enabled: true,
+    push_enabled: true,
     title: '',
     message: '',
     push_title: '',
     push_message: '',
     push_image_url: '',
-    action_type: 'default'
+    action_type: 'default',
+    schedule_type: 'immediate',
+    schedule_delay_minutes: 0,
   });
   
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -105,14 +109,22 @@ export default function NotificationsPage() {
 
   const handleEdit = (template: NotificationTemplate) => {
     setEditingTemplate(template);
+    
+    // Parse channels safely
+    const ch = Array.isArray(template.channels) ? template.channels : [];
+    
     setEditForm({
       is_enabled: template.is_enabled,
+      in_app_enabled: ch.includes('in_app'),
+      push_enabled: ch.includes('push'),
       title: template.title || template.default_title,
       message: template.message || template.default_message,
       push_title: template.push_title || template.default_push_title || template.title || template.default_title,
       push_message: template.push_message || template.default_push_message || template.message || template.default_message,
       push_image_url: template.push_image_url || '',
-      action_type: template.action_config?.type || 'default'
+      action_type: template.action_config?.type || 'default',
+      schedule_type: template.schedule_config?.type || 'immediate',
+      schedule_delay_minutes: template.schedule_config?.delay_minutes || 0,
     });
   };
 
@@ -139,6 +151,27 @@ export default function NotificationsPage() {
       } else {
         body.action_config = null;
       }
+      
+      if (editForm.schedule_type !== 'immediate') {
+        body.schedule_config = { type: editForm.schedule_type, delay_minutes: editForm.schedule_delay_minutes };
+      } else {
+        body.schedule_config = null;
+      }
+      
+      const newChannels = Array.isArray(editingTemplate.channels) ? [...editingTemplate.channels] : [];
+      if (editForm.in_app_enabled && !newChannels.includes('in_app')) newChannels.push('in_app');
+      if (!editForm.in_app_enabled) {
+        const idx = newChannels.indexOf('in_app');
+        if (idx > -1) newChannels.splice(idx, 1);
+      }
+      
+      if (editForm.push_enabled && !newChannels.includes('push')) newChannels.push('push');
+      if (!editForm.push_enabled) {
+        const idx = newChannels.indexOf('push');
+        if (idx > -1) newChannels.splice(idx, 1);
+      }
+      
+      body.channels = newChannels;
 
       const res = await fetch(`/api/superadmin/notification-templates/${editingTemplate.key}`, {
         method: 'PUT',
@@ -423,8 +456,21 @@ export default function NotificationsPage() {
 
                 {/* In-App Content */}
                 <div className={styles.sectionBox}>
-                  <h3>IN-APP NOTIFICATION</h3>
-                  <div className={styles.formGroup}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ margin: 0 }}>IN-APP NOTIFICATION</h3>
+                    <label className={styles.toggleSwitch}>
+                      <input 
+                        type="checkbox" 
+                        checked={editForm.in_app_enabled}
+                        onChange={(e) => setEditForm({...editForm, in_app_enabled: e.target.checked})}
+                      />
+                      <span className={styles.slider}></span>
+                    </label>
+                  </div>
+                  
+                  {editForm.in_app_enabled && (
+                    <>
+                      <div className={styles.formGroup}>
                     <label>Title</label>
                     <input 
                       type="text" 
@@ -457,12 +503,27 @@ export default function NotificationsPage() {
                       </div>
                     </div>
                   )}
+                    </>
+                  )}
                 </div>
 
                 {/* Push Content */}
                 <div className={styles.sectionBox}>
-                  <h3>PUSH NOTIFICATION</h3>
-                  <div className={styles.formGroup}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ margin: 0 }}>PUSH NOTIFICATION</h3>
+                    <label className={styles.toggleSwitch}>
+                      <input 
+                        type="checkbox" 
+                        checked={editForm.push_enabled}
+                        onChange={(e) => setEditForm({...editForm, push_enabled: e.target.checked})}
+                      />
+                      <span className={styles.slider}></span>
+                    </label>
+                  </div>
+                  
+                  {editForm.push_enabled && (
+                    <>
+                      <div className={styles.formGroup}>
                     <label>Push Title</label>
                     <input 
                       type="text" 
@@ -524,7 +585,9 @@ export default function NotificationsPage() {
                       </div>
                     )}
                   </div>
-                </div>
+                </>
+              )}
+            </div>
 
                 {/* Action */}
                 <div className={styles.sectionBox}>
@@ -542,6 +605,34 @@ export default function NotificationsPage() {
                       <option value="salon_profile">Salon Profile</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Schedule */}
+                <div className={styles.sectionBox}>
+                  <h3>SCHEDULE</h3>
+                  <div className={styles.formGroup}>
+                    <label>When should this be sent?</label>
+                    <select 
+                      className={styles.select}
+                      value={editForm.schedule_type}
+                      onChange={(e) => setEditForm({...editForm, schedule_type: e.target.value})}
+                    >
+                      <option value="immediate">Immediately</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  </div>
+                  
+                  {editForm.schedule_type === 'delayed' && (
+                    <div className={styles.formGroup}>
+                      <label>Delay (in minutes)</label>
+                      <input 
+                        type="number" 
+                        className={styles.input}
+                        value={editForm.schedule_delay_minutes}
+                        onChange={(e) => setEditForm({...editForm, schedule_delay_minutes: parseInt(e.target.value) || 0})}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* WhatsApp Note */}

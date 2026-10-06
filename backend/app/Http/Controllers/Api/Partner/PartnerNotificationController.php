@@ -15,6 +15,9 @@ class PartnerNotificationController extends Controller
     public function index(Request $request)
     {
         $notifications = Notification::where('user_id', $request->user()->id)
+            ->where(function($q) {
+                $q->whereNull('data->hide_in_app')->orWhere('data->hide_in_app', false);
+            })
             ->orderByDesc('created_at')
             ->limit((int) $request->get('limit', 50))
             ->get();
@@ -32,6 +35,9 @@ class PartnerNotificationController extends Controller
             ])->values(),
             'unread_count' => Notification::where('user_id', $request->user()->id)
                 ->where('is_read', false)
+                ->where(function($q) {
+                    $q->whereNull('data->hide_in_app')->orWhere('data->hide_in_app', false);
+                })
                 ->count(),
         ]);
     }

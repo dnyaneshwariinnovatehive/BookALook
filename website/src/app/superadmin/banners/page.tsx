@@ -330,7 +330,12 @@ export default function BannersPage() {
         fetchBanners();
       } else {
         const data = await res.json();
-        alert(data.message || `Failed to ${editingBannerId ? 'update' : 'create'} banner`);
+        let errorMessage = data.message || `Failed to ${editingBannerId ? 'update' : 'create'} banner`;
+        if (data.errors) {
+          const messages = Object.values(data.errors).flat().join('\n');
+          if (messages) errorMessage = messages;
+        }
+        alert(errorMessage);
       }
     } catch (error) {
       console.error(error);
@@ -857,7 +862,13 @@ export default function BannersPage() {
                     type="number" 
                     className={styles.input} 
                     value={priority} 
-                    onChange={(e) => setPriority(parseInt(e.target.value))} 
+                    onChange={(e) => setPriority(parseInt(e.target.value) || 0)} 
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                      }
+                    }}
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                     min={0}
                   />
                 </div>

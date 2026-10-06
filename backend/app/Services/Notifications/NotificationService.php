@@ -75,7 +75,8 @@ class NotificationService
         ?string $pushTitle = null,
         ?string $pushMessage = null,
         ?string $pushImageUrl = null,
-        ?array $actionConfig = null
+        ?array $actionConfig = null,
+        ?array $templateChannels = null
     ): ?Notification {
         $userId = $recipient instanceof User ? $recipient->id : $recipient;
 
@@ -110,6 +111,13 @@ class NotificationService
                 $data['action'] = $default;
             }
         }
+        
+        // Respect template channels
+        if (is_array($templateChannels)) {
+            if (!in_array('in_app', $templateChannels)) {
+                $data['hide_in_app'] = true;
+            }
+        }
 
         $notification = Notification::createOnce([
             'user_id' => $userId,
@@ -130,7 +138,9 @@ class NotificationService
 
         // Queued from here, rather than from each caller, so a new notification
         // cannot be added without also being pushed.
-        $this->mirrorToPush($notification);
+        if (!is_array($templateChannels) || in_array('push', $templateChannels)) {
+            $this->mirrorToPush($notification);
+        }
 
         return $notification;
     }
@@ -169,6 +179,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::RESCHEDULE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -227,6 +238,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::PAY_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -267,6 +279,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -313,6 +326,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -358,6 +372,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -404,6 +419,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -457,6 +473,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -494,6 +511,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::RATE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -543,6 +561,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -594,6 +613,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
                 data: [
                     'action' => NotificationAction::VIEW_APPOINTMENT,
                     'appointment_id' => $appointment->id,
@@ -666,6 +686,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::CALL_OWNER,
                 'salon_id' => $salon->id,
@@ -729,6 +750,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => NotificationAction::VIEW_SALON,
                 'salon_id' => $salon->id,
@@ -765,6 +787,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
             salon: $salon,
         );
@@ -788,6 +811,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
             salon: $salon,
         );
@@ -810,6 +834,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: ['salon_id' => $salon->id],
             salon: $salon,
         );
@@ -834,6 +859,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'complaint_id' => $complaintId,
                 'salon_id' => $salon->id,
@@ -860,6 +886,7 @@ class NotificationService
             pushMessage: $resolved['push_message'] ?? null,
             pushImageUrl: $resolved['push_image_url'] ?? null,
             actionConfig: $resolved['action_config'] ?? null,
+            templateChannels: $resolved['template']?->channels ?? null,
             data: [
                 'action' => 'review_complaint',
                 'complaint_id' => $complaintId,
