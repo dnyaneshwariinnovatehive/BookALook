@@ -65,7 +65,7 @@ class BannerController extends Controller
             'start_date'         => 'required|date',
             'end_date'           => 'required|date|after:start_date',
             'is_active'          => 'boolean',
-            'priority'           => 'nullable|integer|min:0',
+            'priority'           => 'nullable|integer|min:0|unique:banners,priority',
         ]);
 
         // Static banners require an image
@@ -95,7 +95,7 @@ class BannerController extends Controller
             'start_date'         => 'sometimes|required|date',
             'end_date'           => 'sometimes|required|date|after:start_date',
             'is_active'          => 'boolean',
-            'priority'           => 'nullable|integer|min:0',
+            'priority'           => 'nullable|integer|min:0|unique:banners,priority,' . $banner->id,
         ]);
 
         $banner->update($validated);

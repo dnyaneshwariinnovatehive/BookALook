@@ -1136,8 +1136,8 @@ class _HomeTabState extends State<HomeTab> {
                       child: Text(
                         salonName,
                         style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF140D20),
                           letterSpacing: -0.5,
                         ),
@@ -1153,12 +1153,12 @@ class _HomeTabState extends State<HomeTab> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.access_time, size: 16, color: AppTheme.accentColor),
+                          Icon(Icons.access_time, size: 14, color: AppTheme.accentColor),
                           const SizedBox(width: 6),
                           Text(
                             '${booking['start_time']} – ${booking['end_time']}',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: isDark ? Colors.white : const Color(0xFF140D20),
                             ),
@@ -1176,13 +1176,13 @@ class _HomeTabState extends State<HomeTab> {
                   Row(
                     children: [
                       Icon(Icons.location_on,
-                          size: 18, color: bodyColor.withValues(alpha: 0.6)),
+                          size: 14, color: bodyColor.withValues(alpha: 0.6)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           address,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: bodyColor.withValues(alpha: 0.8),
                           ),
@@ -1198,14 +1198,14 @@ class _HomeTabState extends State<HomeTab> {
                 Row(
                   children: [
                     Icon(Icons.content_cut,
-                        size: 18,
+                        size: 14,
                         color: AppTheme.accentColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         services,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: bodyColor.withValues(alpha: 0.8),
                         ),
@@ -1227,21 +1227,21 @@ class _HomeTabState extends State<HomeTab> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: isDark ? AppTheme.accentColor.withValues(alpha: 0.2) : AppTheme.accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.calendar_today_outlined, size: 24, color: AppTheme.accentColor),
+                      child: Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.accentColor),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         date != null
                             ? DateFormat('EEE, MMM d, yyyy').format(date)
                             : '',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF140D20),
                         ),
@@ -1273,7 +1273,7 @@ class _HomeTabState extends State<HomeTab> {
                       backgroundColor: isDark ? const Color(0xFF3B2A56) : const Color(0xFF261D32),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24)),
                     ),
@@ -1284,7 +1284,7 @@ class _HomeTabState extends State<HomeTab> {
                           CheckInWindow.canShowQr(booking)
                               ? Icons.qr_code
                               : Icons.map_outlined,
-                          size: 20,
+                          size: 16,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -1292,10 +1292,10 @@ class _HomeTabState extends State<HomeTab> {
                               ? 'Show Check-in QR'
                               : 'View details & Get direction',
                           style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14),
+                              fontWeight: FontWeight.w600, fontSize: 12),
                         ),
                         const Spacer(),
-                        const Icon(Icons.chevron_right, size: 20),
+                        const Icon(Icons.chevron_right, size: 16),
                       ],
                     ),
                   ),

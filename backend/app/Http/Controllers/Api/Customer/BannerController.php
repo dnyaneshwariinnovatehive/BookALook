@@ -67,7 +67,7 @@ class BannerController extends Controller
 
             // For dynamic banners, we check if they have content. If not, and auto_hide is true, we skip them.
             $hasContent = $this->resolveDynamicBanner($banner);
-            $autoHide = $banner->config['auto_hide'] ?? true; // default to auto hide
+            $autoHide = $banner->config['auto_hide'] ?? false; // default to NOT auto hide
 
             if ($hasContent || !$autoHide) {
                 // We add some fallback styling or auto-generated fields if it lacks an image
