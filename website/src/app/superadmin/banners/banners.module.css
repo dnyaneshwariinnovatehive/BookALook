@@ -205,6 +205,11 @@
   opacity: 0.8;
 }
 
+.statusExpired {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger, #dc2626);
+}
+
 .bannerActions {
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--border-color);

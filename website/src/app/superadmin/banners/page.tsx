@@ -24,7 +24,28 @@ interface Banner {
   priority: number;
   impressions: number;
   clicks: number;
+  city?: { id: string; name: string; state?: string } | null;
+  subArea?: { id: string; name: string } | null;
+  salon?: { id: string; name: string } | null;
 }
+
+type SelectOption = { label: string; value: string };
+
+const toLocalISO = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const addDaysISO = (iso: string, days: number) => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toLocalISO(d);
+};
+
+// The stored is_active flag does not know the calendar: a banner switched on
+// for last week still has is_active = true today. Status is what the date says.
+const bannerStatus = (banner: Banner, today: string) => {
+  if (String(banner.end_date).slice(0, 10) < today) return 'expired';
+  return banner.is_active ? 'active' : 'inactive';
+};
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -32,6 +53,7 @@ export default function BannersPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [originalStartDate, setOriginalStartDate] = useState('');
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [confirm, confirmDialog] = useConfirm();
@@ -52,11 +74,29 @@ export default function BannersPage() {
   const [targetCityId, setTargetCityId] = useState('');
   const [targetSubAreaId, setTargetSubAreaId] = useState('');
   const [targetSalonId, setTargetSalonId] = useState('');
+  // react-select is controlled: the option objects are the real state, the ids
+  // above are just what gets posted to the backend.
+  const [targetCityOption, setTargetCityOption] = useState<SelectOption | null>(null);
+  const [targetSubAreaOption, setTargetSubAreaOption] = useState<SelectOption | null>(null);
+  const [targetSalonOption, setTargetSalonOption] = useState<SelectOption | null>(null);
+  const [filterCityOption, setFilterCityOption] = useState<SelectOption | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [priority, setPriority] = useState<number>(0);
   const [actionUrl, setActionUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  const today = toLocalISO(new Date());
+  // New banners: no dates before today. Editing: keep an already-live past start date selectable.
+  const startMin = editingBannerId && originalStartDate && originalStartDate < today ? originalStartDate : today;
+  const endMin = startDate ? addDaysISO(startDate, 1) : '';
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (endDate && value && endDate <= value) {
+      setEndDate('');
+    }
+  };
 
   // Live Preview Data
   const [previewData, setPreviewData] = useState<any>(null);
@@ -229,6 +269,14 @@ export default function BannersPage() {
       alert("Static banners require an image");
       return;
     }
+    if (!startDate || !endDate || endDate <= startDate) {
+      alert("End date must be after the start date");
+      return;
+    }
+    if (!editingBannerId && startDate < today) {
+      alert("Start date cannot be before today");
+      return;
+    }
 
     setIsSubmitting(true);
     let imageUrl = imagePreviewUrl;
@@ -368,8 +416,30 @@ export default function BannersPage() {
     setTargetCityId(banner.target_city_id || '');
     setTargetSubAreaId(banner.target_sub_area_id || '');
     setTargetSalonId(banner.target_salon_id || '');
+    setTargetCityOption(
+      banner.city
+        ? { label: `${banner.city.name}${banner.city.state ? ` (${banner.city.state})` : ''}`, value: String(banner.city.id) }
+        : banner.target_city_id
+          ? { label: 'Selected City', value: banner.target_city_id }
+          : null
+    );
+    setTargetSubAreaOption(
+      banner.subArea
+        ? { label: banner.subArea.name, value: String(banner.subArea.id) }
+        : banner.target_sub_area_id
+          ? { label: 'Selected Sub-Area', value: banner.target_sub_area_id }
+          : null
+    );
+    setTargetSalonOption(
+      banner.salon
+        ? { label: banner.salon.name, value: String(banner.salon.id) }
+        : banner.target_salon_id
+          ? { label: 'Selected Salon', value: banner.target_salon_id }
+          : null
+    );
     setStartDate(banner.start_date.split('T')[0]);
     setEndDate(banner.end_date.split('T')[0]);
+    setOriginalStartDate(banner.start_date.split('T')[0]);
     setPriority(banner.priority || 0);
     setActionUrl(banner.action_url || '');
     setImagePreviewUrl(banner.image_url);
@@ -385,6 +455,9 @@ export default function BannersPage() {
     setTargetCityId('');
     setTargetSubAreaId('');
     setTargetSalonId('');
+    setTargetCityOption(null);
+    setTargetSubAreaOption(null);
+    setTargetSalonOption(null);
     setStartDate('');
     setEndDate('');
     setPriority(0);
@@ -392,6 +465,7 @@ export default function BannersPage() {
     setImageFile(null);
     setImagePreviewUrl(null);
     setEditingBannerId(null);
+    setOriginalStartDate('');
     setPreviewData(null);
   };
 
@@ -461,7 +535,8 @@ export default function BannersPage() {
             cacheOptions
             defaultOptions
             loadOptions={loadCities}
-            onChange={(option: any) => { setFilterCityId(option ? option.value : ''); setCurrentPage(1); }}
+            value={filterCityOption}
+            onChange={(option: SelectOption | null) => { setFilterCityOption(option); setFilterCityId(option ? option.value : ''); setCurrentPage(1); }}
             placeholder="Filter by city..."
             className="react-select-container"
             classNamePrefix="react-select"
@@ -493,8 +568,8 @@ export default function BannersPage() {
               <div className={styles.bannerMeta}>Scope: {banner.target_scope}</div>
               <div className={styles.bannerMeta}>Priority: {banner.priority}</div>
               <div className={styles.bannerMeta}>Impressions: {banner.impressions} | Clicks: {banner.clicks}</div>
-              <span className={`${styles.statusBadge} ${banner.is_active ? styles.statusActive : styles.statusInactive}`}>
-                {banner.is_active ? 'Active' : 'Inactive'}
+              <span className={`${styles.statusBadge} ${bannerStatus(banner, today) === 'active' ? styles.statusActive : bannerStatus(banner, today) === 'expired' ? styles.statusExpired : styles.statusInactive}`}>
+                {bannerStatus(banner, today) === 'expired' ? 'Expired' : banner.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
             <div className={styles.bannerActions}>
@@ -677,15 +752,18 @@ export default function BannersPage() {
                     className={styles.select} 
                     value={targetScope} 
                     onChange={(e) => {
-                      setTargetScope(e.target.value as any);
+                      setTargetScope(e.target.value as Banner['target_scope']);
                       setTargetCityId('');
                       setTargetSubAreaId('');
+                      setTargetCityOption(null);
+                      setTargetSubAreaOption(null);
                     }}
                   >
                     <option value="platform">Platform-wide</option>
                     <option value="city">Specific City</option>
                     <option value="sub_area">Specific Sub-Area</option>
-                    <option value="salon">Specific Salon</option>
+                    {/* Only while editing a salon-scoped banner: new banners can no longer target one salon. */}
+                    {editingBannerId && targetScope === 'salon' && <option value="salon">Specific Salon</option>}
                   </select>
                 </div>
 
@@ -696,9 +774,11 @@ export default function BannersPage() {
                       cacheOptions
                       defaultOptions
                       loadOptions={loadCities}
-                      value={targetCityId ? { label: 'Selected City', value: targetCityId } : null}
-                      onChange={(option: any) => {
+                      value={targetCityOption}
+                      onChange={(option: SelectOption | null) => {
+                        setTargetCityOption(option);
                         setTargetCityId(option ? option.value : '');
+                        setTargetSubAreaOption(null);
                         setTargetSubAreaId(''); // Reset sub area if city changes
                       }}
                       placeholder="Search by city name..."
@@ -715,7 +795,11 @@ export default function BannersPage() {
                       cacheOptions
                       defaultOptions
                       loadOptions={loadSubAreas}
-                      onChange={(option: any) => setTargetSubAreaId(option ? option.value : '')}
+                      value={targetSubAreaOption}
+                      onChange={(option: SelectOption | null) => {
+                        setTargetSubAreaOption(option);
+                        setTargetSubAreaId(option ? option.value : '');
+                      }}
                       placeholder="Search sub-areas in city..."
                       className="react-select-container"
                       classNamePrefix="react-select"
@@ -730,7 +814,11 @@ export default function BannersPage() {
                       cacheOptions
                       defaultOptions
                       loadOptions={loadSalons}
-                      onChange={(option: any) => setTargetSalonId(option ? option.value : '')}
+                      value={targetSalonOption}
+                      onChange={(option: SelectOption | null) => {
+                        setTargetSalonOption(option);
+                        setTargetSalonId(option ? option.value : '');
+                      }}
                       placeholder="Search by salon name..."
                       className="react-select-container"
                       classNamePrefix="react-select"
@@ -745,7 +833,8 @@ export default function BannersPage() {
                       type="date" 
                       className={styles.input} 
                       value={startDate} 
-                      onChange={(e) => setStartDate(e.target.value)} 
+                      min={startMin}
+                      onChange={(e) => handleStartDateChange(e.target.value)} 
                       required
                     />
                   </div>
@@ -755,6 +844,7 @@ export default function BannersPage() {
                       type="date" 
                       className={styles.input} 
                       value={endDate} 
+                      min={endMin}
                       onChange={(e) => setEndDate(e.target.value)} 
                       required
                     />

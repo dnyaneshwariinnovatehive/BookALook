@@ -63,7 +63,7 @@ class BannerController extends Controller
             'target_salon_id'    => 'nullable|uuid',
             'target_sub_area_id' => 'nullable|exists:sub_areas,id',
             'start_date'         => 'required|date',
-            'end_date'           => 'required|date|after_or_equal:start_date',
+            'end_date'           => 'required|date|after:start_date',
             'is_active'          => 'boolean',
             'priority'           => 'nullable|integer|min:0',
         ]);
@@ -93,7 +93,7 @@ class BannerController extends Controller
             'target_salon_id'    => 'nullable|uuid',
             'target_sub_area_id' => 'nullable|exists:sub_areas,id',
             'start_date'         => 'sometimes|required|date',
-            'end_date'           => 'sometimes|required|date|after_or_equal:start_date',
+            'end_date'           => 'sometimes|required|date|after:start_date',
             'is_active'          => 'boolean',
             'priority'           => 'nullable|integer|min:0',
         ]);
