@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
+import '../onboarding/welcome_success_screen.dart';
 import '../../services/salon_access_api.dart';
 import '../../services/wallet_balance.dart';
 import 'tabs/home_tab.dart';
@@ -23,7 +25,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _tabs;
+  late List<Widget> _tabs;
 
   /// One navigator per tab so a page pushed from inside a tab stays inside
   /// that tab and the bottom navigation bar remains visible.
@@ -35,6 +37,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// are drawn rather than letting each screen fail on its own.
   SalonAccess? _access;
   bool _checkingAccess = true;
+  String? _initError;
+  bool _showWelcome = false;
 
   Future<void> _checkAccess() async {
     setState(() => _checkingAccess = true);
@@ -47,18 +51,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // header costs nothing extra to fill.
       WalletBalance.seedFrom(access);
 
+      bool showWelcome = false;
+      if (access.hasNeverSubscribed) {
+        final grantedAt = access.welcomeBonusGrantedAt;
+        if (grantedAt != null) {
+          final now = DateTime.now();
+          if (now.isAfter(grantedAt) && now.difference(grantedAt).inDays < 7) {
+            final prefs = await SharedPreferences.getInstance();
+            final key = 'welcome_shown_${widget.salonData['id']}';
+            if (prefs.getBool(key) != true) {
+              showWelcome = true;
+              await prefs.setBool(key, true);
+            }
+          }
+        }
+      }
+
       setState(() {
         _access = access;
+        _showWelcome = showWelcome;
         _checkingAccess = false;
-        _buildTabs();
+        try {
+          _buildTabs();
+        } catch (e, stack) {
+          _initError = 'Error in _buildTabs (success path): $e\n$stack';
+        }
       });
-    } catch (_) {
+    } catch (e, stack) {
       // A failed check must not lock a paying salon out of its own app.
       if (!mounted) return;
       setState(() {
         _access = null;
         _checkingAccess = false;
-        _buildTabs();
+        try {
+          _buildTabs();
+        } catch (innerE, innerStack) {
+          _initError = 'Error in _buildTabs (catch path): $innerE\n$innerStack\nOriginal error: $e';
+        }
       });
     }
   }
@@ -127,11 +156,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) {
+      return Scaffold(
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              _initError!,
+              style: const TextStyle(color: Colors.red, fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_checkingAccess) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_access != null && _access!.isLocked) {
+      if (_showWelcome) {
+        return WelcomeSuccessScreen(
+          access: _access!,
+          onContinue: () {
+            setState(() => _showWelcome = false);
+          },
+        );
+      }
       return LockedSalonScope(
         salonId: widget.salonData['id'].toString(),
         child: SubscriptionLockedScreen(access: _access!, onRecheck: _checkAccess),

@@ -124,7 +124,7 @@ class BookingPolicyService
     public function checkInWindow(Appointment $appointment): array
     {
         $day = Carbon::parse($appointment->appointment_date)->startOfDay();
-        $opensAt = $this->startsAt($appointment)->subMinutes($this->earlyStartMinutes())->max($day);
+        $opensAt = $this->startsAt($appointment)->subMinutes($this->earlyStartMinutes());
         $closesAt = $day->copy()->endOfDay();
 
         $window = ['opens_at' => $opensAt, 'closes_at' => $closesAt];
