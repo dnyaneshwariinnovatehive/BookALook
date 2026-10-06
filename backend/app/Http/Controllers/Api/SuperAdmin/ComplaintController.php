@@ -183,7 +183,6 @@ class ComplaintController extends Controller
         DB::transaction(function () use ($complaint, $data, $request) {
             $this->notifyOwner(
                 $complaint,
-                'A warning from BookALook',
                 $data['message'],
                 'complaint_warning'
             );
@@ -245,7 +244,6 @@ class ComplaintController extends Controller
 
             $this->notifyOwner(
                 $complaint,
-                'Your salon has been suspended',
                 $data['reason'],
                 'salon_suspended'
             );
@@ -313,15 +311,7 @@ class ComplaintController extends Controller
         );
 
         if ($salon->admin_id) {
-            Notification::create([
-                'user_id' => $salon->admin_id,
-                'type' => 'salon_reinstated',
-                'title' => 'Your salon is back online',
-                'message' => "{$salon->name} is live again and can take bookings.",
-                'data' => ['salon_id' => $salon->id],
-                'related_salon_id' => $salon->id,
-                'is_read' => false,
-            ]);
+            app(\App\Services\Notifications\NotificationService::class)->salonReinstated($salon);
         }
 
         return response()->json([
@@ -371,24 +361,18 @@ class ComplaintController extends Controller
         ]);
     }
 
-    private function notifyOwner(Complaint $complaint, string $title, string $message, string $type): void
+    private function notifyOwner(Complaint $complaint, string $message, string $type): void
     {
         if (! $complaint->salon?->admin_id) {
             return;
         }
 
-        Notification::create([
-            'user_id' => $complaint->salon->admin_id,
-            'type' => $type,
-            'title' => $title,
-            'message' => $message,
-            'data' => [
-                'complaint_id' => $complaint->id,
-                'salon_id' => $complaint->salon_id,
-            ],
-            'related_salon_id' => $complaint->salon_id,
-            'is_read' => false,
-        ]);
+        app(\App\Services\Notifications\NotificationService::class)->complaintWarning(
+            $complaint->salon,
+            $complaint->id,
+            $message,
+            $type
+        );
     }
 
     /** @return array<string, mixed> */

@@ -37,6 +37,10 @@ class NotificationService
 {
     public const TYPE_SALON_CLOSED = NotificationType::SALON_CLOSURE;
 
+    public function __construct(private NotificationTemplateResolver $templates)
+    {
+    }
+
     /**
      * Names the attachment a WhatsApp message wants resolved to a real file.
      *
@@ -124,15 +128,21 @@ class NotificationService
         string $dateLabel,
         ?string $reason
     ): ?Notification {
-        $because = $reason ? " ({$reason})" : '';
+        $resolved = $this->templates->resolve('salon_closure_customer', [
+            'salon_name' => $salonName,
+            'date_label' => $dateLabel,
+            'reason' => $reason ? " ({$reason})" : '',
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
 
         $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::SALON_CLOSURE,
-            title: 'Your appointment needs a new time',
-            message: "{$salonName} is closed on {$dateLabel}{$because}. "
-                . 'Your booking has been released and you can pick a new slot free of charge — '
-                . 'the amount you already paid carries over.',
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::RESCHEDULE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -173,12 +183,20 @@ class NotificationService
      */
     public function bookingAwaitingPayment(Appointment $appointment, string $salonName, float $advanceDue): ?Notification
     {
+        $resolved = $this->templates->resolve('booking_created_customer', [
+            'salon_name' => $salonName,
+            'advance_due' => $this->currency($advanceDue),
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         return $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_CREATED,
-            title: 'Booking created — complete the payment',
-            message: "Your booking at {$salonName} is held. Pay ".config('app.currency_symbol', '₹')
-                .number_format($advanceDue, 2).' to confirm it.',
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::PAY_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -200,11 +218,21 @@ class NotificationService
      */
     public function bookingConfirmed(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
     {
+        $resolved = $this->templates->resolve('booking_confirmed_customer', [
+            'salon_name' => $salonName,
+            'date_label' => $dateLabel,
+            'advance_amount' => $this->currency($appointment->advance_amount ?? 0),
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_CONFIRMED,
-            title: 'Booking confirmed',
-            message: "Your booking at {$salonName} on {$dateLabel} is confirmed.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -232,11 +260,21 @@ class NotificationService
      */
     public function bookingCancelled(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
     {
+        $resolved = $this->templates->resolve('booking_cancelled_customer', [
+            'salon_name' => $salonName,
+            'date_label' => $dateLabel,
+            'reason' => $appointment->cancellation_reason ?: '',
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_CANCELLED,
-            title: 'Booking cancelled',
-            message: "Your booking at {$salonName} on {$dateLabel} has been cancelled.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -264,11 +302,20 @@ class NotificationService
      */
     public function bookingRescheduled(Appointment $appointment, string $salonName, string $dateLabel): ?Notification
     {
+        $resolved = $this->templates->resolve('booking_rescheduled_customer', [
+            'salon_name' => $salonName,
+            'date_label' => $dateLabel,
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         return $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::BOOKING_RESCHEDULED,
-            title: 'Booking rescheduled',
-            message: "Your booking at {$salonName} has moved to {$dateLabel}.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -296,11 +343,21 @@ class NotificationService
         string $dateLabel,
         string $dedupeKey
     ): ?Notification {
+        $resolved = $this->templates->resolve('appointment_reminder_customer', [
+            'salon_name' => $salonName,
+            'date_label' => $dateLabel,
+            'salon_address' => $appointment->salon?->address ?: 'Address in the app',
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         $notification = $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::APPOINTMENT_REMINDER,
-            title: 'Reminder: your appointment is coming up',
-            message: "You are booked at {$salonName} on {$dateLabel}.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -337,11 +394,19 @@ class NotificationService
      */
     public function appointmentMarkedNoShow(Appointment $appointment, string $salonName, ?string $dedupeKey = null): ?Notification
     {
+        $resolved = $this->templates->resolve('appointment_no_show_customer', [
+            'salon_name' => $salonName,
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         return $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::APPOINTMENT_NO_SHOW,
-            title: 'Your appointment was missed',
-            message: "The booking at {$salonName} was marked as missed because nobody checked in.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -362,11 +427,19 @@ class NotificationService
      */
     public function appointmentCompleted(Appointment $appointment, string $salonName, ?string $dedupeKey = null): ?Notification
     {
+        $resolved = $this->templates->resolve('appointment_completed_customer', [
+            'salon_name' => $salonName,
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         return $this->send(
             recipient: $appointment->customer_id,
             type: NotificationType::APPOINTMENT_COMPLETED,
-            title: 'How was your visit?',
-            message: "Your appointment at {$salonName} is complete. Rate your experience.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::RATE_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -398,11 +471,20 @@ class NotificationService
         $customerName = $appointment->customer?->name ?? $appointment->walk_in_customer_name;
         $dateLabel = $this->dateTimeLabel($appointment);
 
+        $resolved = $this->templates->resolve('provider_appointment_rescheduled_partner', [
+            'customer_name' => $customerName,
+            'date_label' => $dateLabel,
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
+
         return $this->send(
             recipient: $provider->user_id,
             type: NotificationType::PROVIDER_APPOINTMENT_RESCHEDULED,
-            title: 'Appointment Rescheduled',
-            message: "Your appointment with {$customerName} on {$dateLabel} has been rescheduled by the customer.",
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_APPOINTMENT,
                 'appointment_id' => $appointment->id,
@@ -434,12 +516,22 @@ class NotificationService
 
         $customerName = $appointment->customer?->name ?? $appointment->walk_in_customer_name;
 
+        $resolved = $this->templates->resolve('new_booking_partner', [
+            'customer_name' => $customerName,
+            'date_label' => $dateLabel,
+            'salon_name' => $salonName,
+        ]);
+
+        if (!$resolved) {
+            return;
+        }
+
         foreach (array_unique($recipients) as $recipientId) {
             $this->send(
                 recipient: $recipientId,
                 type: NotificationType::NEW_BOOKING,
-                title: 'New booking',
-                message: "{$customerName} booked {$dateLabel} at {$salonName}.",
+                title: $resolved['title'],
+                message: $resolved['message'],
                 data: [
                     'action' => NotificationAction::VIEW_APPOINTMENT,
                     'appointment_id' => $appointment->id,
@@ -485,33 +577,29 @@ class NotificationService
 
         $lapsed = $daysLeft < 0;
 
-        if ($lapsed) {
-            $title = "{$salon->name}'s plan has expired";
-            $message = sprintf(
-                '%s is no longer taking bookings. Call %s to get it back online.',
-                $salon->name,
-                $salon->admin->name ?? 'the owner'
-            );
-        } else {
-            $when = match (true) {
-                $daysLeft === 0 => 'today',
-                $daysLeft === 1 => 'tomorrow',
-                default => "in {$daysLeft} days",
-            };
+        $ownerName = $salon->admin->name ?? 'the owner';
+        $when = match (true) {
+            $daysLeft === 0 => 'today',
+            $daysLeft === 1 => 'tomorrow',
+            default => "in {$daysLeft} days",
+        };
 
-            $title = "{$salon->name}'s plan ends {$when}";
-            $message = sprintf(
-                'A salon you onboarded is about to stop taking bookings. Give %s a call '
-                .'before it goes offline.',
-                $salon->admin->name ?? 'the owner'
-            );
+        $templateKey = $lapsed ? 'assigned_salon_expired_partner' : 'assigned_salon_expiring_partner';
+        $resolved = $this->templates->resolve($templateKey, [
+            'salon_name' => $salon->name,
+            'owner_name' => $ownerName,
+            'when' => $when,
+        ]);
+
+        if (!$resolved) {
+            return null;
         }
 
         return $this->send(
             recipient: $salon->assigned_collaborator_id,
             type: NotificationType::ASSIGNED_SALON_EXPIRING,
-            title: $title,
-            message: $message,
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::CALL_OWNER,
                 'salon_id' => $salon->id,
@@ -546,21 +634,31 @@ class NotificationService
 
         $plan = $subscription?->plan;
         $planName = $plan?->name ?? 'a plan';
+        $ownerName = $salon->admin->name ?? 'The owner';
 
-        $message = $subscription?->end_date
+        $liveUntilMsg = $subscription?->end_date
             ? sprintf(
-                '%s renewed %s. It is live until %s — no call needed.',
-                $salon->admin->name ?? 'The owner',
-                $planName,
+                'It is live until %s — no call needed.',
                 Carbon::parse($subscription->end_date)->format('j M Y')
             )
-            : sprintf('%s renewed %s. No call needed.', $salon->admin->name ?? 'The owner', $planName);
+            : 'No call needed.';
+
+        $resolved = $this->templates->resolve('assigned_salon_renewed_partner', [
+            'salon_name' => $salon->name,
+            'owner_name' => $ownerName,
+            'plan_name' => $planName,
+            'live_until_msg' => $liveUntilMsg,
+        ]);
+
+        if (!$resolved) {
+            return null;
+        }
 
         return $this->send(
             recipient: $salon->assigned_collaborator_id,
             type: NotificationType::ASSIGNED_SALON_RENEWED,
-            title: "{$salon->name} is renewed",
-            message: $message,
+            title: $resolved['title'],
+            message: $resolved['message'],
             data: [
                 'action' => NotificationAction::VIEW_SALON,
                 'salon_id' => $salon->id,
@@ -575,6 +673,108 @@ class NotificationService
             dedupeKey: $subscription
                 ? "assigned_salon_renewed:{$salon->id}:{$subscription->id}"
                 : null,
+        );
+    }
+
+    public function ownerSubscriptionExpiring(Salon $salon, int $daysLeft): ?Notification
+    {
+        $resolved = $this->templates->resolve('subscription_expiring_partner', [
+            'days_left' => $daysLeft,
+            'salon_name' => $salon->name,
+            's' => $daysLeft === 1 ? '' : 's',
+        ]);
+
+        if (!$resolved || !$salon->admin_id) return null;
+
+        return $this->send(
+            recipient: $salon->admin_id,
+            type: 'subscription_expiring',
+            title: $resolved['title'],
+            message: $resolved['message'],
+            data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
+            salon: $salon,
+        );
+    }
+
+    public function ownerSubscriptionExpired(Salon $salon, int $daysDown): ?Notification
+    {
+        $resolved = $this->templates->resolve('subscription_expired_partner', [
+            'days_down' => $daysDown <= 1 ? 'a day' : "{$daysDown} days",
+            'salon_name' => $salon->name,
+        ]);
+
+        if (!$resolved || !$salon->admin_id) return null;
+
+        return $this->send(
+            recipient: $salon->admin_id,
+            type: 'subscription_expired',
+            title: $resolved['title'],
+            message: $resolved['message'],
+            data: ['action' => 'renew_subscription', 'salon_id' => $salon->id],
+            salon: $salon,
+        );
+    }
+
+    public function salonReinstated(Salon $salon): ?Notification
+    {
+        $resolved = $this->templates->resolve('salon_reinstated_partner', [
+            'salon_name' => $salon->name,
+        ]);
+
+        if (!$resolved || !$salon->admin_id) return null;
+
+        return $this->send(
+            recipient: $salon->admin_id,
+            type: 'salon_reinstated',
+            title: $resolved['title'],
+            message: $resolved['message'],
+            data: ['salon_id' => $salon->id],
+            salon: $salon,
+        );
+    }
+
+    public function complaintWarning(Salon $salon, string $complaintId, string $adminMessage, string $type): ?Notification
+    {
+        $templateKey = $type === 'complaint_warning' ? 'complaint_warning_partner' : 'complaint_suspension_partner';
+        $resolved = $this->templates->resolve($templateKey, [
+            'salon_name' => $salon->name,
+            'admin_message' => $adminMessage,
+        ]);
+
+        if (!$resolved || !$salon->admin_id) return null;
+
+        return $this->send(
+            recipient: $salon->admin_id,
+            type: $type,
+            title: $resolved['title'],
+            message: $resolved['message'],
+            data: [
+                'complaint_id' => $complaintId,
+                'salon_id' => $salon->id,
+            ],
+            salon: $salon,
+        );
+    }
+
+    public function complaintRaised(string $superAdminId, string $salonName, string $complaintSubject, string $complaintId, string $salonId): ?Notification
+    {
+        $resolved = $this->templates->resolve('complaint_raised_superadmin', [
+            'salon_name' => $salonName,
+            'complaint_subject' => $complaintSubject,
+        ]);
+
+        if (!$resolved) return null;
+
+        return $this->send(
+            recipient: $superAdminId,
+            type: 'complaint_raised',
+            title: $resolved['title'],
+            message: $resolved['message'],
+            data: [
+                'action' => 'review_complaint',
+                'complaint_id' => $complaintId,
+                'salon_id' => $salonId,
+            ],
         );
     }
 
