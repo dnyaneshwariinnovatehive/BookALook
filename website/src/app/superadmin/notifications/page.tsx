@@ -370,7 +370,7 @@ export default function NotificationsPage() {
           value={audienceFilter}
           onChange={(e) => setAudienceFilter(e.target.value)}
         >
-          <option value="all">Who receives this? (All ▼)</option>
+          <option value="all">Who receives this? (All)</option>
           <option value="customer">Customer</option>
           <option value="salon_admin">Salon Admin</option>
           <option value="service_provider">Service Provider</option>

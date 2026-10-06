@@ -1,376 +1,280 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import styles from './page.module.css';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Container } from "@/components/ui/Container";
 
-interface TemplateVariable {
-  key: string;
-  label: string;
-  example?: string;
-  source: 'input' | 'customer' | 'salon';
+interface Variable {
+    key: string;
+    label: string;
+    description: string;
+    example: string;
 }
 
-interface Template {
-  id: string;
-  key: string;
-  name: string;
-  category: string;
-  category_label: string;
-  description: string | null;
-  body_preview: string;
-  variables: TemplateVariable[];
-  meta_template_name: string | null;
-  language: string;
-  min_plan: 'starter' | 'growth';
-  is_active: boolean;
-  campaigns_count: number;
-  sendable: boolean;
+interface Automation {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    audience: string;
+    frequency_label: string;
+    is_enabled: boolean;
+    aisensy_campaign_name: string | null;
+    lead_time_minutes: number | null;
+    variables: Variable[];
+    health: {
+        status: string;
+        last_run_at: string | null;
+        last_success_at: string | null;
+        last_failure_at: string | null;
+        recent_success_count?: number;
+        recent_failure_count?: number;
+    };
 }
 
-interface Overview {
-  window_days: number;
-  campaigns: number;
-  messages_sent: number;
-  messages_failed: number;
-  messages_queued: number;
-  opted_out: number;
-  opted_in: number;
-  opt_outs_this_window: number;
-  top_salons: { salon: string; campaigns: number; messages: number }[];
-  provider: string;
-}
+export default function WhatsappAutomationsPage() {
+    const [automations, setAutomations] = useState<Automation[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [editingKey, setEditingKey] = useState<string | null>(null);
+    const [editData, setEditData] = useState<{
+        is_enabled: boolean;
+        aisensy_campaign_name: string;
+        lead_time_minutes: number | null;
+    } | null>(null);
 
-/**
- * WhatsApp marketing, from the platform's side.
- *
- * Two jobs on one page, and they belong together. The catalogue decides what
- * every salon is allowed to say — there is one WhatsApp Business account behind
- * the whole platform, so a template is approved once, here, and not by each
- * salon. The overview watches what that account is being used for, because the
- * number that ends a WhatsApp Business account is the opt-out rate, and nobody
- * notices it climbing unless it is on a screen somebody looks at.
- */
-export default function MarketingPage() {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [summary, setSummary] = useState({ total: 0, sendable: 0, awaiting_approval: 0 });
-  const [overview, setOverview] = useState<Overview | null>(null);
+    const [testPhone, setTestPhone] = useState("");
+    const [testingKey, setTestingKey] = useState<string | null>(null);
+    const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [banner, setBanner] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Partial<Template>>({});
-  const [saving, setSaving] = useState(false);
+    useEffect(() => {
+        fetchAutomations();
+    }, []);
 
-  const load = useCallback(async () => {
-    try {
-      const [templateRes, overviewRes] = await Promise.all([
-        fetch('/api/proxy/superadmin/campaign-templates', { cache: 'no-store' }),
-        fetch('/api/proxy/superadmin/marketing/overview', { cache: 'no-store' }),
-      ]);
+    const fetchAutomations = async () => {
+        try {
+            const response = await axios.get("/api/proxy/superadmin/whatsapp-automations");
+            if (response.data.success) {
+                setAutomations(response.data.data);
+            }
+        } catch (error) {
+            console.error("Failed to load automations", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-      const templateJson = await templateRes.json();
-      const overviewJson = await overviewRes.json();
+    const handleEdit = (automation: Automation) => {
+        setEditingKey(automation.key);
+        setEditData({
+            is_enabled: automation.is_enabled,
+            aisensy_campaign_name: automation.aisensy_campaign_name || "",
+            lead_time_minutes: automation.lead_time_minutes,
+        });
+    };
 
-      if (!templateJson.success) throw new Error(templateJson.message || 'Could not load templates');
+    const handleSave = async (key: string) => {
+        if (!editData) return;
 
-      setTemplates(templateJson.data || []);
-      setSummary(templateJson.summary || { total: 0, sendable: 0, awaiting_approval: 0 });
-      if (overviewJson.success) setOverview(overviewJson.data);
-    } catch (e) {
-      setBanner({ tone: 'bad', text: e instanceof Error ? e.message : 'Could not load this page' });
-    } finally {
-      setLoading(false);
+        try {
+            const response = await axios.put(`/api/proxy/superadmin/whatsapp-automations/${key}`, editData);
+            if (response.data.success) {
+                setEditingKey(null);
+                setEditData(null);
+                fetchAutomations();
+            }
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Failed to update automation.");
+        }
+    };
+
+    const handleTest = async (key: string) => {
+        if (!testPhone) {
+            alert("Please enter a phone number to test.");
+            return;
+        }
+
+        setTestingKey(key);
+        setTestStatus(null);
+        try {
+            const response = await axios.post(`/api/proxy/superadmin/whatsapp-automations/${key}/test`, {
+                phone: testPhone,
+            });
+            if (response.data.success) {
+                setTestStatus({ type: 'success', message: 'Test message sent successfully.' });
+            }
+        } catch (error: any) {
+            setTestStatus({ type: 'error', message: error.response?.data?.message || 'Failed to send test message.' });
+        } finally {
+            setTestingKey(null);
+        }
+    };
+
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case 'WORKING': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">🟢 Working</span>;
+            case 'READY': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">🟢 Ready</span>;
+            case 'DISABLED': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">⚪ Disabled</span>;
+            case 'NOT_CONFIGURED': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Not Configured</span>;
+            case 'NEEDS_ATTENTION': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">🟡 Needs Attention</span>;
+            case 'FAILING': return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">🔴 Failing</span>;
+            default: return <span>{status}</span>;
+        }
+    };
+
+    if (isLoading) {
+        return <div className="p-8 text-center text-gray-500">Loading automations...</div>;
     }
-  }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+    return (
+        <Container>
+            <PageHeader
+                title="WhatsApp Automations"
+                description="Manage automated system WhatsApp messages sent by BookALook."
+            />
 
-  useEffect(() => {
-    if (banner?.tone !== 'ok') return;
-    const timer = setTimeout(() => setBanner(null), 4000);
-    return () => clearTimeout(timer);
-  }, [banner]);
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
+                {automations.map((automation) => (
+                    <div key={automation.key} className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                            <h3 className="text-lg font-medium text-gray-900">{automation.name}</h3>
+                            <div className="flex items-center">
+                                {getStatusBadge(automation.health.status)}
+                            </div>
+                        </div>
 
-  const save = async (id: string, changes: Partial<Template>) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/proxy/superadmin/campaign-templates/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(changes),
-      });
-      const json = await res.json();
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600 mb-6">{automation.description}</p>
 
-      if (!res.ok || !json.success) throw new Error(json.message || 'Could not save it');
+                            <div className="grid grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Who</h4>
+                                    <p className="text-sm text-gray-900">{automation.audience}</p>
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">When</h4>
+                                    <p className="text-sm text-gray-900">{automation.frequency_label}</p>
+                                </div>
+                            </div>
 
-      setBanner({ tone: 'ok', text: json.message });
-      setEditing(null);
-      setDraft({});
-      await load();
-    } catch (e) {
-      setBanner({ tone: 'bad', text: e instanceof Error ? e.message : 'Could not save it' });
-    } finally {
-      setSaving(false);
-    }
-  };
+                            <div className="mb-6 bg-gray-50 rounded-md p-4 border border-gray-200">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">AiSensy Campaign</h4>
+                                {editingKey === automation.key ? (
+                                    <input 
+                                        type="text" 
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                                        value={editData?.aisensy_campaign_name} 
+                                        onChange={e => setEditData(prev => prev ? {...prev, aisensy_campaign_name: e.target.value} : null)}
+                                        placeholder="e.g. BAL_CUSTOMER_BIRTHDAY"
+                                    />
+                                ) : (
+                                    <div className="flex items-center">
+                                        <p className="text-sm font-medium text-gray-900 mr-3">
+                                            {automation.aisensy_campaign_name || <span className="text-gray-400 italic">Not configured</span>}
+                                        </p>
+                                        {automation.aisensy_campaign_name && (
+                                            <span className="text-green-600 text-xs flex items-center">
+                                                <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                Configured
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, Template[]>();
-    templates.forEach((template) => {
-      map.set(template.category_label, [...(map.get(template.category_label) ?? []), template]);
-    });
-    return [...map.entries()];
-  }, [templates]);
+                            {automation.key === 'whatsapp_appointment_reminder' && editingKey === automation.key && (
+                                <div className="mb-6">
+                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Lead Time (Minutes)</h4>
+                                    <input 
+                                        type="number" 
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" 
+                                        value={editData?.lead_time_minutes || ''} 
+                                        onChange={e => setEditData(prev => prev ? {...prev, lead_time_minutes: parseInt(e.target.value)} : null)}
+                                        min="1"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">E.g., 120 for 2 hours before appointment.</p>
+                                </div>
+                            )}
 
-  return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>WhatsApp Marketing</h1>
-          <p className={styles.subtitle}>
-            Every salon sends through one WhatsApp Business account, so templates are approved by
-            Meta once and listed here. A salon fills in the blanks; it never writes its own copy,
-            because Meta reviews templates rather than messages.
-          </p>
-        </div>
+                            {automation.variables.length > 0 && (
+                                <div className="mb-6">
+                                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Required Variables (in exact order)</h4>
+                                    <ul className="text-sm text-gray-700 space-y-2">
+                                        {automation.variables.map((v, idx) => (
+                                            <li key={v.key} className="flex flex-col">
+                                                <span className="font-mono bg-gray-100 px-1 rounded inline-block w-max mb-1">{idx + 1}. {`{{${v.key}}}`}</span>
+                                                <span className="text-gray-500 text-xs ml-4">E.g. {v.example} ({v.label})</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
 
-        <div className={styles.statRow}>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{summary.sendable}</span>
-            <span className={styles.statLabel}>Ready to send</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{summary.awaiting_approval}</span>
-            <span className={styles.statLabel}>Awaiting approval</span>
-          </div>
-        </div>
-      </header>
+                            {editingKey === automation.key ? (
+                                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id={`enable-${automation.key}`}
+                                            checked={editData?.is_enabled}
+                                            disabled={automation.key === 'whatsapp_otp'}
+                                            onChange={e => setEditData(prev => prev ? {...prev, is_enabled: e.target.checked} : null)}
+                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                        />
+                                        <label htmlFor={`enable-${automation.key}`} className="ml-2 block text-sm text-gray-900">
+                                            Enable Automation
+                                        </label>
+                                    </div>
+                                    <div className="flex space-x-3">
+                                        <button onClick={() => setEditingKey(null)} className="px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                            Cancel
+                                        </button>
+                                        <button onClick={() => handleSave(automation.key)} className="px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-6 pt-4 border-t border-gray-200">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <button onClick={() => handleEdit(automation)} className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                                            Edit Configuration
+                                        </button>
+                                        <div className="text-xs text-gray-500 text-right">
+                                            {automation.health.last_run_at ? `Last run: ${new Date(automation.health.last_run_at).toLocaleString()}` : 'Never run'}
+                                        </div>
+                                    </div>
 
-      {banner && (
-        <div
-          className={`${styles.banner} ${banner.tone === 'ok' ? styles.bannerOk : styles.bannerBad}`}
-        >
-          {banner.text}
-        </div>
-      )}
+                                    {automation.key !== 'whatsapp_otp' && automation.is_enabled && automation.aisensy_campaign_name && (
+                                        <div className="bg-blue-50 p-4 rounded-md flex items-center space-x-3">
+                                            <input 
+                                                type="text"
+                                                placeholder="+91XXXXXXXXXX"
+                                                className="block w-full sm:text-sm border-gray-300 rounded-md"
+                                                value={testPhone}
+                                                onChange={e => setTestPhone(e.target.value)}
+                                            />
+                                            <button 
+                                                onClick={() => handleTest(automation.key)} 
+                                                disabled={testingKey === automation.key}
+                                                className="whitespace-nowrap px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                                            >
+                                                {testingKey === automation.key ? 'Sending...' : 'Send Test'}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {testStatus && testingKey === null && automation.key !== 'whatsapp_otp' && automation.is_enabled && (
+                                        <p className={`mt-2 text-xs ${testStatus.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {testStatus.message}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
-      {/* The provider warning is first because nothing else on this page
-          matters while messages are only being written to a log. */}
-      {overview && overview.provider !== 'meta_cloud' && (
-        <div className={`${styles.banner} ${styles.bannerWarn}`}>
-          <strong>No WhatsApp provider is connected.</strong> Campaigns can be built and previewed,
-          but messages stay queued instead of going out. Set <code>WHATSAPP_DRIVER=meta_cloud</code>{' '}
-          with a phone number id and access token to start sending.
-        </div>
-      )}
-
-      {overview && (
-        <section className={styles.overview}>
-          <h2 className={styles.sectionTitle}>Last {overview.window_days} days</h2>
-          <div className={styles.overviewGrid}>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>{overview.campaigns}</span>
-              <span className={styles.metricLabel}>Campaigns</span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>{overview.messages_sent}</span>
-              <span className={styles.metricLabel}>Messages sent</span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>{overview.messages_queued}</span>
-              <span className={styles.metricLabel}>Queued</span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>{overview.messages_failed}</span>
-              <span className={styles.metricLabel}>Failed</span>
-            </div>
-            {/* The one to watch. A rising opt-out rate is how a WhatsApp
-                Business account gets restricted. */}
-            <div className={`${styles.metric} ${styles.metricAlert}`}>
-              <span className={styles.metricValue}>{overview.opt_outs_this_window}</span>
-              <span className={styles.metricLabel}>
-                New opt-outs ({overview.opted_out} total)
-              </span>
-            </div>
-            <div className={styles.metric}>
-              <span className={styles.metricValue}>{overview.opted_in}</span>
-              <span className={styles.metricLabel}>Opted in</span>
-            </div>
-          </div>
-
-          {overview.top_salons.length > 0 && (
-            <div className={styles.topSalons}>
-              <h3 className={styles.subTitle}>Busiest senders</h3>
-              <div className={styles.tableScroll}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Salon</th>
-                    <th>Campaigns</th>
-                    <th>Messages</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.top_salons.map((row) => (
-                    <tr key={row.salon}>
-                      <td>{row.salon}</td>
-                      <td>{row.campaigns}</td>
-                      <td>{row.messages}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      <h2 className={styles.sectionTitle}>Template catalogue</h2>
-
-      {loading ? (
-        <p className={styles.empty}>Loading…</p>
-      ) : (
-        grouped.map(([category, list]) => (
-          <section key={category} className={styles.categorySection}>
-            <h3 className={styles.categoryHeading}>{category}</h3>
-
-            {list.map((template) => (
-              <div
-                key={template.id}
-                className={`${styles.template} ${template.sendable ? '' : styles.templateOff}`}
-              >
-                <div className={styles.templateHead}>
-                  <div>
-                    <div className={styles.templateName}>
-                      {template.name}
-                      {template.min_plan === 'growth' && (
-                        <span className={styles.growthTag}>Growth</span>
-                      )}
-                      {template.sendable ? (
-                        <span className={styles.liveTag}>Live</span>
-                      ) : (
-                        <span className={styles.pendingTag}>Not approved</span>
-                      )}
+                        </div>
                     </div>
-                    {template.description && (
-                      <p className={styles.templateDescription}>{template.description}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    className={styles.linkButton}
-                    onClick={() => {
-                      setEditing(editing === template.id ? null : template.id);
-                      setDraft({
-                        meta_template_name: template.meta_template_name,
-                        min_plan: template.min_plan,
-                        is_active: template.is_active,
-                      });
-                    }}
-                  >
-                    {editing === template.id ? 'Close' : 'Edit'}
-                  </button>
-                </div>
-
-                <pre className={styles.body}>{template.body_preview}</pre>
-
-                <div className={styles.meta}>
-                  <span>
-                    {template.variables.length} placeholder
-                    {template.variables.length === 1 ? '' : 's'}
-                  </span>
-                  <span>·</span>
-                  <span>{template.campaigns_count} campaign{template.campaigns_count === 1 ? '' : 's'} sent</span>
-                  {template.meta_template_name && (
-                    <>
-                      <span>·</span>
-                      <code className={styles.code}>{template.meta_template_name}</code>
-                    </>
-                  )}
-                </div>
-
-                {editing === template.id && (
-                  <div className={styles.editor}>
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Approved WhatsApp template name</span>
-                      <input
-                        className={styles.input}
-                        value={draft.meta_template_name ?? ''}
-                        placeholder="e.g. combo_promotion_v1"
-                        onChange={(e) =>
-                          setDraft((prev) => ({ ...prev, meta_template_name: e.target.value }))
-                        }
-                      />
-                      <span className={styles.fieldHelp}>
-                        Exactly as Meta approved it. A mismatch here makes every send fail.
-                      </span>
-                    </label>
-
-                    <label className={styles.field}>
-                      <span className={styles.fieldLabel}>Available on</span>
-                      <select
-                        className={styles.input}
-                        value={draft.min_plan ?? 'starter'}
-                        onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            min_plan: e.target.value as 'starter' | 'growth',
-                          }))
-                        }
-                      >
-                        <option value="starter">All paid plans</option>
-                        <option value="growth">Growth only</option>
-                      </select>
-                    </label>
-
-                    <label className={styles.toggle}>
-                      <input
-                        type="checkbox"
-                        checked={draft.is_active ?? false}
-                        onChange={(e) =>
-                          setDraft((prev) => ({ ...prev, is_active: e.target.checked }))
-                        }
-                      />
-                      Offer this template to salons
-                    </label>
-
-                    <div className={styles.editorActions}>
-                      <button
-                        type="button"
-                        className={styles.button}
-                        disabled={saving}
-                        onClick={() =>
-                          save(template.id, {
-                            meta_template_name: draft.meta_template_name?.trim() || null,
-                            min_plan: draft.min_plan,
-                            is_active: draft.is_active,
-                          })
-                        }
-                      >
-                        {saving ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.linkButton}
-                        onClick={() => {
-                          setEditing(null);
-                          setDraft({});
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </section>
-        ))
-      )}
-    </div>
-  );
+                ))}
+            </div>
+        </Container>
+    );
 }
