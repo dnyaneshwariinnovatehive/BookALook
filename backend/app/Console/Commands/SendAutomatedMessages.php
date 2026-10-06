@@ -6,9 +6,12 @@ use Illuminate\Console\Command;
 use App\Models\Salon;
 use App\Models\Appointment;
 use App\Models\User;
+use App\Models\WhatsAppMessage;
+use App\Models\WhatsappAutomation;
+use App\Jobs\SendWhatsAppMessageJob;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class SendAutomatedMessages extends Command
 {
@@ -44,16 +47,20 @@ class SendAutomatedMessages extends Command
     
     private function process25DaysReminders()
     {
+        $automation = WhatsappAutomation::where('key', 'whatsapp_25_day_reminder')->first();
+        if (!$automation || !$automation->is_enabled || empty($automation->aisensy_campaign_name)) {
+            $this->info('25-Days reminder automation is disabled or not fully configured.');
+            return;
+        }
+
         $targetDate = Carbon::now()->subDays(25)->toDateString();
         
         // Find all customers who had a completed appointment exactly 25 days ago
-        // and where the salon has the toggle enabled.
+        // Use completed_at instead of appointment_date
         $appointments = Appointment::where('status', 'completed')
-            ->whereDate('appointment_date', $targetDate)
+            ->whereNotNull('completed_at')
+            ->whereDate('completed_at', $targetDate)
             ->whereNotNull('customer_id')
-            ->whereHas('salon', function($q) {
-                $q->where('whatsapp_25_days_enabled', true);
-            })
             ->with(['salon', 'customer'])
             ->get();
             
@@ -63,35 +70,40 @@ class SendAutomatedMessages extends Command
             $salon = $appointment->salon;
             $customer = $appointment->customer;
             
-            // Dedupe check: ensure we haven't already sent a 25 day reminder to this customer for this salon recently
+            if (!$customer || empty($customer->phone)) {
+                continue;
+            }
+
+            // Dedupe check: one reminder per qualifying completed appointment.
             $recentlySent = DB::table('whatsapp_messages')
-                ->where('related_salon_id', $salon->id)
-                ->where('recipient_phone', $customer->phone ?? '')
-                ->where('template', '25_days_reminder')
-                ->whereDate('created_at', '>', Carbon::now()->subDays(20))
+                ->where('related_appointment_id', $appointment->id)
+                ->where('template', $automation->key)
                 ->exists();
                 
-            if ($recentlySent || empty($customer->phone)) {
+            if ($recentlySent) {
                 continue;
             }
             
-            // Log the message as sent for analytics
-            DB::table('whatsapp_messages')->insert([
-                'id' => Str::uuid(),
+            $payloadParams = [
+                $customer->first_name ?? $customer->name ?? 'Customer',
+                $salon->name ?? 'our salon',
+            ];
+
+            $message = WhatsAppMessage::create([
+                'user_id' => $customer->id,
+                'to_phone' => $customer->phone,
+                'recipient_phone' => $customer->phone, // some code uses to_phone, some uses recipient_phone. Using both to be safe depending on DB schema.
                 'related_salon_id' => $salon->id,
-                'recipient_phone' => $customer->phone,
-                'template' => '25_days_reminder',
-                'category' => 'marketing', // or utility, depending on Meta approval
-                'sent_at' => Carbon::now(),
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'related_appointment_id' => $appointment->id,
+                'template' => $automation->key,
+                'campaign' => $automation->aisensy_campaign_name,
+                'payload' => ['parameters' => $payloadParams],
+                'status' => WhatsAppMessage::STATUS_QUEUED,
+                'category' => 'marketing',
             ]);
             
+            SendWhatsAppMessageJob::dispatch($message->id);
             $sentCount++;
-            
-            // NOTE: The actual integration with Meta/AISensy goes here.
-            // As requested, the template isn't created yet and should not include the salon name.
-            // For now, we simulate the send by tracking it in our database.
         }
         
         $this->info("Processed 25-days reminders. Sent: {$sentCount}");
@@ -99,9 +111,16 @@ class SendAutomatedMessages extends Command
     
     private function processBirthdayMessages()
     {
+        $automation = WhatsappAutomation::where('key', 'whatsapp_customer_birthday')->first();
+        if (!$automation || !$automation->is_enabled || empty($automation->aisensy_campaign_name)) {
+            $this->info('Birthday automation is disabled or not fully configured.');
+            return;
+        }
+
         $today = Carbon::now();
         $month = $today->format('m');
         $day = $today->format('d');
+        $year = $today->year;
         
         // Find all customers whose birthday is today
         $birthdayUsers = User::whereMonth('dob', $month)
@@ -112,45 +131,51 @@ class SendAutomatedMessages extends Command
         $sentCount = 0;
         
         foreach ($birthdayUsers as $user) {
-            // Find which salons this user visits that have birthdays enabled
-            $salonIds = Appointment::where('customer_id', $user->id)
-                ->where('status', 'completed')
-                ->select('salon_id')
-                ->distinct()
-                ->pluck('salon_id');
-                
-            $enabledSalons = Salon::whereIn('id', $salonIds)
-                ->where('whatsapp_birthday_enabled', true)
-                ->get();
-                
-            foreach ($enabledSalons as $salon) {
-                // Dedupe: only 1 birthday message per year per salon
-                $alreadySent = DB::table('whatsapp_messages')
-                    ->where('related_salon_id', $salon->id)
-                    ->where('recipient_phone', $user->phone ?? '')
-                    ->where('template', 'birthday_message')
-                    ->whereYear('created_at', $today->year)
-                    ->exists();
-                    
-                if ($alreadySent || empty($user->phone)) {
-                    continue;
-                }
-                
-                // Log message
-                DB::table('whatsapp_messages')->insert([
-                    'id' => Str::uuid(),
-                    'related_salon_id' => $salon->id,
-                    'recipient_phone' => $user->phone,
-                    'template' => 'birthday_message',
-                    'category' => 'marketing',
-                    'sent_at' => Carbon::now(),
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ]);
-                
-                $sentCount++;
-                // NOTE: Trigger actual WhatsApp send here when template is ready.
+            if (empty($user->phone)) {
+                continue;
             }
+
+            // Dedupe: one message per customer per year
+            // Stable customer identity + year
+            $alreadySent = DB::table('whatsapp_messages')
+                ->where('user_id', $user->id)
+                ->where('template', $automation->key)
+                ->whereYear('created_at', $year)
+                ->exists();
+                
+            if ($alreadySent) {
+                continue;
+            }
+
+            // A customer might visit multiple salons, we need to pick one for the salon_name variable
+            // Usually the most recently visited salon makes the most sense.
+            $lastAppointment = Appointment::where('customer_id', $user->id)
+                ->where('status', 'completed')
+                ->latest('completed_at')
+                ->with('salon')
+                ->first();
+
+            $salonName = $lastAppointment && $lastAppointment->salon ? $lastAppointment->salon->name : 'BookALook';
+            
+            $payloadParams = [
+                $user->first_name ?? $user->name ?? 'Customer',
+                $salonName,
+            ];
+
+            $message = WhatsAppMessage::create([
+                'user_id' => $user->id,
+                'to_phone' => $user->phone,
+                'recipient_phone' => $user->phone,
+                'related_salon_id' => $lastAppointment ? $lastAppointment->salon_id : null,
+                'template' => $automation->key,
+                'campaign' => $automation->aisensy_campaign_name,
+                'payload' => ['parameters' => $payloadParams],
+                'status' => WhatsAppMessage::STATUS_QUEUED,
+                'category' => 'marketing',
+            ]);
+            
+            SendWhatsAppMessageJob::dispatch($message->id);
+            $sentCount++;
         }
         
         $this->info("Processed birthday messages. Sent: {$sentCount}");

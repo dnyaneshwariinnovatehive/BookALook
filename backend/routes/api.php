@@ -215,6 +215,10 @@ Route::prefix('superadmin')->group(function () {
         Route::put('/campaign-templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'update']);
         Route::delete('/campaign-templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'destroy']);
         Route::get('/marketing/overview', [\App\Http\Controllers\Api\SuperAdmin\CampaignTemplateController::class, 'overview']);
+        
+        Route::get('/whatsapp-automations', [\App\Http\Controllers\Api\SuperAdmin\WhatsappAutomationController::class, 'index']);
+        Route::put('/whatsapp-automations/{key}', [\App\Http\Controllers\Api\SuperAdmin\WhatsappAutomationController::class, 'update']);
+        Route::post('/whatsapp-automations/{key}/test', [\App\Http\Controllers\Api\SuperAdmin\WhatsappAutomationController::class, 'test']);
 
         Route::get('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'index']);
         Route::post('/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'store']);

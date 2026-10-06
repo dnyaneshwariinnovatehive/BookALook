@@ -161,12 +161,21 @@ class SendAppointmentReminders extends Command
             return (int) $this->option('lead') * 60;
         }
 
-        $mins = (int) \App\Models\PlatformPolicySetting::value(
-            'appointment_reminder_lead_minutes',
-            config('services.push.appointment_reminder_lead_hours') * 60
-        );
+        $automation = \App\Models\WhatsappAutomation::where('key', 'whatsapp_appointment_reminder')->first();
 
-        return $mins > 0 ? $mins : null;
+        // Fallback to old config if DB is missing or unavailable
+        if (! $automation) {
+            $mins = config('services.push.appointment_reminder_lead_hours', 2) * 60;
+            return $mins > 0 ? $mins : null;
+        }
+
+        if (! $automation->is_enabled || empty($automation->aisensy_campaign_name)) {
+            return null;
+        }
+
+        $mins = $automation->lead_time_minutes;
+
+        return $mins > 0 ? (int) $mins : null;
     }
 
     /**

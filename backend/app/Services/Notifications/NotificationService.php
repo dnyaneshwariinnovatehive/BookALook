@@ -430,19 +430,27 @@ class NotificationService
         );
 
         if ($notification) {
-            $this->mirrorToWhatsApp($appointment, [
-                'parameters' => [
-                    $salonName,
-                    $dateLabel,
-                    // A salon with no address on file is allowed, and `address` is
-                    // a nullable column. Sending the null through would have
-                    // AISensy reject the whole message on parameter count and
-                    // type, and would put the literal word "null" in the address
-                    // slot for Meta — so the placeholder is given something that
-                    // reads as an answer rather than a gap.
-                    $appointment->salon?->address ?: 'Address in the app',
-                ],
-            ], 'appointment_reminder');
+            $automation = \App\Models\WhatsappAutomation::where('key', 'whatsapp_appointment_reminder')->first();
+            $campaign = $automation?->is_enabled ? $automation->aisensy_campaign_name : null;
+
+            // Only mirror if configured in DB or fallback
+            $campaign = $campaign ?: config('services.whatsapp.campaigns.appointment_reminder');
+
+            if ($campaign) {
+                $this->mirrorToWhatsApp($appointment, [
+                    'parameters' => [
+                        $salonName,
+                        $dateLabel,
+                        // A salon with no address on file is allowed, and `address` is
+                        // a nullable column. Sending the null through would have
+                        // AISensy reject the whole message on parameter count and
+                        // type, and would put the literal word "null" in the address
+                        // slot for Meta — so the placeholder is given something that
+                        // reads as an answer rather than a gap.
+                        $appointment->salon?->address ?: 'Address in the app',
+                    ],
+                ], 'appointment_reminder', $campaign);
+            }
         }
 
         return $notification;
@@ -1042,7 +1050,7 @@ class NotificationService
         dispatch(new SendWhatsAppMessageJob($message->id));
     }
 
-    private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event): void
+    private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event, ?string $campaign = null): void
     {
         if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {
             return;
@@ -1059,6 +1067,7 @@ class NotificationService
                 'user_id' => $appointment->customer_id,
                 'to_phone' => $phone,
                 'template' => $this->templateFor($event),
+                'campaign' => $campaign ?: config("services.whatsapp.campaigns.{$event}"),
                 'payload' => $payload,
                 'related_appointment_id' => $appointment->id,
                 'related_salon_id' => $appointment->salon_id,
