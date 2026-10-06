@@ -23,7 +23,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _tabs;
+  late List<Widget> _tabs;
 
   /// One navigator per tab so a page pushed from inside a tab stays inside
   /// that tab and the bottom navigation bar remains visible.
@@ -35,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// are drawn rather than letting each screen fail on its own.
   SalonAccess? _access;
   bool _checkingAccess = true;
+  String? _initError;
 
   Future<void> _checkAccess() async {
     setState(() => _checkingAccess = true);
@@ -50,15 +51,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _access = access;
         _checkingAccess = false;
-        _buildTabs();
+        try {
+          _buildTabs();
+        } catch (e, stack) {
+          _initError = 'Error in _buildTabs (success path): $e\n$stack';
+        }
       });
-    } catch (_) {
+    } catch (e, stack) {
       // A failed check must not lock a paying salon out of its own app.
       if (!mounted) return;
       setState(() {
         _access = null;
         _checkingAccess = false;
-        _buildTabs();
+        try {
+          _buildTabs();
+        } catch (innerE, innerStack) {
+          _initError = 'Error in _buildTabs (catch path): $innerE\n$innerStack\nOriginal error: $e';
+        }
       });
     }
   }
@@ -127,6 +136,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) {
+      return Scaffold(
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              _initError!,
+              style: const TextStyle(color: Colors.red, fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_checkingAccess) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
