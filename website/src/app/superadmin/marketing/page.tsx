@@ -1,9 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Container } from "@/components/ui/Container";
 
 interface Variable {
     key: string;
@@ -53,9 +50,12 @@ export default function WhatsappAutomationsPage() {
 
     const fetchAutomations = async () => {
         try {
-            const response = await axios.get("/api/proxy/superadmin/whatsapp-automations");
-            if (response.data.success) {
-                setAutomations(response.data.data);
+            const response = await fetch("/api/proxy/superadmin/whatsapp-automations");
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    setAutomations(data.data);
+                }
             }
         } catch (error) {
             console.error("Failed to load automations", error);
@@ -77,14 +77,21 @@ export default function WhatsappAutomationsPage() {
         if (!editData) return;
 
         try {
-            const response = await axios.put(`/api/proxy/superadmin/whatsapp-automations/${key}`, editData);
-            if (response.data.success) {
+            const response = await fetch(`/api/proxy/superadmin/whatsapp-automations/${key}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(editData),
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
                 setEditingKey(null);
                 setEditData(null);
                 fetchAutomations();
+            } else {
+                alert(data.message || "Failed to update automation.");
             }
         } catch (error: any) {
-            alert(error.response?.data?.message || "Failed to update automation.");
+            alert("Failed to update automation.");
         }
     };
 
@@ -97,14 +104,19 @@ export default function WhatsappAutomationsPage() {
         setTestingKey(key);
         setTestStatus(null);
         try {
-            const response = await axios.post(`/api/proxy/superadmin/whatsapp-automations/${key}/test`, {
-                phone: testPhone,
+            const response = await fetch(`/api/proxy/superadmin/whatsapp-automations/${key}/test`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: testPhone }),
             });
-            if (response.data.success) {
+            const data = await response.json();
+            if (response.ok && data.success) {
                 setTestStatus({ type: 'success', message: 'Test message sent successfully.' });
+            } else {
+                setTestStatus({ type: 'error', message: data.message || 'Failed to send test message.' });
             }
         } catch (error: any) {
-            setTestStatus({ type: 'error', message: error.response?.data?.message || 'Failed to send test message.' });
+            setTestStatus({ type: 'error', message: 'Failed to send test message.' });
         } finally {
             setTestingKey(null);
         }
@@ -127,11 +139,11 @@ export default function WhatsappAutomationsPage() {
     }
 
     return (
-        <Container>
-            <PageHeader
-                title="WhatsApp Automations"
-                description="Manage automated system WhatsApp messages sent by BookALook."
-            />
+        <div className="p-8">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">WhatsApp Automations</h1>
+                <p className="mt-1 text-sm text-gray-500">Manage automated system WhatsApp messages sent by BookALook.</p>
+            </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
                 {automations.map((automation) => (
@@ -275,6 +287,6 @@ export default function WhatsappAutomationsPage() {
                     </div>
                 ))}
             </div>
-        </Container>
+        </div>
     );
 }
