@@ -50,6 +50,7 @@ class SalonAccess {
   /// which is the difference between "pay ₹1999" and "pay nothing".
   final int walletCoins;
   final double walletValueInr;
+  final DateTime? welcomeBonusGrantedAt;
 
   SalonAccess({
     required this.salonName,
@@ -63,6 +64,7 @@ class SalonAccess {
     this.adminPhone,
     this.walletCoins = 0,
     this.walletValueInr = 0,
+    this.welcomeBonusGrantedAt,
   });
 
   /// A plan that ran out, as opposed to a salon that was never approved.
@@ -90,6 +92,9 @@ class SalonAccess {
       adminPhone: admin?['phone'],
       walletCoins: (json['wallet_coins'] as num?)?.toInt() ?? 0,
       walletValueInr: (json['wallet_value_inr'] as num?)?.toDouble() ?? 0,
+      welcomeBonusGrantedAt: json['welcome_bonus_granted_at'] != null 
+          ? DateTime.tryParse(json['welcome_bonus_granted_at']) 
+          : null,
     );
   }
 

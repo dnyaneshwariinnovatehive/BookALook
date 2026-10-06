@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Salon;
 use App\Models\SalonSubscription;
+use App\Models\WalletTransaction;
 use App\Support\BillingModel;
 use Carbon\Carbon;
 
@@ -121,9 +122,14 @@ class SalonAccessService
         $wallet = app(WalletService::class);
         $coins = (int) $wallet->walletFor($salon->id)->coin_balance;
 
+        $welcomeTransaction = WalletTransaction::where('salon_id', $salon->id)
+            ->where('type', WalletTransaction::TYPE_WELCOME_BONUS)
+            ->first();
+
         return [
             'wallet_coins' => $coins,
             'wallet_value_inr' => round($coins * $wallet->coinValue(), 2),
+            'welcome_bonus_granted_at' => $welcomeTransaction?->created_at?->toISOString(),
             'salon_id' => $salon->id,
             'salon_name' => $salon->name,
             'is_locked' => ! $status['is_active'],

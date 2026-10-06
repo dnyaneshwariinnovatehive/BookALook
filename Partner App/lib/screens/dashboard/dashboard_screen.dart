@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
+import '../onboarding/welcome_success_screen.dart';
 import '../../services/salon_access_api.dart';
 import '../../services/wallet_balance.dart';
 import 'tabs/home_tab.dart';
@@ -36,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   SalonAccess? _access;
   bool _checkingAccess = true;
   String? _initError;
+  bool _showWelcome = false;
 
   Future<void> _checkAccess() async {
     setState(() => _checkingAccess = true);
@@ -48,8 +51,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // header costs nothing extra to fill.
       WalletBalance.seedFrom(access);
 
+      bool showWelcome = false;
+      if (access.hasNeverSubscribed) {
+        final grantedAt = access.welcomeBonusGrantedAt;
+        if (grantedAt != null) {
+          final now = DateTime.now();
+          if (now.isAfter(grantedAt) && now.difference(grantedAt).inDays < 7) {
+            final prefs = await SharedPreferences.getInstance();
+            final key = 'welcome_shown_${widget.salonData['id']}';
+            if (prefs.getBool(key) != true) {
+              showWelcome = true;
+              await prefs.setBool(key, true);
+            }
+          }
+        }
+      }
+
       setState(() {
         _access = access;
+        _showWelcome = showWelcome;
         _checkingAccess = false;
         try {
           _buildTabs();
@@ -155,6 +175,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (_access != null && _access!.isLocked) {
+      if (_showWelcome) {
+        return WelcomeSuccessScreen(
+          access: _access!,
+          onContinue: () {
+            setState(() => _showWelcome = false);
+          },
+        );
+      }
       return LockedSalonScope(
         salonId: widget.salonData['id'].toString(),
         child: SubscriptionLockedScreen(access: _access!, onRecheck: _checkAccess),
