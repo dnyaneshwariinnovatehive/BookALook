@@ -162,7 +162,7 @@ class BannerController extends Controller
 
     private function scopedSalons(string $scope, ?string $cityId, ?string $subAreaId)
     {
-        $query = Salon::query()->where('status', 'approved');
+        $query = Salon::query()->where('status', 'active');
 
         if ($scope === 'city' && $cityId) {
             $query->where('city_id', $cityId);

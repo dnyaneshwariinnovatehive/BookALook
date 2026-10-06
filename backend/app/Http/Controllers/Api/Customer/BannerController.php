@@ -108,7 +108,7 @@ class BannerController extends Controller
             $cityId = $banner->target_city_id;
             $subAreaId = $banner->target_sub_area_id;
 
-            $salonQuery = Salon::query()->where('status', 'approved');
+            $salonQuery = Salon::query()->where('status', 'active');
             if ($scope === 'city' && $cityId) {
                 $salonQuery->where('city_id', $cityId);
             } elseif ($scope === 'sub_area' && $subAreaId) {
