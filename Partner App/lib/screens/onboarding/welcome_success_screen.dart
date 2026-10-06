@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/salon_access_api.dart';
 import '../../theme/app_colors.dart';
@@ -40,17 +42,17 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const Spacer(flex: 2),
+                        const Center(
+                          child: _SalonInteriorVisual(
+                            delay: Duration(milliseconds: 150),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                         StaggeredReveal(
-                          duration: const Duration(milliseconds: 1000), // Slower premium reveal
-                          startDelay: 0.15, // Wait for ambient
-                          step: 0.15,
+                          duration: const Duration(milliseconds: 1500), 
+                          startDelay: 0.3, // 0.3 * 1500 = 450ms
+                          step: 0.1, // 0.1 * 1500 = 150ms
                           children: [
-                            const Center(
-                              child: _PurpleSuccessIcon(
-                                child: SuccessTick(size: 72),
-                              ),
-                            ),
-                            const SizedBox(height: 32),
                             Text(
                               'Salon Unlocked!',
                               textAlign: TextAlign.center,
@@ -81,12 +83,13 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
                               ),
                             ),
                             if (widget.access.walletCoins > 0) ...[
-                              const SizedBox(height: 48),
-                              _RewardParticles(
-                                delay: const Duration(milliseconds: 1000),
-                                child: _buildRewardCard(),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 48, bottom: 24),
+                                child: _RewardParticles(
+                                  delay: const Duration(milliseconds: 1100),
+                                  child: _buildRewardCard(),
+                                ),
                               ),
-                              const SizedBox(height: 24),
                               Text(
                                 'Your welcome credits have been added to your wallet.',
                                 textAlign: TextAlign.center,
@@ -100,7 +103,8 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
                         ),
                         const Spacer(flex: 3),
                         StaggeredReveal(
-                          startDelay: 0.9, // Shows up later
+                          duration: const Duration(milliseconds: 1500),
+                          startDelay: 0.8, // Shows up at 1200ms
                           children: [
                             SweepButton(
                               label: 'Continue',
@@ -152,13 +156,13 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
               Icon(
                 Icons.stars_rounded,
                 color: AppTheme.starRating,
-                size: 18,
+                size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 'WELCOME CREDIT',
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
                   color: AppTheme.lightTextBody,
@@ -169,7 +173,7 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
           const SizedBox(height: 20),
           _AnimatedCoinCounter(
             targetValue: widget.access.walletCoins,
-            delay: const Duration(milliseconds: 900),
+            delay: const Duration(milliseconds: 1050),
           ),
           const SizedBox(height: 6),
           Text(
@@ -205,55 +209,128 @@ class _WelcomeSuccessScreenState extends State<WelcomeSuccessScreen> {
   }
 }
 
-/// A wrapper to recolor the success tick to BookALook purple.
-class _PurpleSuccessIcon extends StatelessWidget {
-  final Widget child;
-  const _PurpleSuccessIcon({required this.child});
+/// Premium visual representing the salon interior, replacing the generic checkmark.
+class _SalonInteriorVisual extends StatefulWidget {
+  final Duration delay;
+  const _SalonInteriorVisual({required this.delay});
+  
+  @override
+  State<_SalonInteriorVisual> createState() => _SalonInteriorVisualState();
+}
+
+class _SalonInteriorVisualState extends State<_SalonInteriorVisual> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
+    Future.delayed(widget.delay, () {
+      if (mounted && !AuthMotion.reduceMotion(context)) {
+        _controller.forward();
+      } else if (mounted) {
+        _controller.value = 1.0;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    // We override the success color so the internal tick renders purple.
-    final overrideColors = AppColors(
-      surface: colors.surface,
-      surfaceMuted: colors.surfaceMuted,
-      accentSoft: colors.accentSoft,
-      border: colors.border,
-      textPrimary: colors.textPrimary,
-      textSecondary: colors.textSecondary,
-      textTertiary: colors.textTertiary,
-      onAccent: colors.onAccent,
-      success: AppTheme.accentColor, // Override to purple
-      successBg: AppTheme.lightAccentSoft,
-      warning: colors.warning,
-      warningBg: colors.warningBg,
-      danger: colors.danger,
-      dangerBg: colors.dangerBg,
-      info: colors.info,
-      infoBg: colors.infoBg,
-      notesBg: colors.notesBg,
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppTheme.lightAccentSoft,
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.accentColor.withValues(alpha: 0.15),
-            blurRadius: 32,
-            spreadRadius: 8,
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = 0.92 + (0.08 * Curves.easeOutCubic.transform(_controller.value));
+        final opacity = Curves.easeOut.transform((_controller.value * 2).clamp(0.0, 1.0));
+        
+        return Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: scale,
+            child: Stack(
+              alignment: Alignment.center,
+              clipBehavior: Clip.none,
+              children: [
+                // The main capsule-like image container for the premium salon photograph
+                Container(
+                  width: double.infinity,
+                  height: 200,
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(32),
+                    color: AppTheme.lightSurface,
+                    border: Border.all(color: Colors.white, width: 6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accentColor.withValues(alpha: 0.12),
+                        blurRadius: 32,
+                        spreadRadius: 8,
+                        offset: const Offset(0, 16),
+                      ),
+                      BoxShadow(
+                        color: AppTheme.accentColor.withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(26), // 32 - 6 (border)
+                    child: Image.asset(
+                      'assets/images/salon.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Sparkles around it
+                if (_controller.value > 0.2)
+                  ..._buildSparkles(),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          extensions: [overrideColors],
-        ),
-        child: child,
-      ),
+        );
+      },
     );
+  }
+
+  List<Widget> _buildSparkles() {
+    final sparkleProgress = ((_controller.value - 0.2) / 0.8).clamp(0.0, 1.0);
+    final opacity = (sparkleProgress < 0.5 ? sparkleProgress * 2 : 1.0) * 0.8;
+    return [
+      Positioned(
+        top: -15, left: 30,
+        child: Opacity(
+          opacity: opacity, 
+          child: const Icon(Icons.star_rounded, color: AppTheme.starRating, size: 28)
+        ),
+      ),
+      Positioned(
+        bottom: 25, right: -10,
+        child: Opacity(
+          opacity: opacity, 
+          child: Icon(Icons.star_rounded, color: AppTheme.accentColor.withValues(alpha: 0.6), size: 20)
+        ),
+      ),
+      Positioned(
+        top: 20, right: 10,
+        child: Opacity(
+          opacity: opacity, 
+          child: Icon(Icons.auto_awesome_rounded, color: AppTheme.accentColor, size: 24)
+        ),
+      ),
+      Positioned(
+        bottom: -5, left: 20,
+        child: Opacity(
+          opacity: opacity, 
+          child: Icon(Icons.circle, color: AppTheme.starRating.withValues(alpha: 0.4), size: 8)
+        ),
+      ),
+    ];
   }
 }
 
@@ -272,12 +349,13 @@ class _AnimatedCoinCounterState extends State<_AnimatedCoinCounter>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<int> _animation;
+  Timer? _hapticTimer;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1400));
+        vsync: this, duration: const Duration(milliseconds: 2200));
     _animation = IntTween(begin: 0, end: widget.targetValue).animate(
       CurvedAnimation(
         parent: _controller,
@@ -286,12 +364,31 @@ class _AnimatedCoinCounterState extends State<_AnimatedCoinCounter>
     );
 
     Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
+      if (mounted) {
+        if (!AuthMotion.reduceMotion(context) && widget.targetValue > 0) {
+          _controller.forward();
+          _startHaptics();
+        } else {
+          _controller.value = 1.0;
+        }
+      }
+    });
+  }
+
+  void _startHaptics() {
+    _hapticTimer?.cancel();
+    _hapticTimer = Timer.periodic(const Duration(milliseconds: 180), (timer) {
+      if (!mounted || _controller.isCompleted) {
+        timer.cancel();
+        return;
+      }
+      HapticFeedback.selectionClick();
     });
   }
 
   @override
   void dispose() {
+    _hapticTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
