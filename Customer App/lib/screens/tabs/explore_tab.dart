@@ -18,6 +18,7 @@ import '../../utils/error_text.dart';
 import '../../widgets/feedback_states.dart';
 import '../../widgets/skeleton.dart';
 import '../../utils/bottom_clearance.dart';
+import '../../widgets/animated_search_field.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -433,8 +434,20 @@ class ExploreTabState extends State<ExploreTab> {
                   Icon(Icons.search_rounded, color: context.colors.textTertiary, size: 22),
                   SizedBox(width: 12),
                   Expanded(
-                    child: TextField(
+                    child: AnimatedSearchField(
                       controller: _searchController,
+                      suggestions: const [
+                        "haircut",
+                        "hair spa",
+                        "facial",
+                        "manicure",
+                        "pedicure",
+                        "cleanup",
+                        "bridal makeup",
+                        "hair colour",
+                        "waxing",
+                        "combo"
+                      ],
                       style: GoogleFonts.outfit(fontSize: 15, color: headingColor),
                       decoration: InputDecoration(
                         hintText: 'Search salons or services...',

@@ -122,11 +122,34 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
           CustomScrollView(
             slivers: [
               _buildAppBar(),
-              SliverToBoxAdapter(child: _buildComboIdentity()),
-              SliverToBoxAdapter(child: _buildSalonInfo()),
-              SliverToBoxAdapter(child: _buildPricingCard()),
-              SliverToBoxAdapter(child: _buildIncludedServices()),
-              SliverToBoxAdapter(child: SizedBox(height: 120)), // Bottom clearance
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 120), // Bottom clearance
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: context.colors.listBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildComboIdentity(),
+                        _buildSalonInfo(),
+                        _buildPricingCard(),
+                        _buildIncludedServices(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           Positioned(
@@ -215,21 +238,8 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
     final count = (widget.salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (widget.salon['avg_rating'] as num?)?.toDouble() ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.colors.listBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -355,11 +365,11 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.accentColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
       ),
       child: Column(

@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/animated_search_field.dart';
 
 /// Search, answered the way a customer asks it.
 ///
@@ -209,16 +210,28 @@ class _SearchScreenState extends State<SearchScreen> {
               color: context.colors.textTertiary),
           const SizedBox(width: 10),
           Expanded(
-            child: TextField(
+            child: AnimatedSearchField(
               controller: _controller,
               focusNode: _focus,
               textInputAction: TextInputAction.search,
               onChanged: _onChanged,
               onSubmitted: _run,
+              suggestions: const [
+                "haircut",
+                "hair spa",
+                "facial",
+                "manicure",
+                "pedicure",
+                "cleanup",
+                "bridal makeup",
+                "hair colour",
+                "waxing",
+                "combo"
+              ],
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: 'Search haircut, facial, salonâ€¦',
+                hintText: 'Search haircut, facial, salon\u2026',
                 hintStyle: TextStyle(
                   fontSize: 14.5,
                   color: context.colors.textTertiary,

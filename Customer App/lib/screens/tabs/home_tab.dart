@@ -28,6 +28,7 @@ import '../category_salons_screen.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/skeleton.dart';
 import '../../utils/bottom_clearance.dart';
+import '../../widgets/animated_search_field.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -683,8 +684,20 @@ class _HomeTabState extends State<HomeTab> {
                     color: bodyColor.withValues(alpha: 0.7), size: 22),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: TextField(
+                  child: AnimatedSearchField(
                     controller: _searchController,
+                    suggestions: const [
+                      "haircut",
+                      "hair spa",
+                      "facial",
+                      "manicure",
+                      "pedicure",
+                      "cleanup",
+                      "bridal makeup",
+                      "hair colour",
+                      "waxing",
+                      "combo"
+                    ],
                     style: TextStyle(
                       color: headingColor,
                       fontSize: 14,

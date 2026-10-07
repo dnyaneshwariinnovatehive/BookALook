@@ -245,6 +245,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       body: _error.isNotEmpty
           ? _buildError()
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_saveProblem != null)
                   Padding(
@@ -481,11 +482,11 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
                       ),
                     ),
                     if (_phase == _LoaderPhase.shimmer || _phase == _LoaderPhase.finalizing)
-                      AnimatedBuilder(
-                        animation: _shimmerController,
-                        builder: (context, child) {
-                          return Positioned.fill(
-                            child: FractionalTranslation(
+                      Positioned.fill(
+                        child: AnimatedBuilder(
+                          animation: _shimmerController,
+                          builder: (context, child) {
+                            return FractionalTranslation(
                               translation: Offset(-1.5 + (_shimmerController.value * 3.0), 0.0),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
@@ -499,9 +500,9 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
                                   )
                                 )
                               )
-                            )
-                          );
-                        }
+                            );
+                          }
+                        ),
                       ),
                   ],
                 ),

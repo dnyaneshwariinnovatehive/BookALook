@@ -13,6 +13,7 @@ import '../widgets/discovery_salon_card.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 import '../theme/app_colors.dart';
+import '../widgets/animated_search_field.dart';
 
 /// Salons that offer a service in one category, in the city the customer picked.
 ///
@@ -42,6 +43,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   bool _signedIn = false;
   Set<String> _favouritedIds = {};
 
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedCategory = 'All';
   String _selectedSort = 'Recommended';
@@ -64,6 +66,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -308,8 +311,21 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
                   Icon(Icons.search, size: 20, color: context.colors.textSecondary),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextField(
+                    child: AnimatedSearchField(
+                      controller: _searchController,
                       onChanged: (val) => setState(() => _searchQuery = val),
+                      suggestions: const [
+                        "haircut",
+                        "hair spa",
+                        "facial",
+                        "manicure",
+                        "pedicure",
+                        "cleanup",
+                        "bridal makeup",
+                        "hair colour",
+                        "waxing",
+                        "combo"
+                      ],
                       style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
                       decoration: InputDecoration(
                         isDense: true,
