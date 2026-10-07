@@ -8,6 +8,7 @@ import '../services/salon_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/city_picker_sheet.dart';
+import '../widgets/combo_discovery_card.dart';
 import '../widgets/discovery_salon_card.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
@@ -40,6 +41,10 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
   bool _signedIn = false;
   Set<String> _favouritedIds = {};
+
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+  String _selectedSort = 'Recommended';
 
   /// Combo is not a catalogue row — it is a package a salon assembles from its
   /// own services — so it carries this sentinel id, which the directory
@@ -258,8 +263,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
         border: Border.all(color: borderColor, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -267,11 +271,215 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       ),
       child: Column(
         children: [
-          _buildPanelHeader(),
+          if (_isCombo) _buildComboFilters(),
+          if (!_isCombo) _buildPanelHeader(),
           Expanded(child: _buildPanelBody()),
         ],
       ),
     );
+  }
+
+  Widget _buildComboFilters() {
+    final borderColor = context.colors.border;
+    final headingColor = context.colors.textPrimary;
+    final categories = ['All', 'Women', 'Men', 'Hair', 'Skin', 'Bridal'];
+    final sorts = ['Recommended', 'Nearest', 'Highest Rated', 'Price: Low to High', 'Price: High to Low', 'Offers'];
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: borderColor, width: 1.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: context.colors.surfaceMuted,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.colors.border),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 20, color: context.colors.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Search combos...',
+                        hintStyle: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final cat = categories[index];
+                final isSelected = _selectedCategory == cat;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = cat),
+                  child: Chip(
+                    label: Text(
+                      cat,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? Colors.white : headingColor,
+                      ),
+                    ),
+                    backgroundColor: isSelected ? AppTheme.accentColor : context.colors.surfaceMuted,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isSelected ? AppTheme.accentColor : context.colors.border,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedSort,
+                    icon: Icon(Icons.arrow_drop_down, color: context.colors.textSecondary),
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: headingColor),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() => _selectedSort = newValue);
+                      }
+                    },
+                    items: sorts.map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const Spacer(),
+                if (!_isLoading && !_loadFailed)
+                  Text(
+                    '${_totalCombosCount} combos found',
+                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.textSecondary),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _minComboPrice(List<dynamic> combos) {
+    double min = double.infinity;
+    for (var c in combos) {
+        final p = (c['price'] as num?)?.toDouble() ?? 0;
+        if (p < min) min = p;
+    }
+    return min == double.infinity ? 0 : min;
+  }
+
+  int get _totalCombosCount {
+    int count = 0;
+    for (var salon in _filteredSalons) {
+        count += (salon['combos'] as List?)?.length ?? 0;
+    }
+    return count;
+  }
+
+  List<Map<String, dynamic>> get _filteredSalons {
+    if (!_isCombo) return _salons;
+
+    List<Map<String, dynamic>> result = [];
+    
+    for (var salon in _salons) {
+      var combos = (salon['combos'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
+      if (combos.isEmpty) continue; // Only show salons with combos
+
+      var filteredCombos = combos.where((combo) {
+         // Search match
+         if (_searchQuery.isNotEmpty) {
+             final q = _searchQuery.toLowerCase();
+             final name = (combo['name'] ?? '').toLowerCase();
+             final servicesStr = ((combo['services'] as List?) ?? []).map((s) => s['name'] ?? '').join(' ').toLowerCase();
+             final salonName = (salon['name'] ?? '').toLowerCase();
+             if (!name.contains(q) && !servicesStr.contains(q) && !salonName.contains(q)) return false;
+         }
+         
+         // Filter category match
+         if (_selectedCategory != 'All') {
+             final cat = _selectedCategory.toLowerCase();
+             final genderFocus = (salon['gender_focus'] ?? '').toLowerCase();
+             if (cat == 'women' && genderFocus == 'men only') return false;
+             if (cat == 'men' && genderFocus == 'women only') return false;
+             
+             if (cat != 'women' && cat != 'men') {
+                 final name = (combo['name'] ?? '').toLowerCase();
+                 final servicesStr = ((combo['services'] as List?) ?? []).map((s) => s['name'] ?? '').join(' ').toLowerCase();
+                 if (!name.contains(cat) && !servicesStr.contains(cat)) return false;
+             }
+         }
+         
+         // Offers match
+         if (_selectedSort == 'Offers') {
+             final price = (combo['price'] as num?)?.toDouble() ?? 0;
+             final orig = (combo['original_price'] as num?)?.toDouble() ?? 0;
+             if (price >= orig || orig == 0) return false;
+         }
+         
+         return true;
+      }).toList();
+      
+      if (filteredCombos.isNotEmpty) {
+          var newSalon = Map<String, dynamic>.from(salon);
+          newSalon['combos'] = filteredCombos;
+          result.add(newSalon);
+      }
+    }
+    
+    if (_selectedSort == 'Nearest') {
+        result.sort((a, b) => (a['distance_km'] as num? ?? 999).compareTo(b['distance_km'] as num? ?? 999));
+    } else if (_selectedSort == 'Price: Low to High') {
+        result.sort((a, b) {
+            final aMin = _minComboPrice(a['combos']);
+            final bMin = _minComboPrice(b['combos']);
+            return aMin.compareTo(bMin);
+        });
+    } else if (_selectedSort == 'Price: High to Low') {
+        result.sort((a, b) {
+            final aMin = _minComboPrice(a['combos']);
+            final bMin = _minComboPrice(b['combos']);
+            return bMin.compareTo(aMin);
+        });
+    } else if (_selectedSort == 'Highest Rated') {
+        result.sort((a, b) => (b['avg_rating'] as num? ?? 0).compareTo(a['avg_rating'] as num? ?? 0));
+    }
+    
+    return result;
   }
 
   Widget _buildPanelHeader() {
@@ -355,16 +563,18 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       );
     }
 
-    if (_salons.isEmpty) {
+    final filteredSalons = _filteredSalons;
+
+    if (filteredSalons.isEmpty) {
       return RefreshIndicator(
         color: AppTheme.accentColor,
         onRefresh: _loadSalons,
         child: ScrollableStateView(
           child: EmptyState(
             icon: Icons.search_off_rounded,
-            title: 'No salons found',
+            title: _isCombo ? 'No combos found' : 'No salons found',
             message: _isCombo
-                ? 'No salons near ${LocationService.instance.city?.name ?? 'you'} offer combo packages yet.'
+                ? 'Try a different search or filter.'
                 : 'No salons near ${LocationService.instance.city?.name ?? 'you'} currently offer $_categoryName.',
             actionLabel: 'Change city',
             onAction: _pickCity,
@@ -378,11 +588,20 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       onRefresh: _loadSalons,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        itemCount: _salons.length,
+        itemCount: filteredSalons.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          final salon = _salons[index];
+          final salon = filteredSalons[index];
           final id = salon['id'].toString();
+
+          if (_isCombo) {
+            return ComboDiscoveryCard(
+              salon: salon,
+              isFavourited: _favouritedIds.contains(id),
+              showFavourite: _signedIn,
+              onToggleFavourite: () => _toggleFavourite(id),
+            );
+          }
 
           return DiscoverySalonCard(
             salon: salon,

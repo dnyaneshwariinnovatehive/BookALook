@@ -438,16 +438,20 @@ class SalonController extends Controller
         // Only when a real category is being browsed: the combo sentinel is not
         // a catalogue category and has no services to show in the strip.
         $servicesBySalon = [];
+        $combosBySalon = [];
 
-        if ($request->filled('category_id')
-            && strtolower((string) $request->category_id) !== Combo::CATEGORY_SENTINEL) {
-            $servicesBySalon = $this->categoryServices(
-                $salons->pluck('id')->all(),
-                (string) $request->category_id,
-            );
+        if ($request->filled('category_id')) {
+            if (strtolower((string) $request->category_id) !== Combo::CATEGORY_SENTINEL) {
+                $servicesBySalon = $this->categoryServices(
+                    $salons->pluck('id')->all(),
+                    (string) $request->category_id,
+                );
+            } else {
+                $combosBySalon = $this->combosBySalon($salons->pluck('id')->all());
+            }
         }
 
-        $rows = $this->present($salons, $access, $servicesBySalon);
+        $rows = $this->present($salons, $access, $servicesBySalon, $combosBySalon);
 
         $suggestedRows = collect();
         $alternativeCity = null;
@@ -631,12 +635,12 @@ class SalonController extends Controller
     }
 
     /** The row shape the directory returns, used for results and suggestions. */
-    private function present($salons, $access, array $servicesBySalon = [])
+    private function present($salons, $access, array $servicesBySalon = [], array $combosBySalon = [])
     {
-        return $salons->map(function (Salon $salon) use ($access, $servicesBySalon) {
+        return $salons->map(function (Salon $salon) use ($access, $servicesBySalon, $combosBySalon) {
             $status = $access->status($salon);
 
-            return [
+            $data = [
                 'id' => $salon->id,
                 'name' => $salon->name,
                 'address' => $salon->address,
@@ -659,6 +663,13 @@ class SalonController extends Controller
                 // plain directory response is byte-for-byte what it was.
                 'category_services' => $servicesBySalon[(string) $salon->id] ?? null,
             ];
+            
+            // For combo category drill-down, provide the packages
+            if (isset($combosBySalon[(string) $salon->id])) {
+                $data['combos'] = $combosBySalon[(string) $salon->id];
+            }
+            
+            return $data;
         });
     }
 
@@ -694,5 +705,59 @@ class SalonController extends Controller
         }
 
         return ['is_bookable' => true, 'reason' => null];
+    }
+
+    /**
+     * Combo packages for a set of salons.
+     */
+    private function combosBySalon(array $salonIds): array
+    {
+        if (empty($salonIds)) {
+            return [];
+        }
+
+        $combos = Combo::with('services.template:id,name,estimated_duration_minutes')
+            ->whereIn('salon_id', $salonIds)
+            ->where('is_active', true)
+            ->get();
+
+        $bySalon = [];
+
+        foreach ($combos as $combo) {
+            $salonId = (string) $combo->salon_id;
+            
+            $price = 0.0;
+            $originalPrice = 0.0;
+            $duration = 0;
+            $lines = [];
+
+            foreach ($combo->services as $service) {
+                $comboPrice = (float) ($service->pivot->combo_special_price ?? $service->price);
+                $price += $comboPrice;
+                $originalPrice += (float) $service->price;
+                $duration += (int) ($service->template->estimated_duration_minutes ?? 30);
+
+                $lines[] = [
+                    'id' => $service->id,
+                    'name' => $service->template->name ?? 'Service',
+                    'price' => $comboPrice,
+                    'original_price' => (float) $service->price,
+                ];
+            }
+
+            $bySalon[$salonId][] = [
+                'id' => $combo->id,
+                'name' => $combo->name,
+                'price' => round($price, 2),
+                'original_price' => round($originalPrice, 2),
+                'savings' => round(max($originalPrice - $price, 0), 2),
+                'duration_minutes' => $duration,
+                'advance_percentage' => (float) $combo->advance_percentage,
+                'refundable_advance' => (bool) $combo->will_refund_advance_if_cancelled,
+                'services' => $lines,
+            ];
+        }
+
+        return $bySalon;
     }
 }
