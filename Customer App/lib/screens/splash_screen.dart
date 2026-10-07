@@ -21,10 +21,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     
-    // Target duration: 2.4 seconds for a premium paced brand motion
+    // Target duration: 2.6 seconds for a premium paced brand motion
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: const Duration(milliseconds: 2600),
     );
 
     _controller.forward();
@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _cachedToken = await AuthService.getToken();
     _authCheckComplete = true;
     
-    // In the rare case auth took longer than 2.4s, navigate as soon as it's ready.
+    // In the rare case auth took longer than 2.6s, navigate as soon as it's ready.
     if (_controller.isCompleted) {
       _navigate();
     }
@@ -78,11 +78,57 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  Widget _buildOrbitingElement({
+    required CustomPainter painter,
+    required double delay,
+    required Offset startOffset,
+    required Offset endOffset,
+    required double startRot,
+    required double endRot,
+    required double t,
+  }) {
+    final progress = ((t - delay) / 0.40).clamp(0.0, 1.0);
+    final opacity = Curves.easeOut.transform(((t - delay) / 0.20).clamp(0.0, 1.0));
+    
+    // Custom curved paths for organic entry
+    final curveX = Curves.easeOutCubic.transform(progress);
+    final curveY = Curves.easeOutSine.transform(progress);
+    
+    final x = startOffset.dx + (endOffset.dx - startOffset.dx) * curveX;
+    final y = startOffset.dy + (endOffset.dy - startOffset.dy) * curveY;
+    final rot = startRot + (endRot - startRot) * curveX;
+    
+    // Floating after settled
+    final postProgress = ((t - delay - 0.40) / (1.0 - delay - 0.40)).clamp(0.0, 1.0);
+    final floatY = math.sin(postProgress * math.pi * 2) * 4;
+    final breatheScale = 1.0 + math.sin(postProgress * math.pi * 2) * 0.03;
+    
+    return Transform.translate(
+      offset: Offset(x, y + floatY),
+      child: Transform.rotate(
+        angle: rot,
+        child: Transform.scale(
+          scale: breatheScale,
+          child: Opacity(
+            opacity: opacity,
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: CustomPaint(painter: painter),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Elegant background: Base color from theme, subtle radial glow in the center.
     final baseColor = Theme.of(context).scaffoldBackgroundColor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accentColor = AppTheme.accentColor;
+    final elementColor = isDark ? Colors.white.withValues(alpha: 0.85) : accentColor.withValues(alpha: 0.85);
     
     return Scaffold(
       backgroundColor: baseColor,
@@ -92,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             center: Alignment.center,
             radius: 0.85,
             colors: [
-              AppTheme.accentColor.withValues(alpha: isDark ? 0.15 : 0.08),
+              accentColor.withValues(alpha: isDark ? 0.15 : 0.08),
               Colors.transparent,
             ],
             stops: const [0.0, 1.0],
@@ -102,21 +148,72 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {
-              // Timeline logic:
-              // 0.00 -> 0.18: Logo fades in
-              // 0.00 -> 0.30: Logo scales gently
-              // 0.20 -> 0.70: Secondary motion draws/morphs
-              // 0.70 -> 1.00: Hold & Transition
+              final t = _controller.value;
+              final logoOpacity = Curves.easeOut.transform((t / 0.18).clamp(0.0, 1.0));
+              final logoScale = 0.90 + 0.10 * Curves.easeOutCubic.transform((t / 0.30).clamp(0.0, 1.0));
               
-              final logoOpacity = Curves.easeOut.transform((_controller.value / 0.18).clamp(0.0, 1.0));
-              final logoScale = 0.95 + 0.05 * Curves.easeOutCubic.transform((_controller.value / 0.30).clamp(0.0, 1.0));
-              
-              final secondaryProgress = ((_controller.value - 0.20) / 0.50).clamp(0.0, 1.0);
-              
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
+              return Stack(
+                alignment: Alignment.center,
                 children: [
+                  // Light Trails behind elements
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: TrailPainter(t, elementColor),
+                    ),
+                  ),
+
+                  // Elements entering from different directions
+                  _buildOrbitingElement(
+                    painter: ScissorsPainter(elementColor),
+                    delay: 0.15,
+                    startOffset: const Offset(-150, -150),
+                    endOffset: const Offset(-110, -80),
+                    startRot: -math.pi / 2,
+                    endRot: -math.pi / 8,
+                    t: t,
+                  ),
+
+                  _buildOrbitingElement(
+                    painter: MakeupBrushPainter(elementColor),
+                    delay: 0.25,
+                    startOffset: const Offset(150, -120),
+                    endOffset: const Offset(110, -70),
+                    startRot: math.pi / 2,
+                    endRot: math.pi / 6,
+                    t: t,
+                  ),
+
+                  _buildOrbitingElement(
+                    painter: LipstickPainter(elementColor),
+                    delay: 0.35,
+                    startOffset: const Offset(-150, 150),
+                    endOffset: const Offset(-105, 80),
+                    startRot: -math.pi / 4,
+                    endRot: math.pi / 8,
+                    t: t,
+                  ),
+
+                  _buildOrbitingElement(
+                    painter: HandMirrorPainter(elementColor),
+                    delay: 0.45,
+                    startOffset: const Offset(150, 150),
+                    endOffset: const Offset(105, 75),
+                    startRot: math.pi / 4,
+                    endRot: -math.pi / 10,
+                    t: t,
+                  ),
+
+                  // Sparkles
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: SparklePainter(
+                        ((t - 0.75) / 0.20).clamp(0.0, 1.0),
+                        elementColor,
+                      ),
+                    ),
+                  ),
+
+                  // Logo (Hero)
                   Opacity(
                     opacity: logoOpacity,
                     child: Transform.scale(
@@ -136,19 +233,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  
-                  // Secondary Animation Area (Subtle beauty/salon motion)
-                  SizedBox(
-                    width: 70,
-                    height: 40,
-                    child: CustomPaint(
-                      painter: _BrandMotionPainter(
-                        progress: secondaryProgress,
-                        color: AppTheme.accentColor,
-                      ),
-                    ),
-                  ),
                 ],
               );
             },
@@ -159,101 +243,270 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 
-class _BrandMotionPainter extends CustomPainter {
+// ---------------------------------------------------------
+// CUSTOM PAINTERS FOR BEAUTY ELEMENTS (Premium Line-Art)
+// ---------------------------------------------------------
+
+class ScissorsPainter extends CustomPainter {
+  final Color color;
+  ScissorsPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+      
+    final w = size.width;
+    final h = size.height;
+    
+    final cx = w * 0.5;
+    final cy = h * 0.5;
+    
+    // Blade 1
+    canvas.drawLine(Offset(cx, cy), Offset(w * 0.2, h * 0.1), paint);
+    // Handle 1 (loop)
+    canvas.drawCircle(Offset(w * 0.75, h * 0.8), w * 0.12, paint);
+    // Connect blade 1 to handle 1
+    canvas.drawLine(Offset(cx, cy), Offset(w * 0.65, h * 0.7), paint);
+    
+    // Blade 2
+    canvas.drawLine(Offset(cx, cy), Offset(w * 0.8, h * 0.1), paint);
+    // Handle 2
+    canvas.drawCircle(Offset(w * 0.25, h * 0.8), w * 0.12, paint);
+    // Connect blade 2 to handle 2
+    canvas.drawLine(Offset(cx, cy), Offset(w * 0.35, h * 0.7), paint);
+    
+    // Pivot screw
+    canvas.drawCircle(Offset(cx, cy), 1.5, Paint()..color=color..style=PaintingStyle.fill);
+  }
+  @override
+  bool shouldRepaint(covariant ScissorsPainter oldDelegate) => oldDelegate.color != color;
+}
+
+class MakeupBrushPainter extends CustomPainter {
+  final Color color;
+  MakeupBrushPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+      
+    final fillPaint = Paint()
+      ..color = color.withValues(alpha: 0.2)
+      ..style = PaintingStyle.fill;
+      
+    final w = size.width;
+    final h = size.height;
+    
+    // Handle
+    canvas.drawLine(Offset(w * 0.5, h * 0.9), Offset(w * 0.5, h * 0.5), paint);
+    
+    // Ferrule
+    canvas.drawRect(Rect.fromLTRB(w * 0.4, h * 0.4, w * 0.6, h * 0.5), paint);
+    
+    // Bristles
+    final bristlePath = Path()
+      ..moveTo(w * 0.4, h * 0.4)
+      ..quadraticBezierTo(w * 0.2, h * 0.1, w * 0.5, h * 0.05)
+      ..quadraticBezierTo(w * 0.8, h * 0.1, w * 0.6, h * 0.4)
+      ..close();
+      
+    canvas.drawPath(bristlePath, fillPaint);
+    canvas.drawPath(bristlePath, paint);
+  }
+  @override
+  bool shouldRepaint(covariant MakeupBrushPainter oldDelegate) => oldDelegate.color != color;
+}
+
+class LipstickPainter extends CustomPainter {
+  final Color color;
+  LipstickPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+      
+    final fillPaint = Paint()
+      ..color = color.withValues(alpha: 0.3)
+      ..style = PaintingStyle.fill;
+      
+    final w = size.width;
+    final h = size.height;
+    
+    // Base
+    canvas.drawRect(Rect.fromLTRB(w * 0.35, h * 0.6, w * 0.65, h * 0.95), paint);
+    
+    // Inner tube
+    canvas.drawLine(Offset(w * 0.4, h * 0.6), Offset(w * 0.4, h * 0.45), paint);
+    canvas.drawLine(Offset(w * 0.6, h * 0.6), Offset(w * 0.6, h * 0.45), paint);
+    
+    // Lipstick
+    final lipPath = Path()
+      ..moveTo(w * 0.42, h * 0.45)
+      ..lineTo(w * 0.42, h * 0.2)
+      ..quadraticBezierTo(w * 0.5, h * 0.1, w * 0.58, h * 0.25)
+      ..lineTo(w * 0.58, h * 0.45)
+      ..close();
+      
+    canvas.drawPath(lipPath, fillPaint);
+    canvas.drawPath(lipPath, paint);
+  }
+  @override
+  bool shouldRepaint(covariant LipstickPainter oldDelegate) => oldDelegate.color != color;
+}
+
+class HandMirrorPainter extends CustomPainter {
+  final Color color;
+  HandMirrorPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+      
+    final w = size.width;
+    final h = size.height;
+    
+    // Handle
+    canvas.drawLine(Offset(w * 0.5, h * 0.9), Offset(w * 0.5, h * 0.65), paint);
+    
+    // Mirror frame
+    canvas.drawOval(Rect.fromCenter(center: Offset(w * 0.5, h * 0.35), width: w * 0.55, height: h * 0.55), paint);
+    
+    // Inner reflection
+    final reflection = Path()
+      ..moveTo(w * 0.35, h * 0.2)
+      ..quadraticBezierTo(w * 0.45, h * 0.15, w * 0.55, h * 0.25);
+    canvas.drawPath(reflection, paint..strokeWidth = 1.0);
+  }
+  @override
+  bool shouldRepaint(covariant HandMirrorPainter oldDelegate) => oldDelegate.color != color;
+}
+
+// ---------------------------------------------------------
+// ELEGANT MOTION TRAILS AND SPARKLES
+// ---------------------------------------------------------
+
+class TrailPainter extends CustomPainter {
   final double progress;
   final Color color;
-
-  _BrandMotionPainter({required this.progress, required this.color});
+  TrailPainter(this.progress, this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
     if (progress <= 0.0) return;
-
+    
     final w = size.width;
     final h = size.height;
+    final cx = w * 0.5;
+    final cy = h * 0.5;
 
-    // Timeline phases within the secondary animation (progress 0.0 to 1.0)
-    final lineProgress = Curves.easeInOutCubic.transform((progress / 0.4).clamp(0.0, 1.0));
-    final leafProgress = Curves.easeOutBack.transform(((progress - 0.3) / 0.4).clamp(0.0, 1.0));
-    final sparkleProgress = ((progress - 0.6) / 0.4).clamp(0.0, 1.0);
+    // Trail 1: Top-Left to Bottom-Right orbiting the logo
+    final path1 = Path()
+      ..moveTo(cx - 150, cy - 100)
+      ..quadraticBezierTo(cx - 50, cy - 120, cx, cy - 80)
+      ..quadraticBezierTo(cx + 80, cy - 20, cx + 120, cy + 50);
 
-    // 1. Flowing beauty line (hair/wellness motif)
-    if (lineProgress > 0) {
-      final linePaint = Paint()
-        ..color = color.withValues(alpha: lineProgress * 0.8)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..strokeCap = StrokeCap.round;
+    // Trail 2: Bottom-Left to Top-Right
+    final path2 = Path()
+      ..moveTo(cx - 120, cy + 100)
+      ..quadraticBezierTo(cx, cy + 120, cx + 60, cy + 80)
+      ..quadraticBezierTo(cx + 100, cy + 20, cx + 140, cy - 60);
 
-      final path = Path();
-      path.moveTo(w * 0.2, h * 0.8);
-      path.quadraticBezierTo(w * 0.4, h * 0.9, w * 0.6, h * 0.5);
+    _drawAnimatedPath(canvas, path1, progress, color, 0.2, 0.6);
+    _drawAnimatedPath(canvas, path2, progress, color, 0.35, 0.75);
+  }
+  
+  void _drawAnimatedPath(Canvas canvas, Path path, double t, Color color, double startT, double endT) {
+    if (t < startT) return;
+    
+    final localT = ((t - startT) / (endT - startT)).clamp(0.0, 1.0);
+    
+    final metric = path.computeMetrics().first;
+    final totalLen = metric.length;
+    
+    final head = totalLen * localT;
+    final tailLen = totalLen * 0.4;
+    final tail = (head - tailLen).clamp(0.0, totalLen);
+    
+    if (head > 0 && head > tail) {
+      final segment = metric.extractPath(tail, head);
+      final fadeOut = 1.0 - ((localT - 0.7) / 0.3).clamp(0.0, 1.0);
       
-      final metric = path.computeMetrics().first;
-      final extractPath = metric.extractPath(0.0, metric.length * lineProgress);
-      canvas.drawPath(extractPath, linePaint);
-    }
-
-    // 2. Leaf/Wellness Symbol
-    if (leafProgress > 0) {
-      final leafPaint = Paint()
-        ..color = color.withValues(alpha: leafProgress.clamp(0.0, 1.0))
-        ..style = PaintingStyle.fill;
-
-      canvas.save();
-      canvas.translate(w * 0.6, h * 0.5);
-      canvas.scale(leafProgress);
-      // Subtle rotation to make it feel natural as it grows
-      canvas.rotate(-0.2 * (1.0 - leafProgress.clamp(0.0, 1.0)));
-
-      final leaf = Path();
-      leaf.moveTo(0, 0);
-      leaf.quadraticBezierTo(8, -10, 14, -6);
-      leaf.quadraticBezierTo(10, 4, 0, 0);
-      
-      canvas.drawPath(leaf, leafPaint);
-      canvas.restore();
-    }
-
-    // 3. Premium Sparkle
-    if (sparkleProgress > 0) {
-      // Pop effect: scales past 1.0 then settles
-      double sparkleScale = 0.0;
-      if (sparkleProgress < 0.5) {
-        sparkleScale = Curves.easeOut.transform(sparkleProgress / 0.5) * 1.2;
-      } else {
-        final settleProgress = (sparkleProgress - 0.5) / 0.5;
-        sparkleScale = 1.2 - Curves.easeInOut.transform(settleProgress) * 0.3;
-      }
-
-      final sparkleAlpha = sparkleProgress < 0.2 
-          ? (sparkleProgress / 0.2) 
-          : 1.0;
-
-      final sparklePaint = Paint()
-        ..color = color.withValues(alpha: sparkleAlpha)
-        ..style = PaintingStyle.fill;
-
-      canvas.save();
-      canvas.translate(w * 0.8, h * 0.2); // Positioned elegantly near the leaf tip
-      canvas.rotate(sparkleProgress * math.pi / 2); // Gentle continuous rotation
-      canvas.scale(sparkleScale);
-
-      final sparkle = Path();
-      sparkle.moveTo(0, -7);
-      sparkle.quadraticBezierTo(1.5, -1.5, 7, 0);
-      sparkle.quadraticBezierTo(1.5, 1.5, 0, 7);
-      sparkle.quadraticBezierTo(-1.5, 1.5, -7, 0);
-      sparkle.quadraticBezierTo(-1.5, -1.5, 0, -7);
-      sparkle.close();
-
-      canvas.drawPath(sparkle, sparklePaint);
-      canvas.restore();
+      canvas.drawPath(
+        segment, 
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..strokeCap = StrokeCap.round
+          ..color = color.withValues(alpha: fadeOut * 0.3)
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _BrandMotionPainter oldDelegate) {
+  bool shouldRepaint(covariant TrailPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
+  }
+}
+
+class SparklePainter extends CustomPainter {
+  final double progress; 
+  final Color color;
+  SparklePainter(this.progress, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.0 || progress >= 1.0) return;
+    
+    // Pop and fade
+    final scale = math.sin(progress * math.pi); 
+    if (scale <= 0) return;
+
+    final paint = Paint()
+      ..color = color.withValues(alpha: scale * 0.8)
+      ..style = PaintingStyle.fill;
+      
+    void drawSparkle(Offset center, double maxRadius) {
+      final r = maxRadius * scale;
+      final path = Path()
+        ..moveTo(center.dx, center.dy - r)
+        ..quadraticBezierTo(center.dx + r*0.2, center.dy - r*0.2, center.dx + r, center.dy)
+        ..quadraticBezierTo(center.dx + r*0.2, center.dy + r*0.2, center.dx, center.dy + r)
+        ..quadraticBezierTo(center.dx - r*0.2, center.dy + r*0.2, center.dx - r, center.dy)
+        ..quadraticBezierTo(center.dx - r*0.2, center.dy - r*0.2, center.dx, center.dy - r)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+    
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    
+    drawSparkle(Offset(cx + 90, cy - 40), 12);
+    drawSparkle(Offset(cx - 80, cy + 30), 8);
+    drawSparkle(Offset(cx - 60, cy - 50), 6);
+  }
+
+  @override
+  bool shouldRepaint(covariant SparklePainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.color != color;
   }
 }

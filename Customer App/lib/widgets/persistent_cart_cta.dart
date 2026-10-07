@@ -16,14 +16,9 @@ class PersistentCartCTA extends StatelessWidget {
     final int count = items.length;
     final String label = count == 1 ? '1 item' : '$count items';
 
-    return SafeArea(
-      top: false,
-      bottom: false,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Material(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Material(
             color: AppTheme.accentColor,
             elevation: 0,
             clipBehavior: Clip.antiAlias,
@@ -75,8 +70,6 @@ class PersistentCartCTA extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
     );
   }
 }

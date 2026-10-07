@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../widgets/tab_navigator.dart';
 import '../widgets/persistent_cart_cta.dart';
+import '../widgets/tab_loading_overlay.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/explore_tab.dart';
 import 'tabs/bookings_tab.dart';
@@ -57,6 +58,21 @@ class _MainScreenState extends State<MainScreen> {
   /// follow the customer into the app however they arrive — a deep link from a
   /// QR code lands on a salon page, not on home.
   bool _askedThisSession = false;
+
+  bool _isTabLoading = false;
+  String _loadingMessage = '';
+  int _loadingTab = -1;
+  int? _targetTabIndex;
+
+  String _getLoadingMessage(int index) {
+    switch (index) {
+      case 0: return "Finding salons near you";
+      case 1: return "Discovering beauty services";
+      case 2: return "Loading your appointments";
+      case 3: return "Loading your profile";
+      default: return "";
+    }
+  }
 
   @override
   void initState() {
@@ -111,27 +127,77 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _onTabTapped(int index) {
-    AppHaptics.selectionClick();
-    if (index == 2 && !widget.isGuest) {
-      _bookingsKey.currentState?.loadBookings();
-    }
-    if (index == 1) {
-      // Reaching Explore by tapping the bar means "show me the directory", not
-      // "keep showing whichever category I filtered by last". The request
-      // listener above switches tabs itself, so it never passes through here
-      // and cannot undo its own filter.
-      _exploreKey.currentState?.clearCategoryFilter();
-    }
-
-    if (index == _currentIndex) {
-      // Tapping the tab you are already on goes back to its first page.
+  void _onTabTapped(int index) async {
+    if (index == _currentIndex && !_isTabLoading) {
+      AppHaptics.selectionClick();
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
       return;
     }
+
+    if (_isTabLoading) {
+      _targetTabIndex = index;
+      return;
+    }
+
+    AppHaptics.selectionClick();
+
+    Future<void> realOperation = Future.value();
+
+    if (index == 2 && !widget.isGuest) {
+      realOperation = _bookingsKey.currentState?.loadBookings() ?? Future.value();
+    } else if (index == 1) {
+      _exploreKey.currentState?.clearCategoryFilter();
+    }
+
+    bool isFast = false;
+    final fastTimer = Future.delayed(const Duration(milliseconds: 150));
+    
+    await Future.any([
+      realOperation.then((_) => isFast = true).catchError((_) => isFast = true),
+      fastTimer,
+    ]);
+
+    if (!mounted) return;
+
+    if (isFast) {
+      // Network is fast, switch instantly without overlay
+      setState(() {
+        _currentIndex = _targetTabIndex ?? index;
+        _targetTabIndex = null;
+      });
+      return;
+    }
+
+    // Network is slow, show the loading overlay
     setState(() {
-      _currentIndex = index;
+      _isTabLoading = true;
+      _targetTabIndex = index;
+      _loadingTab = index;
+      _loadingMessage = _getLoadingMessage(index);
+      _currentIndex = index; // Switch instantly under overlay
     });
+
+    try {
+      await realOperation;
+    } catch (_) {
+      // Let individual tabs handle errors
+    }
+
+    if (!mounted) return;
+
+    final finalIndex = _targetTabIndex ?? index;
+
+    setState(() {
+      _isTabLoading = false;
+      _targetTabIndex = null;
+      if (_currentIndex != finalIndex) {
+        _currentIndex = finalIndex;
+      }
+    });
+
+    if (finalIndex != index) {
+      _onTabTapped(finalIndex);
+    }
   }
 
   /// Back unwinds the active tab first, then falls back to the Home tab and
@@ -203,45 +269,66 @@ class _MainScreenState extends State<MainScreen> {
                   // Approximate CTA capsule height (48) + padding (12) + buffer (8) = 68
                   final extraPadding = hasItems ? 68.0 : 0.0;
                   
-                  return MediaQuery(
-                    data: mediaQuery.copyWith(
-                      padding: mediaQuery.padding.copyWith(
-                        bottom: mediaQuery.padding.bottom + extraPadding,
-                      ),
-                    ),
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: [
-                        for (var i = 0; i < _tabs.length; i++)
-                          TickerMode(
-                            enabled: i == _currentIndex,
-                            child: TabNavigator(
-                              navigatorKey: _navigatorKeys[i],
-                              root: _tabs[i],
-                            ),
+                  return Stack(
+                    children: [
+                      MediaQuery(
+                        data: mediaQuery.copyWith(
+                          padding: mediaQuery.padding.copyWith(
+                            bottom: mediaQuery.padding.bottom + extraPadding,
                           ),
-                      ],
-                    ),
+                        ),
+                        child: IndexedStack(
+                          index: _currentIndex,
+                          children: [
+                            for (var i = 0; i < _tabs.length; i++)
+                              TickerMode(
+                                enabled: i == _currentIndex,
+                                child: TabNavigator(
+                                  navigatorKey: _navigatorKeys[i],
+                                  root: _tabs[i],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring: !_isTabLoading,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: _isTabLoading
+                                ? BookALookTabLoadingOverlay(
+                                    message: _loadingMessage,
+                                    tabIndex: _loadingTab,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 }
               ),
-              SafeArea(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: hasItems
-                      ? PersistentCartCTA(key: const ValueKey('cart_cta'), cart: cart)
-                      : const SizedBox.shrink(key: ValueKey('empty_cta')),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: SafeArea(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(
+                          scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: hasItems
+                        ? PersistentCartCTA(key: const ValueKey('cart_cta'), cart: cart)
+                        : const SizedBox.shrink(key: ValueKey('empty_cta')),
+                  ),
                 ),
               ),
             ],
