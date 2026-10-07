@@ -371,6 +371,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      bottom: false,
       // Pull to refresh the whole page: offers, categories and the next
       // appointment all change while the app sits open.
       child: RefreshIndicator(

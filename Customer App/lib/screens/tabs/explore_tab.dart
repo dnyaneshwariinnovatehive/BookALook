@@ -256,6 +256,7 @@ class ExploreTabState extends State<ExploreTab> {
       return Scaffold(
         backgroundColor: context.colors.pageTint,
         body: SafeArea(
+          bottom: false,
           child: SkeletonList(
             padding: EdgeInsets.fromLTRB(20, 24, 20, bottomClearance(context)),
             itemBuilder: (_) => const SalonCardSkeleton(),
@@ -267,6 +268,7 @@ class ExploreTabState extends State<ExploreTab> {
       return Scaffold(
         backgroundColor: context.colors.pageTint,
         body: SafeArea(
+          bottom: false,
           child: RefreshIndicator(
             color: AppTheme.accentColor,
             onRefresh: _loadSalons,
@@ -292,6 +294,7 @@ class ExploreTabState extends State<ExploreTab> {
     return Scaffold(
       backgroundColor: context.colors.pageTint,
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
           color: AppTheme.accentColor,
           onRefresh: _loadSalons,

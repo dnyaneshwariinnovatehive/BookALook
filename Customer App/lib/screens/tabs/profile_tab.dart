@@ -405,6 +405,7 @@ class _ProfileTabState extends State<ProfileTab> {
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(24.0, 20.0, 24.0, bottomClearance(context)),
           child: Column(
