@@ -318,7 +318,7 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
     if (!allowed || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the invoice. Try again in a moment.')),
+        const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not open the invoice. Try again in a moment.')),
       );
     }
   }

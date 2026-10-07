@@ -12,6 +12,8 @@ import 'tabs/appointments_tab.dart';
 import 'tabs/staff_tab.dart';
 import 'tabs/services_tab.dart';
 import 'tabs/more_tab.dart';
+import '../../widgets/location_permission_modal.dart';
+import '../../widgets/animated_staff_icon.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -39,6 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _checkingAccess = true;
   String? _initError;
   bool _showWelcome = false;
+  bool _hasCheckedLocationReminder = false;
 
   Future<void> _checkAccess() async {
     setState(() => _checkingAccess = true);
@@ -77,6 +80,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _initError = 'Error in _buildTabs (success path): $e\n$stack';
         }
       });
+      
+      if (mounted && !showWelcome && !access.isLocked && !_hasCheckedLocationReminder) {
+        _hasCheckedLocationReminder = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            LocationPermissionModal.checkAndShow(context, widget.salonData['id'].toString());
+          }
+        });
+      }
     } catch (e, stack) {
       // A failed check must not lock a paying salon out of its own app.
       if (!mounted) return;
@@ -248,8 +260,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Appointments',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.people_outline),
-                activeIcon: Icon(Icons.people),
+                icon: const AnimatedStaffIcon(isActive: false),
+                activeIcon: const AnimatedStaffIcon(isActive: true),
                 label: 'Staff',
               ),
               BottomNavigationBarItem(

@@ -86,7 +86,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
       print('AppointmentsTab error: $e');
       print(stack);
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load appointments')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
     }
   }
 
@@ -695,7 +695,6 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  flex: 5,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -706,15 +705,13 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
                     ],
                   ),
                 ),
-                Expanded(
-                  flex: 4,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text('Time: ', style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13)),
-                      Text(TimeFmt.slot(apt['start_time'], apt['end_time']), style: GoogleFonts.outfit(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                    ],
-                  ),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Time: ', style: GoogleFonts.outfit(color: secondaryTextColor, fontSize: 13)),
+                    Text(TimeFmt.slot(apt['start_time'], apt['end_time']), style: GoogleFonts.outfit(color: primaryTextColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
                 ),
               ],
             ),

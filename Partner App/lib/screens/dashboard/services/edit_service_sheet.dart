@@ -79,7 +79,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
     } catch (e) {
       setState(() { _isSaving = false; });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
       }
     }
   }
@@ -107,7 +107,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
     } catch (e) {
       setState(() { _isDeleting = false; });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
       }
     }
   }

@@ -495,18 +495,57 @@ class _PhoneScreenState extends State<PhoneScreen> {
 class IndianMobileFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    if (digits.length > 10 && digits.startsWith('91')) {
-      digits = digits.substring(2);
-    } else if (digits.length > 10 && digits.startsWith('0')) {
-      digits = digits.substring(1);
+    // Fast path: if the new value is entirely digits and within the limit, accept it exactly as is.
+    // This perfectly preserves all native cursor movements, deletions, and keyboard composition states.
+    if (RegExp(r'^\d{0,10}$').hasMatch(newValue.text)) {
+      return newValue;
     }
-    if (digits.length > 10) digits = digits.substring(0, 10);
+    
+    // Strip non-digits
+    String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    // Handle pasted prefixes
+    if (digits.length > 10) {
+      if (digits.startsWith('91')) {
+        digits = digits.substring(2);
+      } else if (digits.startsWith('0')) {
+        digits = digits.substring(1);
+      }
+    }
+
+    // If still over 10, reject if it was a normal type-in, or just truncate if pasted.
+    if (digits.length > 10) {
+      if (oldValue.text.length == 10 && (newValue.text.length - oldValue.text.length) == 1) {
+        // They tried to type an 11th digit interactively. Reject it.
+        return oldValue;
+      }
+      digits = digits.substring(0, 10);
+    }
+
+    // Calculate cursor position
+    int cursorOffset = 0;
+    if (newValue.selection.end > -1) {
+      String textBeforeCursor = newValue.text.substring(0, newValue.selection.end);
+      cursorOffset = textBeforeCursor.replaceAll(RegExp(r'\D'), '').length;
+      
+      // If we stripped a prefix, we should adjust the cursor offset.
+      String originalDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
+      if (originalDigits.length > 10) {
+        if (originalDigits.startsWith('91')) {
+          cursorOffset -= 2;
+        } else if (originalDigits.startsWith('0')) {
+          cursorOffset -= 1;
+        }
+      }
+    }
+
+    if (cursorOffset < 0) cursorOffset = 0;
+    if (cursorOffset > digits.length) cursorOffset = digits.length;
 
     return TextEditingValue(
       text: digits,
-      selection: TextSelection.collapsed(offset: digits.length),
+      selection: TextSelection.collapsed(offset: cursorOffset),
     );
   }
 }
+

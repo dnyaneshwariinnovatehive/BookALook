@@ -610,7 +610,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   Future<void> _callOwner(String? phone, String salonName) async {
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No phone number on file for $salonName.')),
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('No phone number on file for $salonName.')),
       );
       return;
     }
@@ -620,7 +620,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not start a call. The number is $phone.')));
+      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not start a call. The number is $phone.')));
     }
   }
 

@@ -88,14 +88,14 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
         // Revert on failure
         setState(() => _pushEnabled = !value);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update preferences')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to update preferences')),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _pushEnabled = !value);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')),
         );
       }
     }

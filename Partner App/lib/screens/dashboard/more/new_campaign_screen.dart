@@ -237,7 +237,7 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2500), 
           content: Text('Your campaign is on its way.', style: GoogleFonts.outfit()),
           backgroundColor: AppTheme.lightSuccess,
         ),
@@ -252,7 +252,7 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2500), 
           content: Text(e.toString(), style: GoogleFonts.outfit()),
           backgroundColor: AppTheme.lightDanger,
         ),

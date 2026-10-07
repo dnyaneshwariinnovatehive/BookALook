@@ -86,7 +86,7 @@ class _CheckInConfirmSheetState extends State<CheckInConfirmSheet> {
       if (!mounted) return;
       Navigator.pop(context, true);
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text('Session started for ${_apt.customerName}.'),
       ));
     } catch (e) {

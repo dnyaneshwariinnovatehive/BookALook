@@ -163,7 +163,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
     
     final validServices = _selectedServices.where((s) => s['service_id'] != null).toList();
     if (validServices.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least 2 services for a combo')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Please select at least 2 services for a combo')));
       return;
     }
 
@@ -193,7 +193,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
     } catch (e) {
       setState(() { _isSaving = false; });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
       }
     }
   }
@@ -229,7 +229,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
                     if (mounted) Navigator.pop(context, true);
                   } catch (e) {
                     setState(() => _isLoading = false);
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
                   }
                 }
               },

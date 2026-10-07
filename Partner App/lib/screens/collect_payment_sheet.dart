@@ -104,7 +104,7 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
     setState(() => _target = updated);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Added to the bill.')),
+      const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Added to the bill.')),
     );
   }
 
@@ -189,7 +189,7 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
       Navigator.pop(context, true);
 
       final coins = result['coins_earned'] ?? 0;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text(coins > 0
             ? 'Payment collected. The salon earned $coins coins.'
             : 'Payment collected. Appointment completed.'),

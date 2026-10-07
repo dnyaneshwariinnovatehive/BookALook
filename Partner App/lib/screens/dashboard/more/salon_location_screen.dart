@@ -63,11 +63,11 @@ class _SalonLocationScreenState extends State<SalonLocationScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+          .showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
       await _load();
     } on LocationDisabledException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: const Text('Please turn on Location Services and try again.'),
         action: SnackBarAction(
           label: 'Settings',
@@ -76,12 +76,12 @@ class _SalonLocationScreenState extends State<SalonLocationScreen> {
       ));
     } on LocationPermissionDeniedException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text('BookALook needs location permission to update your salon pin.'),
       ));
     } on LocationPermissionPermanentlyDeniedException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: const Text('Location permission is disabled for BookALook. Please enable it in Settings.'),
         action: SnackBarAction(
           label: 'Settings',
@@ -91,7 +91,7 @@ class _SalonLocationScreenState extends State<SalonLocationScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(e.toString().replaceFirst('Exception: ', ''))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

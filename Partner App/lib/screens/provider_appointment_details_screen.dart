@@ -72,7 +72,7 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
           content: Text(e.toString().replaceFirst('Exception: ', '')),
           backgroundColor: Colors.red,
         ));

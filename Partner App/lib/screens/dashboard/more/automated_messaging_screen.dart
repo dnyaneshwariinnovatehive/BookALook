@@ -105,7 +105,7 @@ class _AutomatedMessagingScreenState extends State<AutomatedMessagingScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
       content: Text(message),
       backgroundColor: Colors.red,
     ));

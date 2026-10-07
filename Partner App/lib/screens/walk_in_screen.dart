@@ -248,7 +248,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
 
   void _showMessage(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(text)));
   }
 
   void _showError(String text) {

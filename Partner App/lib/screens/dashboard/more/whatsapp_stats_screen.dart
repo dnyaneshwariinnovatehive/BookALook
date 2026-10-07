@@ -40,7 +40,7 @@ class _WhatsappStatsScreenState extends State<WhatsappStatsScreen> {
 
   void _sendCampaign(String title) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Starting WhatsApp campaign for $title...')),
+      SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Starting WhatsApp campaign for $title...')),
     );
   }
 

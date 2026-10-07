@@ -141,13 +141,12 @@ class _CloseDaySheetState extends State<CloseDaySheet> {
       if (!mounted) return;
       Navigator.pop(context, true);
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text(
           result.releasedCount == 0
               ? result.message
               : '${result.message} ${result.notifiedCount} customer(s) notified.',
         ),
-        duration: const Duration(seconds: 5),
       ));
     } catch (e) {
       if (!mounted) return;

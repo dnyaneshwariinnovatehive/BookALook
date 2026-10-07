@@ -106,7 +106,7 @@ class _SalonQrScreenState extends State<SalonQrScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text('Could not create the image. Please try again.'),
       ));
     } finally {
@@ -123,7 +123,7 @@ class _SalonQrScreenState extends State<SalonQrScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Link copied.')),
+      const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Link copied.')),
     );
   }
 

@@ -121,7 +121,7 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
   Future<void> _callOwner(String? phone, String salonName) async {
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No phone number on file for $salonName.')),
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('No phone number on file for $salonName.')),
       );
       return;
     }
@@ -130,7 +130,7 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     if (!await launchUrl(uri)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2500), 
           content: Text('Could not start a call. The number is $phone.'),
         ),
       );

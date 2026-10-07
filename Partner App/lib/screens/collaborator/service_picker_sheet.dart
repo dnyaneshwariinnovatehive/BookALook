@@ -128,7 +128,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   }
 
   void _say(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
   }
 
   @override

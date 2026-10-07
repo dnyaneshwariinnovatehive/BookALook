@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import 'city_picker_sheet.dart';
+import 'salon_illustration.dart';
 
 /// Shows the BookALook location permission modal with entrance animation.
 ///
@@ -189,28 +190,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                     // Top Illustration Header with Close Button
                     Stack(
                       children: [
-                        Container(
-                          height: 215,
-                          width: double.infinity,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF3EDFD),
-                          ),
-                          child: Image.asset(
-                            'assets/images/location_salon_header.png',
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: const Color(0xFFEDE9FE),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.storefront_rounded,
-                                  size: 64,
-                                  color: Color(0xFF7C3AED),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        const SalonIllustration(),
                         // Soft bottom gradient blend
                         Positioned(
                           left: 0,

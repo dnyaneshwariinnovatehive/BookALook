@@ -257,7 +257,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
     // A plan the coins cover outright is activated on the spot, so the only
     // time a screenshot is needed is when real money changed hands.
     if (!_fullyPaidByCoins && _screenshot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload a screenshot of your transaction')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Please upload a screenshot of your transaction')));
       return;
     }
     setState(() => _isProcessing = true);
@@ -302,10 +302,10 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
 
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'])));
         Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'] ?? 'Failed')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'] ?? 'Failed')));
       }
     } catch (e) {
       debugPrint('Error upgrading: $e');

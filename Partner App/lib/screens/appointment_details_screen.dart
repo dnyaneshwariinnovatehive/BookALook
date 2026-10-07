@@ -91,7 +91,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(e.toString().replaceFirst('Exception: ', ''))),
         );
       }
     } finally {

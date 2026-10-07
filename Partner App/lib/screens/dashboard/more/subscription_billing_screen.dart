@@ -186,12 +186,12 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'])),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'])),
         );
         _fetchSubscription();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Renewal failed')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'] ?? 'Renewal failed')),
         );
         setState(() => _isLoading = false);
       }
@@ -252,7 +252,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data['message'] ?? 'Could not send the request.')),
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'] ?? 'Could not send the request.')),
       );
 
       if (data['success'] == true) _fetchSubscription();
@@ -720,7 +720,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
     // `allowed` being true is what proves uri is non-null, so no bang needed.
     if (!allowed || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failureMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(failureMessage)));
     }
   }
 

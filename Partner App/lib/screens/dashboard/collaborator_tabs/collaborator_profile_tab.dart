@@ -86,7 +86,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+        ).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Profile updated.')));
       }
     }
   }

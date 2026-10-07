@@ -46,7 +46,7 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       print('Error fetching appointments: $e');
       print(stack);
       setState(() => _isLoading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load appointments')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
     }
   }
 

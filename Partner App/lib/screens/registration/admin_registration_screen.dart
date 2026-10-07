@@ -76,7 +76,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Registration failed')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(result['message'] ?? 'Registration failed')),
         );
       }
     }

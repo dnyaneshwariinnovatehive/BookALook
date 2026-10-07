@@ -114,7 +114,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
       _longitude = position?.longitude;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
       content: Text(position == null
           ? 'Could not read your location. You can add it later from More > Salon Location.'
           : 'Location captured. Nearby customers will see you at the right distance.'),
@@ -132,7 +132,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
 
       if (_useDropdowns && _selectedSubAreaId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please choose the area your salon is in')),
+          const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Please choose the area your salon is in')),
         );
         return;
       }

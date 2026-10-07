@@ -37,7 +37,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
 
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No phone number on file for the salon owner.')),
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('No phone number on file for the salon owner.')),
       );
       return;
     }
@@ -47,7 +47,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
     if (!await launchUrl(uri)) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start a call. The number is $phone.')),
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not start a call. The number is $phone.')),
       );
     }
   }

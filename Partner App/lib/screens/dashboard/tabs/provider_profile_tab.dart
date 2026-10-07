@@ -115,7 +115,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             Future<void> submitLeave() async {
               if (!isFullDay && (startTime == null || endTime == null)) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: const Text('Please select start and end time for partial day leave.'), backgroundColor: AppTheme.darkDanger),
+                  SnackBar(duration: const Duration(milliseconds: 2500), content: const Text('Please select start and end time for partial day leave.'), backgroundColor: AppTheme.darkDanger),
                 );
                 return;
               }
@@ -124,7 +124,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 final endMin = endTime!.hour * 60 + endTime!.minute;
                 if (endMin <= startMin) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('End time must be after start time.'), backgroundColor: AppTheme.darkDanger),
+                    SnackBar(duration: const Duration(milliseconds: 2500), content: const Text('End time must be after start time.'), backgroundColor: AppTheme.darkDanger),
                   );
                   return;
                 }
@@ -147,7 +147,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                   Navigator.pop(ctx);
                   final isAutoApproved = response['auto_approved'] == true;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    SnackBar(duration: const Duration(milliseconds: 2500), 
                       content: Text(isAutoApproved ? 'Leave approved automatically.' : 'Leave requested successfully. Waiting for admin approval.'),
                       backgroundColor: AppTheme.accentColor,
                       behavior: SnackBarBehavior.floating,
@@ -158,7 +158,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
               } catch (e) {
                 setModalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to submit leave: ${e.toString()}'), backgroundColor: AppTheme.darkDanger),
+                  SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to submit leave: ${e.toString()}'), backgroundColor: AppTheme.darkDanger),
                 );
               }
             }

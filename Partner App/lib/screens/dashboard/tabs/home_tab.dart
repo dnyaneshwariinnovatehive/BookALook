@@ -337,14 +337,14 @@ class _HomeTabState extends State<HomeTab> {
       await StaffApi.updateLeaveStatus(widget.salonId, leave.id, newStatus);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Leave request ${newStatus == 'approved' ? 'approved' : 'rejected'}.')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Leave request ${newStatus == 'approved' ? 'approved' : 'rejected'}.')),
         );
         _fetchHomeData(silent: true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update leave status: $e')),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to update leave status: $e')),
         );
       }
     }

@@ -162,7 +162,7 @@ class PushNotificationService {
           // Typically we would parse an appointment_id and navigate to details.
           // For now, simply log and show a snackbar as foundation
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Received notification type: $type')),
+            SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Received notification type: $type')),
           );
         }
       });

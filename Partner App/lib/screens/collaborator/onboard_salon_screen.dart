@@ -257,7 +257,7 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
 
   void _say(String message) {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
+    messenger?.showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
   }
 
   // ------------------------------------------------------------------ build

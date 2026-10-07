@@ -94,7 +94,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load data: $e')));
         setState(() => _isLoading = false);
       }
     }
@@ -142,7 +142,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
               !h.isWeeklyOff && (h.shiftStart == null || h.shiftEnd == null));
       if (invalid) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), 
           content: Text(
             'Set a shift start and end for every working day before saving.',
           ),
@@ -178,7 +178,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff saved successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Staff saved successfully')));
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -395,7 +395,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                     if (mounted) Navigator.pop(context, true);
                   } catch (e) {
                     setState(() => _isLoading = false);
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
                   }
                 }
               },

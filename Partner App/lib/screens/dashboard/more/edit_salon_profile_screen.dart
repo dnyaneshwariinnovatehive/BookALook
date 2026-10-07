@@ -81,7 +81,7 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
 
   Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name is required')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Name is required')));
       return;
     }
 
@@ -104,14 +104,14 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+          const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
         );
         Navigator.pop(context, updatedSalon); // Return the updated salon map
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile: $e'), backgroundColor: Colors.red),
+          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to update profile: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {

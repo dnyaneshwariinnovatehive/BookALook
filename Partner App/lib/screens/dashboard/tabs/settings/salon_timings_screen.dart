@@ -51,12 +51,12 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
     try {
       await SalonSettingsApi.updateWorkingHours(widget.salonId, _workingHours);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Working hours updated successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Working hours updated successfully!')));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
       }
     } finally {
       if (mounted) {
@@ -118,10 +118,9 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text('Copied ${_daysOfWeek[sourceHour.dayOfWeek]}\'s schedule to all days'),
         backgroundColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
-        duration: const Duration(seconds: 2),
       ),
     );
   }
