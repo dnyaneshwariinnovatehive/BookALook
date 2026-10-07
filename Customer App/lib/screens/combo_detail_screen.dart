@@ -114,7 +114,7 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isServiceable = widget.salon['is_serviceable'] != false;
-    
+
     return Scaffold(
       backgroundColor: context.colors.surfaceMuted,
       body: Stack(
@@ -124,30 +124,20 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
               _buildAppBar(),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 120), // Bottom clearance
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: context.colors.listBorder),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildComboIdentity(),
-                        _buildSalonInfo(),
-                        _buildPricingCard(),
-                        _buildIncludedServices(),
-                      ],
-                    ),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _buildHeaderCard(),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _buildPricingCard(),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, bottomClearance(context, gap: 84)),
+                  child: _buildIncludedServices(),
                 ),
               ),
             ],
@@ -207,7 +197,7 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
               Image.network(
                 photoUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: context.colors.imagePlaceholder,
                   child: const Icon(Icons.storefront, color: AppTheme.accentColor, size: 32),
                 ),
@@ -232,14 +222,34 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
     );
   }
 
-  Widget _buildComboIdentity() {
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: context.colors.listBorder),
+      boxShadow: [
+        BoxShadow(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCard() {
     final name = widget.combo['name'] ?? 'Combo';
     final salonName = widget.salon['name'] ?? 'Unnamed Salon';
     final count = (widget.salon['review_count'] as num?)?.toInt() ?? 0;
     final avg = (widget.salon['avg_rating'] as num?)?.toDouble() ?? 0;
+    final address = widget.salon['address'] ?? '';
+    final distance = widget.salon['distance_km'];
+    final bool isServiceable = widget.salon['is_serviceable'] != false;
+    final String unavailableReason = widget.salon['unavailable_reason'] ?? 'Not taking bookings';
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -285,22 +295,7 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                 ),
               ],
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSalonInfo() {
-    final address = widget.salon['address'] ?? '';
-    final distance = widget.salon['distance_km'];
-    final bool isServiceable = widget.salon['is_serviceable'] != false;
-    final String unavailableReason = widget.salon['unavailable_reason'] ?? 'Not taking bookings';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          const SizedBox(height: 16),
           if (address.isNotEmpty) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,7 +310,7 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
           ],
           if (!isServiceable)
             Container(
@@ -365,11 +360,10 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.accentColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
       ),
       child: Column(
@@ -467,10 +461,15 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
   }
 
   Widget _buildIncludedServices() {
-    final services = (widget.combo['services'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
+    final services = (widget.combo['services'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((s) => Map<String, dynamic>.from(s))
+        .toList();
+    if (services.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -522,71 +521,63 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
   Widget _buildBottomBar(bool isServiceable) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        border: Border(top: BorderSide(color: context.colors.border)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        bottomClearance(context, gap: 12),
       ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.of(context).padding.bottom),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: (isServiceable && !_isAdding) ? _addCombo : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  disabledBackgroundColor: context.colors.surfaceMuted,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: (isServiceable && !_isAdding) ? _addCombo : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                disabledBackgroundColor: context.colors.surfaceMuted,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: _isAdding
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Book This Combo',
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isServiceable ? Colors.white : context.colors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.arrow_forward,
-                            size: 18,
+                elevation: 4,
+                shadowColor: AppTheme.accentColor.withValues(alpha: 0.35),
+              ),
+              child: _isAdding
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Book This Combo',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: isServiceable ? Colors.white : context.colors.textSecondary,
                           ),
-                        ],
-                      ),
-              ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 18,
+                          color: isServiceable ? Colors.white : context.colors.textSecondary,
+                        ),
+                      ],
+                    ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -177,7 +177,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
         context.colors.textPrimary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 20, 14),
+      padding: const EdgeInsets.fromLTRB(4, 4, 14, 10),
       child: Row(
         children: [
           IconButton(
@@ -258,11 +258,11 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     final borderColor = context.colors.listBorder;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: borderColor, width: 1.5),
         boxShadow: [
           BoxShadow(
@@ -297,7 +297,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
             child: Container(
               height: 44,
               decoration: BoxDecoration(
@@ -342,10 +342,10 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
           SizedBox(
             height: 40,
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               scrollDirection: Axis.horizontal,
               itemCount: categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final cat = categories[index];
                 final isSelected = _selectedCategory == cat;
@@ -375,7 +375,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
           ),
           const SizedBox(height: 8),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Row(
               children: [
                 DropdownButtonHideUnderline(
@@ -399,7 +399,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
                 const Spacer(),
                 if (!_isLoading && !_loadFailed)
                   Text(
-                    '${_totalCombosCount} combos found',
+                    '$_totalCombosCount combos found',
                     style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.textSecondary),
                   ),
               ],
@@ -506,7 +506,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: borderColor, width: 1.2)),
       ),
@@ -558,7 +558,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     if (_isLoading) {
       return SkeletonList(
         count: 4,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 14),
         itemBuilder: (_) => const SalonCardSkeleton(),
       );
     }
@@ -603,7 +603,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
       color: AppTheme.accentColor,
       onRefresh: _loadSalons,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 14),
         itemCount: filteredSalons.length,
         separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -637,7 +637,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
           child: InlineStatus(
             message: _actionError!,
             onDismiss: () => setState(() => _actionError = null),
