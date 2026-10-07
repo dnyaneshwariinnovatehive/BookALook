@@ -52,22 +52,9 @@ class _SalonLocationScreenState extends State<SalonLocationScreen> {
   Future<void> _pinHere() async {
     setState(() => _saving = true);
 
-    final position = await SalonLocationApi.devicePosition();
-
-    if (!mounted) return;
-
-    if (position == null) {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-          'We could not read your location. Check that location is switched on '
-          'and that BookALook is allowed to use it.',
-        ),
-      ));
-      return;
-    }
-
     try {
+      final position = await SalonLocationApi.requireDevicePosition();
+
       final message = await SalonLocationApi.save(
         widget.salonId,
         position.latitude,
@@ -78,6 +65,29 @@ class _SalonLocationScreenState extends State<SalonLocationScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
       await _load();
+    } on LocationDisabledException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Please turn on Location Services and try again.'),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: () => SalonLocationApi.openLocationSettings(),
+        ),
+      ));
+    } on LocationPermissionDeniedException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('BookALook needs location permission to update your salon pin.'),
+      ));
+    } on LocationPermissionPermanentlyDeniedException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Location permission is disabled for BookALook. Please enable it in Settings.'),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: () => SalonLocationApi.openAppSettings(),
+        ),
+      ));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

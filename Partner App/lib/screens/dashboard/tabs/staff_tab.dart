@@ -230,6 +230,118 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     return matching;
   }
 
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _fetchStaff(),
+      _fetchLeaves(),
+    ]);
+  }
+
+  String _staffFilter = 'all';
+
+  int get _totalStaff => _staff.length;
+  int get _activeStaff => _staff.where((s) => s.isActive).length;
+  
+  int get _onLeaveStaff {
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    int count = 0;
+    for (var member in _staff) {
+      if (_leaves.any((l) => l.providerId == member.id && l.leaveDate == todayStr && l.status == 'approved')) {
+        count++;
+      }
+    }
+    return count;
+  }
+  
+  int get _pendingLeaveRequests => _leaves.where((l) => l.status == 'pending').length;
+
+  Widget _buildSummaryRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final totalBg = isDark ? const Color(0xFF3B285E) : const Color(0xFFF3E8FF);
+    final totalIconColor = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF9C27B0);
+    
+    final activeBg = isDark ? const Color(0xFF1B3B22) : const Color(0xFFE8F5E9);
+    final activeIconColor = isDark ? const Color(0xFF81C784) : const Color(0xFF4CAF50);
+    
+    final leaveBg = isDark ? const Color(0xFF4A3419) : const Color(0xFFFFF3E0);
+    final leaveIconColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFFF9800);
+
+    if (_isLoadingStaff || _isLoadingLeaves) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          children: List.generate(3, (index) => Expanded(
+            child: Container(
+              height: 60,
+              margin: EdgeInsets.only(right: index < 2 ? 8 : 0),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          )),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(child: _buildSummaryCard('Total Staff', _totalStaff, Icons.people_alt, totalBg, totalIconColor, isDark, () {
+            _tabController.animateTo(0);
+            setState(() => _staffFilter = 'all');
+          })),
+          const SizedBox(width: 8),
+          Expanded(child: _buildSummaryCard('Active', _activeStaff, Icons.person, activeBg, activeIconColor, isDark, () {
+            _tabController.animateTo(0);
+            setState(() => _staffFilter = 'active');
+          })),
+          const SizedBox(width: 8),
+          Expanded(child: _buildSummaryCard('On Leave', _onLeaveStaff, Icons.event_busy, leaveBg, leaveIconColor, isDark, () {
+            _tabController.animateTo(1);
+            setState(() => _leaveFilter = 'approved');
+          })),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(String title, int count, IconData icon, Color bgColor, Color iconColor, bool isDark, VoidCallback onTap) {
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          decoration: BoxDecoration(
+            border: Border.all(color: iconColor.withOpacity(0.15)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 14, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text(count.toString(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87, height: 1.0)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(title, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54, height: 1.0), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatLeaveTime(ProviderLeave leave) {
     try {
       DateTime date = DateTime.parse(leave.leaveDate);
@@ -359,6 +471,38 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
       child: Text(
         label,
         style: TextStyle(color: Color(0xFF9C27B0), fontSize: 11, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildStaffFilterChip(String value, String label) {
+    final selected = _staffFilter == value;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => setState(() => _staffFilter = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.accentColor : theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppTheme.accentColor : theme.dividerColor,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : (isDark ? theme.colorScheme.onSurface : const Color(0xFF6B7280)),
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -514,6 +658,13 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
     );
   }
 
+  List<StaffMember> get _filteredStaff {
+    if (_staffFilter == 'active') {
+      return _staff.where((s) => s.isActive).toList();
+    }
+    return _staff;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -553,9 +704,10 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
       ),
       body: Column(
         children: [
+          _buildSummaryRow(),
           // Segmented Tab Bar
           Container(
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: AppTheme.accentColor.withOpacity(0.08),
@@ -575,9 +727,9 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
               labelStyle: TextStyle(fontWeight: FontWeight.bold),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              tabs: const [
-                Tab(text: 'All Staff'),
-                Tab(text: 'Leave Requests'),
+              tabs: [
+                Tab(text: _isLoadingStaff ? 'All Staff' : 'All Staff ($_totalStaff)'),
+                Tab(text: _isLoadingLeaves ? 'Leave Requests' : 'Leave Requests ($_pendingLeaveRequests)'),
               ],
             ),
           ),
@@ -591,13 +743,53 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                     ? const Center(child: CircularProgressIndicator())
                     : _staffError != null
                         ? Center(child: Text(_staffError!))
-                        : _staff.isEmpty
-                            ? const Center(child: Text('No staff added yet.'))
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: _staff.length,
-                                itemBuilder: (context, index) => _buildStaffCard(_staff[index]),
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                child: Row(
+                                  children: [
+                                    _buildStaffFilterChip('all', 'All Staff'),
+                                    const SizedBox(width: 8),
+                                    _buildStaffFilterChip('active', 'Active'),
+                                  ],
+                                ),
                               ),
+                              Expanded(
+                                child: _staff.isEmpty
+                                    ? RefreshIndicator(
+                                        onRefresh: _refreshAll,
+                                        color: AppTheme.accentColor,
+                                        child: ListView(
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          children: const [
+                                            SizedBox(height: 100),
+                                            Center(child: Text('No staff added yet.')),
+                                          ],
+                                        ),
+                                      )
+                                    : RefreshIndicator(
+                                        onRefresh: _refreshAll,
+                                        color: AppTheme.accentColor,
+                                        child: _filteredStaff.isEmpty
+                                            ? ListView(
+                                                physics: const AlwaysScrollableScrollPhysics(),
+                                                children: const [
+                                                  SizedBox(height: 100),
+                                                  Center(child: Text('No active staff found.')),
+                                                ],
+                                              )
+                                            : ListView.builder(
+                                                physics: const AlwaysScrollableScrollPhysics(),
+                                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                                itemCount: _filteredStaff.length,
+                                                itemBuilder: (context, index) => _buildStaffCard(_filteredStaff[index]),
+                                              ),
+                                      ),
+                              ),
+                            ],
+                          ),
 
                 // Leave Requests View
                 _isLoadingLeaves
@@ -621,24 +813,35 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
                                 ),
                               ),
                               Expanded(
-                                child: _filteredLeaves.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          _leaves.isEmpty
-                                              ? 'No leave requests found.'
-                                              : 'No ${_leaveFilter} leave requests.',
-                                          style: TextStyle(
-                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                            fontSize: 14,
-                                          ),
+                                child: RefreshIndicator(
+                                  onRefresh: _refreshAll,
+                                  color: AppTheme.accentColor,
+                                  child: _filteredLeaves.isEmpty
+                                      ? ListView(
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          children: [
+                                            const SizedBox(height: 100),
+                                            Center(
+                                              child: Text(
+                                                _leaves.isEmpty
+                                                    ? 'No leave requests found.'
+                                                    : 'No $_leaveFilter leave requests.',
+                                                style: TextStyle(
+                                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : ListView.builder(
+                                          physics: const AlwaysScrollableScrollPhysics(),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          itemCount: _filteredLeaves.length,
+                                          itemBuilder: (context, index) =>
+                                              _buildLeaveCard(_filteredLeaves[index]),
                                         ),
-                                      )
-                                    : ListView.builder(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        itemCount: _filteredLeaves.length,
-                                        itemBuilder: (context, index) =>
-                                            _buildLeaveCard(_filteredLeaves[index]),
-                                      ),
+                                ),
                               ),
                             ],
                           ),

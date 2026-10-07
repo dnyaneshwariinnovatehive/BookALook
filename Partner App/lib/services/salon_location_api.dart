@@ -56,6 +56,10 @@ class SalonQrCode {
       );
 }
 
+class LocationDisabledException implements Exception {}
+class LocationPermissionDeniedException implements Exception {}
+class LocationPermissionPermanentlyDeniedException implements Exception {}
+
 /// Reading and setting the salon's position.
 ///
 /// Customers see the nearest salons first, so this is not decoration — a salon
@@ -104,25 +108,27 @@ class SalonLocationApi {
     return body['message'] ?? 'Location saved.';
   }
 
-  /// Read the device's position.
-  ///
-  /// Null on any refusal or failure — the owner can try again later, and
-  /// nothing else in the app depends on this succeeding.
-  static Future<Position?> devicePosition() async {
+  /// Read the device's position, throwing specific exceptions if it fails.
+  static Future<Position> requireDevicePosition() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      throw LocationDisabledException();
+    }
+
+    var permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      throw LocationPermissionDeniedException();
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw LocationPermissionPermanentlyDeniedException();
+    }
+
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) return null;
-
-      var permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return null;
-      }
-
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           // The owner is standing in the salon, so it is worth waiting for a
@@ -132,10 +138,25 @@ class SalonLocationApi {
         ),
       );
     } catch (e) {
+      throw Exception('We couldn\'t determine your current location. Please try again.');
+    }
+  }
+
+  /// Read the device's position safely.
+  ///
+  /// Null on any refusal or failure — the owner can try again later, and
+  /// nothing else in the app depends on this succeeding.
+  static Future<Position?> devicePosition() async {
+    try {
+      return await requireDevicePosition();
+    } catch (e) {
       debugPrint('Could not get a position: $e');
       return null;
     }
   }
+
+  static Future<void> openAppSettings() => Geolocator.openAppSettings();
+  static Future<void> openLocationSettings() => Geolocator.openLocationSettings();
 
   /// The address this salon's QR poster points at.
   ///
