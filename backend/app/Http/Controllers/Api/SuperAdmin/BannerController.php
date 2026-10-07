@@ -57,6 +57,7 @@ class BannerController extends Controller
             'banner_type'        => 'required|in:' . implode(',', Banner::TYPES),
             'config'             => 'nullable|array',
             'image_url'          => 'nullable|url|max:255',
+            'media_kind'         => 'sometimes|in:' . implode(',', Banner::MEDIA_KINDS),
             'action_url'         => 'nullable|url|max:255',
             'target_scope'       => 'required|in:platform,city,salon,sub_area',
             'target_city_id'     => 'nullable|exists:cities,id',
@@ -73,6 +74,16 @@ class BannerController extends Controller
             return response()->json(['message' => 'Static banners require an image.'], 422);
         }
 
+        // New writes must be explicit about animated media; without a declared
+        // kind the column default 'image' applies and the extension check below
+        // will point a GIF URL at media_kind: "animated".
+        $validated['media_kind'] ??= 'image';
+
+        $mediaError = $this->mediaConsistencyError($validated['media_kind'], $validated['image_url'] ?? null);
+        if ($mediaError !== null) {
+            return response()->json(['message' => $mediaError], 422);
+        }
+
         $banner = Banner::create($validated);
 
         return response()->json(['message' => 'Banner created successfully', 'banner' => $banner->load(['city', 'salon', 'subArea'])], 201);
@@ -87,6 +98,7 @@ class BannerController extends Controller
             'banner_type'        => 'sometimes|in:' . implode(',', Banner::TYPES),
             'config'             => 'nullable|array',
             'image_url'          => 'nullable|url|max:255',
+            'media_kind'         => 'sometimes|in:' . implode(',', Banner::MEDIA_KINDS),
             'action_url'         => 'nullable|url|max:255',
             'target_scope'       => 'sometimes|in:platform,city,salon,sub_area',
             'target_city_id'     => 'nullable|exists:cities,id',
@@ -97,6 +109,28 @@ class BannerController extends Controller
             'is_active'          => 'boolean',
             'priority'           => 'nullable|integer|min:0|unique:banners,priority,' . $banner->id,
         ]);
+
+        // Media consistency for the edit:
+        //   - a declared media_kind always wins (it is validated against the
+        //     resulting image_url below);
+        //   - swapping in a new image_url without declaring the kind keeps the
+        //     banner's stored kind, so an animated banner pointed at a JPEG is
+        //     refused rather than silently reclassified;
+        //   - leaving the image alone derives the kind from the stored URL, so
+        //     a legacy GIF row (stored before media_kind existed, defaulting to
+        //     'image') can still be edited without a spurious 422.
+        $changesImage = array_key_exists('image_url', $validated);
+        $effectiveUrl = $changesImage ? $validated['image_url'] : $banner->image_url;
+        $effectiveKind = $validated['media_kind']
+            ?? ($changesImage
+                ? $banner->media_kind
+                : ($this->mediaKindFromUrl($effectiveUrl) ?? $banner->media_kind))
+            ?? 'image';
+
+        $mediaError = $this->mediaConsistencyError($effectiveKind, $effectiveUrl);
+        if ($mediaError !== null) {
+            return response()->json(['message' => $mediaError], 422);
+        }
 
         $banner->update($validated);
 
@@ -109,6 +143,86 @@ class BannerController extends Controller
         $banner->delete();
 
         return response()->json(['message' => 'Banner deleted successfully']);
+    }
+
+    /**
+     * Check that media_kind and image_url agree with each other.
+     * Rules (applied in order):
+     *   1. An animated banner must have an image_url; an image banner may be empty.
+     *   2. No/unparseable file extension → skip the remaining checks. Cloudinary
+     *      URLs can be transformation-based (e.g. f_auto) and carry no extension,
+     *      so we stay lenient rather than break legacy rows.
+     *   3. Extension outside {jpg,jpeg,png,gif,webp} → reject (svg/mp4/webm/...).
+     *   4. animated + not gif/webp → reject.
+     *   5. image + not jpg/jpeg/png → reject (sender should set media_kind: animated).
+     *
+     * A missing media_kind is treated as 'image', matching the column default.
+     * Returns a human-readable message, or null when the combination is valid.
+     */
+    private function mediaConsistencyError(string $mediaKind, ?string $imageUrl): ?string
+    {
+        if (empty($imageUrl)) {
+            return $mediaKind === 'animated'
+                ? 'Animated banners require an image URL.'
+                : null;
+        }
+
+        $path = parse_url($imageUrl, PHP_URL_PATH);
+        $basename = is_string($path) ? basename($path) : '';
+        $extension = str_contains($basename, '.') ? strtolower(pathinfo($basename, PATHINFO_EXTENSION)) : '';
+
+        // No clear extension (query-string-less Cloudinary transform URLs, etc.).
+        if ($extension === '' || preg_match('/^[a-z0-9]{1,5}$/', $extension) !== 1) {
+            return null;
+        }
+
+        if (!in_array($extension, Banner::IMAGE_EXTENSIONS, true)) {
+            return sprintf(
+                'Unsupported image format "%s". Allowed formats: %s.',
+                $extension,
+                implode(', ', Banner::IMAGE_EXTENSIONS)
+            );
+        }
+
+        if ($mediaKind === 'animated' && !in_array($extension, Banner::ANIMATED_EXTENSIONS, true)) {
+            return sprintf(
+                'media_kind "animated" requires a GIF or WebP image, got "%s".',
+                $extension
+            );
+        }
+
+        if ($mediaKind === 'image' && !in_array($extension, Banner::STATIC_EXTENSIONS, true)) {
+            return 'The image at that URL is not a static JPG or PNG. '
+                .'If it is a GIF or animated WebP, send media_kind: "animated".';
+        }
+
+        return null;
+    }
+
+    /**
+     * Best-effort guess of the media kind from a URL's file extension.
+     * Returns null when the extension says nothing useful (no extension,
+     * video/json/etc.), letting the caller fall back to the stored column.
+     */
+    private function mediaKindFromUrl(?string $imageUrl): ?string
+    {
+        if (empty($imageUrl)) {
+            return null;
+        }
+
+        $path = parse_url($imageUrl, PHP_URL_PATH);
+        $basename = is_string($path) ? basename($path) : '';
+        $extension = str_contains($basename, '.') ? strtolower(pathinfo($basename, PATHINFO_EXTENSION)) : '';
+
+        if (in_array($extension, Banner::ANIMATED_EXTENSIONS, true)) {
+            return 'animated';
+        }
+
+        if (in_array($extension, Banner::STATIC_EXTENSIONS, true)) {
+            return 'image';
+        }
+
+        return null;
     }
 
     /**

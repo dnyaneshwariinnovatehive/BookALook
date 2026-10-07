@@ -500,3 +500,43 @@
   font-size: 0.78rem;
 }
 
+/* The media axis: is the artwork a still or a loop. Said out loud in the
+   toolbar because it decides whether cropping is offered at all. */
+.mediaKind {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mediaKindAnimated {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--accent-color);
+}
+
+/* Same badge in the preview card and on the list cards. */
+.animatedBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* Inside the preview card it sits over the artwork, clear of the title. */
+.appCardBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+

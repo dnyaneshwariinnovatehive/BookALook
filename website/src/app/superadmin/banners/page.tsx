@@ -5,7 +5,7 @@ import AsyncSelect from 'react-select/async';
 import Select from 'react-select';
 import { useConfirm } from '@/components/admin/ui';
 import styles from './banners.module.css';
-import BannerStudio from './BannerStudio';
+import BannerStudio, { mediaKindFromUrl, type MediaKind } from './BannerStudio';
 
 interface Banner {
   id: string;
@@ -13,6 +13,7 @@ interface Banner {
   banner_type: 'static' | 'combo_discount' | 'specific_combo' | 'new_arrivals' | 'category_spotlight' | 'seasonal';
   config: any;
   image_url: string;
+  media_kind?: MediaKind;
   action_url?: string;
   target_scope: 'platform' | 'city' | 'salon' | 'sub_area';
   target_city_id?: string;
@@ -85,6 +86,9 @@ export default function BannersPage() {
   const [priority, setPriority] = useState<number>(0);
   const [actionUrl, setActionUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // Static image or animated GIF/WebP. Owned here because it is what gets
+  // posted as media_kind; BannerStudio only reports how it changed.
+  const [mediaKind, setMediaKind] = useState<MediaKind>('image');
 
   const today = toLocalISO(new Date());
   // New banners: no dates before today. Editing: keep an already-live past start date selectable.
@@ -269,6 +273,10 @@ export default function BannersPage() {
       alert("Static banners require an image");
       return;
     }
+    if (mediaKind === 'animated' && !imagePreviewUrl) {
+      alert("An animated banner needs its GIF or WebP image");
+      return;
+    }
     if (!startDate || !endDate || endDate <= startDate) {
       alert("End date must be after the start date");
       return;
@@ -298,6 +306,7 @@ export default function BannersPage() {
       banner_type: bannerType,
       config,
       image_url: imageUrl,
+      media_kind: mediaKind,
       action_url: actionUrl ? actionUrl : null,
       target_scope: targetScope,
       target_city_id: (targetScope === 'city' || targetScope === 'sub_area') ? targetCityId : null,
@@ -448,6 +457,9 @@ export default function BannersPage() {
     setPriority(banner.priority || 0);
     setActionUrl(banner.action_url || '');
     setImagePreviewUrl(banner.image_url);
+    // The URL decides when it can — a legacy GIF row predates the column —
+    // so editing one never presents it as a static image.
+    setMediaKind(mediaKindFromUrl(banner.image_url) ?? banner.media_kind ?? 'image');
     setImageFile(null);
     setIsModalOpen(true);
   };
@@ -469,6 +481,7 @@ export default function BannersPage() {
     setActionUrl('');
     setImageFile(null);
     setImagePreviewUrl(null);
+    setMediaKind('image');
     setEditingBannerId(null);
     setOriginalStartDate('');
     setPreviewData(null);
@@ -564,8 +577,14 @@ export default function BannersPage() {
           <div key={banner.id} className={styles.bannerCard}>
             <div style={{ position: 'relative' }}>
               <img src={banner.image_url || 'https://via.placeholder.com/600x240?text=Auto+Generated'} alt={banner.title} className={styles.bannerImage} />
-              <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--surface-color)', padding: '2px 8px', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600 }}>
-                {banner.banner_type.replace('_', ' ').toUpperCase()}
+              {/* Stacked so adding the media badge never shifts the type badge. */}
+              <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <div style={{ background: 'var(--surface-color)', padding: '2px 8px', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600 }}>
+                  {banner.banner_type.replace('_', ' ').toUpperCase()}
+                </div>
+                {(mediaKindFromUrl(banner.image_url) ?? banner.media_kind) === 'animated' && (
+                  <span className={styles.animatedBadge}>ANIMATED</span>
+                )}
               </div>
             </div>
             <div className={styles.bannerContent}>
@@ -892,8 +911,10 @@ export default function BannersPage() {
                     previewUrl={imagePreviewUrl}
                     savedUrl={editingBannerId && !imageFile ? imagePreviewUrl : null}
                     title={title}
+                    mediaKind={mediaKind}
                     onFile={setImageFile}
                     onPreview={setImagePreviewUrl}
+                    onMediaKind={setMediaKind}
                   />
                 </div>
 

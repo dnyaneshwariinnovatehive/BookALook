@@ -14,6 +14,7 @@ class Banner extends Model
         'banner_type',
         'config',
         'image_url',
+        'media_kind',
         'action_url',
         'target_scope',
         'target_city_id',
@@ -64,4 +65,18 @@ class Banner extends Model
         'category_spotlight',
         'seasonal',
     ];
+
+    /**
+     * Media axis — deliberately separate from TYPES.
+     * 'image'    → static raster only (jpg/jpeg/png)
+     * 'animated' → animated raster only (gif/webp)
+     */
+    public const MEDIA_KINDS = ['image', 'animated'];
+
+    public const STATIC_EXTENSIONS = ['jpg', 'jpeg', 'png'];
+
+    public const ANIMATED_EXTENSIONS = ['gif', 'webp'];
+
+    /** Every extension allowed on an image_url (static ∪ animated). */
+    public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 }

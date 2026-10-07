@@ -91,7 +91,31 @@ class BannerController extends Controller
             }
         }
 
+        $this->applyImagePlaceholders($resolvedBanners);
+
         return response()->json(array_values($resolvedBanners));
+    }
+
+    /**
+     * Defensive pass: every banner the app receives must carry an image_url.
+     * The Flutter PromoBanner model treats image_url as non-nullable, and a
+     * single null in the list would crash the whole carousel. Any banner that
+     * reached here without one (e.g. a static/seasonal row created before the
+     * media rules) gets a title-derived placeholder instead.
+     */
+    private function applyImagePlaceholders(array $banners): void
+    {
+        foreach ($banners as $banner) {
+            if (!empty($banner->image_url)) {
+                continue;
+            }
+
+            $label = $banner->title
+                ? str_replace('_', ' ', strtoupper($banner->title))
+                : str_replace('_', ' ', strtoupper($banner->banner_type));
+
+            $banner->image_url = 'https://via.placeholder.com/800x320/F3EBFE/6B46C1?text=' . urlencode($label);
+        }
     }
 
     /**

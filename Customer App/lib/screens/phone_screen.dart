@@ -1,5 +1,6 @@
 import 'main_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import 'otp_screen.dart';
 import '../utils/app_haptics.dart';
@@ -55,6 +56,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty || phone.length < 10) {
       _fail('Please enter a valid phone number (min 10 digits)');
+      return;
+    }
+    if (phone.length > 10) {
+      _fail('Please enter a valid 10-digit phone number');
       return;
     }
 
@@ -254,10 +259,15 @@ class _PhoneScreenState extends State<PhoneScreen> {
                       key: PhoneScreen.phoneFieldKey,
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      autofillHints: const [AutofillHints.telephoneNumber],
+                      textInputAction: TextInputAction.go,
+                      autofillHints: const [AutofillHints.telephoneNumberNational],
+                      inputFormatters: [IndianMobileFormatter()],
                       style: const TextStyle(fontSize: 16),
                       onChanged: (_) {
                         if (_error != null) setState(() => _error = null);
+                      },
+                      onSubmitted: (_) {
+                        if (!_isLoading) _sendOtp();
                       },
                       decoration: InputDecoration(
                         hintText: 'Enter your mobile no.',
@@ -399,6 +409,33 @@ class _PhoneScreenState extends State<PhoneScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Keeps the phone field to the 10 digits the backend expects.
+///
+/// Strips spaces, dashes, and other non-digits, and drops a pasted or autofilled
+/// `+91`, `91` or leading `0` so "+91 98765 43210" becomes "9876543210" instead
+/// of being truncated to the wrong digits. Restricts input to at most 10 digits.
+class IndianMobileFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length == 12 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length > 10 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length > 10 && digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (digits.length > 10) digits = digits.substring(0, 10);
+
+    return TextEditingValue(
+      text: digits,
+      selection: TextSelection.collapsed(offset: digits.length),
     );
   }
 }

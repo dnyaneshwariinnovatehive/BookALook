@@ -27,12 +27,13 @@ class AnimatedSearchField extends StatefulWidget {
   State<AnimatedSearchField> createState() => _AnimatedSearchFieldState();
 }
 
-class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTickerProviderStateMixin {
+class _AnimatedSearchFieldState extends State<AnimatedSearchField>
+    with SingleTickerProviderStateMixin {
   Timer? _timer;
   int _wordIndex = 0;
   String _currentHint = "";
   bool _isTyping = true;
-  bool _isActive = true;
+  bool _isActive = false;
   late FocusNode _focusNode;
   late AnimationController _cursorController;
 
@@ -42,18 +43,17 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTi
     _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_onFocusChanged);
     widget.controller.addListener(_onTextChanged);
-    
+
     _cursorController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     )..repeat(reverse: true);
-    
-    _startAnimation();
+
+    _startAnimation(isInitial: true);
   }
 
   void _onFocusChanged() {
     if (mounted) {
-      setState(() {});
       if (_focusNode.hasFocus) {
         _stopAnimation();
       } else {
@@ -61,40 +61,40 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTi
           _startAnimation();
         }
       }
+      setState(() {});
     }
   }
 
   void _onTextChanged() {
     if (mounted) {
-      setState(() {});
       if (widget.controller.text.isNotEmpty || _focusNode.hasFocus) {
         _stopAnimation();
       } else {
         _startAnimation();
       }
+      setState(() {});
     }
   }
 
   void _stopAnimation() {
     if (!_isActive) return;
     _timer?.cancel();
+    _isActive = false;
+    _currentHint = "";
     if (mounted) {
-      setState(() {
-        _isActive = false;
-        _currentHint = "";
-      });
+      setState(() {});
     }
   }
 
-  void _startAnimation() {
+  void _startAnimation({bool isInitial = false}) {
     if (_isActive || widget.suggestions.isEmpty) return;
-    if (mounted) {
-      setState(() {
-        _isActive = true;
-        _wordIndex = 0;
-        _currentHint = "";
-        _isTyping = true;
-      });
+    _timer?.cancel();
+    _isActive = true;
+    _wordIndex = 0;
+    _currentHint = "";
+    _isTyping = true;
+    if (!isInitial && mounted) {
+      setState(() {});
     }
     _scheduleNextTick();
   }
@@ -102,7 +102,8 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTi
   void _scheduleNextTick() {
     if (!mounted || !_isActive || widget.suggestions.isEmpty) return;
 
-    final currentWord = widget.suggestions[_wordIndex % widget.suggestions.length];
+    final currentWord =
+        widget.suggestions[_wordIndex % widget.suggestions.length];
 
     if (_isTyping) {
       if (_currentHint.length < currentWord.length) {
@@ -149,46 +150,50 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final bool showAnimatedHint = widget.controller.text.isEmpty && !_focusNode.hasFocus && widget.suggestions.isNotEmpty;
-    
+    final bool showAnimatedHint = widget.controller.text.isEmpty &&
+        !_focusNode.hasFocus &&
+        widget.suggestions.isNotEmpty;
+
     final TextStyle baseStyle = widget.style ?? const TextStyle(fontSize: 14);
-    final TextStyle hintStyle = widget.decoration.hintStyle ?? baseStyle.copyWith(color: Colors.grey);
-    
+    final TextStyle hintStyle = widget.decoration.hintStyle ??
+        baseStyle.copyWith(color: Colors.grey);
+
     Widget hintLayer = const SizedBox.shrink();
     if (showAnimatedHint) {
-       hintLayer = IgnorePointer(
-         child: Padding(
-           padding: widget.decoration.contentPadding ?? EdgeInsets.zero,
-           child: Row(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               Text('Search "', style: hintStyle),
-               Text(_currentHint, style: hintStyle),
-               AnimatedBuilder(
-                 animation: _cursorController,
-                 builder: (context, child) {
-                   return Opacity(
-                     opacity: _currentHint.isEmpty ? 0.0 : _cursorController.value,
-                     child: Container(
-                       width: 1.5,
-                       height: hintStyle.fontSize != null ? hintStyle.fontSize! * 1.2 : 16,
-                       color: hintStyle.color ?? Colors.grey,
-                       margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                     ),
-                   );
-                 }
-               ),
-               Text('"', style: hintStyle),
-             ],
-           ),
-         ),
-       );
+      hintLayer = IgnorePointer(
+        child: Padding(
+          padding: widget.decoration.contentPadding ?? EdgeInsets.zero,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Search "', style: hintStyle),
+              Text(_currentHint, style: hintStyle),
+              AnimatedBuilder(
+                animation: _cursorController,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _cursorController.value,
+                    child: Container(
+                      width: 1.5,
+                      height: hintStyle.fontSize != null
+                          ? hintStyle.fontSize! * 1.2
+                          : 16,
+                      color: hintStyle.color ?? Colors.grey,
+                      margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                    ),
+                  );
+                },
+              ),
+              Text('"', style: hintStyle),
+            ],
+          ),
+        ),
+      );
     }
 
     return Stack(
       alignment: Alignment.centerLeft,
       children: [
-        if (showAnimatedHint) hintLayer,
         TextField(
           controller: widget.controller,
           focusNode: _focusNode,
@@ -200,6 +205,7 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTi
             hintText: showAnimatedHint ? '' : widget.decoration.hintText,
           ),
         ),
+        if (showAnimatedHint) hintLayer,
       ],
     );
   }

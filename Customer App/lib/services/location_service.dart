@@ -282,4 +282,79 @@ class LocationService extends ChangeNotifier {
       return 'We could not work out your city. Pick one below instead.';
     }
   }
+
+  // --------------------------------------------------- permissions & lifecycle
+
+  static const _hasPromptedInitialLocationKey = 'has_prompted_initial_location';
+
+  bool _remindedPostLogin = false;
+  bool get canShowPostLoginReminder => !_remindedPostLogin;
+  void markPostLoginReminded() => _remindedPostLogin = true;
+
+  Future<bool> hasPromptedInitialLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_hasPromptedInitialLocationKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> markInitialLocationPrompted() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_hasPromptedInitialLocationKey, true);
+    } catch (_) {}
+  }
+
+  Future<LocationPermission> checkPermission() async {
+    try {
+      return await Geolocator.checkPermission();
+    } catch (_) {
+      return LocationPermission.denied;
+    }
+  }
+
+  Future<LocationPermission> requestPermission() async {
+    try {
+      return await Geolocator.requestPermission();
+    } catch (_) {
+      return LocationPermission.denied;
+    }
+  }
+
+  Future<bool> isLocationServiceEnabled() async {
+    try {
+      return await Geolocator.isLocationServiceEnabled();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> hasPermission() async {
+    try {
+      final p = await Geolocator.checkPermission();
+      return p == LocationPermission.whileInUse ||
+          p == LocationPermission.always;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> openAppSettings() async {
+    try {
+      return await Geolocator.openAppSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> openLocationSettings() async {
+    try {
+      return await Geolocator.openLocationSettings();
+    } catch (_) {
+      return false;
+    }
+  }
 }
+

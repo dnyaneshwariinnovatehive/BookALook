@@ -283,4 +283,28 @@ void main() {
     expect((knob.decoration as BoxDecoration).color,
         AppTheme.darkTheme.colorScheme.primary);
   });
+
+  testWidgets('phone field does not take 11 digits', (tester) async {
+    await tester.pumpWidget(_wrap(const PhoneScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+
+    // Typing 11 digits is capped to 10 digits
+    await tester.enterText(find.byKey(PhoneScreen.phoneFieldKey), '98765432101');
+    await tester.pump();
+
+    final field = tester.widget<TextField>(find.byKey(PhoneScreen.phoneFieldKey));
+    expect(field.controller!.text, '9876543210');
+
+    // Pasting formatted +91 number is resolved to 10 digits
+    await tester.enterText(find.byKey(PhoneScreen.phoneFieldKey), '+91 91234 56789');
+    await tester.pump();
+    expect(field.controller!.text, '9123456789');
+
+    // Pasting leading 0 number is resolved to 10 digits
+    await tester.enterText(find.byKey(PhoneScreen.phoneFieldKey), '09123456789');
+    await tester.pump();
+    expect(field.controller!.text, '9123456789');
+  });
 }
+

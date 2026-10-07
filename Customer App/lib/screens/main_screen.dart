@@ -15,6 +15,8 @@ import '../utils/app_haptics.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
 import '../theme/app_colors.dart';
+import '../services/location_service.dart';
+import '../widgets/location_permission_modal.dart';
 
 class MainScreen extends StatefulWidget {
   /// The floating navigation pill: 75 tall, held 20 off the sides and the
@@ -79,13 +81,14 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
 
-    // After the first frame: the shell has to exist before a sheet can sit on
+    // After the first frame: the shell has to exist before a modal or sheet can sit on
     // top of it.
-    if (!widget.isGuest) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _askForPendingReviews(),
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _checkLocationPermission();
+      if (!widget.isGuest && mounted) {
+        _askForPendingReviews();
+      }
+    });
 
     _tabs = [
       HomeTab(isGuest: widget.isGuest),
@@ -95,6 +98,28 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     ExploreRequestBus.instance.addListener(_onExploreRequested);
+  }
+
+  Future<void> _checkLocationPermission() async {
+    if (!mounted) return;
+
+    final hasPerm = await LocationService.instance.hasPermission();
+    if (hasPerm) return;
+
+    final hasPrompted =
+        await LocationService.instance.hasPromptedInitialLocation();
+    if (!hasPrompted) {
+      await LocationService.instance.markInitialLocationPrompted();
+      if (!mounted) return;
+      await showLocationPermissionModal(context);
+      return;
+    }
+
+    if (!widget.isGuest && LocationService.instance.canShowPostLoginReminder) {
+      LocationService.instance.markPostLoginReminded();
+      if (!mounted) return;
+      await showLocationPermissionModal(context);
+    }
   }
 
   @override
