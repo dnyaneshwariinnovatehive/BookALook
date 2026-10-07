@@ -10,26 +10,24 @@ class BannerCarousel extends StatefulWidget {
   final bool autoPlay;
 
   const BannerCarousel({
-    Key? key,
+    super.key,
     required this.banners,
     this.autoPlay = true,
-  }) : super(key: key);
+  });
 
   @override
-  _BannerCarouselState createState() => _BannerCarouselState();
+  State<BannerCarousel> createState() => _BannerCarouselState();
 }
 
 class _BannerCarouselState extends State<BannerCarousel> {
   late PageController _pageController;
-  int _currentPage = 0;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     // Start at a large multiple so the user can scroll left immediately
-    int initialPage = widget.banners.length > 1 ? widget.banners.length * 1000 : 0;
-    _currentPage = initialPage;
+    final int initialPage = widget.banners.length > 1 ? widget.banners.length * 1000 : 0;
     _pageController = PageController(initialPage: initialPage);
   }
 
@@ -54,13 +52,13 @@ class _BannerCarouselState extends State<BannerCarousel> {
   }
 
   void _startAutoPlay() {
-    _timer = Timer.periodic(Duration(seconds: 4), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
       // A Timer is not a Ticker, so TickerMode does not stop it: on a hidden
       // tab it would keep paging. Skip the tick while this tab is off screen.
-      if (!mounted || !TickerMode.of(context)) return;
+      if (!mounted || !TickerMode.valuesOf(context).enabled) return;
       if (_pageController.hasClients) {
         _pageController.nextPage(
-          duration: Duration(milliseconds: 350),
+          duration: const Duration(milliseconds: 350),
           curve: Curves.easeIn,
         );
       }
@@ -115,11 +113,6 @@ class _BannerCarouselState extends State<BannerCarousel> {
       height: 160,
       child: PageView.builder(
         controller: _pageController,
-        onPageChanged: (int page) {
-          setState(() {
-            _currentPage = page;
-          });
-        },
         itemCount: isInfinite ? null : widget.banners.length,
         itemBuilder: (context, index) {
           final realIndex = isInfinite ? index % widget.banners.length : index;
@@ -146,15 +139,39 @@ class _BannerCarouselState extends State<BannerCarousel> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(26),
                 color: context.colors.accentSoft,
-                image: DecorationImage(
-                  image: NetworkImage(banner.imageUrl),
-                  fit: BoxFit.cover,
-                ),
               ),
               clipBehavior: Clip.antiAlias,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Banner Image (Static or Animated GIF/WebP)
+                  if (banner.imageUrl.isNotEmpty)
+                    Image.network(
+                      banner.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: context.colors.accentSoft,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.broken_image_rounded,
+                            color: context.colors.textTertiary,
+                            size: 32,
+                          ),
+                        );
+                      },
+                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded || frame != null) {
+                          return child;
+                        }
+                        return Container(
+                          color: context.colors.accentSoft,
+                        );
+                      },
+                    ),
+
                   // Very subtle gradient overlay so the image is the main focus
                   DecoratedBox(
                     decoration: BoxDecoration(
