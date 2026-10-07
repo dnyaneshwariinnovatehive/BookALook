@@ -439,6 +439,7 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
             if (_phase == _LoaderPhase.shimmer || _phase == _LoaderPhase.finalizing)
               _buildSparkles(),
             
+            // Document container is unconditionally rendered for all phases
             Container(
               width: 100,
               height: 140,
@@ -481,7 +482,7 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
                         ],
                       ),
                     ),
-                    if (_phase == _LoaderPhase.shimmer || _phase == _LoaderPhase.finalizing)
+                    if (_phase == _LoaderPhase.shimmer)
                       Positioned.fill(
                         child: AnimatedBuilder(
                           animation: _shimmerController,

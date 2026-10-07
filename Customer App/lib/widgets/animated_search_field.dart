@@ -12,7 +12,7 @@ class AnimatedSearchField extends StatefulWidget {
   final List<String> suggestions;
 
   const AnimatedSearchField({
-    Key? key,
+    super.key,
     required this.controller,
     required this.suggestions,
     this.focusNode,
@@ -21,30 +21,57 @@ class AnimatedSearchField extends StatefulWidget {
     this.onChanged,
     this.onSubmitted,
     this.textInputAction,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedSearchField> createState() => _AnimatedSearchFieldState();
 }
 
-class _AnimatedSearchFieldState extends State<AnimatedSearchField> {
+class _AnimatedSearchFieldState extends State<AnimatedSearchField> with SingleTickerProviderStateMixin {
   Timer? _timer;
   int _wordIndex = 0;
   String _currentHint = "";
   bool _isTyping = true;
   bool _isActive = true;
+  late FocusNode _focusNode;
+  late AnimationController _cursorController;
+
   @override
   void initState() {
     super.initState();
+    _focusNode = widget.focusNode ?? FocusNode();
+    _focusNode.addListener(_onFocusChanged);
     widget.controller.addListener(_onTextChanged);
+    
+    _cursorController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..repeat(reverse: true);
+    
     _startAnimation();
   }
 
+  void _onFocusChanged() {
+    if (mounted) {
+      setState(() {});
+      if (_focusNode.hasFocus) {
+        _stopAnimation();
+      } else {
+        if (widget.controller.text.isEmpty) {
+          _startAnimation();
+        }
+      }
+    }
+  }
+
   void _onTextChanged() {
-    if (widget.controller.text.isNotEmpty) {
-      _stopAnimation();
-    } else {
-      _startAnimation();
+    if (mounted) {
+      setState(() {});
+      if (widget.controller.text.isNotEmpty || _focusNode.hasFocus) {
+        _stopAnimation();
+      } else {
+        _startAnimation();
+      }
     }
   }
 
@@ -88,7 +115,7 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> {
         });
       } else {
         _isTyping = false;
-        _timer = Timer(const Duration(milliseconds: 1200), _scheduleNextTick);
+        _timer = Timer(const Duration(milliseconds: 1300), _scheduleNextTick);
       }
     } else {
       if (_currentHint.isNotEmpty) {
@@ -110,26 +137,70 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField> {
   @override
   void dispose() {
     _timer?.cancel();
+    _cursorController.dispose();
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
+    } else {
+      _focusNode.removeListener(_onFocusChanged);
+    }
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final hint = widget.suggestions.isNotEmpty
-        ? 'Search "$_currentHint"'
-        : widget.decoration.hintText;
+    final bool showAnimatedHint = widget.controller.text.isEmpty && !_focusNode.hasFocus && widget.suggestions.isNotEmpty;
+    
+    final TextStyle baseStyle = widget.style ?? const TextStyle(fontSize: 14);
+    final TextStyle hintStyle = widget.decoration.hintStyle ?? baseStyle.copyWith(color: Colors.grey);
+    
+    Widget hintLayer = const SizedBox.shrink();
+    if (showAnimatedHint) {
+       hintLayer = IgnorePointer(
+         child: Padding(
+           padding: widget.decoration.contentPadding ?? EdgeInsets.zero,
+           child: Row(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               Text('Search "', style: hintStyle),
+               Text(_currentHint, style: hintStyle),
+               AnimatedBuilder(
+                 animation: _cursorController,
+                 builder: (context, child) {
+                   return Opacity(
+                     opacity: _currentHint.isEmpty ? 0.0 : _cursorController.value,
+                     child: Container(
+                       width: 1.5,
+                       height: hintStyle.fontSize != null ? hintStyle.fontSize! * 1.2 : 16,
+                       color: hintStyle.color ?? Colors.grey,
+                       margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                     ),
+                   );
+                 }
+               ),
+               Text('"', style: hintStyle),
+             ],
+           ),
+         ),
+       );
+    }
 
-    return TextField(
-      controller: widget.controller,
-      focusNode: widget.focusNode,
-      style: widget.style,
-      onChanged: widget.onChanged,
-      onSubmitted: widget.onSubmitted,
-      textInputAction: widget.textInputAction,
-      decoration: widget.decoration.copyWith(
-        hintText: hint,
-      ),
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        if (showAnimatedHint) hintLayer,
+        TextField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          style: widget.style,
+          onChanged: widget.onChanged,
+          onSubmitted: widget.onSubmitted,
+          textInputAction: widget.textInputAction,
+          decoration: widget.decoration.copyWith(
+            hintText: showAnimatedHint ? '' : widget.decoration.hintText,
+          ),
+        ),
+      ],
     );
   }
 }
