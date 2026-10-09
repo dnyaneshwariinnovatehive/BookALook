@@ -13,13 +13,15 @@ class StaffTab extends StatefulWidget {
   const StaffTab({super.key, required this.salonId});
 
   @override
-  State<StaffTab> createState() => _StaffTabState();
+  State<StaffTab> createState() => StaffTabState();
 }
 
-class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin {
+class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   
   bool _isLoadingStaff = true;
+  bool get isLoading => _isLoadingStaff || _isLoadingLeaves;
+  Future<void>? loadFuture;
   List<StaffMember> _staff = [];
   String? _staffError;
 
@@ -35,8 +37,10 @@ class _StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchStaff();
-    _fetchLeaves();
+    loadFuture = Future.wait([
+      _fetchStaff(),
+      _fetchLeaves(),
+    ]);
   }
 
   @override

@@ -14,6 +14,8 @@ import 'tabs/services_tab.dart';
 import 'tabs/more_tab.dart';
 import '../../widgets/location_permission_modal.dart';
 import '../../widgets/animated_staff_icon.dart';
+import '../../widgets/tab_loading_overlay.dart';
+import '../../utils/app_haptics.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -33,6 +35,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// that tab and the bottom navigation bar remains visible.
   final List<GlobalKey<NavigatorState>> _navigatorKeys =
       List.generate(5, (_) => GlobalKey<NavigatorState>());
+
+  final GlobalKey<HomeTabState> _homeKey = GlobalKey<HomeTabState>();
+  final GlobalKey<AppointmentsTabState> _appointmentsKey = GlobalKey<AppointmentsTabState>();
+  final GlobalKey<StaffTabState> _staffKey = GlobalKey<StaffTabState>();
+  final GlobalKey<ServicesTabState> _servicesKey = GlobalKey<ServicesTabState>();
+
+  bool _isTabLoading = false;
+  String _loadingMessage = '';
+  int _loadingTab = -1;
+  int? _targetTabIndex;
+
+  String _getLoadingMessage(int index) {
+    switch (index) {
+      case 0: return "Loading your dashboard";
+      case 1: return "Loading your appointments";
+      case 2: return "Loading your staff";
+      case 3: return "Loading your services";
+      case 4: return "Loading your account";
+      default: return "";
+    }
+  }
 
 
   /// The salon's plan gates the whole shell, so it is checked before the tabs
@@ -107,14 +130,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _buildTabs() {
     _tabs = [
       HomeTab(
+        key: _homeKey,
         salonId: widget.salonData['id'].toString(), 
         salonName: widget.salonData['name']?.toString() ?? '',
         planName: _access?.planName,
         daysRemaining: _access?.daysRemaining,
       ),
-      AppointmentsTab(salonId: widget.salonData['id'].toString()),
-      StaffTab(salonId: widget.salonData['id'].toString()),
-      ServicesTab(salonId: widget.salonData['id'].toString()),
+      AppointmentsTab(
+        key: _appointmentsKey,
+        salonId: widget.salonData['id'].toString(),
+      ),
+      StaffTab(
+        key: _staffKey,
+        salonId: widget.salonData['id'].toString(),
+      ),
+      ServicesTab(
+        key: _servicesKey,
+        salonId: widget.salonData['id'].toString(),
+      ),
       MoreTab(
         salonData: widget.salonData,
         planName: _access?.planName,
@@ -136,15 +169,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _buildTabs();
   }
 
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) {
+  void _onItemTapped(int index) async {
+    if (index == _selectedIndex && !_isTabLoading) {
       // Tapping the tab you are already on goes back to its first page.
+      AppHaptics.selectionClick();
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
       return;
     }
+
+    if (_isTabLoading) {
+      _targetTabIndex = index;
+      return;
+    }
+
+    AppHaptics.selectionClick();
+
+    Future<void> realOperation = Future.value();
+
+    if (index == 0) {
+      if (_homeKey.currentState?.isLoading == true) {
+        realOperation = _homeKey.currentState?.loadFuture ?? Future.value();
+      }
+    } else if (index == 1) {
+      if (_appointmentsKey.currentState?.isLoading == true) {
+        realOperation = _appointmentsKey.currentState?.loadFuture ?? Future.value();
+      }
+    } else if (index == 2) {
+      if (_staffKey.currentState?.isLoading == true) {
+        realOperation = _staffKey.currentState?.loadFuture ?? Future.value();
+      }
+    } else if (index == 3) {
+      if (_servicesKey.currentState?.isLoading == true) {
+        realOperation = _servicesKey.currentState?.loadFuture ?? Future.value();
+      }
+    }
+
+    bool isFast = false;
+    final fastTimer = Future.delayed(const Duration(milliseconds: 250));
+    
+    await Future.any([
+      realOperation.then((_) => isFast = true).catchError((_) => isFast = true),
+      fastTimer,
+    ]);
+
+    if (!mounted) return;
+
+    if (isFast) {
+      // Data is ready, switch instantly without overlay
+      setState(() {
+        _selectedIndex = _targetTabIndex ?? index;
+        _targetTabIndex = null;
+      });
+      return;
+    }
+
+    // Network is slow, show the loading overlay
     setState(() {
-      _selectedIndex = index;
+      _isTabLoading = true;
+      _targetTabIndex = index;
+      _loadingTab = index;
+      _loadingMessage = _getLoadingMessage(index);
+      _selectedIndex = index; // Switch instantly under overlay
     });
+
+    try {
+      await realOperation;
+    } catch (_) {
+      // Let individual tabs handle errors
+    }
+
+    if (!mounted) return;
+
+    final finalIndex = _targetTabIndex ?? index;
+
+    setState(() {
+      _isTabLoading = false;
+      _targetTabIndex = null;
+      if (_selectedIndex != finalIndex) {
+        _selectedIndex = finalIndex;
+      }
+    });
+
+    if (finalIndex != index) {
+      _onItemTapped(finalIndex);
+    }
   }
 
   /// Back unwinds the active tab first, then falls back to Home and only then
@@ -212,11 +320,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildShell(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
+      body: Stack(
         children: [
-          for (var i = 0; i < _tabs.length; i++)
-            TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
+          IndexedStack(
+            index: _selectedIndex,
+            children: [
+              for (var i = 0; i < _tabs.length; i++)
+                TickerMode(
+                  enabled: i == _selectedIndex,
+                  child: TabNavigator(navigatorKey: _navigatorKeys[i], root: _tabs[i]),
+                ),
+            ],
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_isTabLoading,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: _isTabLoading
+                    ? BookALookTabLoadingOverlay(
+                        message: _loadingMessage,
+                        tabIndex: _loadingTab,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

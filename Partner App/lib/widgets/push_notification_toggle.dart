@@ -105,9 +105,9 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const ListTile(
-        title: Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        title: Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
         trailing: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       );
     }
     
@@ -117,9 +117,10 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
       secondary: Icon(
         _pushEnabled ? Icons.notifications_active : Icons.notifications_off,
         color: _pushEnabled ? Colors.green : Colors.grey,
+        size: 26,
       ),
-      title: const Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      title: const Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
     );
   }
 }

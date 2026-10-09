@@ -426,18 +426,14 @@ class _ProfileTabState extends State<ProfileTab> {
                   Container(
                     width: 80,
                     height: 80,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [AppTheme.accentColor, Colors.purpleAccent],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      border: Border.all(color: AppTheme.accentColor, width: 2),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(3.0),
+                      padding: const EdgeInsets.all(4.0),
                       child: CircleAvatar(
-                        backgroundColor: surfaceColor,
+                        backgroundColor: context.colors.accentSoft,
                         child: Icon(
                           Icons.person,
                           size: 40,
@@ -789,10 +785,10 @@ class _ProfileTabState extends State<ProfileTab> {
     Color headingColor,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
@@ -807,7 +803,7 @@ class _ProfileTabState extends State<ProfileTab> {
           Text(
             count,
             style: GoogleFonts.outfit(
-              fontSize: 22,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: headingColor,
             ),
@@ -856,10 +852,12 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
             if (trailing != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: context.colors.accentSoft,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   trailing,

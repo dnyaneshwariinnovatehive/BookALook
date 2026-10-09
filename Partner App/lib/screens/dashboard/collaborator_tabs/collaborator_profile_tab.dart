@@ -170,7 +170,13 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('Your details and your tally', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.normal)),
+          ],
+        ),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -187,6 +193,15 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
               if (_failed)
                 _buildOfflineNote()
               else ...[
+                Text(
+                  'My Profile',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 _buildHeaderCard(),
                 const SizedBox(height: 24),
                 
@@ -242,7 +257,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
             isDark ? Icons.dark_mode : Icons.light_mode,
             color: isDark ? Colors.yellow : Colors.orange,
           ),
-          title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         );
       },
@@ -312,7 +327,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         leading: Icon(Icons.bar_chart, color: AppTheme.accentColor),
-        title: const Text('Your work', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        title: const Text('Your work', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
         childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
           Row(
@@ -383,7 +398,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         leading: Icon(Icons.contact_mail_outlined, color: Colors.blue),
-        title: const Text('Contact details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        title: const Text('Contact details', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
         childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
           Row(
@@ -507,6 +522,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: palette.danger,
+          backgroundColor: palette.danger.withValues(alpha: 0.1),
           padding: const EdgeInsets.symmetric(vertical: 14),
           side: BorderSide(color: palette.danger.withValues(alpha: 0.35)),
           shape: RoundedRectangleBorder(

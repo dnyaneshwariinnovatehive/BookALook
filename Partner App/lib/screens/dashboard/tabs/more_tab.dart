@@ -8,7 +8,6 @@ import '../more/wallet_screen.dart';
 import '../more/salon_location_screen.dart';
 import '../more/salon_qr_screen.dart';
 import '../more/salon_reviews_screen.dart';
-import '../more/marketing_screen.dart';
 import '../more/insights_screen.dart';
 import '../more/payroll_screen.dart';
 import '../more/salon_payouts_screen.dart';
@@ -19,7 +18,6 @@ import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
-import '../more/whatsapp_stats_screen.dart';
 import '../more/automated_messaging_screen.dart';
 
 class MoreTab extends StatefulWidget {
@@ -116,9 +114,9 @@ class _MoreTabState extends State<MoreTab> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: isGrowth ? Colors.purple.withOpacity(0.1) : Colors.blue.withOpacity(0.1),
+        color: isGrowth ? Colors.purple.withValues(alpha: 0.1) : Colors.blue.withValues(alpha: 0.1),
         border: Border.all(
-          color: isGrowth ? Colors.purple.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
+          color: isGrowth ? Colors.purple.withValues(alpha: 0.5) : Colors.blue.withValues(alpha: 0.5),
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -140,7 +138,7 @@ class _MoreTabState extends State<MoreTab> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        title: const Text('More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -149,18 +147,18 @@ class _MoreTabState extends State<MoreTab> {
           const SizedBox(width: 16),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Top Card
-            Container(
+      body: ListView(
+        padding: const EdgeInsets.only(top: 8, bottom: 100), // padding for bottom nav
+        children: [
+          // Top Card (Salon Profile)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: Offset(0, 4)),
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Column(
@@ -170,14 +168,14 @@ class _MoreTabState extends State<MoreTab> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: Container(
                       height: 120,
-                      color: isDark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor,
+                      color: theme.dividerColor,
                       child: salonData['cover_photo_url'] != null
                           ? Image.network(
                               salonData['cover_photo_url'],
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                              errorBuilder: (context, error, stackTrace) => Icon(Icons.image, size: 50, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                             )
-                          : Icon(Icons.image, size: 50, color: isDark ? Theme.of(context).dividerColor : Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                          : Icon(Icons.image, size: 50, color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
                     ),
                   ),
                   Padding(
@@ -203,21 +201,21 @@ class _MoreTabState extends State<MoreTab> {
                           ),
                         ),
                         GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => EditSalonProfileScreen(salonData: salonData)),
-                          ).then((updatedData) {
-                            if (updatedData != null && updatedData is Map<String, dynamic>) {
-                              setState(() {
-                                salonData.addAll(updatedData);
-                              });
-                              if (widget.onSalonUpdated != null) {
-                                widget.onSalonUpdated!(updatedData);
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => EditSalonProfileScreen(salonData: salonData)),
+                            ).then((updatedData) {
+                              if (updatedData != null && updatedData is Map<String, dynamic>) {
+                                setState(() {
+                                  salonData.addAll(updatedData);
+                                });
+                                if (widget.onSalonUpdated != null) {
+                                  widget.onSalonUpdated!(updatedData);
+                                }
                               }
-                            }
-                          });
-                        },
+                            });
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
@@ -233,247 +231,210 @@ class _MoreTabState extends State<MoreTab> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            
-            // Options List
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: Offset(0, 4)),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildOptionTile(context, 
-                    icon: Icons.storefront,
-                    iconColor: Colors.purple,
-                    title: 'Switch Salon',
-                    onTap: () => _logout(context, action: 'Switch Salon'), // Using logout as placeholder per old logic
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.access_time,
-                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning),
-                    title: 'Change Salon Timings',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SalonTimingsScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  // SuperAdmin's warnings and suspensions are the messages an
-                  // owner most needs to see, so the inbox sits at the top.
-                  _buildOptionTile(context,
-                    icon: Icons.notifications_outlined,
-                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkWarning : AppTheme.lightWarning),
-                    title: 'Notifications',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  // Customers browse nearest-first, so an unpinned salon sorts
-                  // below every salon on the same street that has pinned itself.
-                  _buildOptionTile(context,
-                    icon: Icons.place_outlined,
-                    iconColor: AppTheme.accentColor,
-                    title: 'Salon Location',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SalonLocationScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  // What customers said. High up the list on purpose — it is
-                  // the only page here that tells an owner how the business is
-                  // actually doing.
-                  _buildOptionTile(context,
-                    icon: Icons.star_outline_rounded,
-                    iconColor: const Color(0xFFF5A623),
-                    title: 'Customer Reviews',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SalonReviewsScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  // Directly above Marketing, because it is where the reason to
-                  // send a campaign comes from — who has stopped coming in,
-                  // which hours are empty, what customers already buy together.
-                  _buildOptionTile(context,
-                    icon: Icons.insights_outlined,
-                    iconColor: Colors.deepPurple,
-                    title: 'Business Insights',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => InsightsScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
+          ),
+          const SizedBox(height: 16),
+          
+          _buildSectionHeading('Salon management'),
+          _buildOptionTile(
+            icon: Icons.storefront,
+            iconColor: Colors.purple,
+            title: 'Switch Salon',
+            onTap: () => _logout(context, action: 'Switch Salon'),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.place_outlined,
+            iconColor: AppTheme.accentColor,
+            title: 'Salon Location',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonLocationScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.access_time,
+            iconColor: isDark ? AppTheme.darkWarning : AppTheme.lightWarning,
+            title: 'Change Salon Timings',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonTimingsScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.qr_code_2,
+            iconColor: AppTheme.accentColor,
+            title: 'Your QR Code',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonQrScreen(salonId: salonData['id'].toString()))),
+          ),
 
-                  Divider(height: 1, indent: 56),
-                  // The poster that goes in the window. Prints to a real PNG.
-                  _buildOptionTile(context,
-                    icon: Icons.qr_code_2,
-                    iconColor: AppTheme.accentColor,
-                    title: 'Your QR Code',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SalonQrScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.receipt_long,
-                    iconColor: Colors.teal,
-                    title: 'Subscription & Billing',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SubscriptionBillingScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context,
-                    icon: Icons.groups,
-                    iconColor: Colors.indigo,
-                    title: 'Staff Payroll',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => PayrollScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context,
-                    icon: Icons.account_balance,
-                    iconColor: Colors.blueGrey,
-                    title: 'Payouts from BookALook',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => SalonPayoutsScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.account_balance_wallet,
-                    iconColor: Colors.amber,
-                    title: 'My Wallet',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => WalletScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.mark_chat_read,
-                    iconColor: Colors.green,
-                    title: 'Automated Messaging',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => AutomatedMessagingScreen(salonId: salonData['id'].toString())),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.manage_accounts,
-                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkInfo : AppTheme.lightInfo),
-                    title: 'Switch Account',
-                    onTap: () => _logout(context, action: 'Switch Account'),
-                  ),
-                  Divider(height: 1, indent: 56),
-                  _buildOptionTile(context, 
-                    icon: Icons.help_outline,
-                    iconColor: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess),
-                    title: 'Help & Support',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
-                      );
-                    },
-                  ),
-                  Divider(height: 1, indent: 56),
-                  const PushNotificationToggle(),
-                  Divider(height: 1, indent: 56),
-                  ValueListenableBuilder<ThemeMode>(
-                    valueListenable: themeNotifier,
-                    builder: (context, currentMode, _) {
-                      final isDark = currentMode == ThemeMode.dark;
-                      return SwitchListTile(
-                        value: isDark,
-                        onChanged: (val) async {
-                          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool('isDarkMode', val);
-                        },
-                        secondary: Icon(
-                          isDark ? Icons.dark_mode : Icons.light_mode,
-                          color: isDark ? Colors.yellow : Colors.orange,
-                        ),
-                        title: Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Logout Button
-            GestureDetector(
-              onTap: () => _logout(context, action: 'Logging out'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: isDark ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger).withOpacity(0.15) : const Color(0xFFFDECEE),
-                  borderRadius: BorderRadius.circular(12),
+          _buildSectionHeading('Insights & communication'),
+          _buildOptionTile(
+            icon: Icons.insights_outlined,
+            iconColor: Colors.deepPurple,
+            title: 'Business Insights',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InsightsScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.star_outline_rounded,
+            iconColor: const Color(0xFFF5A623),
+            title: 'Customer Reviews',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonReviewsScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.notifications_outlined,
+            iconColor: isDark ? AppTheme.darkWarning : AppTheme.lightWarning,
+            title: 'Notifications',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.mark_chat_read,
+            iconColor: Colors.green,
+            title: 'Automated Messaging',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AutomatedMessagingScreen(salonId: salonData['id'].toString()))),
+          ),
+
+          _buildSectionHeading('Payments & payroll'),
+          _buildOptionTile(
+            icon: Icons.account_balance_wallet,
+            iconColor: Colors.amber,
+            title: 'My Wallet',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WalletScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.account_balance,
+            iconColor: Colors.blueGrey,
+            title: 'Payouts from BookALook',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalonPayoutsScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.groups,
+            iconColor: Colors.indigo,
+            title: 'Staff Payroll',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PayrollScreen(salonId: salonData['id'].toString()))),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.receipt_long,
+            iconColor: Colors.teal,
+            title: 'Subscription & Billing',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SubscriptionBillingScreen(salonId: salonData['id'].toString()))),
+          ),
+
+          _buildSectionHeading('Account & app settings'),
+          _buildOptionTile(
+            icon: Icons.manage_accounts,
+            iconColor: isDark ? AppTheme.darkInfo : AppTheme.lightInfo,
+            title: 'Switch Account',
+            onTap: () => _logout(context, action: 'Switch Account'),
+          ),
+          _buildDivider(),
+          const PushNotificationToggle(),
+          _buildDivider(),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, currentMode, _) {
+              final isDark = currentMode == ThemeMode.dark;
+              return SwitchListTile(
+                value: isDark,
+                onChanged: (val) async {
+                  themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('isDarkMode', val);
+                },
+                secondary: Icon(
+                  isDark ? Icons.dark_mode : Icons.light_mode,
+                  color: isDark ? Colors.yellow : Colors.orange,
+                  size: 26,
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  'Logout',
-                  style: TextStyle(color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDanger : AppTheme.lightDanger), fontWeight: FontWeight.bold, fontSize: 16),
+                title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              );
+            },
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.help_outline,
+            iconColor: isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess,
+            title: 'Help & Support',
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen())),
+          ),
+
+          const SizedBox(height: 16),
+          
+          // Logout Button
+          InkWell(
+            onTap: () => _logout(context, action: 'Logging out'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Text(
+                'Log out',
+                style: TextStyle(
+                  color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger, 
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 16,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-          ],
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeading(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
       ),
     );
   }
 
-  Widget _buildOptionTile(BuildContext context, {required IconData icon, required Color iconColor, required String title, required VoidCallback onTap}) {
-    return ListTile(
-      leading: Icon(icon, color: iconColor),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-      trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+  Widget _buildDivider() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      indent: 66,
+      color: isDark ? Colors.white24 : Colors.black12,
+    );
+  }
+
+  Widget _buildOptionTile({
+    required IconData icon, 
+    required Color iconColor, 
+    required String title, 
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 26),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title, 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.normal),
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios, 
+              size: 14, 
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -34,11 +34,13 @@ class HomeTab extends StatefulWidget {
   });
 
   @override
-  State<HomeTab> createState() => _HomeTabState();
+  State<HomeTab> createState() => HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> {
+class HomeTabState extends State<HomeTab> {
   bool _isLoading = true;
+  bool get isLoading => _isLoading;
+  Future<void>? loadFuture;
   String _errorMessage = '';
 
   int _todaysAppts = 0;
@@ -61,7 +63,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _fetchHomeData();
+    loadFuture = _fetchHomeData();
     _refreshUnreadCount();
     // Poll every 60 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {

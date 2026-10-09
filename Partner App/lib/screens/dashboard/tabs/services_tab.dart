@@ -12,12 +12,14 @@ class ServicesTab extends StatefulWidget {
   const ServicesTab({super.key, required this.salonId});
 
   @override
-  State<ServicesTab> createState() => _ServicesTabState();
+  State<ServicesTab> createState() => ServicesTabState();
 }
 
-class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStateMixin {
+class ServicesTabState extends State<ServicesTab> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
+  bool get isLoading => _isLoading || _isLoadingCombos;
+  Future<void>? loadFuture;
   List<Map<String, dynamic>> _groupedServices = [];
   String? _error;
 
@@ -33,8 +35,10 @@ class _ServicesTabState extends State<ServicesTab> with SingleTickerProviderStat
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchServices();
-    _fetchCombos();
+    loadFuture = Future.wait([
+      _fetchServices(),
+      _fetchCombos(),
+    ]);
   }
 
   @override

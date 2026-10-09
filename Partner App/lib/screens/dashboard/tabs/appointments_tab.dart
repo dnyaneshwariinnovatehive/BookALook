@@ -48,13 +48,15 @@ class AppointmentsTab extends StatefulWidget {
   const AppointmentsTab({Key? key, required this.salonId}) : super(key: key);
 
   @override
-  State<AppointmentsTab> createState() => _AppointmentsTabState();
+  State<AppointmentsTab> createState() => AppointmentsTabState();
 }
 
-class _AppointmentsTabState extends State<AppointmentsTab> {
+class AppointmentsTabState extends State<AppointmentsTab> {
   final PartnerAppointmentService _service = PartnerAppointmentService();
   List<dynamic> _appointments = [];
   bool _isLoading = true;
+  bool get isLoading => _isLoading;
+  Future<void>? loadFuture;
 
   // Today is what an admin is running the salon against; the full history is
   // one dropdown away.
@@ -70,7 +72,7 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
   @override
   void initState() {
     super.initState();
-    _loadAppointments();
+    loadFuture = _loadAppointments();
   }
 
   Future<void> _loadAppointments() async {

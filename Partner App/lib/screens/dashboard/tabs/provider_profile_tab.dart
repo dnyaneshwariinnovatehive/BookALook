@@ -375,9 +375,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Padding(
@@ -421,9 +421,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Column(
@@ -433,7 +433,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
                       leading: const Icon(Icons.person_outline, color: AppTheme.accentColor),
-                      title: const Text('Personal Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      title: const Text('Personal Information', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
                       childrenPadding: const EdgeInsets.all(16),
                       children: [
                         _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
@@ -444,14 +444,14 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       ]
                     )
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
 
                   // Working Hours
                   Theme(
                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
                       leading: const Icon(Icons.access_time, color: Colors.orange),
-                      title: const Text('Working Hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      title: const Text('Working Hours', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
                       childrenPadding: const EdgeInsets.all(16),
                       children: [
                         if (workingHours.isEmpty)
@@ -483,7 +483,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       ]
                     )
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
 
                   // Services
                   if (services.isNotEmpty) ...[
@@ -491,7 +491,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
                         leading: const Icon(Icons.content_cut, color: Colors.pink),
-                        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
                         childrenPadding: const EdgeInsets.all(16),
                         children: [
                           Wrap(
@@ -502,7 +502,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                         ]
                       )
                     ),
-                    const Divider(height: 1, indent: 56),
+                    Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                   ],
 
                   // My Leaves
@@ -515,7 +515,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       MaterialPageRoute(builder: (context) => ProviderLeavesScreen(salon: widget.salon)),
                     ),
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
 
                   // My Salary & Commission
                   _buildOptionTile(context, 
@@ -527,11 +527,11 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       MaterialPageRoute(builder: (_) => MySalaryScreen(salonId: widget.salon['id'].toString())),
                     ),
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                   
                   // Push Notifications
                   const PushNotificationToggle(),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
                   
                   // Dark Mode
                   ValueListenableBuilder<ThemeMode>(
@@ -549,7 +549,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                           isDarkMode ? Icons.dark_mode : Icons.light_mode,
                           color: isDarkMode ? Colors.yellow : Colors.orange,
                         ),
-                        title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       );
                     },
@@ -566,7 +566,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkDanger.withOpacity(0.15) : const Color(0xFFFDECEE),
+                  color: isDark ? AppTheme.darkDanger.withValues(alpha: 0.15) : const Color(0xFFFDECEE),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -591,7 +591,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
   Widget _buildOptionTile(BuildContext context, {required IconData icon, required Color iconColor, required String title, required VoidCallback onTap}) {
     return ListTile(
       leading: Icon(icon, color: iconColor),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
       trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
