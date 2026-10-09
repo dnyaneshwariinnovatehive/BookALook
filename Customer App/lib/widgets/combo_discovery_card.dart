@@ -108,7 +108,7 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
               await _addCombo(combo);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-            child: Text('Replace', style: GoogleFonts.outfit(color: Colors.white)),
+            child: Text('Replace', style: GoogleFonts.outfit(color: context.colors.onAccent)),
           ),
         ],
       ),
@@ -467,12 +467,12 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
               ),
               alignment: Alignment.center,
               child: isAdding
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onAccent),
                     )
-                  : const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                  : Icon(Icons.arrow_forward, color: context.colors.onAccent, size: 18),
             ),
           ),
         ],

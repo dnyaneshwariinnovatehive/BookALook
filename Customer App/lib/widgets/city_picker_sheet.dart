@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/location_service.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/bottom_clearance.dart';
 import 'feedback_states.dart';
@@ -254,7 +255,7 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
                 : AppTheme.accentColor.withValues(alpha: 0.12),
             child: Icon(Icons.location_city_rounded,
                 size: 20,
-                color: selected ? Colors.white : AppTheme.accentColor),
+                color: selected ? context.colors.onAccent : AppTheme.accentColor),
           ),
           title: Text(city.name,
               style: GoogleFonts.outfit(
@@ -277,11 +278,11 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 44, color: Colors.grey.shade400),
+              Icon(icon, size: 44, color: context.colors.iconIdle),
               const SizedBox(height: 12),
               Text(text,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(color: Colors.grey.shade700)),
+                  style: GoogleFonts.outfit(color: context.colors.textSecondary)),
               if (action != null) ...[
                 const SizedBox(height: 12),
                 TextButton(onPressed: action, child: const Text('Try again')),

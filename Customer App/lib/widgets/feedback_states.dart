@@ -133,7 +133,7 @@ class ErrorState extends StatelessWidget {
         label: const Text('Try again'),
         style: ElevatedButton.styleFrom(
           backgroundColor: context.colors.actionFill,
-          foregroundColor: Colors.white,
+          foregroundColor: context.colors.surface,
           minimumSize: const Size(48, 48),
         ),
       ),

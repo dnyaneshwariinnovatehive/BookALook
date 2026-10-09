@@ -137,7 +137,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
             ),
             child: Text(
               'Replace',
-              style: GoogleFonts.outfit(color: Colors.white),
+              style: GoogleFonts.outfit(color: context.colors.onAccent),
             ),
           ),
         ],
@@ -314,26 +314,26 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
         height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isBookable ? AppTheme.accentColor : const Color(0xFFCFCBD8),
+          color: isBookable ? AppTheme.accentColor : context.colors.iconIdle,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: isAdding
-            ? const SizedBox(
-                width: 13,
-                height: 13,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
+            child: isAdding
+                ? SizedBox(
+                    width: 13,
+                    height: 13,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: context.colors.onAccent,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: context.colors.onAccent,
+                    ),
+                  ),
       ),
     );
   }

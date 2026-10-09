@@ -613,7 +613,7 @@ class _NewCampaignScreenState extends State<NewCampaignScreen> {
         ),
         child: Text(text,
             style: GoogleFonts.outfit(
-                fontSize: 13.5, color: const Color(0xFF1C1726), height: 1.5)),
+                fontSize: 13.5, color: const Color(0xFF18151D), height: 1.5)),
       );
 
   Widget _footer(bool dark) {

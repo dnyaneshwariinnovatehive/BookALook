@@ -49,7 +49,7 @@ class CategoryGrid extends StatelessWidget {
 
   /// Soft backgrounds behind the icons.
   static const List<(Color, Color)> _tints = [
-    (Color(0xFFF3EBFE), Color(0xFF9C54F2)), // lavender
+    (Color(0xFFEEE3FD), Color(0xFF9850F1)), // lavender
     (Color(0xFFFFF1E6), Color(0xFFEF6C00)), // peach
     (Color(0xFFE6F6EF), Color(0xFF2E7D32)), // mint
     (Color(0xFFFDE8EF), Color(0xFFD81B60)), // rose

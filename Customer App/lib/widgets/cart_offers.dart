@@ -227,7 +227,7 @@ class ComboOfferCard extends StatelessWidget {
                     : () => onCompletePackage!(missingIds),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
-                  foregroundColor: Colors.white,
+                  foregroundColor: context.colors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 child: Text('Add all ${missing.length} and save ₹${saving.toStringAsFixed(0)}',

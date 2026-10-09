@@ -337,7 +337,7 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isScheduled
                               ? const Color(0xFF16A34A)
-                              : const Color(0xFF9C54F2),
+                              : const Color(0xFF9850F1),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),

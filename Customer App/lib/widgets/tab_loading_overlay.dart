@@ -106,7 +106,7 @@ class _BookALookTabLoadingOverlayState extends State<BookALookTabLoadingOverlay>
                             child: Icon(
                               icon2,
                               size: 24,
-                              color: Colors.purpleAccent.withValues(alpha: 0.8),
+                              color: AppTheme.accentGradientLightEnd.withValues(alpha: 0.8),
                             ),
                           ),
                         ),

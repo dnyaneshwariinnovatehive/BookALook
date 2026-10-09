@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../screens/cart_screen.dart';
 
@@ -41,20 +42,20 @@ class PersistentCartCTA extends StatelessWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: context.colors.onAccent,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Container(
                       width: 1,
                       height: 14,
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: context.colors.onAccent.withValues(alpha: 0.3),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(
+                    Icon(
                       Icons.shopping_cart_outlined,
                       size: 16,
-                      color: Colors.white,
+                      color: context.colors.onAccent,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -62,7 +63,7 @@ class PersistentCartCTA extends StatelessWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: context.colors.onAccent,
                       ),
                     ),
                   ],

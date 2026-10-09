@@ -128,7 +128,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
       body: SafeArea(
         child: RefreshIndicator(
         onRefresh: _loadAppointments,
-        color: const Color(0xFF9C54F2),
+        color: const Color(0xFF9850F1),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           physics: const AlwaysScrollableScrollPhysics(),
@@ -212,7 +212,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
               const SizedBox(height: 16),
 
               if (_isLoading)
-                const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
+                const Center(child: CircularProgressIndicator(color: Color(0xFF9850F1)))
               else 
                 Builder(
                   builder: (context) {

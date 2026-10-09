@@ -153,10 +153,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           ),
         ],
       ),
-      body: Stack(
-        alignment: Alignment.center,
-        children: [
-          MobileScanner(
+      body: SizedBox.expand(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
             errorBuilder: (context, error) => _buildCameraError(error),
@@ -179,6 +180,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               child: const Center(child: CircularProgressIndicator(color: Colors.white)),
             ),
         ],
+      ),
       ),
     );
   }

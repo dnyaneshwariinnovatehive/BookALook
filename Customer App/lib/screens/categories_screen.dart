@@ -146,7 +146,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     _fetchCategories();
   }
 
-  static const (Color, Color) _comboTint = (Color(0xFFF3EBFE), Color(0xFF9C54F2));
+  static const (Color, Color) _comboTint = (Color(0xFFEEE3FD), Color(0xFF9850F1));
 
   static const List<(Color, Color)> _tints = [
     (Color(0xFFFFF1E6), Color(0xFFEF6C00)),

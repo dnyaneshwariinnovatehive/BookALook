@@ -142,7 +142,7 @@ class LocationPermissionModal extends StatelessWidget {
                       icon: Icons.directions_walk,
                       title: 'Get more walk-ins',
                       description: 'Your location helps nearby customers reach you.',
-                      color: const Color(0xFFF3EBFE),
+                      color: const Color(0xFFEEE3FD),
                       iconColor: AppTheme.accentColor,
                     ),
                     const SizedBox(height: 16),

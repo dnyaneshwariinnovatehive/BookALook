@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 class SalonIllustration extends StatelessWidget {
   const SalonIllustration({super.key});
@@ -9,8 +11,8 @@ class SalonIllustration extends StatelessWidget {
       width: double.infinity,
       height: 230,
       clipBehavior: Clip.hardEdge,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF3EDFD), // Light soft background matching modal
+      decoration: BoxDecoration(
+        color: context.colors.accentSoft, // Light soft background matching modal
       ),
       child: Stack(
         alignment: Alignment.bottomCenter,
@@ -65,7 +67,7 @@ class SalonIllustration extends StatelessWidget {
           // Big Purple Pin & Cutout
           Positioned(
             bottom: 120,
-            child: _buildPinArea(),
+            child: _buildPinArea(context),
           ),
         ],
       ),
@@ -154,7 +156,7 @@ class SalonIllustration extends StatelessWidget {
                             margin: const EdgeInsets.only(right: 6),
                             width: 4,
                             height: 24,
-                            decoration: BoxDecoration(color: const Color(0xFFC0A6F2), borderRadius: BorderRadius.circular(2)),
+                            decoration: BoxDecoration(color: AppTheme.accentGradientLightEnd, borderRadius: BorderRadius.circular(2)),
                           ),
                         ),
                       ],
@@ -241,14 +243,14 @@ class SalonIllustration extends StatelessWidget {
                   return Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: index % 2 == 0 ? const Color(0xFF9050ED) : const Color(0xFF7A42D6),
+                        color: index % 2 == 0 ? AppTheme.accentColor : AppTheme.accentGradientEnd,
                         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: index % 2 == 0 
-                            ? [const Color(0xFFA56DFA), const Color(0xFF8845ED)]
-                            : [const Color(0xFF9157EB), const Color(0xFF743ACF)],
+                            ? [AppTheme.accentGradientLightEnd, AppTheme.accentColor]
+                            : [AppTheme.accentColor, AppTheme.accentGradientEnd],
                         ),
                       ),
                     ),
@@ -273,7 +275,7 @@ class SalonIllustration extends StatelessWidget {
             width: 14,
             height: 14,
             decoration: BoxDecoration(
-              color: const Color(0xFF9050ED),
+              color: AppTheme.accentColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -281,7 +283,7 @@ class SalonIllustration extends StatelessWidget {
             width: 16,
             height: 6,
             decoration: BoxDecoration(
-              color: const Color(0xFF7A42D6),
+              color: AppTheme.accentGradientEnd,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -302,7 +304,7 @@ class SalonIllustration extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.rectangle,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF7A42D6), width: 2),
+        border: Border.all(color: AppTheme.accentGradientEnd, width: 2),
         color: const Color(0xFFFDFDFD),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 2))
@@ -323,7 +325,7 @@ class SalonIllustration extends StatelessWidget {
             width: 22,
             height: 20,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF9050ED), Color(0xFF7A42D6)]),
+              gradient: const LinearGradient(colors: [AppTheme.accentColor, AppTheme.accentGradientEnd]),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))],
             ),
@@ -335,7 +337,7 @@ class SalonIllustration extends StatelessWidget {
               width: 26,
               height: 6,
               decoration: BoxDecoration(
-                color: const Color(0xFFA56DFA),
+                color: AppTheme.accentGradientLightEnd,
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
@@ -474,7 +476,7 @@ class SalonIllustration extends StatelessWidget {
     );
   }
 
-  Widget _buildPinArea() {
+  Widget _buildPinArea(BuildContext context) {
     return SizedBox(
       width: 100,
       height: 90,
@@ -487,9 +489,9 @@ class SalonIllustration extends StatelessWidget {
             child: Container(
               width: 70,
               height: 35,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF2F0FB), // Match background to simulate cutout
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(35)),
+              decoration: BoxDecoration(
+                color: context.colors.accentSoft, // Match background to simulate cutout
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(35)),
               ),
             ),
           ),
@@ -549,7 +551,7 @@ class _AnimatedBigPinState extends State<_AnimatedBigPin> with SingleTickerProvi
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF9050ED).withValues(alpha: 0.4),
+                  color: AppTheme.accentColor.withValues(alpha: 0.4),
                   blurRadius: 15,
                   spreadRadius: 2,
                 ),
@@ -560,7 +562,7 @@ class _AnimatedBigPinState extends State<_AnimatedBigPin> with SingleTickerProvi
           const Icon(
             Icons.location_on,
             size: 72,
-            color: Color(0xFF9050ED),
+            color: AppTheme.accentColor,
           ),
           // Inner White Dot
           Positioned(

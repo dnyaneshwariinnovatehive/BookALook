@@ -412,15 +412,15 @@ class _ReviewPromptSheetState extends State<ReviewPromptSheet> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: AppTheme.accentColor,
-                foregroundColor: Colors.white,
+                foregroundColor: context.colors.onAccent,
                 disabledBackgroundColor: context.colors.border,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _submitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 19,
                       width: 19,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onAccent))
                   : Text(_reporting ? 'Submit rating and report' : 'Submit rating',
                       style: GoogleFonts.outfit(fontSize: 15.5, fontWeight: FontWeight.bold)),
             ),

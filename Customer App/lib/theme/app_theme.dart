@@ -5,17 +5,17 @@ import 'app_colors.dart';
 
 class AppTheme {
   // Brand Colors
-  static const Color accentColor = Color(0xFF9C54F2);
-  static const Color accentGradientStart = Color(0xFF9C54F2);
+  static const Color accentColor = Color(0xFF9850F1);
+  static const Color accentGradientStart = Color(0xFF9850F1);
   static const Color accentGradientEnd = Color(0xFF7B32EC);
   static const Color accentGradientLightEnd = Color(0xFFB088FF);
 
   // Light Mode Colors
-  static const Color lightBg = Color(0xFFF8F7FC);
+  static const Color lightBg = Color(0xFFFCFAFF);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightAccentSoft = Color(0xFFF3EBFE);
+  static const Color lightAccentSoft = Color(0xFFEEE3FD);
   static const Color lightAccentSoftHover = Color(0xFFE9DAFD);
-  static const Color lightTextHeading = Color(0xFF1C1726);
+  static const Color lightTextHeading = Color(0xFF18151D);
   static const Color lightTextBody = Color(0xFF7C758D);
   static const Color lightTextLight = Color(0xFFB7B2C5);
   static const Color lightBorder = Color(0xFFECEAF2);

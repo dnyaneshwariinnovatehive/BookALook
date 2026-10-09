@@ -155,7 +155,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
             child: Container(
               constraints: const BoxConstraints(maxWidth: 400),
               decoration: BoxDecoration(
-                color: isDark ? context.colors.surface : Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                   color: isDark
@@ -203,13 +203,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
-                                  (isDark
-                                          ? context.colors.surface
-                                          : Colors.white)
-                                      .withValues(alpha: 0.0),
-                                  isDark
-                                      ? context.colors.surface
-                                      : Colors.white,
+                                  context.colors.surface.withValues(alpha: 0.0),
+                                  context.colors.surface,
                                 ],
                               ),
                             ),
@@ -231,7 +226,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                 width: 34,
                                 height: 34,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.90),
+                                  color: context.colors.surface.withValues(alpha: 0.90),
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
@@ -289,8 +284,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                           // Benefit 1: Discover salons near you
                           _buildBenefitRow(
                             icon: Icons.location_on_rounded,
-                            iconColor: const Color(0xFF7C3AED),
-                            iconBg: const Color(0xFFEDE9FE),
+                            iconColor: AppTheme.accentColor,
+                            iconBg: context.colors.accentSoft,
                             title: 'Discover salons near you',
                             description:
                                 'Find salons and services available around your location.',
@@ -375,8 +370,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                 onPressed:
                                     _loading ? null : _handleEnableLocation,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF7C3AED),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: AppTheme.accentColor,
+                                  foregroundColor: context.colors.onAccent,
                                   elevation: 0,
                                   padding: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
@@ -387,8 +382,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
-                                        Color(0xFF8B5CF6),
-                                        Color(0xFF6D28D9),
+                                        AppTheme.accentGradientStart,
+                                        AppTheme.accentGradientEnd,
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
@@ -396,7 +391,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF7C3AED)
+                                        color: AppTheme.accentColor
                                             .withValues(alpha: 0.35),
                                         blurRadius: 14,
                                         offset: const Offset(0, 4),
@@ -405,38 +400,38 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                   ),
                                   child: Center(
                                     child: _loading
-                                        ? const SizedBox(
+                                        ? SizedBox(
                                             width: 22,
                                             height: 22,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2.2,
-                                              color: Colors.white,
+                                              color: context.colors.onAccent,
                                             ),
                                           )
                                         : Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
-                                            children: const [
+                                            children: [
                                               Icon(
                                                 Icons.my_location_rounded,
                                                 size: 20,
-                                                color: Colors.white,
+                                                color: context.colors.onAccent,
                                               ),
-                                              SizedBox(width: 8),
+                                              const SizedBox(width: 8),
                                               Text(
                                                 'Enable location',
                                                 style: TextStyle(
                                                   fontSize: 15.5,
                                                   fontWeight: FontWeight.w700,
-                                                  color: Colors.white,
+                                                  color: context.colors.onAccent,
                                                   letterSpacing: 0.2,
                                                 ),
                                               ),
-                                              SizedBox(width: 4),
+                                              const SizedBox(width: 4),
                                               Icon(
                                                 Icons.chevron_right_rounded,
                                                 size: 20,
-                                                color: Colors.white,
+                                                color: context.colors.onAccent,
                                               ),
                                             ],
                                           ),
@@ -460,8 +455,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                 style: TextButton.styleFrom(
                                   backgroundColor: isDark
                                       ? context.colors.surfaceMuted
-                                      : const Color(0xFFF3F0FF),
-                                  foregroundColor: const Color(0xFF7C3AED),
+                                      : context.colors.accentSoft,
+                                  foregroundColor: AppTheme.accentColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -471,7 +466,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF7C3AED),
+                                    color: AppTheme.accentColor,
                                   ),
                                 ),
                               ),

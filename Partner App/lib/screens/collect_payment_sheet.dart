@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/check_in_api.dart';
 import '../services/insights_api.dart';
+import '../services/wallet_balance.dart';
 import '../theme/app_theme.dart';
 import 'add_extra_service_sheet.dart';
 
@@ -189,6 +190,10 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
       Navigator.pop(context, true);
 
       final coins = result['coins_earned'] ?? 0;
+      if (coins > 0) {
+        WalletBalance.refresh(widget.salonId);
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
         content: Text(coins > 0
             ? 'Payment collected. The salon earned $coins coins.'

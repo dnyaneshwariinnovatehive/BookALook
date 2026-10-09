@@ -177,7 +177,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   else if (isInProgress)
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF9C54F2),
+                        backgroundColor: const Color(0xFF9850F1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       icon: const Icon(Icons.receipt_long, color: Colors.white, size: 18),
@@ -281,7 +281,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF9C54F2))),
+          Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF9850F1))),
           const SizedBox(height: 16),
           ...children,
         ],

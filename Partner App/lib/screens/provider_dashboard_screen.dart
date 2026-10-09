@@ -79,7 +79,7 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF9C54F2)),
+            colorScheme: const ColorScheme.light(primary: Color(0xFF9850F1)),
           ),
           child: child!,
         );
@@ -223,9 +223,9 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
             // Queue List
             Expanded(
               child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF9C54F2)))
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF9850F1)))
                 : RefreshIndicator(
-                    color: const Color(0xFF9C54F2),
+                    color: const Color(0xFF9850F1),
                     onRefresh: _loadAppointments,
                     child: filtered.isEmpty
                         ? ListView(
