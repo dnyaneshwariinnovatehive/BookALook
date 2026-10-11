@@ -13,6 +13,8 @@ import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/push_notification_toggle.dart';
 import '../../../widgets/initials_avatar.dart';
+import '../../../widgets/logout_confirmation_dialog.dart';
+import '../../../services/auth_service.dart';
 
 /// The collaborator's own page: who they are, what they have done, and out.
 ///
@@ -56,13 +58,37 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     try {
       final profile = await CollaboratorApi.profile();
       if (mounted) {
-        setState(() {
-          _profile = profile;
-          _failed = profile == null;
-        });
+        if (profile != null) {
+          setState(() {
+            _profile = profile;
+            _failed = false;
+          });
+        } else {
+          final userMap = await AuthService().getUser();
+          final user = userMap?['user'];
+          setState(() {
+            if (user is Map) {
+              _profile = Map<String, dynamic>.from(user);
+              _failed = false;
+            } else {
+              _failed = true;
+            }
+          });
+        }
       }
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted) {
+        final userMap = await AuthService().getUser();
+        final user = userMap?['user'];
+        setState(() {
+          if (user is Map) {
+            _profile = Map<String, dynamic>.from(user);
+            _failed = false;
+          } else {
+            _failed = true;
+          }
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -84,9 +110,12 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     if (saved == true) {
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Profile updated.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text('Profile updated.'),
+          ),
+        );
       }
     }
   }
@@ -99,36 +128,13 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     // collaborator signed-in-but-stranded on a blank panel.
     final rootNavigator = Navigator.of(context, rootNavigator: true);
 
-    // The dialog must be popped with its OWN context. [showDialog] puts its
-    // route on the root navigator, but this tab sits inside a [TabNavigator] —
-    // so `Navigator.pop(context)` on the tab's context pops the tab's only
-    // route instead of the dialog. The dialog then stays on screen forever and
-    // `confirmed` never resolves, which reads to the user as a dead button.
-    // Every collaborator tab is nested this way, so this is not a one-off.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text(
+    final confirmed = await LogoutConfirmationDialog.show(
+      context,
+      name: _profile?['name']?.toString(),
+      phone: _profile?['phone']?.toString(),
+      secondaryNote:
           'Any salon drafts saved on this device will be cleared. Send anything '
           'you have finished before logging out.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Stay'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(dialogContext).brightness == Brightness.dark
-                  ? AppTheme.darkDanger
-                  : AppTheme.lightDanger,
-            ),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed != true) return;
@@ -157,7 +163,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     await prefs.setBool('isDarkMode', value);
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (_firstLoad && _loading) {
@@ -169,18 +174,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('Your details and your tally', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13, fontWeight: FontWeight.normal)),
-          ],
-        ),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        centerTitle: false,
-      ),
       body: RefreshIndicator(
         onRefresh: _load,
         color: AppTheme.accentColor,
@@ -204,33 +197,48 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
                 const SizedBox(height: 16),
                 _buildHeaderCard(),
                 const SizedBox(height: 24),
-                
-                // Options List
-                Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
-                  ),
+
+                Material(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       _buildStatsCard(),
-                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                      Divider(
+                        height: 1,
+                        indent: 56,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.12),
+                      ),
                       _buildDetailsCard(),
-                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                      Divider(
+                        height: 1,
+                        indent: 56,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.12),
+                      ),
                       _buildAppearanceCard(),
-                      Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
-                      const PushNotificationToggle(),
+                      Divider(
+                        height: 1,
+                        indent: 56,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.12),
+                      ),
+                      const PushNotificationToggle(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
                 _buildLogoutButton(),
                 const SizedBox(height: 40),
-              ]
+              ],
             ],
           ),
         ),
@@ -256,8 +264,12 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
           secondary: Icon(
             isDark ? Icons.dark_mode : Icons.light_mode,
             color: isDark ? Colors.yellow : Colors.orange,
+            size: 26,
           ),
-          title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+          title: const Text(
+            'Dark Mode',
+            style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+          ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         );
       },
@@ -265,7 +277,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   }
 
   // ---------------------------------------------------------------- header
-
 
   Widget _buildHeaderCard() {
     final theme = Theme.of(context);
@@ -277,17 +288,20 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            InitialsAvatar(
-              name: name,
-              radius: 36,
-            ),
+            InitialsAvatar(name: name, radius: 36),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -295,17 +309,29 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Collaborator',
-                    style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: AppTheme.accentColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _profile!['phone']?.toString() ?? '',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.6),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -318,7 +344,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
 
   // ----------------------------------------------------------------- stats
 
-
   Widget _buildStatsCard() {
     final stats = Map<String, dynamic>.from(_profile!['stats'] as Map? ?? {});
     final palette = context.colors;
@@ -327,7 +352,10 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         leading: Icon(Icons.bar_chart, color: AppTheme.accentColor),
-        title: const Text('Your work', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+        title: const Text(
+          'Your work',
+          style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+        ),
         childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
           Row(
@@ -398,7 +426,10 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         leading: Icon(Icons.contact_mail_outlined, color: Colors.blue),
-        title: const Text('Contact details', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+        title: const Text(
+          'Contact details',
+          style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+        ),
         childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         children: [
           Row(
@@ -416,12 +447,34 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
             ],
           ),
           _row(Icons.person_outline, 'Name', _profile!['name']?.toString()),
-          _row(Icons.smartphone_outlined, 'Phone', _profile!['phone']?.toString(), note: 'Used to sign in'),
+          _row(
+            Icons.smartphone_outlined,
+            'Phone',
+            _profile!['phone']?.toString(),
+            note: 'Used to sign in',
+          ),
           _row(Icons.alternate_email, 'Email', _profile!['email']?.toString()),
-          _row(Icons.wc_outlined, 'Gender', _prettyGender(_profile!['gender']?.toString())),
-          _row(Icons.cake_outlined, 'Date of birth', dob == null ? null : DateFormat('d MMMM yyyy').format(dob)),
-          _row(Icons.home_outlined, 'Address', _profile!['address']?.toString()),
-          _row(Icons.pin_drop_outlined, 'Pincode', _profile!['pincode']?.toString(), isLast: true),
+          _row(
+            Icons.wc_outlined,
+            'Gender',
+            _prettyGender(_profile!['gender']?.toString()),
+          ),
+          _row(
+            Icons.cake_outlined,
+            'Date of birth',
+            dob == null ? null : DateFormat('d MMMM yyyy').format(dob),
+          ),
+          _row(
+            Icons.home_outlined,
+            'Address',
+            _profile!['address']?.toString(),
+          ),
+          _row(
+            Icons.pin_drop_outlined,
+            'Pincode',
+            _profile!['pincode']?.toString(),
+            isLast: true,
+          ),
         ],
       ),
     );
@@ -499,12 +552,18 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
   // ---------------------------------------------------------------- states
 
   Widget _buildOfflineNote() {
-    return CollaboratorEmptyState(
-      icon: Icons.cloud_off_outlined,
-      title: 'Could not load your profile',
-      body: 'Your saved drafts are safe on this device either way.',
-      actionLabel: 'Try again',
-      onAction: _load,
+    return Column(
+      children: [
+        CollaboratorEmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Could not load your profile',
+          body: 'Your saved drafts are safe on this device either way.',
+          actionLabel: 'Try again',
+          onAction: _load,
+        ),
+        const SizedBox(height: 24),
+        _buildLogoutButton(),
+      ],
     );
   }
 

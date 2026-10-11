@@ -10,6 +10,7 @@ import '../more/provider_leaves_screen.dart';
 import '../../../services/staff_api.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
+import '../../../widgets/logout_confirmation_dialog.dart';
 
 class ProviderProfileTab extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -33,27 +34,16 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
   bool _showPersonalInfo = false;
   static const int _maxVisibleServices = 2;
 
-  Future<void> _logout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log out'),
-        content: const Text('You will need your phone number to sign back in.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Log out',
-              style: TextStyle(
-                color: Theme.of(ctx).brightness == Brightness.dark
-                    ? AppTheme.darkDanger
-                    : AppTheme.lightDanger,
-              ),
-            ),
-          ),
-        ],
-      ),
+  Future<void> _logout() async {
+    final name = widget.user['name']?.toString();
+    final phone = widget.user['phone']?.toString();
+
+    final confirmed = await LogoutConfirmationDialog.show(
+      context,
+      name: name,
+      phone: phone,
+      secondaryNote:
+          'Your appointments and schedule stay saved to your account.',
     );
 
     if (confirmed != true) return;
@@ -81,7 +71,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
@@ -100,14 +92,16 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             Future<void> pickTime(bool isStart) async {
               final picked = await showTimePicker(
                 context: ctx,
-                initialTime: isStart 
+                initialTime: isStart
                     ? (startTime ?? const TimeOfDay(hour: 9, minute: 0))
                     : (endTime ?? const TimeOfDay(hour: 17, minute: 0)),
               );
               if (picked != null) {
                 setModalState(() {
-                  if (isStart) startTime = picked;
-                  else endTime = picked;
+                  if (isStart)
+                    startTime = picked;
+                  else
+                    endTime = picked;
                 });
               }
             }
@@ -115,7 +109,13 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             Future<void> submitLeave() async {
               if (!isFullDay && (startTime == null || endTime == null)) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(duration: const Duration(milliseconds: 2500), content: const Text('Please select start and end time for partial day leave.'), backgroundColor: AppTheme.darkDanger),
+                  SnackBar(
+                    duration: const Duration(milliseconds: 2500),
+                    content: const Text(
+                      'Please select start and end time for partial day leave.',
+                    ),
+                    backgroundColor: AppTheme.darkDanger,
+                  ),
                 );
                 return;
               }
@@ -124,7 +124,11 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 final endMin = endTime!.hour * 60 + endTime!.minute;
                 if (endMin <= startMin) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(duration: const Duration(milliseconds: 2500), content: const Text('End time must be after start time.'), backgroundColor: AppTheme.darkDanger),
+                    SnackBar(
+                      duration: const Duration(milliseconds: 2500),
+                      content: const Text('End time must be after start time.'),
+                      backgroundColor: AppTheme.darkDanger,
+                    ),
                   );
                   return;
                 }
@@ -136,29 +140,48 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                   'leave_date': DateFormat('yyyy-MM-dd').format(selectedDate),
                   'leave_type': leaveType,
                   'is_full_day': isFullDay,
-                  if (!isFullDay) 'start_time': '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
-                  if (!isFullDay) 'end_time': '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
-                  if (reasonController.text.isNotEmpty) 'reason': reasonController.text,
+                  if (!isFullDay)
+                    'start_time':
+                        '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
+                  if (!isFullDay)
+                    'end_time':
+                        '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
+                  if (reasonController.text.isNotEmpty)
+                    'reason': reasonController.text,
                 };
-                
-                final response = await StaffApi.requestLeave(widget.salon['id'], data);
-                
+
+                final response = await StaffApi.requestLeave(
+                  widget.salon['id'],
+                  data,
+                );
+
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                   final isAutoApproved = response['auto_approved'] == true;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(duration: const Duration(milliseconds: 2500), 
-                      content: Text(isAutoApproved ? 'Leave approved automatically.' : 'Leave requested successfully. Waiting for admin approval.'),
+                    SnackBar(
+                      duration: const Duration(milliseconds: 2500),
+                      content: Text(
+                        isAutoApproved
+                            ? 'Leave approved automatically.'
+                            : 'Leave requested successfully. Waiting for admin approval.',
+                      ),
                       backgroundColor: AppTheme.accentColor,
                       behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   );
                 }
               } catch (e) {
                 setModalState(() => isSubmitting = false);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to submit leave: ${e.toString()}'), backgroundColor: AppTheme.darkDanger),
+                  SnackBar(
+                    duration: const Duration(milliseconds: 2500),
+                    content: Text('Failed to submit leave: ${e.toString()}'),
+                    backgroundColor: AppTheme.darkDanger,
+                  ),
                 );
               }
             }
@@ -166,7 +189,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                top: 24, left: 24, right: 24,
+                top: 24,
+                left: 24,
+                right: 24,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -174,24 +199,37 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Request Time Off', 
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(ctx).colorScheme.onSurface)
+                      'Request Time Off',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(ctx).colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     GestureDetector(
                       onTap: pickDate,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                          border: Border.all(
+                            color: Theme.of(
+                              ctx,
+                            ).colorScheme.onSurface.withOpacity(0.2),
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              DateFormat('EEEE, MMM d, yyyy').format(selectedDate),
+                              DateFormat(
+                                'EEEE, MMM d, yyyy',
+                              ).format(selectedDate),
                               style: const TextStyle(fontSize: 16),
                             ),
                             const Icon(Icons.calendar_today, size: 20),
@@ -200,7 +238,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -208,7 +246,8 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                             title: const Text('Unpaid'),
                             value: 'unpaid',
                             groupValue: leaveType,
-                            onChanged: (val) => setModalState(() => leaveType = val!),
+                            onChanged: (val) =>
+                                setModalState(() => leaveType = val!),
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),
@@ -217,20 +256,24 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                             title: const Text('Paid'),
                             value: 'paid',
                             groupValue: leaveType,
-                            onChanged: (val) => setModalState(() => leaveType = val!),
+                            onChanged: (val) =>
+                                setModalState(() => leaveType = val!),
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),
                       ],
                     ),
-                    
+
                     SwitchListTile(
-                      title: const Text('Full Day Leave', style: TextStyle(fontWeight: FontWeight.w600)),
+                      title: const Text(
+                        'Full Day Leave',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       value: isFullDay,
                       onChanged: (val) => setModalState(() => isFullDay = val),
                       contentPadding: EdgeInsets.zero,
                     ),
-                    
+
                     if (!isFullDay) ...[
                       const SizedBox(height: 16),
                       Row(
@@ -239,18 +282,36 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                             child: GestureDetector(
                               onTap: () => pickTime(true),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 16,
+                                ),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      ctx,
+                                    ).colorScheme.onSurface.withOpacity(0.2),
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Start Time', style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6))),
+                                    Text(
+                                      'Start Time',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(ctx)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.6),
+                                      ),
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      startTime != null ? startTime!.format(context) : 'Select Time',
+                                      startTime != null
+                                          ? startTime!.format(context)
+                                          : 'Select Time',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
@@ -263,18 +324,36 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                             child: GestureDetector(
                               onTap: () => pickTime(false),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 16,
+                                ),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.2)),
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      ctx,
+                                    ).colorScheme.onSurface.withOpacity(0.2),
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('End Time', style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6))),
+                                    Text(
+                                      'End Time',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(ctx)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.6),
+                                      ),
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      endTime != null ? endTime!.format(context) : 'Select Time',
+                                      endTime != null
+                                          ? endTime!.format(context)
+                                          : 'Select Time',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
@@ -285,7 +364,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                         ],
                       ),
                     ],
-                    
+
                     const SizedBox(height: 16),
                     TextField(
                       controller: reasonController,
@@ -293,7 +372,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       decoration: InputDecoration(
                         labelText: 'Reason for leave (Optional)',
                         alignLabelWithHint: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -302,18 +383,34 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.accentColor,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: isSubmitting 
-                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Submit Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Submit Request',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
             );
-          }
+          },
         );
       },
     );
@@ -339,29 +436,43 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
       int m = int.tryParse(parts[1]) ?? 0;
       final tod = TimeOfDay(hour: h, minute: m);
       String period = tod.hour >= 12 ? 'PM' : 'AM';
-      int displayHour = tod.hour > 12 ? tod.hour - 12 : (tod.hour == 0 ? 12 : tod.hour);
+      int displayHour = tod.hour > 12
+          ? tod.hour - 12
+          : (tod.hour == 0 ? 12 : tod.hour);
       return '${displayHour.toString().padLeft(2, '0')}:${tod.minute.toString().padLeft(2, '0')} $period';
     }
     return timeStr;
   }
 
   @override
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     final List<dynamic> services = widget.provider['services'] ?? [];
     final List<dynamic> workingHours = widget.provider['working_hours'] ?? [];
-    
-    workingHours.sort((a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int));
-    final List<String> daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    workingHours.sort(
+      (a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int),
+    );
+    final List<String> daysOfWeek = [
+      'Sun',
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Fri',
+      'Sat',
+    ];
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28)),
+        title: const Text(
+          'My Profile',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28),
+        ),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -377,7 +488,13 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                      alpha: isDark ? 0.2 : 0.05,
+                    ),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: Padding(
@@ -395,17 +512,29 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                         children: [
                           Text(
                             widget.user['name'] ?? 'Unknown',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Service Provider',
-                            style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: AppTheme.accentColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             widget.salon['name'] ?? '',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.6),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -414,125 +543,259 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Options List
             Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                      alpha: isDark ? 0.2 : 0.05,
+                    ),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: Column(
                 children: [
                   // Personal Information
                   Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
-                      leading: const Icon(Icons.person_outline, color: AppTheme.accentColor),
-                      title: const Text('Personal Information', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+                      leading: const Icon(
+                        Icons.person_outline,
+                        color: AppTheme.accentColor,
+                      ),
+                      title: const Text(
+                        'Personal Information',
+                        style: TextStyle(
+                          fontWeight: FontWeight.normal,
+                          fontSize: 16,
+                        ),
+                      ),
                       childrenPadding: const EdgeInsets.all(16),
                       children: [
-                        _buildInfoRow(context, 'FULL NAME', widget.user['name'] ?? '', actionIcon: Icons.lock_outline),
-                        Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
-                        _buildInfoRow(context, 'PHONE NUMBER', widget.user['phone'] ?? '', actionText: 'Edit'),
-                        Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
-                        _buildInfoRow(context, 'EMAIL ADDRESS', widget.user['email'] ?? 'Not provided', actionIcon: Icons.lock_outline),
-                      ]
-                    )
+                        _buildInfoRow(
+                          context,
+                          'FULL NAME',
+                          widget.user['name'] ?? '',
+                          actionIcon: Icons.lock_outline,
+                        ),
+                        Divider(
+                          height: 32,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.12),
+                        ),
+                        _buildInfoRow(
+                          context,
+                          'PHONE NUMBER',
+                          widget.user['phone'] ?? '',
+                          actionText: 'Edit',
+                        ),
+                        Divider(
+                          height: 32,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.12),
+                        ),
+                        _buildInfoRow(
+                          context,
+                          'EMAIL ADDRESS',
+                          widget.user['email'] ?? 'Not provided',
+                          actionIcon: Icons.lock_outline,
+                        ),
+                      ],
+                    ),
                   ),
-                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
 
                   // Working Hours
                   Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
-                      leading: const Icon(Icons.access_time, color: Colors.orange),
-                      title: const Text('Working Hours', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+                      leading: const Icon(
+                        Icons.access_time,
+                        color: Colors.orange,
+                      ),
+                      title: const Text(
+                        'Working Hours',
+                        style: TextStyle(
+                          fontWeight: FontWeight.normal,
+                          fontSize: 16,
+                        ),
+                      ),
                       childrenPadding: const EdgeInsets.all(16),
                       children: [
                         if (workingHours.isEmpty)
-                          Text('No working hours assigned yet.', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)))
+                          Text(
+                            'No working hours assigned yet.',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                          )
                         else
                           Column(
                             children: workingHours.asMap().entries.map((entry) {
                               final index = entry.key;
                               final hour = entry.value;
-                              final isOff = hour['is_weekly_off'] == 1 || hour['is_weekly_off'] == true;
-                              
-                              final workTime = isOff 
-                                ? 'Closed' 
-                                : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
-                                
-                              final breakTime = hour['break_start'] != null 
-                                ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
-                                : 'No break';
+                              final isOff =
+                                  hour['is_weekly_off'] == 1 ||
+                                  hour['is_weekly_off'] == true;
+
+                              final workTime = isOff
+                                  ? 'Closed'
+                                  : '${_formatTime(hour['shift_start'])} - ${_formatTime(hour['shift_end'])}';
+
+                              final breakTime = hour['break_start'] != null
+                                  ? '${_formatTime(hour['break_start'])} - ${_formatTime(hour['break_end'])}'
+                                  : 'No break';
 
                               return Column(
                                 children: [
-                                  _buildWorkingHourRow(context, daysOfWeek[hour['day_of_week']], workTime, isOff ? null : breakTime),
+                                  _buildWorkingHourRow(
+                                    context,
+                                    daysOfWeek[hour['day_of_week']],
+                                    workTime,
+                                    isOff ? null : breakTime,
+                                  ),
                                   if (index < workingHours.length - 1)
-                                    Divider(height: 32, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.12)),
+                                    Divider(
+                                      height: 32,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.12),
+                                    ),
                                 ],
                               );
                             }).toList(),
                           ),
-                      ]
-                    )
+                      ],
+                    ),
                   ),
-                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
 
                   // Services
                   if (services.isNotEmpty) ...[
                     Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      data: Theme.of(
+                        context,
+                      ).copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
-                        leading: const Icon(Icons.content_cut, color: Colors.pink),
-                        title: const Text('Services', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
+                        leading: const Icon(
+                          Icons.content_cut,
+                          color: Colors.pink,
+                        ),
+                        title: const Text(
+                          'Services',
+                          style: TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: 16,
+                          ),
+                        ),
                         childrenPadding: const EdgeInsets.all(16),
                         children: [
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: services.map((s) => _buildServiceChip(_getServiceName(s))).toList(),
+                            children: services
+                                .map(
+                                  (s) => _buildServiceChip(_getServiceName(s)),
+                                )
+                                .toList(),
                           ),
-                        ]
-                      )
+                        ],
+                      ),
                     ),
-                    Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                    Divider(
+                      height: 1,
+                      indent: 56,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.12),
+                    ),
                   ],
 
                   // My Leaves
-                  _buildOptionTile(context, 
+                  _buildOptionTile(
+                    context,
                     icon: Icons.calendar_today_outlined,
                     iconColor: Colors.purple,
                     title: 'My Leaves',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => ProviderLeavesScreen(salon: widget.salon)),
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ProviderLeavesScreen(salon: widget.salon),
+                      ),
                     ),
                   ),
-                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
 
                   // My Salary & Commission
-                  _buildOptionTile(context, 
+                  _buildOptionTile(
+                    context,
                     icon: Icons.account_balance_wallet_outlined,
                     iconColor: Colors.green,
                     title: 'My Salary & Commission',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => MySalaryScreen(salonId: widget.salon['id'].toString())),
+                      MaterialPageRoute(
+                        builder: (_) => MySalaryScreen(
+                          salonId: widget.salon['id'].toString(),
+                        ),
+                      ),
                     ),
                   ),
-                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                  
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
+
                   // Push Notifications
-                  const PushNotificationToggle(),
-                  Divider(height: 1, indent: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.12)),
-                  
+                  const PushNotificationToggle(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.12),
+                  ),
+
                   // Dark Mode
                   ValueListenableBuilder<ThemeMode>(
                     valueListenable: themeNotifier,
@@ -541,32 +804,45 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                       return SwitchListTile(
                         value: isDarkMode,
                         onChanged: (val) async {
-                          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                          themeNotifier.value = val
+                              ? ThemeMode.dark
+                              : ThemeMode.light;
                           final prefs = await SharedPreferences.getInstance();
                           await prefs.setBool('isDarkMode', val);
                         },
                         secondary: Icon(
                           isDarkMode ? Icons.dark_mode : Icons.light_mode,
                           color: isDarkMode ? Colors.yellow : Colors.orange,
+                          size: 26,
                         ),
-                        title: const Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text(
+                          'Dark Mode',
+                          style: TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: 16,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
                       );
                     },
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Logout Button
             GestureDetector(
-              onTap: () => _logout(context),
+              onTap: _logout,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkDanger.withValues(alpha: 0.15) : const Color(0xFFFDECEE),
+                  color: isDark
+                      ? AppTheme.darkDanger.withValues(alpha: 0.15)
+                      : const Color(0xFFFDECEE),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -580,7 +856,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 40),
           ],
         ),
@@ -588,11 +864,24 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
     );
   }
 
-  Widget _buildOptionTile(BuildContext context, {required IconData icon, required Color iconColor, required String title, required VoidCallback onTap}) {
+  Widget _buildOptionTile(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required VoidCallback onTap,
+  }) {
     return ListTile(
-      leading: Icon(icon, color: iconColor),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
-      trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+      leading: Icon(icon, color: iconColor, size: 26),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 14,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+      ),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
@@ -607,12 +896,22 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: AppTheme.accentColor, fontSize: 13, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: AppTheme.accentColor,
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, String label, String value, {IconData? actionIcon, String? actionText}) {
+  Widget _buildInfoRow(
+    BuildContext context,
+    String label,
+    String value, {
+    IconData? actionIcon,
+    String? actionText,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -622,37 +921,63 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
             children: [
               Text(
                 label,
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 value,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
         ),
         if (actionIcon != null)
-          Icon(actionIcon, size: 20, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+          Icon(
+            actionIcon,
+            size: 20,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26),
+          ),
         if (actionText != null)
           Text(
             actionText,
-            style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(
+              color: AppTheme.accentColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
           ),
       ],
     );
   }
 
-
-
-  Widget _buildWorkingHourRow(BuildContext context, String day, String workTime, String? breakTime) {
+  Widget _buildWorkingHourRow(
+    BuildContext context,
+    String day,
+    String workTime,
+    String? breakTime,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           day,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         Row(
           children: [
@@ -661,19 +986,33 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
               children: [
                 Text(
                   workTime,
-                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.54),
+                  ),
                 ),
                 if (breakTime != null) ...[
                   const SizedBox(height: 4),
                   Text(
                     'Break: $breakTime',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.38),
+                    ),
                   ),
-                ]
+                ],
               ],
             ),
             const SizedBox(width: 12),
-            Icon(Icons.lock_outline, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+            Icon(
+              Icons.lock_outline,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26),
+            ),
           ],
         ),
       ],

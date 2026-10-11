@@ -11,6 +11,7 @@ import '../../services/http_client.dart' show loginRouteName;
 import '../../services/profile_service.dart';
 import '../phone_screen.dart';
 import 'favourites_tab.dart';
+import '../../widgets/logout_confirmation_dialog.dart';
 import '../../utils/app_haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/bottom_clearance.dart';
@@ -21,7 +22,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 class ProfileTab extends StatefulWidget {
   final bool isGuest;
 
-  const ProfileTab({Key? key, required this.isGuest}) : super(key: key);
+  const ProfileTab({super.key, required this.isGuest});
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -36,9 +37,9 @@ class _ProfileTabState extends State<ProfileTab> {
   /// Insertion order is the reading order: what you agreed to, what happens to
   /// your money, then who we are.
   static const Map<String, IconData> _legalDocuments = {
-    'terms': Icons.gavel_outlined,
-    'privacy': Icons.lock_outline,
+    'terms': Icons.description_outlined,
     'cancellation-refund': Icons.event_busy_outlined,
+    'privacy': Icons.lock_outline,
     'about': Icons.info_outline,
   };
 
@@ -51,7 +52,6 @@ class _ProfileTabState extends State<ProfileTab> {
   // Settings states
   bool _pushNotifications = true;
   bool _locationAccess = true;
-  bool _showDeleteAccount = false;
 
   @override
   void initState() {
@@ -92,8 +92,9 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     final settings = await FirebaseMessaging.instance.getNotificationSettings();
-    bool osEnabled = settings.authorizationStatus == AuthorizationStatus.authorized || 
-                     settings.authorizationStatus == AuthorizationStatus.provisional;
+    bool osEnabled =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
     bool apiEnabled = true;
 
     // Load Push notification preference from backend if not guest
@@ -123,94 +124,23 @@ class _ProfileTabState extends State<ProfileTab> {
   /// Signing out ends the session and clears the token on this device, so the
   /// account being signed out of is named before it happens.
   Future<void> _logout(BuildContext context) async {
-    final textHeading = context.colors.textPrimary;
-    final textBody = context.colors.textSecondary;
-    final textLight = context.colors.textTertiary;
-    final danger = context.colors.danger;
-    final surface = context.colors.surface;
+    Map<String, dynamic>? profile = _userProfile;
+    if (profile == null && !widget.isGuest) {
+      try {
+        final data = await _profileService.getProfile();
+        profile = data['user'] as Map<String, dynamic>?;
+      } catch (_) {}
+    }
 
-    final name = (_userProfile?['name'] ?? '').toString().trim();
-    final phone = (_userProfile?['phone'] ?? '').toString().trim();
-    final email = (_userProfile?['email'] ?? '').toString().trim();
-    final contact = phone.isNotEmpty ? phone : (email.isNotEmpty ? email : '');
+    if (!context.mounted) return;
 
-    AppHaptics.lightImpact();
+    final name = (profile?['name'] ?? '').toString().trim();
+    final phone = (profile?['phone'] ?? '').toString().trim();
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: surface,
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        title: Text(
-          'Log out of BookALook?',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: textHeading,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (name.isNotEmpty)
-              Text(
-                name,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: textHeading,
-                ),
-              ),
-            if (contact.isNotEmpty) ...[
-              if (name.isNotEmpty) const SizedBox(height: 2),
-              Text(
-                contact,
-                style: GoogleFonts.outfit(fontSize: 14, color: textBody),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Text(
-              contact.isNotEmpty
-                  ? 'You will need to sign in again with $contact to reach your bookings, wallet and profile on this device.'
-                  : 'You will need to sign in again to reach your bookings, wallet and profile on this device.',
-              style: GoogleFonts.outfit(fontSize: 14, color: textBody),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Your bookings and cart stay saved to your account.',
-              style: GoogleFonts.outfit(fontSize: 12, color: textLight),
-            ),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        actions: [
-          TextButton(
-            onPressed: () {
-              AppHaptics.lightImpact();
-              Navigator.pop(dialogContext, false);
-            },
-            child: Text(
-              'Stay signed in',
-              style: GoogleFonts.outfit(color: textBody),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              AppHaptics.lightImpact();
-              Navigator.pop(dialogContext, true);
-            },
-            child: Text(
-              'Log out',
-              style: GoogleFonts.outfit(
-                color: danger,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await LogoutConfirmationDialog.show(
+      context,
+      name: name.isNotEmpty ? name : null,
+      phone: phone.isNotEmpty ? phone : null,
     );
 
     if (confirmed != true) return;
@@ -256,7 +186,11 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             Text(
               'This action is permanent and cannot be undone.',
-              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: textHeading),
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: textHeading,
+              ),
             ),
             const SizedBox(height: 14),
             Text(
@@ -272,10 +206,7 @@ class _ProfileTabState extends State<ProfileTab> {
               AppHaptics.lightImpact();
               Navigator.pop(dialogContext, false);
             },
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.outfit(color: textBody),
-            ),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: textBody)),
           ),
           TextButton(
             onPressed: () {
@@ -300,7 +231,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final success = await authService.deleteAccount();
 
     if (!context.mounted) return;
-    
+
     if (success) {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -330,13 +261,62 @@ class _ProfileTabState extends State<ProfileTab> {
     _loadProfileData();
   }
 
+  Future<void> _onTogglePushNotifications(bool val) async {
+    if (val) {
+      NotificationSettings settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
+          settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        settings = await FirebaseMessaging.instance.requestPermission();
+        if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+            settings.authorizationStatus != AuthorizationStatus.provisional) {
+          if (!mounted) return;
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Notifications Disabled'),
+              content: const Text(
+                'Please enable notifications for BookALook in your device settings to receive updates.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _pushNotifications = val);
+    if (!widget.isGuest) {
+      try {
+        await _profileService.updateNotificationPreferences({
+          'push_enabled': val,
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _pushNotifications = !val);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update preferences')),
+        );
+      }
+    } else {
+      _toggleSetting('push_notifications', val);
+    }
+  }
+
   String _formatJoinDate(String? dateStr) {
-    if (dateStr == null) return '';
+    if (dateStr == null || dateStr.trim().isEmpty) return 'Member';
     try {
       final date = DateTime.parse(dateStr);
       return 'Member Since ${DateFormat('MMM yyyy').format(date)}';
     } catch (e) {
-      return '';
+      return 'Member';
     }
   }
 
@@ -399,107 +379,117 @@ class _ProfileTabState extends State<ProfileTab> {
       );
     }
 
-    final userName = _userProfile?['name'] ?? 'Guest';
+    final userName = (_userProfile?['name'] ?? 'Guest').toString();
     final joinDate = _formatJoinDate(_userProfile?['created_at']);
+    final avatarUrl =
+        (_userProfile?['profile_photo'] ?? _userProfile?['avatar'])?.toString();
 
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
+        top: true,
         bottom: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(24.0, 20.0, 24.0, bottomClearance(context)),
+          padding: EdgeInsets.fromLTRB(
+            20.0,
+            16.0,
+            20.0,
+            bottomClearance(context, gap: 32),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Profile Header
+              // Page Title: My Profile
               Text(
                 'My Profile',
                 style: GoogleFonts.outfit(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: headingColor,
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Profile Header: Avatar, Name, Edit Icon, Join Date
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 74,
+                    height: 74,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.accentColor, width: 2),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: CircleAvatar(
-                        backgroundColor: context.colors.accentSoft,
-                        child: Icon(
-                          Icons.person,
-                          size: 40,
-                          color: AppTheme.accentColor,
-                        ),
+                      border: Border.all(
+                        color: AppTheme.accentColor,
+                        width: 2.2,
                       ),
+                    ),
+                    padding: const EdgeInsets.all(3.5),
+                    child: CircleAvatar(
+                      backgroundColor: context.colors.accentSoft,
+                      backgroundImage:
+                          (avatarUrl != null && avatarUrl.isNotEmpty)
+                          ? NetworkImage(avatarUrl)
+                          : null,
+                      child: (avatarUrl == null || avatarUrl.isEmpty)
+                          ? Icon(
+                              Icons.person,
+                              size: 38,
+                              color: AppTheme.accentColor,
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
-                            Text(
-                              userName,
-                              style: GoogleFonts.outfit(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: headingColor,
+                            Flexible(
+                              child: Text(
+                                userName,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w700,
+                                  color: headingColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            PopupMenuButton<String>(
-                              icon: Icon(Icons.edit, size: 20, color: AppTheme.accentColor),
-                              padding: EdgeInsets.zero,
-                              offset: const Offset(0, 40),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              color: context.colors.surface,
-                              onSelected: (value) async {
-                                if (value == 'edit') {
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () async {
                                   if (_userProfile == null) return;
+                                  AppHaptics.lightImpact();
                                   final result = await Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => EditProfileScreen(user: _userProfile!)),
+                                    MaterialPageRoute(
+                                      builder: (context) => EditProfileScreen(
+                                        user: _userProfile!,
+                                      ),
+                                    ),
                                   );
                                   if (result == true) {
                                     _loadProfileData();
                                   }
-                                } else if (value == 'delete') {
-                                  _deleteAccount(context);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.person_outline, color: context.colors.textPrimary, size: 20),
-                                      const SizedBox(width: 12),
-                                      Text('Edit Profile', style: GoogleFonts.outfit(color: context.colors.textPrimary)),
-                                    ],
+                                },
+                                borderRadius: BorderRadius.circular(16),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4.0),
+                                  child: Icon(
+                                    Icons.edit_outlined,
+                                    size: 19,
+                                    color: AppTheme.accentColor,
                                   ),
                                 ),
-                                PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.delete_outline, color: context.colors.danger, size: 20),
-                                      const SizedBox(width: 12),
-                                      Text('Delete Account', style: GoogleFonts.outfit(color: context.colors.danger)),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
@@ -507,7 +497,8 @@ class _ProfileTabState extends State<ProfileTab> {
                         Text(
                           joinDate,
                           style: GoogleFonts.outfit(
-                            fontSize: 14,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                             color: context.colors.textTertiary,
                           ),
                         ),
@@ -516,259 +507,304 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // Stats Grid
+              // Statistics Cards: Appointments & Fav Salons
               Row(
                 children: [
                   Expanded(
                     child: _buildStatCard(
                       context,
-                      _appointmentsCount.toString(),
-                      'Appointments',
-                      surfaceColor,
-                      borderColor,
-                      headingColor,
+                      count: _appointmentsCount.toString(),
+                      label: 'Appointments',
+                      surfaceColor: surfaceColor,
+                      borderColor: borderColor,
+                      headingColor: headingColor,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: _buildStatCard(
                       context,
-                      _favSalonsCount.toString(),
-                      'Fav Salons',
-                      surfaceColor,
-                      borderColor,
-                      headingColor,
+                      count: _favSalonsCount.toString(),
+                      label: 'Fav Salons',
+                      surfaceColor: surfaceColor,
+                      borderColor: borderColor,
+                      headingColor: headingColor,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Favourites lives here rather than in the footer, where it took a
-              // slot that the four core destinations use better.
-              Container(
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: _buildNavRow(
-                  context,
-                  icon: Icons.favorite_outline,
-                  label: 'My Favourites',
-                  trailing: _favSalonsCount > 0 ? '${_favSalonsCount}' : null,
-                  headingColor: headingColor,
-                  onTap: _openFavourites,
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Settings Header
-              Text(
-                'ACCOUNT SETTINGS',
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                  color: context.colors.textTertiary,
-                ),
-              ),
               const SizedBox(height: 16),
 
-              // Settings Card
+              // My Favourites Full-Width Row
               Container(
                 decoration: BoxDecoration(
                   color: surfaceColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
+                  border: Border.all(color: borderColor, width: 1.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.02),
-                      blurRadius: 10,
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.15)
+                          : const Color(0xFF6B46C1).withValues(alpha: 0.04),
+                      blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Column(
-                  children: [
-                    _buildToggleRow(
-                      context,
-                      icon: Icons.dark_mode_outlined,
-                      label: 'Dark Mode',
-                      value: isDark,
-                      onChanged: (val) {
-                        themeNotifier.value = val
-                            ? ThemeMode.dark
-                            : ThemeMode.light;
-                      },
-                      headingColor: headingColor,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _openFavourites,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            child: Icon(
+                              Icons.favorite_border_rounded,
+                              size: 22,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'My Favourites',
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: headingColor,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 26,
+                              minHeight: 24,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: context.colors.accentSoft,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$_favSalonsCount',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: context.colors.textTertiary,
+                          ),
+                        ],
+                      ),
                     ),
-                    Divider(height: 1, color: borderColor),
-                    _buildToggleRow(
-                      context,
-                      icon: Icons.notifications_outlined,
-                      label: 'Push Notifications',
-                      value: _pushNotifications,
-                      onChanged: (val) async {
-                        if (val) {
-                          NotificationSettings settings = await FirebaseMessaging.instance.getNotificationSettings();
-                          if (settings.authorizationStatus == AuthorizationStatus.denied ||
-                              settings.authorizationStatus == AuthorizationStatus.notDetermined) {
-                            settings = await FirebaseMessaging.instance.requestPermission();
-                            if (settings.authorizationStatus != AuthorizationStatus.authorized &&
-                                settings.authorizationStatus != AuthorizationStatus.provisional) {
-                              if (!mounted) return;
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Notifications Disabled'),
-                                  content: const Text('Please enable notifications for BookALook in your device settings to receive updates.'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ACCOUNT SETTINGS Header
+              _buildSectionHeader(context, 'ACCOUNT SETTINGS'),
+              const SizedBox(height: 8),
+
+              // Account Settings Card Container
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor, width: 1.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.15)
+                          : const Color(0xFF6B46C1).withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Column(
+                    children: [
+                      _buildToggleRow(
+                        context,
+                        icon: Icons.dark_mode_outlined,
+                        label: 'Dark Mode',
+                        value: isDark,
+                        onChanged: (val) {
+                          themeNotifier.value = val
+                              ? ThemeMode.dark
+                              : ThemeMode.light;
+                        },
+                      ),
+                      Divider(height: 1, thickness: 1, color: borderColor),
+                      _buildToggleRow(
+                        context,
+                        icon: Icons.notifications_none_rounded,
+                        label: 'Push Notifications',
+                        value: _pushNotifications,
+                        onChanged: _onTogglePushNotifications,
+                      ),
+                      Divider(height: 1, thickness: 1, color: borderColor),
+                      _buildToggleRow(
+                        context,
+                        icon: Icons.location_on_outlined,
+                        label: 'Location Access',
+                        value: _locationAccess,
+                        onChanged: (val) {
+                          setState(() => _locationAccess = val);
+                          _toggleSetting('location_access', val);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // HELP & LEGAL Header
+              _buildSectionHeader(context, 'HELP & LEGAL'),
+              const SizedBox(height: 8),
+
+              // Help & Legal Card Container
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: borderColor, width: 1.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.15)
+                          : const Color(0xFF6B46C1).withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < _legalDocuments.length; i++) ...[
+                        () {
+                          final entry = _legalDocuments.entries.elementAt(i);
+                          final doc = legalDocumentBySlug(entry.key);
+                          final title = doc?.title ?? entry.key;
+                          return _buildNavActionRow(
+                            context,
+                            icon: entry.value,
+                            label: title,
+                            onTap: () {
+                              AppHaptics.lightImpact();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      LegalDocumentScreen(slug: entry.key),
                                 ),
                               );
-                              return;
-                            }
-                          }
-                        }
-
-                        setState(() => _pushNotifications = val);
-                        if (!widget.isGuest) {
-                          try {
-                            await _profileService.updateNotificationPreferences({
-                              'push_enabled': val,
-                            });
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() => _pushNotifications = !val);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Failed to update preferences'))
-                              );
-                            }
-                          }
-                        } else {
-                          _toggleSetting('push_notifications', val);
-                        }
-                      },
-                      headingColor: headingColor,
-                    ),
-                    Divider(height: 1, color: borderColor),
-                    _buildToggleRow(
-                      context,
-                      icon: Icons.location_on_outlined,
-                      label: 'Location Access',
-                      value: _locationAccess,
-                      onChanged: (val) {
-                        setState(() => _locationAccess = val);
-                        _toggleSetting('location_access', val);
-                      },
-                      headingColor: headingColor,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Legal Header
-              Text(
-                'HELP & LEGAL',
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                  color: context.colors.textTertiary,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Always reachable, signed in or not. A guest reading the
-              // cancellation policy before their first booking is exactly the
-              // person most likely to need it.
-              Container(
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    for (final entry in _legalDocuments.entries) ...[
-                      LegalDocumentTile(slug: entry.key, icon: entry.value),
-                      if (entry.key != _legalDocuments.keys.last)
-                        Divider(height: 1, color: borderColor),
+                            },
+                          );
+                        }(),
+                        if (i < _legalDocuments.length - 1)
+                          Divider(height: 1, thickness: 1, color: borderColor),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
+              // Legal contact info
               Center(
                 child: Text(
-                  'BooKalook · ${kLegalContactEmail}',
+                  'BooKalook · $kLegalContactEmail',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
-                    fontSize: 11,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: context.colors.textTertiary,
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
 
               // Logout Button
               Center(
                 child: TextButton.icon(
                   onPressed: () => _logout(context),
-                  icon: Icon(Icons.logout, color: dangerColor, size: 20),
+                  icon: Icon(
+                    Icons.logout_rounded,
+                    color: dangerColor,
+                    size: 18,
+                  ),
                   label: Text(
                     'Log Out',
                     style: GoogleFonts.outfit(
                       color: dangerColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 15,
                     ),
                   ),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
+                      horizontal: 28,
                       vertical: 12,
                     ),
                     backgroundColor: context.colors.dangerSoft,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(24),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+
+              const SizedBox(height: 10),
+
+              // Delete Account
+              Center(
+                child: TextButton(
+                  onPressed: () => _deleteAccount(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                  ),
+                  child: Text(
+                    'Delete Account',
+                    style: GoogleFonts.outfit(
+                      color: context.colors.textTertiary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -776,106 +812,68 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title,
+        style: GoogleFonts.outfit(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+          color: context.colors.textTertiary,
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatCard(
-    BuildContext context,
-    String count,
-    String label,
-    Color surfaceColor,
-    Color borderColor,
-    Color headingColor,
-  ) {
+    BuildContext context, {
+    required String count,
+    required String label,
+    required Color surfaceColor,
+    required Color borderColor,
+    required Color headingColor,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
+        border: Border.all(color: borderColor, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.02),
-            blurRadius: 10,
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.15)
+                : const Color(0xFF6B46C1).withValues(alpha: 0.04),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             count,
             style: GoogleFonts.outfit(
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: FontWeight.bold,
               color: headingColor,
+              height: 1.1,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: context.colors.textTertiary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: context.colors.textSecondary,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// A tappable destination, matching the account-settings rows so the profile
-  /// reads as one list rather than two different card styles.
-  Widget _buildNavRow(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color headingColor,
-    required VoidCallback onTap,
-    String? trailing,
-  }) {
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: headingColor.withValues(alpha: 0.7)),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                label,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: headingColor,
-                ),
-              ),
-            ),
-            if (trailing != null)
-              Container(
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.colors.accentSoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  trailing,
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.accentColor,
-                  ),
-                ),
-              ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: headingColor.withValues(alpha: 0.4),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -886,31 +884,91 @@ class _ProfileTabState extends State<ProfileTab> {
     required String label,
     required bool value,
     required ValueChanged<bool> onChanged,
-    required Color headingColor,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: headingColor.withValues(alpha: 0.7)),
-          const SizedBox(width: 16),
+          SizedBox(
+            width: 28,
+            child: Icon(icon, size: 22, color: AppTheme.accentColor),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
               style: GoogleFonts.outfit(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: headingColor,
+                color: context.colors.textPrimary,
               ),
             ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppTheme.accentColor,
-            activeTrackColor: AppTheme.accentColor.withValues(alpha: 0.3),
+          Container(
+            width: 52,
+            alignment: Alignment.centerRight,
+            child: Switch(
+              value: value,
+              onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppTheme.accentColor,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: isDark
+                  ? const Color(0xFF4A4458)
+                  : const Color(0xFFE2DEEC),
+              trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
+                (states) => Colors.transparent,
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNavActionRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Icon(icon, size: 22, color: AppTheme.accentColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                width: 52,
+                alignment: Alignment.centerRight,
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: context.colors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

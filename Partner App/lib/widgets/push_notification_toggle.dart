@@ -3,7 +3,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/notification_service.dart';
 
 class PushNotificationToggle extends StatefulWidget {
-  const PushNotificationToggle({super.key});
+  final EdgeInsetsGeometry contentPadding;
+
+  const PushNotificationToggle({
+    super.key,
+    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
+  });
 
   @override
   State<PushNotificationToggle> createState() => _PushNotificationToggleState();
@@ -24,12 +29,14 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
       final prefs = await PartnerNotificationService.getPreferences();
       // In real-world apps, the toggle should also reflect the OS permission status.
       // If OS permission is denied, the toggle should be off regardless of API preferences.
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
-      bool osEnabled = settings.authorizationStatus == AuthorizationStatus.authorized || 
-                       settings.authorizationStatus == AuthorizationStatus.provisional;
-                       
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      bool osEnabled =
+          settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+
       bool apiEnabled = prefs['push_enabled'] ?? false;
-      
+
       bool actualEnabled = osEnabled && apiEnabled;
 
       if (mounted) {
@@ -50,22 +57,23 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
   Future<void> _togglePush(bool value) async {
     if (value) {
       // Trying to turn ON
-      NotificationSettings settings = await FirebaseMessaging.instance.getNotificationSettings();
-      if (settings.authorizationStatus == AuthorizationStatus.denied || 
+      NotificationSettings settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
           settings.authorizationStatus == AuthorizationStatus.notDetermined) {
-        
         settings = await FirebaseMessaging.instance.requestPermission();
-        
+
         if (settings.authorizationStatus != AuthorizationStatus.authorized &&
             settings.authorizationStatus != AuthorizationStatus.provisional) {
-          
           if (!mounted) return;
           // User denied or permanently denied. Show dialog.
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Notifications Disabled'),
-              content: const Text('Please enable notifications for BookALook in your device settings to receive updates.'),
+              content: const Text(
+                'Please enable notifications for BookALook in your device settings to receive updates.',
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -88,14 +96,20 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
         // Revert on failure
         setState(() => _pushEnabled = !value);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to update preferences')),
+          SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text('Failed to update preferences'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _pushEnabled = !value);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')),
+          SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text('Error: $e'),
+          ),
         );
       }
     }
@@ -104,13 +118,25 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const ListTile(
-        title: Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
-        trailing: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-        contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      return ListTile(
+        leading: const Icon(
+          Icons.notifications_none,
+          color: Colors.grey,
+          size: 26,
+        ),
+        title: const Text(
+          'Push Notifications',
+          style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+        ),
+        trailing: const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        contentPadding: widget.contentPadding,
       );
     }
-    
+
     return SwitchListTile(
       value: _pushEnabled,
       onChanged: _togglePush,
@@ -119,8 +145,11 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
         color: _pushEnabled ? Colors.green : Colors.grey,
         size: 26,
       ),
-      title: const Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      title: const Text(
+        'Push Notifications',
+        style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+      ),
+      contentPadding: widget.contentPadding,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/main.dart' show themeNotifier;
 import 'package:partner_app/screens/dashboard/collaborator_tabs/collaborator_profile_tab.dart';
 import 'package:partner_app/theme/app_theme.dart';
@@ -31,6 +32,13 @@ void main() {
     await tester.pump();
   }
 
+  setUp(() {
+    SharedPreferences.setMockInitialValues({
+      'auth_state':
+          '{"user":{"name":"Test Collaborator","phone":"9876543210"},"role":"collaborator"}',
+    });
+  });
+
   tearDown(() {
     themeNotifier.value = ThemeMode.light;
   });
@@ -45,7 +53,8 @@ void main() {
 
     // The button inside the dialog, not the one that opened it.
     await tester.tap(find.widgetWithText(TextButton, 'Log out').last);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(
       find.byType(AlertDialog),
@@ -76,7 +85,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(OutlinedButton, 'Log out'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Stay'));
+    await tester.tap(find.widgetWithText(TextButton, 'Stay signed in'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsNothing);
