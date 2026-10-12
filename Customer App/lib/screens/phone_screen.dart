@@ -223,7 +223,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     children: [
                       Image.asset(
                         'assets/images/logo.png',
-                        height: 60,
+                        height: 180,
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 8),

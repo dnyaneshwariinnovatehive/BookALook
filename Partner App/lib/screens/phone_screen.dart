@@ -185,7 +185,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
         Semantics(
           label: 'BookALook Partner',
           image: true,
-          child: Image.asset('assets/images/logo.png', height: 60, fit: BoxFit.contain),
+          child: Image.asset('assets/images/logo.png', height: 180, fit: BoxFit.contain),
         ),
         const SizedBox(height: 10),
         Text(
