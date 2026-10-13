@@ -289,11 +289,15 @@ class NotificationService
         );
 
         if ($notification) {
+            $customerName = $appointment->customer?->name ?: 'Customer';
+            $advance = $appointment->advance_amount ?? 0;
+            $advanceFormatted = (string) (intval($advance) == $advance ? intval($advance) : number_format($advance, 2));
+
             $this->mirrorToWhatsApp($appointment, [
                 'parameters' => [
-                    $salonName,
+                    $customerName,
                     $dateLabel,
-                    $this->currency($appointment->advance_amount ?? 0),
+                    $advanceFormatted,
                 ],
                 'attachment' => self::ATTACHMENT_INVOICE,
             ], 'booking_confirmed');
@@ -1009,9 +1013,20 @@ class NotificationService
      */
     public function salonDeactivated(Salon $salon, string $pdfUrl): void
     {
-        if (! \App\Models\PlatformPolicySetting::value('whatsapp_salon_deactivated_enabled', true)) {
-            return;
+        $automation = \App\Models\WhatsappAutomation::where('key', 'whatsapp_salon_deactivated')->first();
+        if ($automation) {
+            if (! $automation->is_enabled) {
+                return;
+            }
+            $campaign = $automation->aisensy_campaign_name;
+        } else {
+            if (! \App\Models\PlatformPolicySetting::value('whatsapp_salon_deactivated_enabled', true)) {
+                return;
+            }
+            $campaign = config('services.whatsapp.campaigns.salon_deactivated');
         }
+
+        $campaign = $campaign ?: config('services.whatsapp.campaigns.salon_deactivated');
 
         $phone = $salon->admin->phone ?? $salon->phone_num;
 
@@ -1020,40 +1035,56 @@ class NotificationService
         }
 
         $payload = [
-            'parameters' => [
-                $salon->name,
-            ],
-            'attachment' => [
-                'type' => 'document',
-                'link' => $pdfUrl,
+            'parameters' => [],
+            'media' => [
+                'url' => $pdfUrl,
                 'filename' => 'Staff_Dues.pdf',
             ],
         ];
 
-        // Ensure the campaign is configured. 
-        $campaign = config("services.push.whatsapp.campaigns.salon_deactivated");
-        if (! $campaign && config('services.push.whatsapp.driver') === 'aisensy') {
-            \Illuminate\Support\Facades\Log::warning("No AISensy campaign is configured for template 'salon_deactivated'.");
-            return;
+        $template = config('services.whatsapp.templates.salon_deactivated', 'bookalook_salan_deactivate');
+
+        try {
+            $message = WhatsAppMessage::create([
+                'to_phone' => $phone,
+                'template' => $template,
+                'campaign' => $campaign ?? '',
+                'payload' => $payload,
+                'related_salon_id' => $salon->id,
+                'status' => WhatsAppMessage::STATUS_QUEUED,
+            ]);
+
+            SendWhatsAppMessageJob::dispatch($message->id)->afterCommit();
+        } catch (\Throwable $e) {
+            Log::warning('Could not queue salonDeactivated WhatsApp notification', [
+                'salon_id' => $salon->id,
+                'error' => $e->getMessage(),
+            ]);
         }
-
-        $message = WhatsAppMessage::create([
-            'recipient' => $phone,
-            'template' => 'salon_deactivated',
-            'campaign' => $campaign ?? '',
-            'payload' => $payload,
-            'status' => 'pending',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        dispatch(new SendWhatsAppMessageJob($message->id));
     }
 
     private function mirrorToWhatsApp(Appointment $appointment, array $payload, string $event, ?string $campaign = null): void
     {
-        if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {
-            return;
+        $automationKey = match ($event) {
+            'salon_closure' => 'whatsapp_booking_reschedule',
+            default => 'whatsapp_' . $event,
+        };
+
+        $automation = \App\Models\WhatsappAutomation::where('key', $automationKey)
+            ->orWhere('key', 'whatsapp_' . $event)
+            ->first();
+
+        if ($automation) {
+            if (! $automation->is_enabled) {
+                return;
+            }
+            if (! $campaign && ! empty($automation->aisensy_campaign_name)) {
+                $campaign = $automation->aisensy_campaign_name;
+            }
+        } else {
+            if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {
+                return;
+            }
         }
 
         try {

@@ -84,11 +84,12 @@ return [
         ],
 
         'templates' => [
-            'booking_confirmed' => env('WHATSAPP_TEMPLATE_BOOKING_CONFIRMED', 'bookalook_booking_confirmed'),
+            'booking_confirmed' => env('WHATSAPP_TEMPLATE_BOOKING_CONFIRMED', 'bookalook_booking_confirmed2'),
             'appointment_reminder' => env('WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER', 'bookalook_appointment_reminder'),
             'appointment_cancelled' => env('WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED', 'bookalook_appointment_cancelled'),
-            'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),
-            'salon_deactivated' => env('WHATSAPP_TEMPLATE_SALON_DEACTIVATED', 'salon_deactivated_dues'),
+            'booking_reschedule' => env('WHATSAPP_TEMPLATE_BOOKING_RESCHEDULE', 'bookalook_booking_reschedule'),
+            'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'bookalook_booking_reschedule'),
+            'salon_deactivated' => env('WHATSAPP_TEMPLATE_SALON_DEACTIVATED', 'bookalook_salan_deactivate'),
             'customer_birthday' => env('WHATSAPP_TEMPLATE_CUSTOMER_BIRTHDAY', 'bookalook_customer_birthday'),
             '25_day_reminder' => env('WHATSAPP_TEMPLATE_25_DAY_REMINDER', 'bookalook_25_day_reminder'),
             'otp' => env('WHATSAPP_TEMPLATE_OTP', 'bookalook_auth_otp'),
@@ -98,11 +99,12 @@ return [
         // and a send for a blank campaign is recorded as a failure naming the
         // variable to set rather than being attempted.
         'campaigns' => [
-            'booking_confirmed' => env('WHATSAPP_CAMPAIGN_BOOKING_CONFIRMED', ''),
+            'booking_confirmed' => env('WHATSAPP_CAMPAIGN_BOOKING_CONFIRMED', 'BAL_BOOKING_CONFIRMED'),
             'appointment_reminder' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_REMINDER', 'BAL_apt_reminder'),
             'appointment_cancelled' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_CANCELLED', ''),
-            'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', ''),
-            'salon_deactivated' => env('WHATSAPP_CAMPAIGN_SALON_DEACTIVATED', ''),
+            'booking_reschedule' => env('WHATSAPP_CAMPAIGN_BOOKING_RESCHEDULE', 'bal_booking_reschedule'),
+            'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', 'bal_booking_reschedule'),
+            'salon_deactivated' => env('WHATSAPP_CAMPAIGN_SALON_DEACTIVATED', 'BAL_salon_deactivated'),
             'customer_birthday' => env('WHATSAPP_CAMPAIGN_CUSTOMER_BIRTHDAY', 'BAL_customer_birthday'),
             '25_day_reminder' => env('WHATSAPP_CAMPAIGN_25_DAY_REMINDER', 'BAL_25_day_reminder'),
             'otp' => env('WHATSAPP_CAMPAIGN_OTP', 'BAL_whatsapp_otp'),

@@ -21,13 +21,17 @@ class WhatsappAutomationController extends Controller
         // Ensure we sort them in a logical order
         $order = [
             'whatsapp_otp',
+            'whatsapp_booking_confirmed',
+            'whatsapp_appointment_reminder',
+            'whatsapp_booking_reschedule',
             'whatsapp_customer_birthday',
             'whatsapp_25_day_reminder',
-            'whatsapp_appointment_reminder'
+            'whatsapp_salon_deactivated',
         ];
 
         $sortedAutomations = $automations->sortBy(function ($model) use ($order) {
-            return array_search($model['key'], $order);
+            $idx = array_search($model['key'], $order);
+            return $idx === false ? 99 : $idx;
         })->values();
 
         return response()->json([
@@ -71,9 +75,12 @@ class WhatsappAutomationController extends Controller
 
         $request->validate([
             'phone' => 'required|string|max:20',
+            'campaign' => 'nullable|string|max:120',
         ]);
 
-        if (empty($automation->aisensy_campaign_name)) {
+        $campaign = trim($request->input('campaign') ?: ($automation->aisensy_campaign_name ?? ''));
+
+        if (empty($campaign)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot send test message: AiSensy campaign is not configured.',
@@ -87,11 +94,27 @@ class WhatsappAutomationController extends Controller
             $payloadParams[] = $variable['example'] ?? 'Test';
         }
 
+        $payload = ['parameters' => $payloadParams];
+
+        // For document/PDF templates, AiSensy requires a media attachment object
+        if (in_array($automation->key, ['whatsapp_booking_confirmed', 'whatsapp_salon_deactivated'])) {
+            $payload['media'] = [
+                'url' => 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+                'filename' => $automation->key === 'whatsapp_booking_confirmed' ? 'sample_invoice.pdf' : 'Staff_Dues.pdf',
+            ];
+        }
+
+        $eventKey = match ($automation->key) {
+            'whatsapp_booking_reschedule' => 'booking_reschedule',
+            default => str_replace('whatsapp_', '', $automation->key),
+        };
+        $template = config("services.whatsapp.templates.{$eventKey}", $automation->key);
+
         $message = WhatsAppMessage::create([
             'to_phone' => $request->phone,
-            'template' => 'test_' . $automation->key,
-            'campaign' => $automation->aisensy_campaign_name,
-            'payload' => ['parameters' => $payloadParams],
+            'template' => $template,
+            'campaign' => $campaign,
+            'payload' => $payload,
             'status' => WhatsAppMessage::STATUS_QUEUED,
             'category' => 'test', // Explicitly marked as test
         ]);
@@ -117,6 +140,13 @@ class WhatsappAutomationController extends Controller
 
     private function formatAutomation(WhatsappAutomation $automation)
     {
+        $eventKey = match ($automation->key) {
+            'whatsapp_booking_reschedule' => 'booking_reschedule',
+            default => str_replace('whatsapp_', '', $automation->key),
+        };
+
+        $isPdf = in_array($automation->key, ['whatsapp_booking_confirmed', 'whatsapp_salon_deactivated']);
+
         return [
             'id' => $automation->id,
             'key' => $automation->key,
@@ -127,6 +157,8 @@ class WhatsappAutomationController extends Controller
             'is_enabled' => $automation->is_enabled,
             'aisensy_campaign_name' => $automation->aisensy_campaign_name,
             'lead_time_minutes' => $automation->lead_time_minutes,
+            'template_name' => config("services.whatsapp.templates.{$eventKey}", $automation->key),
+            'template_type' => $isPdf ? 'pdf' : 'txt',
             'variables' => WhatsappVariableCatalog::forAutomation($automation->key),
             'health' => $this->computeHealth($automation),
         ];

@@ -22,6 +22,8 @@ interface Automation {
     is_enabled: boolean;
     aisensy_campaign_name: string | null;
     lead_time_minutes: number | null;
+    template_name?: string;
+    template_type?: 'pdf' | 'txt';
     variables: Variable[];
     health: {
         status: string;
@@ -129,12 +131,21 @@ export default function WhatsappAutomationsPage() {
             return;
         }
 
+        const campaignToTest = editData?.aisensy_campaign_name || editingAutomation.aisensy_campaign_name;
+        if (!campaignToTest) {
+            showToast('error', 'Please configure an AiSensy campaign name first.');
+            return;
+        }
+
         setIsTesting(true);
         try {
             const response = await fetch(`/api/proxy/superadmin/whatsapp-automations/${editingAutomation.key}/test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: testPhone }),
+                body: JSON.stringify({ 
+                    phone: testPhone,
+                    campaign: campaignToTest,
+                }),
             });
             const data = await response.json();
             if (response.ok && data.success) {
@@ -248,7 +259,16 @@ export default function WhatsappAutomationsPage() {
                                     </div>
                                     <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
                                         <Icon name="checkCircle" size={14} style={{ color: automation.aisensy_campaign_name ? '#10b981' : '#cbd5e1' }} />
-                                        Campaign: {automation.aisensy_campaign_name ? <span style={{ color: '#0f172a', fontWeight: 500 }}>{automation.aisensy_campaign_name}</span> : <span style={{ fontStyle: 'italic' }}>Not configured</span>}
+                                        Campaign: {automation.aisensy_campaign_name ? (
+                                            <span style={{ color: '#0f172a', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                {automation.aisensy_campaign_name}
+                                                {automation.template_type === 'pdf' ? (
+                                                    <span style={{ fontSize: 10, background: '#fee2e2', color: '#b91c1c', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>PDF</span>
+                                                ) : (
+                                                    <span style={{ fontSize: 10, background: '#f1f5f9', color: '#475569', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>TXT</span>
+                                                )}
+                                            </span>
+                                        ) : <span style={{ fontStyle: 'italic' }}>Not configured</span>}
                                     </div>
                                 </div>
                                 
@@ -343,7 +363,12 @@ export default function WhatsappAutomationsPage() {
                                         onChange={(e) => setEditData({...editData, aisensy_campaign_name: e.target.value})}
                                         placeholder="e.g. bal_apt_reminder"
                                     />
-                                    <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>This must be an approved AiSensy campaign name exactly as it appears in the AiSensy dashboard.</p>
+                                    <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0 0' }}>
+                                        Approved AiSensy campaign name exactly as in AiSensy dashboard.
+                                        {editingAutomation.template_name && (
+                                            <> (Meta Template: <code>{editingAutomation.template_name}</code> &middot; <strong>{editingAutomation.template_type?.toUpperCase()}</strong>)</>
+                                        )}
+                                    </p>
                                 </div>
 
                                 {editingAutomation.key === 'whatsapp_appointment_reminder' && (
@@ -399,7 +424,10 @@ export default function WhatsappAutomationsPage() {
                             <div className={styles.sectionBox}>
                                 <h3 style={{ marginBottom: 16 }}>Test</h3>
                                 <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px 0' }}>
-                                    Send a test WhatsApp to verify the campaign. Test uses the configured AiSensy approved template and backend-supported variables.
+                                    Send a test WhatsApp to verify the campaign before turning it on.
+                                    {editingAutomation.template_type === 'pdf' && (
+                                        <span> Test sends a sample PDF document attachment.</span>
+                                    )}
                                 </p>
                                 
                                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -410,24 +438,24 @@ export default function WhatsappAutomationsPage() {
                                             value={testPhone}
                                             onChange={(e) => setTestPhone(e.target.value)}
                                             placeholder="+91XXXXXXXXXX"
-                                            disabled={!editingAutomation.is_enabled || !editData.aisensy_campaign_name}
+                                            disabled={!editData.aisensy_campaign_name}
                                         />
                                     </div>
                                     <div style={{ marginTop: '-20px' }}>
                                         <button 
                                             className={styles.testBtn} 
                                             onClick={handleTest}
-                                            disabled={isTesting || !editingAutomation.is_enabled || !editData.aisensy_campaign_name}
-                                            style={{ opacity: (!editingAutomation.is_enabled || !editData.aisensy_campaign_name) ? 0.5 : 1 }}
+                                            disabled={isTesting || !editData.aisensy_campaign_name}
+                                            style={{ opacity: (!editData.aisensy_campaign_name) ? 0.5 : 1 }}
                                         >
                                             {isTesting ? 'Sending...' : 'Send Test'}
                                         </button>
                                     </div>
                                 </div>
                                 
-                                {(!editingAutomation.is_enabled || !editData.aisensy_campaign_name) && (
+                                {!editData.aisensy_campaign_name && (
                                     <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0 0' }}>
-                                        Enable the automation and configure a campaign name to test.
+                                        Configure an AiSensy campaign name to test.
                                     </p>
                                 )}
                             </div>
