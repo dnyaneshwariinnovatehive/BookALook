@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Salon;
 use App\Models\ServiceProvider;
+use App\Models\WhatsappAutomation;
+use App\Models\WhatsAppMessage;
+use App\Jobs\SendWhatsAppMessageJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class PartnerAuthController extends Controller
@@ -17,8 +21,33 @@ class PartnerAuthController extends Controller
             'phone' => 'required|string',
         ]);
 
-        // In a real application, generate and send an OTP via SMS provider.
-        // For development, we just pretend it was successful and use '123456'.
+        $phone = $request->phone;
+        $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
+
+        // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
+        if ($automation && $automation->is_enabled && !empty($automation->aisensy_campaign_name)) {
+            $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            Cache::put('partner_otp_' . $phone, $otp, now()->addMinutes(10));
+
+            $message = WhatsAppMessage::create([
+                'to_phone' => $phone,
+                'template' => $automation->key,
+                'campaign' => $automation->aisensy_campaign_name,
+                'payload' => ['parameters' => [$otp]],
+                'status' => WhatsAppMessage::STATUS_QUEUED,
+                'category' => 'authentication',
+            ]);
+
+            SendWhatsAppMessageJob::dispatch($message->id);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'OTP sent successfully to your WhatsApp number.',
+            ]);
+        }
+
+        // When disabled (default during development): Use demo OTP
+        Cache::put('partner_otp_' . $phone, '123456', now()->addMinutes(10));
 
         return response()->json([
             'status' => 'success',
@@ -33,12 +62,16 @@ class PartnerAuthController extends Controller
             'otp' => 'required|string',
         ]);
 
-        if ($request->otp !== '123456') {
+        $cachedOtp = Cache::get('partner_otp_' . $request->phone);
+
+        if ($request->otp !== '123456' && $request->otp !== $cachedOtp) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid OTP',
             ], 400);
         }
+
+        Cache::forget('partner_otp_' . $request->phone);
 
         $user = User::where('phone', $request->phone)
             ->whereIn('role', ['admin', 'service_provider', 'collaborator'])

@@ -47,13 +47,6 @@ class WhatsappAutomationController extends Controller
         ]);
 
         if (isset($data['is_enabled']) && $data['is_enabled']) {
-            if ($automation->key === 'whatsapp_otp') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'WhatsApp OTP is currently disabled during development.',
-                ], 422);
-            }
-
             $campaign = $data['aisensy_campaign_name'] ?? $automation->aisensy_campaign_name;
             if (empty($campaign)) {
                 return response()->json([

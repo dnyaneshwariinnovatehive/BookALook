@@ -17,7 +17,7 @@ class WhatsappAutomationSeeder extends Seeder
                 'audience' => 'All Roles',
                 'frequency_label' => 'On login/registration',
                 'is_enabled' => false,
-                'aisensy_campaign_name' => null,
+                'aisensy_campaign_name' => config('services.whatsapp.campaigns.otp', 'BAL_whatsapp_otp'),
                 'lead_time_minutes' => null,
             ],
             [
@@ -27,7 +27,7 @@ class WhatsappAutomationSeeder extends Seeder
                 'audience' => 'Customer',
                 'frequency_label' => 'Customer\'s birthday • Once per year',
                 'is_enabled' => false,
-                'aisensy_campaign_name' => null,
+                'aisensy_campaign_name' => config('services.whatsapp.campaigns.customer_birthday', 'BAL_customer_birthday'),
                 'lead_time_minutes' => null,
             ],
             [
@@ -37,7 +37,7 @@ class WhatsappAutomationSeeder extends Seeder
                 'audience' => 'Customer',
                 'frequency_label' => '25 days after completed visit',
                 'is_enabled' => false,
-                'aisensy_campaign_name' => null,
+                'aisensy_campaign_name' => config('services.whatsapp.campaigns.25_day_reminder', 'BAL_25_day_reminder'),
                 'lead_time_minutes' => null,
             ],
             [

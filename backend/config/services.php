@@ -89,6 +89,9 @@ return [
             'appointment_cancelled' => env('WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED', 'bookalook_appointment_cancelled'),
             'salon_closure' => env('WHATSAPP_TEMPLATE_SALON_CLOSURE', 'salon_closure_reschedule'),
             'salon_deactivated' => env('WHATSAPP_TEMPLATE_SALON_DEACTIVATED', 'salon_deactivated_dues'),
+            'customer_birthday' => env('WHATSAPP_TEMPLATE_CUSTOMER_BIRTHDAY', 'bookalook_customer_birthday'),
+            '25_day_reminder' => env('WHATSAPP_TEMPLATE_25_DAY_REMINDER', 'bookalook_25_day_reminder'),
+            'otp' => env('WHATSAPP_TEMPLATE_OTP', 'bookalook_auth_otp'),
         ],
 
         // AISensy API campaign names, one per event. Blank means "not configured",
@@ -100,6 +103,9 @@ return [
             'appointment_cancelled' => env('WHATSAPP_CAMPAIGN_APPOINTMENT_CANCELLED', ''),
             'salon_closure' => env('WHATSAPP_CAMPAIGN_SALON_CLOSURE', ''),
             'salon_deactivated' => env('WHATSAPP_CAMPAIGN_SALON_DEACTIVATED', ''),
+            'customer_birthday' => env('WHATSAPP_CAMPAIGN_CUSTOMER_BIRTHDAY', 'BAL_customer_birthday'),
+            '25_day_reminder' => env('WHATSAPP_CAMPAIGN_25_DAY_REMINDER', 'BAL_25_day_reminder'),
+            'otp' => env('WHATSAPP_CAMPAIGN_OTP', 'BAL_whatsapp_otp'),
         ],
     ],
 

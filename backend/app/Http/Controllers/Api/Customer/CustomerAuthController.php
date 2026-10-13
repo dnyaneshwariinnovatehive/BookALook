@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\WhatsappAutomation;
+use App\Models\WhatsAppMessage;
+use App\Jobs\SendWhatsAppMessageJob;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -25,11 +29,33 @@ class CustomerAuthController extends Controller
         }
 
         $phone = $request->phone;
+        $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
 
-        // Mock OTP
+        // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
+        if ($automation && $automation->is_enabled && !empty($automation->aisensy_campaign_name)) {
+            $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            Cache::put('otp_' . $phone, $otp, now()->addMinutes(10));
+
+            $message = WhatsAppMessage::create([
+                'to_phone' => $phone,
+                'template' => $automation->key,
+                'campaign' => $automation->aisensy_campaign_name,
+                'payload' => ['parameters' => [$otp]],
+                'status' => WhatsAppMessage::STATUS_QUEUED,
+                'category' => 'authentication',
+            ]);
+
+            SendWhatsAppMessageJob::dispatch($message->id);
+
+            return response()->json([
+                'message' => 'OTP sent successfully to your WhatsApp number.',
+                'phone' => $phone
+            ]);
+        }
+
+        // When disabled (default during development): Use demo OTP
         $mockedOtp = '123456';
-        
-        \Illuminate\Support\Facades\Cache::put('otp_' . $phone, $mockedOtp, now()->addMinutes(10));
+        Cache::put('otp_' . $phone, $mockedOtp, now()->addMinutes(10));
 
         return response()->json([
             'message' => 'OTP sent successfully. For testing, use 123456.',

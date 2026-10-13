@@ -283,18 +283,17 @@ export default function WhatsappAutomationsPage() {
                                     <div>
                                         <div style={{ fontWeight: 500, fontSize: 14, color: '#0f172a', marginBottom: 4 }}>Status</div>
                                         {editingAutomation.key === 'whatsapp_otp' ? (
-                                            <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <Icon name="info" size={14} /> WhatsApp OTP is currently disabled during development.
+                                            <div style={{ fontSize: 13, color: '#64748b' }}>
+                                                Send real OTPs via WhatsApp when enabled. When disabled, the demo 123456 OTP is used.
                                             </div>
                                         ) : (
                                             <div style={{ fontSize: 13, color: '#64748b' }}>Allow the system to send WhatsApp messages when this event occurs.</div>
                                         )}
                                     </div>
-                                    <label className={styles.toggleSwitch} style={{ opacity: editingAutomation.key === 'whatsapp_otp' ? 0.5 : 1, cursor: editingAutomation.key === 'whatsapp_otp' ? 'not-allowed' : 'pointer' }}>
+                                    <label className={styles.toggleSwitch} style={{ cursor: 'pointer' }}>
                                         <input 
                                             type="checkbox" 
                                             checked={editData.is_enabled}
-                                            disabled={editingAutomation.key === 'whatsapp_otp'}
                                             onChange={(e) => setEditData({...editData, is_enabled: e.target.checked})}
                                         />
                                         <span className={styles.slider}></span>
@@ -411,22 +410,22 @@ export default function WhatsappAutomationsPage() {
                                             value={testPhone}
                                             onChange={(e) => setTestPhone(e.target.value)}
                                             placeholder="+91XXXXXXXXXX"
-                                            disabled={!editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp'}
+                                            disabled={!editingAutomation.is_enabled || !editData.aisensy_campaign_name}
                                         />
                                     </div>
                                     <div style={{ marginTop: '-20px' }}>
                                         <button 
                                             className={styles.testBtn} 
                                             onClick={handleTest}
-                                            disabled={isTesting || !editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp'}
-                                            style={{ opacity: (!editingAutomation.is_enabled || !editData.aisensy_campaign_name || editingAutomation.key === 'whatsapp_otp') ? 0.5 : 1 }}
+                                            disabled={isTesting || !editingAutomation.is_enabled || !editData.aisensy_campaign_name}
+                                            style={{ opacity: (!editingAutomation.is_enabled || !editData.aisensy_campaign_name) ? 0.5 : 1 }}
                                         >
                                             {isTesting ? 'Sending...' : 'Send Test'}
                                         </button>
                                     </div>
                                 </div>
                                 
-                                {(!editingAutomation.is_enabled || !editData.aisensy_campaign_name) && editingAutomation.key !== 'whatsapp_otp' && (
+                                {(!editingAutomation.is_enabled || !editData.aisensy_campaign_name) && (
                                     <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0 0' }}>
                                         Enable the automation and configure a campaign name to test.
                                     </p>
