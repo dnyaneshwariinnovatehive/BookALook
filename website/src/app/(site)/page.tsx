@@ -263,6 +263,8 @@ export default function LandingPage() {
     pincode: '',
     message: ''
   });
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -319,6 +321,34 @@ export default function LandingPage() {
     }));
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('The image size cannot exceed 5MB.');
+      return;
+    }
+
+    setErrorMessage('');
+    setPhoto(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setPhoto(null);
+    setPhotoPreview(null);
+  };
+
   const filteredCities = formData.state 
     ? cities.filter(c => c.state === formData.state) 
     : [];
@@ -329,18 +359,34 @@ export default function LandingPage() {
     setErrorMessage('');
 
     try {
+      const payload = new FormData();
+      payload.append('salon_name', formData.salon_name);
+      payload.append('owner_name', formData.owner_name);
+      payload.append('phone', formData.phone);
+      payload.append('city_id', formData.city_id);
+      payload.append('sub_area_id', formData.sub_area_id);
+      payload.append('street_address', formData.street_address);
+      payload.append('pincode', formData.pincode);
+      if (formData.message) {
+        payload.append('message', formData.message);
+      }
+      if (photo) {
+        payload.append('photo', photo);
+      }
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/enquiries`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: payload,
       });
 
       if (response.ok) {
         setStatus('success');
         setFormData({ salon_name: '', owner_name: '', phone: '', state: '', city_id: '', sub_area_id: '', street_address: '', pincode: '', message: '' });
+        setPhoto(null);
+        setPhotoPreview(null);
       } else {
         const data = await response.json();
         setStatus('error');
@@ -656,11 +702,69 @@ export default function LandingPage() {
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Message (Optional)</label>
                 <textarea 
                   name="message" 
-                  rows={4}
+                  rows={3} 
                   value={formData.message} 
                   onChange={handleInputChange}
+                  placeholder="Tell us anything else about your salon..."
                   style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
                 ></textarea>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Salon Photo (Optional)</label>
+                {photoPreview ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '8px', background: '#fafafa' }}>
+                    <img 
+                      src={photoPreview} 
+                      alt="Salon preview" 
+                      style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #eee' }} 
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {photo?.name}
+                      </p>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
+                        {(photo ? (photo.size / (1024 * 1024)).toFixed(2) : 0)} MB
+                      </p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={handleRemovePhoto}
+                      style={{ background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label 
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      padding: '1.25rem', 
+                      border: '2px dashed #ccc', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer', 
+                      background: '#fafafa',
+                      transition: 'border-color 0.2s',
+                    }}
+                  >
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '0.5rem' }}>
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                    <span style={{ fontSize: '0.9rem', color: '#333', fontWeight: 500 }}>Click to upload a salon photo</span>
+                    <span style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>PNG, JPG, or WebP up to 5MB</span>
+                    <input 
+                      type="file" 
+                      accept="image/png,image/jpeg,image/webp" 
+                      onChange={handlePhotoChange} 
+                      style={{ display: 'none' }} 
+                    />
+                  </label>
+                )}
               </div>
 
               <button 

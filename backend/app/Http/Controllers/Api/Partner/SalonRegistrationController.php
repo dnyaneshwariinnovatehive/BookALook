@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Salon;
+use App\Models\SalonMedia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -43,6 +44,12 @@ class SalonRegistrationController extends Controller
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'gender_focus' => 'nullable|string', // Appended to description
+
+            // Photos (Optional during self-registration)
+            'photos' => 'nullable|array|max:10',
+            'photos.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'cover_index' => 'nullable|integer|min:0',
         ]);
 
         try {
@@ -112,12 +119,53 @@ class SalonRegistrationController extends Controller
                 'gender_focus' => $request->gender_focus ?? 'Unisex',
             ]);
 
+            // 5. Store Photos if provided
+            $uploadedPhotos = [];
+            if ($request->hasFile('photos')) {
+                $uploadedPhotos = $request->file('photos');
+            } elseif ($request->hasFile('cover_image')) {
+                $uploadedPhotos = [$request->file('cover_image')];
+            }
+
+            $coverIndex = (int) ($request->input('cover_index') ?? 0);
+            $coverUrl = null;
+
+            if (!empty($uploadedPhotos)) {
+                foreach (array_values($uploadedPhotos) as $index => $photo) {
+                    $path = $photo->storeAs(
+                        'salons',
+                        Str::uuid() . '.' . ($photo->getClientOriginalExtension() ?: 'jpg'),
+                        'public'
+                    );
+
+                    $url = asset('storage/' . $path);
+                    $isCover = ($index === $coverIndex);
+
+                    SalonMedia::create([
+                        'salon_id' => $salon->id,
+                        'media_type' => 'image',
+                        'file_url' => $url,
+                        'sort_order' => $index,
+                        'is_cover' => $isCover,
+                        'uploaded_by' => $adminUser->id,
+                    ]);
+
+                    if ($isCover || $coverUrl === null) {
+                        $coverUrl = $url;
+                    }
+                }
+
+                if ($coverUrl) {
+                    $salon->update(['cover_photo_url' => $coverUrl]);
+                }
+            }
+
             DB::commit();
 
             return response()->json([
                 'message' => 'Salon registered successfully. Pending SuperAdmin approval.',
                 'user' => $adminUser,
-                'salon' => $salon
+                'salon' => $salon->fresh()->load('media')
             ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {

@@ -8,6 +8,7 @@ use App\Models\City;
 use App\Models\SalonEnquiry;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class PublicEnquiryController extends Controller
 {
@@ -31,10 +32,13 @@ class PublicEnquiryController extends Controller
             'street_address' => 'required|string|max:255',
             'pincode' => 'required|string|max:20',
             'message' => 'nullable|string',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ], [
             'city_id.required' => 'Please choose your city.',
             'sub_area_id.required' => 'Please choose your area.',
             'sub_area_id.exists' => 'That area is not in the city you picked.',
+            'photo.image' => 'The uploaded file must be an image.',
+            'photo.max' => 'The image must not be larger than 5MB.',
         ]);
 
         if ($validator->fails()) {
@@ -43,6 +47,15 @@ class PublicEnquiryController extends Controller
 
         try {
             $city = City::find($request->city_id);
+
+            $photoUrl = null;
+            if ($request->hasFile('photo')) {
+                $file = $request->file('photo');
+                $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                $filename = Str::uuid() . '.' . $extension;
+                $path = $file->storeAs('enquiries', $filename, 'public');
+                $photoUrl = asset('storage/' . $path);
+            }
 
             $enquiry = SalonEnquiry::create([
                 'salon_name' => $request->salon_name,
@@ -53,6 +66,7 @@ class PublicEnquiryController extends Controller
                 'street_address' => $request->street_address,
                 'pincode' => $request->pincode,
                 'message' => $request->message,
+                'photo_url' => $photoUrl,
                 'status' => 'new',
             ]);
 

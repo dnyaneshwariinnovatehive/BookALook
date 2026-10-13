@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
@@ -41,26 +42,64 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
+      final photoPaths = (data['photo_paths'] as List?)?.cast<String>() ?? [];
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/partner/register'),
-        headers: headers,
-        body: jsonEncode(data),
-      );
+      if (photoPaths.isNotEmpty) {
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/partner/register'),
+        );
+        request.headers['Accept'] = 'application/json';
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
 
-      final decoded = jsonDecode(response.body);
+        data.forEach((key, value) {
+          if (key != 'photo_paths' && value != null) {
+            request.fields[key] = value.toString();
+          }
+        });
 
-      if (response.statusCode == 201) {
-        return {'success': true, 'message': decoded['message'], 'data': decoded};
+        for (final path in photoPaths) {
+          final file = File(path);
+          if (await file.exists()) {
+            final multipartFile = await http.MultipartFile.fromPath('photos[]', path);
+            request.files.add(multipartFile);
+          }
+        }
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        final decoded = jsonDecode(response.body);
+
+        if (response.statusCode == 201) {
+          return {'success': true, 'message': decoded['message'], 'data': decoded};
+        } else {
+          return {'success': false, 'message': decoded['message'] ?? 'Unknown error occurred'};
+        }
       } else {
-        return {'success': false, 'message': decoded['message'] ?? 'Unknown error occurred'};
+        final headers = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        };
+        if (token != null) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+
+        final Map<String, dynamic> cleanData = Map.from(data)..remove('photo_paths');
+        final response = await http.post(
+          Uri.parse('$baseUrl/partner/register'),
+          headers: headers,
+          body: jsonEncode(cleanData),
+        );
+
+        final decoded = jsonDecode(response.body);
+
+        if (response.statusCode == 201) {
+          return {'success': true, 'message': decoded['message'], 'data': decoded};
+        } else {
+          return {'success': false, 'message': decoded['message'] ?? 'Unknown error occurred'};
+        }
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};

@@ -28,6 +28,7 @@ interface Enquiry {
   city_name?: string | null;
   sub_area_name?: string | null;
   location_label?: string | null;
+  photo_url?: string | null;
 }
 
 interface Collaborator {
@@ -425,8 +426,19 @@ export default function SalonApprovalQueue() {
                 enquiries.map((enq) => (
                   <tr key={enq.id} className={`${styles.tr} ${justAssignedIds.includes(enq.id) ? styles.rowSuccess : ''}`}>
                     <td className={styles.td}>
-                      <div className={styles.salonName}>{enq.salon_name}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>{enq.owner_name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {enq.photo_url ? (
+                          <img
+                            src={enq.photo_url}
+                            alt=""
+                            style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }}
+                          />
+                        ) : null}
+                        <div>
+                          <div className={styles.salonName}>{enq.salon_name}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-body)' }}>{enq.owner_name}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className={styles.td}>
                       {enq.sub_area_name ? (

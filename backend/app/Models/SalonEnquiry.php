@@ -23,6 +23,7 @@ class SalonEnquiry extends Model
         'street_address',
         'pincode',
         'message',
+        'photo_url',
         'status',
         'assigned_collaborator_id',
         'assigned_at',

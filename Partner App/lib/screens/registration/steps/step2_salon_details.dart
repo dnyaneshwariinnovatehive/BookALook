@@ -1,4 +1,6 @@
-import 'package:partner_app/theme/app_theme.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../services/salon_location_api.dart';
 import '../../../../theme/app_theme.dart';
@@ -31,6 +33,9 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   bool _locating = false;
   
   String _genderFocus = 'Unisex';
+
+  final List<String> _photoPaths = [];
+  int _coverIndex = 0;
   
   List<dynamic> _cities = [];
   List<String> _states = [];
@@ -153,6 +158,8 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         // fine — the owner can pin later from More > Salon Location.
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
+        'photo_paths': _photoPaths,
+        'cover_index': _coverIndex,
       });
     }
   }
@@ -340,6 +347,9 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                 _buildGenderToggle('Women Only'),
               ],
             ),
+            const SizedBox(height: 20),
+
+            _buildPhotoSection(),
             const SizedBox(height: 32),
 
             Row(
@@ -510,4 +520,157 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
       ),
     );
   }
+
+  Future<void> _addPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 1600);
+    if (picked == null) return;
+
+    if (!mounted) return;
+    setState(() {
+      _photoPaths.add(picked.path);
+    });
+  }
+
+  void _removePhoto(int index) {
+    setState(() {
+      _photoPaths.removeAt(index);
+      if (_coverIndex >= _photoPaths.length) {
+        _coverIndex = _photoPaths.isEmpty ? 0 : _photoPaths.length - 1;
+      }
+    });
+  }
+
+  Widget _buildPhotoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildLabel('Salon Photos (Optional)'),
+            if (_photoPaths.isNotEmpty)
+              Text(
+                '${_photoPaths.length} photo${_photoPaths.length == 1 ? '' : 's'} added',
+                style: const TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Add photos of your storefront or interior. Tap a photo to select it as your cover picture.',
+          style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (var i = 0; i < _photoPaths.length; i++) _buildPhotoTile(i, _photoPaths[i]),
+            if (_photoPaths.length < 10) _buildAddPhotoTile(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoTile(int index, String path) {
+    final isCover = index == _coverIndex;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _coverIndex = index);
+      },
+      child: Stack(
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isCover ? AppTheme.accentColor : AppTheme.lightBorder,
+                width: isCover ? 2.5 : 1,
+              ),
+              image: DecorationImage(
+                image: kIsWeb ? NetworkImage(path) as ImageProvider : FileImage(File(path)),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          if (isCover)
+            Positioned(
+              left: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Cover',
+                  style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          Positioned(
+            right: 2,
+            top: 2,
+            child: GestureDetector(
+              onTap: () => _removePhoto(index),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close, size: 12, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddPhotoTile() => GestureDetector(
+        onTap: _addPhoto,
+        child: Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.lightBorder, style: BorderStyle.solid),
+          ),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_a_photo_outlined, color: AppTheme.accentColor, size: 24),
+              SizedBox(height: 4),
+              Text('Add photo', style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody)),
+            ],
+          ),
+        ),
+      );
 }
