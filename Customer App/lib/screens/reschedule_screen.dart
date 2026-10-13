@@ -393,6 +393,32 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     }
   }
 
+  int? _minutesOfDay(dynamic timeStr) {
+    if (timeStr == null) return null;
+    final str = '$timeStr'.trim();
+    final isPm = str.toUpperCase().contains('PM');
+    final isAm = str.toUpperCase().contains('AM');
+    final clean = str.replaceAll(RegExp(r'[^\d:]'), '');
+    final parts = clean.split(':');
+    if (parts.length < 2) return null;
+    var hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (isPm && hour < 12) hour += 12;
+    if (isAm && hour == 12) hour = 0;
+    return hour * 60 + minute;
+  }
+
+  bool _isWithinSelectedBooking(dynamic slotTime) {
+    if (_selectedTime == null || _totalDuration <= 0) return false;
+
+    final start = _minutesOfDay(_selectedTime);
+    final slot = _minutesOfDay(slotTime);
+    if (start == null || slot == null) return false;
+
+    return slot > start && slot < start + _totalDuration;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -466,8 +492,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           _sectionTitle('3. New Time'),
           if (_totalDuration > 0) ...[
             SizedBox(height: 4),
-            Text('Your services take about $_totalDuration minutes.',
-                style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
+            Text(
+              'Your services take about $_totalDuration minutes (${(_totalDuration / 30).ceil()} consecutive time slots).',
+              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
+            ),
           ],
           SizedBox(height: 16),
           _buildSlots(),
@@ -602,12 +630,16 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _selectedDate == null
-                    ? 'Pick a date'
-                    : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate!),
-                style: GoogleFonts.outfit(fontSize: 16),
+              Expanded(
+                child: Text(
+                  _selectedDate == null
+                      ? 'Pick a date'
+                      : DateFormat('EEEE, MMM d, yyyy').format(_selectedDate!),
+                  style: GoogleFonts.outfit(fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Icon(Icons.calendar_today, color: AppTheme.accentColor),
             ],
           ),
@@ -645,74 +677,126 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               style: GoogleFonts.outfit(fontSize: 13, color: context.colors.warning),
             ),
           ),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: _slots.map<Widget>((slot) {
-            final isAvailable = slot['available'] == true;
-            final isSelected = _selectedTime == slot['time'];
+        Builder(
+          builder: (context) {
+            final slotsNeeded = (_totalDuration / 30).ceil();
 
-            return InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: isAvailable
-                  ? () {
-                      AppHaptics.selectionClick();
-                      setState(() {
-                        _selectedTime = slot['time'];
-                        _slotHint = null;
-                      });
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _slots.map<Widget>((slot) {
+                    final isAvailable = slot['available'] == true;
+                    final isSelected = _selectedTime == slot['time'];
+                    final isOccupied = !isSelected && _isWithinSelectedBooking(slot['time']);
+
+                    Color background;
+                    Color textColor;
+                    Color borderColor = context.colors.border;
+
+                    if (isSelected || isOccupied) {
+                      background = AppTheme.accentColor;
+                      textColor = Colors.white;
+                      borderColor = AppTheme.accentColor;
+                    } else if (isAvailable) {
+                      background = context.colors.surface;
+                      textColor = context.colors.textPrimary;
+                    } else {
+                      background = context.colors.border;
+                      textColor = context.colors.textTertiary;
                     }
-                  : () {
-                      AppHaptics.error();
-                      setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
-                    },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                width: (MediaQuery.of(context).size.width - 64) / 3,
-                padding: EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accentColor
-                      : isAvailable
-                          ? context.colors.surface
-                          : context.colors.border,
-                  border: Border.all(color: isSelected ? AppTheme.accentColor : context.colors.border),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.accentColor.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
-                      : [],
+
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: isAvailable
+                          ? () {
+                              AppHaptics.selectionClick();
+                              setState(() {
+                                _selectedTime = slot['time'];
+                                _slotHint = null;
+                              });
+                            }
+                          : () {
+                              AppHaptics.error();
+                              setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                            },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        width: (MediaQuery.of(context).size.width - 64) / 3,
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: background,
+                          border: Border.all(color: borderColor),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: (isSelected || isOccupied)
+                              ? [
+                                  BoxShadow(
+                                    color: AppTheme.accentColor.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ]
+                              : [],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: (isSelected || isOccupied) ? FontWeight.bold : FontWeight.w600,
+                                color: textColor,
+                                decoration: isAvailable || isOccupied ? TextDecoration.none : TextDecoration.lineThrough,
+                              ),
+                              child: Text(slot['time']),
+                            ),
+                            if (isSelected && slotsNeeded > 1) ...[
+                              const SizedBox(height: 3),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Slot 1 (Start)',
+                                  style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ] else if (isOccupied) ...[
+                              const SizedBox(height: 3),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Included',
+                                  style: GoogleFonts.outfit(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                child: Center(
-                  child: AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected
-                          ? Colors.white
-                          : isAvailable
-                              ? context.colors.textPrimary
-                              : context.colors.textTertiary,
-                      decoration: isAvailable ? TextDecoration.none : TextDecoration.lineThrough,
-                    ),
-                    child: Text(slot['time']),
-                  ),
+                SizedBox(height: 12),
+                Text(
+                  _selectedTime != null && slotsNeeded > 1
+                      ? 'All $slotsNeeded purple blocks together are your $_totalDuration minute appointment, starting at $_selectedTime.'
+                      : 'Greyed out slots are outside working hours or already booked. Tap one to see why.',
+                  style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
                 ),
-              ),
+              ],
             );
-          }).toList(),
-        ),
-        SizedBox(height: 12),
-        Text(
-          'Greyed out slots are outside working hours or already booked. Tap one to see why.',
-          style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
+          },
         ),
       ],
     );

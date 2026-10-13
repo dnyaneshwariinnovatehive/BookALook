@@ -207,12 +207,30 @@ class BookingPolicyService
 
     public function cancellationWindow(Appointment $appointment): array
     {
-        return $this->baseWindow($appointment, $this->cancellationCutoffMinutes());
+        $window = $this->baseWindow($appointment, $this->cancellationCutoffMinutes());
+
+        if ($window['allowed'] && ! $window['free_reschedule'] && $appointment->rescheduled_from_id !== null) {
+            return array_merge($window, [
+                'allowed' => false,
+                'reason' => 'Rescheduled appointments cannot be cancelled.',
+            ]);
+        }
+
+        return $window;
     }
 
     public function rescheduleWindow(Appointment $appointment): array
     {
-        return $this->baseWindow($appointment, $this->rescheduleCutoffMinutes());
+        $window = $this->baseWindow($appointment, $this->rescheduleCutoffMinutes());
+
+        if ($window['allowed'] && ! $window['free_reschedule'] && $appointment->rescheduled_from_id !== null) {
+            return array_merge($window, [
+                'allowed' => false,
+                'reason' => 'This appointment has already been rescheduled once and cannot be moved again.',
+            ]);
+        }
+
+        return $window;
     }
 
     /**

@@ -361,7 +361,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     required String label,
     required Color iconColor,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
+    final effectiveColor = isEnabled ? iconColor : const Color(0xFFB8B2C4);
+    final effectiveTextColor = isEnabled ? const Color(0xFF18151D) : const Color(0xFFB8B2C4);
+
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -373,14 +377,14 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 20, color: iconColor),
+                Icon(icon, size: 20, color: effectiveColor),
                 const SizedBox(height: 6),
                 Text(
                   label,
                   style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF18151D),
+                    color: effectiveTextColor,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -416,7 +420,9 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
 
   void _toast(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(text),
         behavior: SnackBarBehavior.floating,
@@ -853,11 +859,15 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     final advance = _toDouble(booking['advance_paid']);
     final balance = _toDouble(booking['balance_amount']);
     final needsReschedule = booking['needs_reschedule'] == true;
-    final canCancel = booking['can_cancel'] == true;
-    final canReschedule = booking['can_reschedule'] == true;
-    final cancelBlockedReason = booking['cancel_blocked_reason']?.toString();
-    final rescheduleBlockedReason = booking['reschedule_blocked_reason']
-        ?.toString();
+    final isAlreadyRescheduled = booking['rescheduled_from_id'] != null;
+    final canCancel = !isAlreadyRescheduled && booking['can_cancel'] == true;
+    final canReschedule = !isAlreadyRescheduled && booking['can_reschedule'] == true;
+    final cancelBlockedReason = isAlreadyRescheduled
+        ? 'Rescheduled appointments cannot be cancelled.'
+        : booking['cancel_blocked_reason']?.toString();
+    final rescheduleBlockedReason = isAlreadyRescheduled
+        ? 'This appointment has already been rescheduled once.'
+        : booking['reschedule_blocked_reason']?.toString();
     final salon = booking['salon'] as Map<String, dynamic>? ?? const {};
     final salonPhone = salon['phone']?.toString().trim() ?? '';
     final providerPhone = booking['provider_phone']?.toString().trim() ?? '';
@@ -996,7 +1006,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _buildUpcomingStatusBadge(status),
+                    _buildUpcomingStatusBadge(status, isRescheduled: isAlreadyRescheduled),
                   ],
                 ),
 
@@ -1235,6 +1245,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       icon: Icons.edit_calendar_outlined,
                       label: 'Reschedule',
                       iconColor: const Color(0xFF9850F1),
+                      isEnabled: canReschedule,
                       onTap: () {
                         AppHaptics.lightImpact();
                         if (canReschedule) {
@@ -1258,6 +1269,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       icon: Icons.cancel_outlined,
                       label: 'Cancel',
                       iconColor: const Color(0xFFE53935),
+                      isEnabled: canCancel,
                       onTap: () {
                         AppHaptics.lightImpact();
                         if (canCancel) {
@@ -1280,7 +1292,39 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
-  Widget _buildUpcomingStatusBadge(String status) {
+  Widget _buildUpcomingStatusBadge(String status, {bool isRescheduled = false}) {
+    if (isRescheduled) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5EFFF),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF9850F1),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              'Rescheduled',
+              style: GoogleFonts.outfit(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF9850F1),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final lower = status.toLowerCase();
     if (lower == 'scheduled' || lower == 'confirmed') {
       return Container(

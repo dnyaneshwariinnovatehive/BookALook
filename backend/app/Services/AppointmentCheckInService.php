@@ -424,6 +424,13 @@ class AppointmentCheckInService
 
             $wallet = $this->awardWalletCoins($appointment);
 
+            // Generate invoice after completing the appointment
+            try {
+                app(\App\Services\InvoiceService::class)->issueFor($appointment);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Invoice generation failed on complete: ' . $e->getMessage());
+            }
+
             return [
                 'appointment' => $appointment->fresh($this->relations()),
                 'bill' => $bill,

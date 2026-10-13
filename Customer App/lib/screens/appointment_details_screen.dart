@@ -288,13 +288,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     
     final freeReschedule = _booking['free_reschedule'] == true;
     final needsReschedule = _booking['needs_reschedule'] == true;
-    final canCancel = _booking['can_cancel'] == true;
-    final canReschedule = _booking['can_reschedule'] == true;
+    final isAlreadyRescheduled = _booking['rescheduled_from_id'] != null;
+    final canCancel = !isAlreadyRescheduled && _booking['can_cancel'] == true;
+    final canReschedule = !isAlreadyRescheduled && _booking['can_reschedule'] == true;
     final canGenerateQr = CheckInWindow.canShowQr(_booking);
     final qrNotYetOpen = CheckInWindow.notYetOpenLabel(_booking);
 
-    final cancelBlockedReason = _booking['cancel_blocked_reason'];
-    final rescheduleBlockedReason = _booking['reschedule_blocked_reason'];
+    final cancelBlockedReason = isAlreadyRescheduled
+        ? 'Rescheduled appointments cannot be cancelled.'
+        : _booking['cancel_blocked_reason'];
+    final rescheduleBlockedReason = isAlreadyRescheduled
+        ? 'This appointment has already been rescheduled once.'
+        : _booking['reschedule_blocked_reason'];
 
     String serviceNames = services.map((s) => s['name']).join(', ');
     if (serviceNames.isEmpty) serviceNames = 'Service';

@@ -965,6 +965,14 @@ class AppointmentController extends Controller
             ? $appointment->invoice
             : Invoice::where('appointment_id', $appointment->id)->first();
 
+        if (! $invoice && $appointment->status === 'completed') {
+            try {
+                $invoice = $this->invoices->issueFor($appointment);
+            } catch (\Throwable $e) {
+                // Non-blocking fallback
+            }
+        }
+
         if (! $invoice) {
             return null;
         }
