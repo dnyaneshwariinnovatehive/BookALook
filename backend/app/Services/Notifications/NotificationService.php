@@ -299,7 +299,6 @@ class NotificationService
                     $dateLabel,
                     $advanceFormatted,
                 ],
-                'attachment' => self::ATTACHMENT_INVOICE,
             ], 'booking_confirmed');
         }
 

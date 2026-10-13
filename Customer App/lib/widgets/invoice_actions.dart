@@ -18,6 +18,9 @@ class InvoiceInfo {
   /// use. The buttons below render nothing in that case rather than showing an
   /// action that is guaranteed to fail.
   static InvoiceInfo? fromBooking(Map<String, dynamic> booking) {
+    final status = (booking['status'] ?? '').toString().toLowerCase();
+    if (status != 'completed') return null;
+
     final raw = booking['invoice'];
     if (raw is! Map) return null;
 

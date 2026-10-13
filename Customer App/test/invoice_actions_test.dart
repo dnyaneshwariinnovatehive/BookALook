@@ -4,8 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:customer_app/services/invoice_service.dart';
 import 'package:customer_app/widgets/invoice_actions.dart';
 
-Map<String, dynamic> bookingWith(Object? invoice) => {
+Map<String, dynamic> bookingWith(Object? invoice, {String status = 'completed'}) => {
       'id': 7,
+      'status': status,
       'invoice': invoice,
     };
 
@@ -13,7 +14,7 @@ Widget harness(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('InvoiceInfo.fromBooking', () {
-    test('reads the number and url off a real payload', () {
+    test('reads the number and url off a real payload when completed', () {
       final info = InvoiceInfo.fromBooking(bookingWith({
         'number': 'BAL-2026-00042',
         'issued_at': '2026-09-28T09:00:00+05:30',
@@ -23,6 +24,30 @@ void main() {
       expect(info, isNotNull);
       expect(info!.number, 'BAL-2026-00042');
       expect(info.url, 'https://api.bookalook.in/api/invoices/9?signature=abc');
+    });
+
+    test('is null when the booking is cancelled even if an invoice payload exists', () {
+      final info = InvoiceInfo.fromBooking(bookingWith(
+        {
+          'number': 'BAL-2026-00042',
+          'url': 'https://api.bookalook.in/api/invoices/9?signature=abc',
+        },
+        status: 'cancelled',
+      ));
+
+      expect(info, isNull);
+    });
+
+    test('is null when the booking is scheduled even if an invoice payload exists', () {
+      final info = InvoiceInfo.fromBooking(bookingWith(
+        {
+          'number': 'BAL-2026-00042',
+          'url': 'https://api.bookalook.in/api/invoices/9?signature=abc',
+        },
+        status: 'scheduled',
+      ));
+
+      expect(info, isNull);
     });
 
     test('is null when the booking has no invoice yet', () {
@@ -83,17 +108,33 @@ void main() {
   group('invoice actions', () {
     const withInvoice = {
       'id': 7,
+      'status': 'completed',
       'invoice': {
         'number': 'BAL-2026-00042',
         'url': 'https://api.bookalook.in/api/invoices/9?signature=abc',
       },
     };
 
-    testWidgets('the card link shows the invoice number', (tester) async {
+    const cancelledWithInvoice = {
+      'id': 8,
+      'status': 'cancelled',
+      'invoice': {
+        'number': 'BAL-2026-00042',
+        'url': 'https://api.bookalook.in/api/invoices/9?signature=abc',
+      },
+    };
+
+    testWidgets('the card link shows the invoice number for completed booking', (tester) async {
       await tester.pumpWidget(harness(InvoiceLinkButton(booking: withInvoice)));
 
       expect(find.text('View invoice'), findsOneWidget);
       expect(find.text('BAL-2026-00042'), findsOneWidget);
+    });
+
+    testWidgets('the card link is absent for a cancelled booking', (tester) async {
+      await tester.pumpWidget(harness(InvoiceLinkButton(booking: cancelledWithInvoice)));
+
+      expect(find.text('View invoice'), findsNothing);
     });
 
     testWidgets('the card link is absent for a booking with no invoice', (tester) async {
@@ -102,10 +143,16 @@ void main() {
       expect(find.text('View invoice'), findsNothing);
     });
 
-    testWidgets('the details button names the invoice', (tester) async {
+    testWidgets('the details button names the invoice for completed booking', (tester) async {
       await tester.pumpWidget(harness(InvoiceActionButton(booking: withInvoice)));
 
       expect(find.text('View invoice BAL-2026-00042'), findsOneWidget);
+    });
+
+    testWidgets('the details button is absent for a cancelled booking', (tester) async {
+      await tester.pumpWidget(harness(InvoiceActionButton(booking: cancelledWithInvoice)));
+
+      expect(find.text('View invoice'), findsNothing);
     });
 
     testWidgets('the details button falls back to plain wording', (tester) async {

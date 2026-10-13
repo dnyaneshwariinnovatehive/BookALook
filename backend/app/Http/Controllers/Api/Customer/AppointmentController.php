@@ -450,30 +450,8 @@ class AppointmentController extends Controller
         // they find out by opening the app.
         $this->notifications->notifySalonOfNewBooking($appointment, $salonName, $dateLabel);
 
-        // The customer's receipt for the advance they just paid.
-        //
-        // Issued here, after the booking is committed, because this is the one
-        // place a booking becomes real — so a receipt cannot exist for a hold
-        // that was abandoned. And wrapped, deliberately: the booking is already
-        // saved and the money is already taken, so a receipt that fails to draw
-        // is an operational problem to be reported and re-run, never a reason to
-        // fail a confirmed appointment and leave the customer unsure whether
-        // they are booked.
-        try {
-            $this->invoices->issueFor($appointment);
-        } catch (\Throwable $e) {
-            report($e);
-        }
-
-        // And only now the customer's confirmation, because it is the message that
-        // carries the receipt.
-        //
-        // The ordering here is load-bearing, not incidental. This notification
-        // writes an outbox row and hands it straight to a queue worker, and there
-        // is no transaction open at this point for `afterCommit` to wait on — so
-        // the worker can start rendering the PDF before `issueFor` above has run.
-        // It would find no invoice, send the confirmation text with no document,
-        // and AISensy would reject the whole send for the missing media.
+        // Notify the customer that the booking is confirmed.
+        // Invoices are generated only when the appointment is completed.
         $this->notifications->bookingConfirmed($appointment, $salonName, $dateLabel);
     }
 
@@ -656,6 +634,9 @@ class AppointmentController extends Controller
             $appointment->save();
 
             $appointment->services()->update(['line_status' => 'cancelled']);
+
+            // Any invoice associated with a cancelled booking is removed.
+            Invoice::where('appointment_id', $appointment->id)->delete();
 
             $this->raiseRefund(
                 $appointment,
@@ -961,11 +942,16 @@ class AppointmentController extends Controller
      */
     private function invoiceState(Appointment $appointment): ?array
     {
+        // An invoice is only generated and available when the booking has been completed.
+        if ($appointment->status !== 'completed') {
+            return null;
+        }
+
         $invoice = $appointment->relationLoaded('invoice')
             ? $appointment->invoice
             : Invoice::where('appointment_id', $appointment->id)->first();
 
-        if (! $invoice && $appointment->status === 'completed') {
+        if (! $invoice) {
             try {
                 $invoice = $this->invoices->issueFor($appointment);
             } catch (\Throwable $e) {

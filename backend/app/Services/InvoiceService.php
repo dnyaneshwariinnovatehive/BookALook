@@ -35,6 +35,11 @@ class InvoiceService
      */
     public function issueFor(Appointment $appointment): ?Invoice
     {
+        // An invoice is only issued for a completed appointment.
+        if ($appointment->status !== 'completed') {
+            return null;
+        }
+
         $existing = Invoice::where('appointment_id', $appointment->id)->first();
 
         if ($existing) {

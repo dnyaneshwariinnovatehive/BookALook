@@ -1559,7 +1559,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     final canReview = booking['can_review'] == true;
     final blockedReason = booking['review_blocked_reason']?.toString();
 
-    final bool mightHaveInvoice = booking['invoice'] is Map;
+    final bool mightHaveInvoice =
+        booking['invoice'] is Map && booking['status'] == 'completed';
 
     if (!mightHaveInvoice &&
         review == null &&
