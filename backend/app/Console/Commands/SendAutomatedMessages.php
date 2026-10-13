@@ -86,7 +86,6 @@ class SendAutomatedMessages extends Command
             
             $payloadParams = [
                 $customer->first_name ?? $customer->name ?? 'Customer',
-                $salon->name ?? 'our salon',
             ];
 
             $message = WhatsAppMessage::create([
@@ -158,7 +157,6 @@ class SendAutomatedMessages extends Command
             
             $payloadParams = [
                 $user->first_name ?? $user->name ?? 'Customer',
-                $salonName,
             ];
 
             $message = WhatsAppMessage::create([

@@ -28,8 +28,6 @@ class WhatsappVariableCatalog
                 'description' => 'The name of the business.',
                 'example' => 'Glow Studio',
                 'available_for' => [
-                    'whatsapp_customer_birthday',
-                    'whatsapp_25_day_reminder',
                     'whatsapp_appointment_reminder',
                 ],
             ],
