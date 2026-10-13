@@ -109,7 +109,8 @@ class _HomeTabState extends State<HomeTab> {
 
   void _onCityChanged() {
     if (!mounted) return;
-    setState(() {});
+    setState(() => _isLoadingBanners = true);
+    _fetchBanners();
   }
 
   /// Let the customer change market, and reload what that changes.

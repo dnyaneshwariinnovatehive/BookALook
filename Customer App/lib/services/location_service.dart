@@ -12,12 +12,16 @@ class ServiceCity {
   final String name;
   final String state;
   final int salonCount;
+  final double? latitude;
+  final double? longitude;
 
   const ServiceCity({
     required this.id,
     required this.name,
     required this.state,
     required this.salonCount,
+    this.latitude,
+    this.longitude,
   });
 
   /// "Pune, Maharashtra" — the state matters because two Indian cities can
@@ -29,10 +33,22 @@ class ServiceCity {
         name: json['name'] ?? '',
         state: json['state'] ?? '',
         salonCount: json['salon_count'] ?? 0,
+        latitude: json['latitude'] != null
+            ? double.tryParse(json['latitude'].toString())
+            : null,
+        longitude: json['longitude'] != null
+            ? double.tryParse(json['longitude'].toString())
+            : null,
       );
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'name': name, 'state': state, 'salon_count': salonCount};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'state': state,
+        'salon_count': salonCount,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      };
 }
 
 /// Which city the customer is shopping in.
@@ -106,6 +122,11 @@ class LocationService extends ChangeNotifier {
   /// leave the screen showing a city they did not pick.
   Future<void> setCity(ServiceCity city) async {
     _city = city;
+    if (city.latitude != null && city.longitude != null) {
+      _lat = city.latitude;
+      _lng = city.longitude;
+      await _rememberPosition(city.latitude!, city.longitude!);
+    }
     notifyListeners();
 
     try {
@@ -157,9 +178,28 @@ class LocationService extends ChangeNotifier {
       throw Exception('Could not load cities');
     }
 
-    return (jsonDecode(response.body) as List)
+    final cities = (jsonDecode(response.body) as List)
         .map((e) => ServiceCity.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    if (cities.isNotEmpty) {
+      return cities;
+    }
+
+    // Fallback: If no serviceable cities exist, query all active cities from DB
+    try {
+      final fallbackUri = Uri.parse('$_baseUrl/cities').replace(queryParameters: {
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
+      final fallbackResp = await http.get(fallbackUri, headers: {'Accept': 'application/json'});
+      if (fallbackResp.statusCode == 200) {
+        return (jsonDecode(fallbackResp.body) as List)
+            .map((e) => ServiceCity.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (_) {}
+
+    return cities;
   }
 
   /// Adopt whatever city the directory decided to show.
@@ -206,20 +246,37 @@ class LocationService extends ChangeNotifier {
         return null;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          // City resolution and distance ordering do not need metre accuracy,
-          // and asking for less keeps the fix quick and cheap on battery.
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 12),
-        ),
-      );
+      // Fast-path: Check for cached last known position from the OS (instant <10ms response)
+      Position? lastKnown;
+      try {
+        lastKnown = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        debugPrint('Could not get last known position: $e');
+      }
+
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            // If cached fix is already known, allow only 3s for a fresher fix; otherwise 5s max
+            timeLimit: Duration(seconds: lastKnown != null ? 3 : 5),
+          ),
+        );
+      } catch (e) {
+        // If fresh fix timed out indoors/low signal, fall back immediately to cached position
+        if (lastKnown != null) {
+          position = lastKnown;
+        } else {
+          debugPrint('Could not get fresh position and no cached position: $e');
+          return null;
+        }
+      }
 
       await _rememberPosition(position.latitude, position.longitude);
 
       return position;
     } catch (e) {
-      // A timeout is the normal case indoors, not an exception worth surfacing.
       debugPrint('Could not get a position: $e');
       return null;
     }

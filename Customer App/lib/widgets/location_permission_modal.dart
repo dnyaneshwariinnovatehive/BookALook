@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/deep_link_service.dart';
 import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -43,11 +44,82 @@ class _LocationPermissionDialog extends StatefulWidget {
       _LocationPermissionDialogState();
 }
 
-class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
+class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
+    with WidgetsBindingObserver {
   bool _loading = false;
   String? _statusMessage;
   bool _isPermanentlyDenied = false;
   bool _isServiceDisabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !_loading) {
+      _checkStatusOnResume();
+    }
+  }
+
+  Future<void> _checkStatusOnResume() async {
+    final serviceEnabled =
+        await LocationService.instance.isLocationServiceEnabled();
+    final permission = await LocationService.instance.checkPermission();
+
+    if (!mounted) return;
+
+    // Case 1: GPS was disabled, user turned it on in settings
+    if (_isServiceDisabled && serviceEnabled) {
+      setState(() {
+        _isServiceDisabled = false;
+        _statusMessage = null;
+      });
+      _handleEnableLocation();
+      return;
+    }
+
+    // Case 2: Permission was permanently denied, user enabled it in app settings
+    if (_isPermanentlyDenied &&
+        (permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always)) {
+      setState(() {
+        _isPermanentlyDenied = false;
+        _statusMessage = null;
+      });
+      _handleEnableLocation();
+      return;
+    }
+
+    // Case 3: Refresh state if user updated settings without enabling
+    if (!serviceEnabled) {
+      setState(() {
+        _isServiceDisabled = true;
+        _statusMessage =
+            'Device location is turned off. Please turn on GPS or select your city manually.';
+      });
+    } else if (permission == LocationPermission.deniedForever) {
+      setState(() {
+        _isPermanentlyDenied = true;
+        _statusMessage =
+            'Location permission is disabled in phone settings. You can pick your city manually or allow access in Settings.';
+      });
+    } else if (_isPermanentlyDenied &&
+        permission != LocationPermission.deniedForever) {
+      setState(() {
+        _isPermanentlyDenied = false;
+        _statusMessage = null;
+      });
+    }
+  }
 
   Future<void> _handleEnableLocation() async {
     setState(() {
@@ -66,10 +138,9 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
           _loading = false;
           _isServiceDisabled = true;
           _statusMessage =
-              'Device location is turned off. Please enable GPS in device settings.';
+              'Device location is turned off. Please turn on GPS or select your city manually.';
         });
         AppHaptics.error();
-        await LocationService.instance.openLocationSettings();
         return;
       }
 
@@ -81,10 +152,9 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
           _loading = false;
           _isPermanentlyDenied = true;
           _statusMessage =
-              'Location permission is permanently disabled. Please allow location access in App Settings.';
+              'Location permission is disabled in phone settings. You can pick your city manually or allow access in Settings.';
         });
-        AppHaptics.error();
-        await LocationService.instance.openAppSettings();
+        AppHaptics.lightImpact();
         return;
       }
 
@@ -97,9 +167,49 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         AppHaptics.success();
-        // Resolve location in background to update nearest city & coordinates
-        await LocationService.instance.useCurrentLocation();
-        if (mounted) {
+        final problem = await LocationService.instance.useCurrentLocation();
+        if (!mounted) return;
+
+        if (problem != null) {
+          if (LocationService.instance.hasCity) {
+            // Nearest market resolved even if out of exact range
+            if (mounted) {
+              Navigator.of(context).pop(true);
+            }
+            final ctx = DeepLinkService.navigatorKey.currentContext;
+            if (ctx != null && ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(problem),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 4),
+                  backgroundColor: const Color(0xFF1E293B),
+                ),
+              );
+            }
+          } else {
+            // Failed to resolve coordinates or network error
+            if (mounted) {
+              Navigator.of(context).pop(false);
+            }
+            final ctx = DeepLinkService.navigatorKey.currentContext;
+            if (ctx != null && ctx.mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (ctx.mounted) {
+                  showCityPicker(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(problem),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
+              });
+            }
+          }
+        } else {
+          // Success!
           Navigator.of(context).pop(true);
         }
       } else if (permission == LocationPermission.deniedForever) {
@@ -107,15 +217,20 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
           _loading = false;
           _isPermanentlyDenied = true;
           _statusMessage =
-              'Location permission was denied. You can enable it in Settings anytime.';
+              'Location permission was denied. You can pick your city manually or enable it in Settings.';
         });
-        AppHaptics.error();
-        await LocationService.instance.openAppSettings();
+        AppHaptics.lightImpact();
       } else {
-        // User tapped deny in OS dialog
+        // User tapped deny in OS dialog — smoothly fall back to manual city selection
         AppHaptics.lightImpact();
         if (mounted) {
           Navigator.of(context).pop(false);
+          final ctx = DeepLinkService.navigatorKey.currentContext;
+          if (ctx != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showCityPicker(ctx);
+            });
+          }
         }
       }
     } catch (e) {
@@ -132,12 +247,24 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
     }
   }
 
+  Future<void> _handleOpenSettings() async {
+    AppHaptics.lightImpact();
+    await LocationService.instance.openAppSettings();
+  }
+
+  Future<void> _handleOpenLocationSettings() async {
+    AppHaptics.lightImpact();
+    await LocationService.instance.openLocationSettings();
+  }
+
   void _handleSelectManually() {
     AppHaptics.selectionClick();
     Navigator.of(context).pop(false);
-    // Reuse existing manual location flow
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      showCityPicker(context);
+      final ctx = DeepLinkService.navigatorKey.currentContext;
+      if (ctx != null) {
+        showCityPicker(ctx);
+      }
     });
   }
 
@@ -359,119 +486,341 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog> {
 
                           const SizedBox(height: 18),
 
-                          // Primary CTA: Enable location
-                          Semantics(
-                            button: true,
-                            label: 'Enable location',
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: ElevatedButton(
-                                onPressed:
-                                    _loading ? null : _handleEnableLocation,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.accentColor,
-                                  foregroundColor: context.colors.onAccent,
-                                  elevation: 0,
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                          // Primary & Secondary CTAs
+                          if (_isPermanentlyDenied) ...[
+                            // Primary CTA: Select location manually
+                            Semantics(
+                              button: true,
+                              label: 'Select location manually',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _loading ? null : _handleSelectManually,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.accentColor,
+                                    foregroundColor: context.colors.onAccent,
+                                    elevation: 0,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Ink(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          AppTheme.accentGradientStart,
+                                          AppTheme.accentGradientEnd,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.accentColor
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.location_city_rounded,
+                                            size: 20,
+                                            color: context.colors.onAccent,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Select location manually',
+                                            style: TextStyle(
+                                              fontSize: 15.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: context.colors.onAccent,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            Icons.chevron_right_rounded,
+                                            size: 20,
+                                            color: context.colors.onAccent,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        AppTheme.accentGradientStart,
-                                        AppTheme.accentGradientEnd,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            // Secondary CTA: Open Settings
+                            Semantics(
+                              button: true,
+                              label: 'Open Phone Settings',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: TextButton(
+                                  onPressed:
+                                      _loading ? null : _handleOpenSettings,
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: isDark
+                                        ? context.colors.surfaceMuted
+                                        : context.colors.accentSoft,
+                                    foregroundColor: AppTheme.accentColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.accentColor
-                                            .withValues(alpha: 0.35),
-                                        blurRadius: 14,
-                                        offset: const Offset(0, 4),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.settings_outlined, size: 18),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Open Phone Settings',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.accentColor,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  child: Center(
-                                    child: _loading
-                                        ? SizedBox(
-                                            width: 22,
-                                            height: 22,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.2,
-                                              color: context.colors.onAccent,
-                                            ),
-                                          )
-                                        : Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.my_location_rounded,
-                                                size: 20,
-                                                color: context.colors.onAccent,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'Enable location',
-                                                style: TextStyle(
-                                                  fontSize: 15.5,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: context.colors.onAccent,
-                                                  letterSpacing: 0.2,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Icon(
-                                                Icons.chevron_right_rounded,
-                                                size: 20,
-                                                color: context.colors.onAccent,
-                                              ),
-                                            ],
+                                ),
+                              ),
+                            ),
+                          ] else if (_isServiceDisabled) ...[
+                            // Primary CTA: Turn on GPS
+                            Semantics(
+                              button: true,
+                              label: 'Turn on GPS',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: _loading
+                                      ? null
+                                      : _handleOpenLocationSettings,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.accentColor,
+                                    foregroundColor: context.colors.onAccent,
+                                    elevation: 0,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Ink(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          AppTheme.accentGradientStart,
+                                          AppTheme.accentGradientEnd,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.accentColor
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.gps_fixed_rounded,
+                                            size: 20,
+                                            color: context.colors.onAccent,
                                           ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Turn on GPS in Settings',
+                                            style: TextStyle(
+                                              fontSize: 15.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: context.colors.onAccent,
+                                              letterSpacing: 0.2,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            Icons.chevron_right_rounded,
+                                            size: 20,
+                                            color: context.colors.onAccent,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
+                            const SizedBox(height: 10),
+                            // Secondary CTA: Select location manually
+                            Semantics(
+                              button: true,
+                              label: 'Select location manually',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: TextButton(
+                                  onPressed:
+                                      _loading ? null : _handleSelectManually,
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: isDark
+                                        ? context.colors.surfaceMuted
+                                        : context.colors.accentSoft,
+                                    foregroundColor: AppTheme.accentColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Select location manually',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.accentColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            // Primary CTA: Enable location
+                            Semantics(
+                              button: true,
+                              label: 'Enable location',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _loading ? null : _handleEnableLocation,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.accentColor,
+                                    foregroundColor: context.colors.onAccent,
+                                    elevation: 0,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: Ink(
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          AppTheme.accentGradientStart,
+                                          AppTheme.accentGradientEnd,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.accentColor
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: _loading
+                                          ? SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color: context.colors.onAccent,
+                                              ),
+                                            )
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.my_location_rounded,
+                                                  size: 20,
+                                                  color:
+                                                      context.colors.onAccent,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Enable location',
+                                                  style: TextStyle(
+                                                    fontSize: 15.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color:
+                                                        context.colors.onAccent,
+                                                    letterSpacing: 0.2,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.chevron_right_rounded,
+                                                  size: 20,
+                                                  color:
+                                                      context.colors.onAccent,
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
 
-                          // Secondary CTA: Select location manually
-                          Semantics(
-                            button: true,
-                            label: 'Select location manually',
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: TextButton(
-                                onPressed:
-                                    _loading ? null : _handleSelectManually,
-                                style: TextButton.styleFrom(
-                                  backgroundColor: isDark
-                                      ? context.colors.surfaceMuted
-                                      : context.colors.accentSoft,
-                                  foregroundColor: AppTheme.accentColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                            // Secondary CTA: Select location manually
+                            Semantics(
+                              button: true,
+                              label: 'Select location manually',
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: TextButton(
+                                  onPressed:
+                                      _loading ? null : _handleSelectManually,
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: isDark
+                                        ? context.colors.surfaceMuted
+                                        : context.colors.accentSoft,
+                                    foregroundColor: AppTheme.accentColor,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
                                   ),
-                                ),
-                                child: const Text(
-                                  'Select location manually',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.accentColor,
+                                  child: const Text(
+                                    'Select location manually',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.accentColor,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 14),
 
                           // Informational Footer

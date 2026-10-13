@@ -15,7 +15,9 @@ import '../utils/app_haptics.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
 import '../theme/app_colors.dart';
+import '../services/deep_link_service.dart';
 import '../services/location_service.dart';
+import '../widgets/city_picker_sheet.dart';
 import '../widgets/location_permission_modal.dart';
 
 class MainScreen extends StatefulWidget {
@@ -84,9 +86,20 @@ class _MainScreenState extends State<MainScreen> {
     // After the first frame: the shell has to exist before a modal or sheet can sit on
     // top of it.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _checkLocationPermission();
+      // Restore saved city first so one-time permissions or manual selections are loaded
+      await LocationService.instance.restore();
+
+      // If opened via QR code or deep link to a specific salon, skip initial modal prompt
+      if (!DeepLinkService.instance.hasPendingInitialLink) {
+        await _checkLocationPermission();
+      }
+
+      // Spaced dialog sequencing: give 1.5s breathing room so review dialogs never clash
       if (!widget.isGuest && mounted) {
-        _askForPendingReviews();
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (mounted && !DeepLinkService.instance.hasPendingInitialLink) {
+          _askForPendingReviews();
+        }
       }
     });
 
@@ -111,14 +124,20 @@ class _MainScreenState extends State<MainScreen> {
     if (!hasPrompted) {
       await LocationService.instance.markInitialLocationPrompted();
       if (!mounted) return;
-      await showLocationPermissionModal(context);
+      final granted = await showLocationPermissionModal(context);
+      if (mounted && !LocationService.instance.hasCity && granted != true) {
+        await showCityPicker(context);
+      }
       return;
     }
 
     if (!widget.isGuest && LocationService.instance.canShowPostLoginReminder) {
       LocationService.instance.markPostLoginReminded();
       if (!mounted) return;
-      await showLocationPermissionModal(context);
+      final granted = await showLocationPermissionModal(context);
+      if (mounted && !LocationService.instance.hasCity && granted != true) {
+        await showCityPicker(context);
+      }
     }
   }
 

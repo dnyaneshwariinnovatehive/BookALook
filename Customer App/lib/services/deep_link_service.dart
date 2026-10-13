@@ -34,6 +34,10 @@ class DeepLinkService {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _subscription;
   bool _started = false;
+  bool _hasPendingInitialLink = false;
+
+  /// Whether a cold-start deep link (e.g. salon QR scan) is currently pending navigation.
+  bool get hasPendingInitialLink => _hasPendingInitialLink;
 
   /// Begin listening. Safe to call more than once.
   Future<void> start() async {
@@ -45,9 +49,13 @@ class DeepLinkService {
       final initial = await _appLinks.getInitialLink();
 
       if (initial != null) {
+        _hasPendingInitialLink = true;
         // Deferred: the first frame has not been drawn yet, so there is no
         // navigator to push onto until the splash screen has mounted.
-        WidgetsBinding.instance.addPostFrameCallback((_) => _handle(initial));
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _handle(initial);
+          _hasPendingInitialLink = false;
+        });
       }
 
       _subscription = _appLinks.uriLinkStream.listen(

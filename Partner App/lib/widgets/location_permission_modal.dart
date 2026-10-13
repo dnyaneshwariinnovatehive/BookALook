@@ -12,33 +12,28 @@ class LocationPermissionModal extends StatelessWidget {
   const LocationPermissionModal({super.key, required this.salonId});
 
   static Future<void> checkAndShow(BuildContext context, String salonId) async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // If service is totally off, maybe wait for permission first, or just show it anyway.
-      // But let's check permission.
-    }
-    
     final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      // Show the modal
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       if (!context.mounted) return;
       await showDialog(
         context: context,
-        barrierDismissible: false,
-        barrierColor: Colors.black.withOpacity(0.4),
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.4),
         builder: (context) => LocationPermissionModal(salonId: salonId),
       );
     }
   }
 
   Future<void> _enableLocation(BuildContext context) async {
-    // Check permission
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.deniedForever) {
-      // Permanently denied, tell user to go to settings
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        duration: const Duration(milliseconds: 2500),
-        content: const Text('Location permission is permanently denied. Please enable it in Settings.'),
+        duration: const Duration(seconds: 4),
+        content: const Text(
+          'Location permission is permanently denied. Please enable it in Settings.',
+        ),
         action: SnackBarAction(
           label: 'Settings',
           onPressed: () => SalonLocationApi.openAppSettings(),
@@ -52,32 +47,54 @@ class LocationPermissionModal extends StatelessWidget {
       permission = await Geolocator.requestPermission();
     }
 
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      // Granted!
+    if (permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always) {
       if (!context.mounted) return;
-      Navigator.pop(context);
-      
+
       // Check if location services are disabled
       if (!await Geolocator.isLocationServiceEnabled()) {
         if (!context.mounted) return;
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 2500),
-          content: const Text('Location permission granted, but Location Services are turned off. Please turn them on.'),
+          duration: const Duration(seconds: 4),
+          content: const Text(
+            'Permission granted, but Device Location (GPS) is off. Please turn it on.',
+          ),
           action: SnackBarAction(
             label: 'Settings',
             onPressed: () => SalonLocationApi.openLocationSettings(),
           ),
         ));
-      } else {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            duration: Duration(milliseconds: 2500),
-            content: Text('Location permission granted!'),
-         ));
+        return;
+      }
+
+      // Read position and save to salon
+      try {
+        final position = await SalonLocationApi.requireDevicePosition();
+        final message = await SalonLocationApi.save(
+          salonId,
+          position.latitude,
+          position.longitude,
+        );
+
+        if (!context.mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 4),
+          backgroundColor: Colors.green.shade700,
+          content: Text(message),
+        ));
+      } catch (e) {
+        if (!context.mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 4),
+          content: Text('Permission granted. ${e.toString().replaceFirst('Exception: ', '')}'),
+        ));
       }
     } else {
-      // Still denied
       if (!context.mounted) return;
-      Navigator.pop(context); // just dismiss, don't spam
+      Navigator.pop(context);
     }
   }
 
@@ -93,7 +110,7 @@ class LocationPermissionModal extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 32,
               offset: const Offset(0, 16),
             ),
@@ -194,7 +211,7 @@ class LocationPermissionModal extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'Select location manually',
+                        'View location details',
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -284,4 +301,3 @@ class LocationPermissionModal extends StatelessWidget {
     );
   }
 }
-

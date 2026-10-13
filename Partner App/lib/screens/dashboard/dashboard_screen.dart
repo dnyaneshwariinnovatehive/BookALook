@@ -12,7 +12,6 @@ import 'tabs/appointments_tab.dart';
 import 'tabs/staff_tab.dart';
 import 'tabs/services_tab.dart';
 import 'tabs/more_tab.dart';
-import '../../widgets/location_permission_modal.dart';
 import '../../widgets/animated_staff_icon.dart';
 import '../../widgets/tab_loading_overlay.dart';
 import '../../utils/app_haptics.dart';
@@ -64,7 +63,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _checkingAccess = true;
   String? _initError;
   bool _showWelcome = false;
-  bool _hasCheckedLocationReminder = false;
 
   Future<void> _checkAccess() async {
     setState(() => _checkingAccess = true);
@@ -103,16 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _initError = 'Error in _buildTabs (success path): $e\n$stack';
         }
       });
-      
-      if (mounted && !showWelcome && !access.isLocked && !_hasCheckedLocationReminder) {
-        _hasCheckedLocationReminder = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            LocationPermissionModal.checkAndShow(context, widget.salonData['id'].toString());
-          }
-        });
-      }
-    } catch (e, stack) {
+    } catch (e) {
       // A failed check must not lock a paying salon out of its own app.
       if (!mounted) return;
       setState(() {

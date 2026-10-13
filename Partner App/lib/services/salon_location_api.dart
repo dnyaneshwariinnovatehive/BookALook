@@ -108,7 +108,15 @@ class SalonLocationApi {
     return body['message'] ?? 'Location saved.';
   }
 
+  /// Check whether location permission is currently granted.
+  static Future<bool> isPermissionGranted() async {
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+  }
+
   /// Read the device's position, throwing specific exceptions if it fails.
+  /// Uses high accuracy with fast fallback to avoid 20-second indoor freeze.
   static Future<Position> requireDevicePosition() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw LocationDisabledException();
@@ -128,17 +136,36 @@ class SalonLocationApi {
       throw LocationPermissionPermanentlyDeniedException();
     }
 
+    // Try fast high-accuracy fix first (usually resolves within 1-3 seconds)
     try {
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          // The owner is standing in the salon, so it is worth waiting for a
-          // good fix here — this is recorded once and used for a long time.
-          accuracy: LocationAccuracy.best,
-          timeLimit: Duration(seconds: 20),
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 7),
         ),
       );
-    } catch (e) {
-      throw Exception('We couldn\'t determine your current location. Please try again.');
+    } catch (_) {
+      // Fallback 1: check if a recent last known position is available
+      try {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          return last;
+        }
+      } catch (_) {}
+
+      // Fallback 2: try medium accuracy (cell/Wi-Fi assisted) with short timeout
+      try {
+        return await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 4),
+          ),
+        );
+      } catch (_) {
+        throw Exception(
+          'Weak GPS signal indoors. Please step closer to a window or entrance and try again.',
+        );
+      }
     }
   }
 
