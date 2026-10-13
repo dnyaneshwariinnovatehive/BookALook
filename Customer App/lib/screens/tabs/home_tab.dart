@@ -14,6 +14,7 @@ import '../../services/appointment_service.dart';
 import '../../services/notification_service.dart';
 import '../notifications_screen.dart';
 import '../reschedule_screen.dart';
+import '../../services/salon_service.dart';
 import '../salon_list_screen.dart';
 import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
@@ -52,11 +53,37 @@ class _HomeTabState extends State<HomeTab> {
   List<dynamic> _past = [];
   int _unreadNotifications = 0;
 
+  List<dynamic> _recommendedSalons = [];
+  bool _isLoadingRecommended = true;
+
   String _selectedGender = 'All';
   final TextEditingController _searchController = TextEditingController();
 
   ScrollController? _bookAgainScrollController;
   Timer? _bookAgainTimer;
+
+  /// Deduplicated recent salon visits for the Book Again section.
+  /// Preserves recent booking order (most recently booked salon first)
+  /// and ensures each salon appears only once based on its stable unique salon ID.
+  List<Map<String, dynamic>> get _deduplicatedBookAgainList {
+    if (_past.isEmpty || widget.isGuest) return [];
+
+    final List<Map<String, dynamic>> deduplicated = [];
+    final Set<String> seenSalonIds = {};
+
+    for (final item in _past) {
+      if (item is! Map<String, dynamic>) continue;
+      final salonId = (item['salon_id'] ?? item['salon']?['id'])?.toString();
+      if (salonId == null || salonId.isEmpty) continue;
+
+      if (!seenSalonIds.contains(salonId)) {
+        seenSalonIds.add(salonId);
+        deduplicated.add(item);
+      }
+    }
+
+    return deduplicated;
+  }
 
   @override
   void initState() {
@@ -82,12 +109,19 @@ class _HomeTabState extends State<HomeTab> {
 
   void _startBookAgainTimer() {
     _bookAgainTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (!mounted || _past.isEmpty || _bookAgainScrollController == null) return;
+      if (!mounted || _bookAgainScrollController == null) return;
       if (!_bookAgainScrollController!.hasClients) return;
-      
+      final list = _deduplicatedBookAgainList;
+      if (list.length <= 1) return;
+
+      final maxScroll = _bookAgainScrollController!.position.maxScrollExtent;
       final currentOffset = _bookAgainScrollController!.offset;
       final stride = 250.0 + 14.0; // card width + gap
-      final targetOffset = ((currentOffset / stride).floor() + 1) * stride;
+      double targetOffset = currentOffset + stride;
+
+      if (targetOffset > maxScroll + 10) {
+        targetOffset = 0.0;
+      }
 
       _bookAgainScrollController!.animateTo(
         targetOffset,
@@ -105,12 +139,17 @@ class _HomeTabState extends State<HomeTab> {
     if (!mounted) return;
     setState(() {});
     _fetchBanners();
+    _fetchRecommendedSalons();
   }
 
   void _onCityChanged() {
     if (!mounted) return;
-    setState(() => _isLoadingBanners = true);
+    setState(() {
+      _isLoadingBanners = true;
+      _isLoadingRecommended = true;
+    });
     _fetchBanners();
+    _fetchRecommendedSalons();
   }
 
   /// Let the customer change market, and reload what that changes.
@@ -118,8 +157,78 @@ class _HomeTabState extends State<HomeTab> {
     final changed = await showCityPicker(context);
 
     if (changed && mounted) {
-      setState(() => _isLoadingBanners = true);
+      setState(() {
+        _isLoadingBanners = true;
+        _isLoadingRecommended = true;
+      });
       _fetchBanners();
+      _fetchRecommendedSalons();
+    }
+  }
+
+  /// Fetch recommended salons prioritizing nearby and top-rated salons.
+  /// Reuses SalonService().fetchSalons() which respects location coordinates
+  /// and selected city, deduplicating results by salon ID.
+  Future<void> _fetchRecommendedSalons() async {
+    try {
+      final response = await SalonService().fetchSalons();
+      if (!mounted) return;
+      final rawSalons = (response['salons'] as List?) ?? [];
+      final suggested = (response['suggested_salons'] as List?) ?? [];
+
+      final allSalons = rawSalons.isNotEmpty ? rawSalons : suggested;
+
+      // Deduplicate by salon ID
+      final Map<String, dynamic> uniqueSalons = {};
+      for (var s in allSalons) {
+        if (s is Map<String, dynamic>) {
+          final id = s['id']?.toString();
+          if (id != null && id.isNotEmpty && !uniqueSalons.containsKey(id)) {
+            uniqueSalons[id] = s;
+          }
+        }
+      }
+
+      var list = uniqueSalons.values.toList();
+      // Only keep serviceable salons
+      list = list.where((s) => s['is_serviceable'] != false).toList();
+
+      // Recommendation ranking:
+      // Prioritize well-rated nearby salons, then nearby salons, or top-rated if distance is absent
+      list.sort((a, b) {
+        final distA = (a['distance_km'] as num?)?.toDouble();
+        final distB = (b['distance_km'] as num?)?.toDouble();
+        final ratingA = (a['avg_rating'] as num?)?.toDouble() ?? 0.0;
+        final ratingB = (b['avg_rating'] as num?)?.toDouble() ?? 0.0;
+
+        if (distA != null && distB != null) {
+          // If both have distance, well-rated salons (>= 4.0) within reasonable distance get top priority
+          final isTopA = ratingA >= 4.0;
+          final isTopB = ratingB >= 4.0;
+          if (isTopA && !isTopB && distA <= distB * 1.5) return -1;
+          if (!isTopA && isTopB && distB <= distA * 1.5) return 1;
+
+          final distComp = distA.compareTo(distB);
+          if (distComp != 0) return distComp;
+          return ratingB.compareTo(ratingA);
+        } else if (distA != null) {
+          return -1;
+        } else if (distB != null) {
+          return 1;
+        } else {
+          return ratingB.compareTo(ratingA);
+        }
+      });
+
+      setState(() {
+        _recommendedSalons = list.take(10).toList();
+        _isLoadingRecommended = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingRecommended = false;
+      });
     }
   }
 
@@ -366,6 +475,7 @@ class _HomeTabState extends State<HomeTab> {
         _fetchBanners(),
         _fetchCategories(),
         _fetchAlerts(),
+        _fetchRecommendedSalons(),
       ]);
 
   // BUILD
@@ -412,11 +522,16 @@ class _HomeTabState extends State<HomeTab> {
             // 6. Next appointment
             Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildNextAppointmentSection()),
 
-            if (!widget.isGuest) ...[
+            if (!widget.isGuest && _deduplicatedBookAgainList.isNotEmpty) ...[
               const SizedBox(height: 15),
               // 7. Book again
               _buildBookAgainSection(),
             ],
+
+            const SizedBox(height: 15),
+
+            // 8. Recommended for You
+            _buildRecommendedSection(),
 
             SizedBox(height: bottomClearance(context)), // clears the nav pill
           ],
@@ -848,7 +963,7 @@ class _HomeTabState extends State<HomeTab> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         // Category chips
         if (_isLoadingCategories)
           const Padding(
@@ -1334,11 +1449,11 @@ class _HomeTabState extends State<HomeTab> {
   // BOOK AGAIN SECTION
   // ---------------------------------------------------------------------------
   Widget _buildBookAgainSection() {
-    final headingColor =
-        context.colors.textPrimary;
+    final headingColor = context.colors.textPrimary;
     final surfaceColor = context.colors.surface;
     final borderColor = context.colors.border;
     final bodyColor = context.colors.textSecondary;
+    final deduplicated = _deduplicatedBookAgainList;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1379,20 +1494,19 @@ class _HomeTabState extends State<HomeTab> {
         ),
         const SizedBox(height: 12),
 
-        // Book again content
-        if (_past.isNotEmpty && !widget.isGuest)
+        // Book again content (deduplicated: each salon appears only once)
+        if (deduplicated.isNotEmpty && !widget.isGuest)
           SizedBox(
             height: 200,
             child: ListView.builder(
               controller: _bookAgainScrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(20, 5, 20, 15),
-              // Omit itemCount for infinite loop
+              itemCount: deduplicated.length,
               itemBuilder: (context, index) {
-                final realIndex = index % _past.length;
                 return Padding(
                   padding: const EdgeInsets.only(right: 14),
-                  child: _buildBookAgainCard(_past[realIndex]),
+                  child: _buildBookAgainCard(deduplicated[index]),
                 );
               },
             ),
@@ -1429,25 +1543,28 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildBookAgainCard(Map<String, dynamic> booking) {
     final salonName = booking['salon']?['name'] ?? 'Salon';
     final services = (booking['services'] as List?)
-            ?.map((s) => s['name'])
+            ?.map((s) => s['name']?.toString())
+            .where((name) => name != null && name.isNotEmpty)
             .join(', ') ??
         'Services';
-    final salonId = booking['salon_id'];
+    final salonId = (booking['salon_id'] ?? booking['salon']?['id'])?.toString();
+    final distanceKm = booking['salon']?['distance_km'];
+    final isApprox = booking['salon']?['distance_is_approximate'] == true;
 
-    final headingColor =
-        context.colors.textPrimary;
+    final headingColor = context.colors.textPrimary;
     final surfaceColor = context.colors.surface;
     final borderColor = context.colors.border;
     final bodyColor = context.colors.textSecondary;
 
     return GestureDetector(
       onTap: () {
-        if (salonId != null) {
+        if (salonId != null && salonId.isNotEmpty) {
+          AppHaptics.selectionClick();
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => SalonDetailScreen(
-                salonId: salonId.toString(),
+                salonId: salonId,
               ),
             ),
           );
@@ -1458,151 +1575,539 @@ class _HomeTabState extends State<HomeTab> {
         child: Container(
           width: 250,
           decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: borderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.accentColor.withValues(alpha: 0.02),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: borderColor, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.accentColor.withValues(alpha: 0.02),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image Wrapper
-          SizedBox(
-            height: 110,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(22),
-                      topRight: Radius.circular(22)),
-                  child: Image.network(
-                    booking['salon']?['cover_image'] ??
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image Wrapper
+              SizedBox(
+                height: 110,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(22),
+                          topRight: Radius.circular(22)),
+                      child: Image.network(
                         booking['salon']?['cover_photo_url'] ??
-                        'https://via.placeholder.com/250x110',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: context.colors.accentSoft,
-                      child: Icon(Icons.image,
-                          color: AppTheme.accentColor.withValues(alpha: 0.5)),
+                            booking['salon']?['cover_image'] ??
+                            booking['salon']?['logo_image'] ??
+                            '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: context.colors.accentSoft,
+                          child: Icon(Icons.storefront_rounded,
+                              color: AppTheme.accentColor.withValues(alpha: 0.5)),
+                        ),
+                      ),
                     ),
-                  ),
+                    // Real Distance Badge (rendered only when distance data is available)
+                    if (distanceKm != null)
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xB32A2320),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${isApprox ? '~' : ''}$distanceKm km',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                // Distance Badge Placeholder
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xB32A2320), // rgba(42, 35, 32, 0.7)
-                      borderRadius: BorderRadius.circular(6),
+              ),
+              // Info Section
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            salonName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: headingColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Rebook',
+                            style: TextStyle(
+                              color: AppTheme.accentColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      '2.5 km',
+                    const SizedBox(height: 4),
+                    Text(
+                      services.isNotEmpty ? services : 'Services',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: bodyColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RECOMMENDED FOR YOU SECTION
+  // ---------------------------------------------------------------------------
+  Widget _buildRecommendedSection() {
+    final headingColor = context.colors.textPrimary;
+    final bodyColor = context.colors.textSecondary;
+    final currentCity = LocationService.instance.city?.name ?? 'your area';
+
+    if (!_isLoadingRecommended && _recommendedSalons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Recommended for You',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: headingColor,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Top-rated & nearby salons in $currentCity',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: bodyColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  AppHaptics.selectionClick();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SalonListScreen(
+                        title: 'Recommended for You',
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 2),
+                  child: Text(
+                    'See All',
+                    style: GoogleFonts.outfit(
+                      color: AppTheme.accentColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Carousel / Horizontal list of recommended salons
+        if (_isLoadingRecommended)
+          SizedBox(
+            height: 225,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: 3,
+              separatorBuilder: (context, index) => const SizedBox(width: 14),
+              itemBuilder: (context, index) => _buildRecommendedSkeletonCard(),
+            ),
+          )
+        else
+          SizedBox(
+            height: 225,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: _recommendedSalons.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final salon = _recommendedSalons[index] as Map<String, dynamic>;
+                return _buildRecommendedCard(salon);
+              },
             ),
           ),
-          // Info Section
+      ],
+    );
+  }
+
+  Widget _buildRecommendedCard(Map<String, dynamic> salon) {
+    final salonId = salon['id']?.toString() ?? '';
+    final salonName = salon['name']?.toString() ?? 'Salon';
+    final address = salon['address']?.toString() ?? '';
+    final imageUrl = salon['cover_photo_url'] ??
+        salon['cover_image'] ??
+        salon['logo_image'] ??
+        '';
+    final avgRating = (salon['avg_rating'] as num?)?.toDouble() ?? 0.0;
+    final reviewCount = (salon['review_count'] as num?)?.toInt() ??
+        (salon['rating_count'] as num?)?.toInt() ??
+        0;
+    final distanceKm = (salon['distance_km'] as num?)?.toDouble();
+    final isApprox = salon['distance_is_approximate'] == true;
+    final isTopRated = avgRating >= 4.5;
+
+    final headingColor = context.colors.textPrimary;
+    final surfaceColor = context.colors.surface;
+    final borderColor = context.colors.border;
+    final bodyColor = context.colors.textSecondary;
+
+    return GestureDetector(
+      onTap: () {
+        if (salonId.isNotEmpty) {
+          AppHaptics.selectionClick();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SalonDetailScreen(
+                salonId: salonId,
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        width: 240,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.accentColor.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Stack
+            SizedBox(
+              height: 118,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: context.colors.accentSoft.withValues(alpha: 0.4),
+                      child: Center(
+                        child: Icon(
+                          Icons.storefront_rounded,
+                          color: AppTheme.accentColor.withValues(alpha: 0.5),
+                          size: 34,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.25),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Top-rated pill badge
+                  if (isTopRated)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.auto_awesome, size: 10, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              'TOP RATED',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Distance badge (only if real distance available)
+                  if (distanceKm != null)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC18151D),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.near_me_rounded, size: 10, color: Colors.white),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${isApprox ? '~' : ''}${distanceKm.toStringAsFixed(1)} km',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Info Content
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Salon name
+                  Text(
+                    salonName,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: headingColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  // Rating & Review count row
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 16, color: Color(0xFFFFB800)),
+                      const SizedBox(width: 3),
+                      Text(
+                        avgRating > 0 ? avgRating.toStringAsFixed(1) : 'New',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: headingColor,
+                        ),
+                      ),
+                      if (reviewCount > 0) ...[
+                        const SizedBox(width: 3),
+                        Text(
+                          '($reviewCount)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: bodyColor,
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      // "Explore" link with accent arrow
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Explore',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 10,
+                            color: AppTheme.accentColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  // Address row
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 13, color: bodyColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          address.isNotEmpty ? address : 'Local Salon',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: bodyColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecommendedSkeletonCard() {
+    return Container(
+      width: 240,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.colors.border, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 118,
+            width: double.infinity,
+            color: context.colors.accentSoft.withValues(alpha: 0.3),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        salonName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: headingColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Rebook',
-                        style: TextStyle(
-                          color: AppTheme.accentColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  services,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: bodyColor,
+                Container(
+                  height: 14,
+                  width: 140,
+                  decoration: BoxDecoration(
+                    color: context.colors.accentSoft.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 12,
+                  width: 90,
+                  decoration: BoxDecoration(
+                    color: context.colors.accentSoft.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 12,
+                  width: 160,
+                  decoration: BoxDecoration(
+                    color: context.colors.accentSoft.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
-      ),
-      ),
-    );
-  }
-}
-
-class _DashedDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        final boxWidth = constraints.constrainWidth();
-        const dashWidth = 4.0;
-        const dashHeight = 1.0;
-        final dashCount = (boxWidth / (2 * dashWidth)).floor();
-        return Flex(
-          children: List.generate(dashCount, (_) {
-            return SizedBox(
-              width: dashWidth,
-              height: dashHeight,
-              child: DecoratedBox(
-                decoration: BoxDecoration(color: Color(0xFFBDBDBD)),
-              ),
-            );
-          }),
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          direction: Axis.horizontal,
-        );
-      },
     );
   }
 }

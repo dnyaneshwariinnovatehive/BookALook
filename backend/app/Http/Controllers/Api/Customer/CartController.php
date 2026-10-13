@@ -170,6 +170,44 @@ class CartController extends Controller
     }
 
     /**
+     * Update quantity of an item in the cart.
+     */
+    public function updateItemQuantity(Request $request, $cart_item_id)
+    {
+        $validator = Validator::make($request->all(), [
+            'quantity' => 'required|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $item = CartItem::whereHas('cart', function ($q) use ($request) {
+            $q->where('customer_id', $request->user()->id);
+        })->find($cart_item_id);
+
+        if (!$item) {
+            return response()->json(['message' => 'Cart item not found.'], 404);
+        }
+
+        $cart = $item->cart;
+
+        if ($request->quantity <= 0) {
+            $item->delete();
+        } else {
+            $item->quantity = $request->quantity;
+            $item->save();
+        }
+
+        $cart->load(['items.service.template', 'items.combo.services.template', 'items.preferredProvider.user']);
+
+        return response()->json([
+            'message' => 'Cart updated.',
+            'cart' => $this->withSummary($cart),
+        ]);
+    }
+
+    /**
      * Remove an item from the cart.
      */
     public function removeItem(Request $request, $cart_item_id)

@@ -52,6 +52,7 @@ Route::prefix('customer')->group(function () {
         Route::delete('/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'clearGlobalCart']);
         Route::get('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'getCart']);
         Route::post('/salons/{salon_id}/cart/items', [\App\Http\Controllers\Api\Customer\CartController::class, 'addItem']);
+        Route::patch('/cart/items/{item_id}', [\App\Http\Controllers\Api\Customer\CartController::class, 'updateItemQuantity']);
         Route::delete('/cart/items/{item_id}', [\App\Http\Controllers\Api\Customer\CartController::class, 'removeItem']);
         Route::delete('/salons/{salon_id}/cart', [\App\Http\Controllers\Api\Customer\CartController::class, 'clearCart']);
 

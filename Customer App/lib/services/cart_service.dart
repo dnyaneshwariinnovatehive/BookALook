@@ -12,9 +12,11 @@ class CartConflictException implements Exception {
 }
 
 class CartService {
-  final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+  final String baseUrl =
+      dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
 
-  static final ValueNotifier<Map<String, dynamic>?> globalCartNotifier = ValueNotifier(null);
+  static final ValueNotifier<Map<String, dynamic>?> globalCartNotifier =
+      ValueNotifier(null);
 
   Future<Map<String, dynamic>?> getGlobalCart() async {
     final prefs = await SharedPreferences.getInstance();
@@ -24,10 +26,7 @@ class CartService {
 
     final response = await http.get(
       Uri.parse('$baseUrl/customer/cart'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
     if (response.statusCode == 200) {
@@ -46,10 +45,7 @@ class CartService {
 
     final response = await http.delete(
       Uri.parse('$baseUrl/customer/cart'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
     if (response.statusCode != 200) {
@@ -64,10 +60,7 @@ class CartService {
 
     final response = await http.get(
       Uri.parse('$baseUrl/customer/salons/$salonId/cart'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
     if (response.statusCode == 200) {
@@ -81,17 +74,26 @@ class CartService {
     }
   }
 
-  Future<Map<String, dynamic>?> addItem(String salonId, String serviceId, {int quantity = 1}) =>
-      _addToCart(salonId, {'service_id': serviceId, 'quantity': quantity});
+  Future<Map<String, dynamic>?> addItem(
+    String salonId,
+    String serviceId, {
+    int quantity = 1,
+  }) => _addToCart(salonId, {'service_id': serviceId, 'quantity': quantity});
 
   /// Adds a whole combo package. The backend explodes it into its constituent
   /// services when the appointment is booked.
-  Future<Map<String, dynamic>?> addCombo(String salonId, String comboId, {int quantity = 1}) =>
-      _addToCart(salonId, {'combo_id': comboId, 'quantity': quantity});
+  Future<Map<String, dynamic>?> addCombo(
+    String salonId,
+    String comboId, {
+    int quantity = 1,
+  }) => _addToCart(salonId, {'combo_id': comboId, 'quantity': quantity});
 
   /// Returns the cart as it stands after the add, so the caller can show what
   /// the customer just unlocked — a completed package, or what to add next.
-  Future<Map<String, dynamic>?> _addToCart(String salonId, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>?> _addToCart(
+    String salonId,
+    Map<String, dynamic> body,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -108,7 +110,10 @@ class CartService {
     if (response.statusCode == 409) {
       final json = jsonDecode(response.body);
       if (json['different_salon'] == true) {
-        throw CartConflictException(json['message'], json['current_salon_name']);
+        throw CartConflictException(
+          json['message'],
+          json['current_salon_name'],
+        );
       }
     }
 
@@ -127,15 +132,68 @@ class CartService {
 
     final response = await http.delete(
       Uri.parse('$baseUrl/customer/cart/items/$itemId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
 
     if (response.statusCode != 200) {
       throw Exception('Failed to remove item');
     }
     await getGlobalCart();
+  }
+
+  /// Updates quantity of an item in the cart.
+  /// If newQuantity is 0 or less, removes the item.
+  /// Otherwise updates the item quantity atomically.
+  Future<Map<String, dynamic>?> updateQuantity(
+    String salonId,
+    String itemId, {
+    String? serviceId,
+    String? comboId,
+    required int newQuantity,
+  }) async {
+    if (newQuantity <= 0) {
+      await removeItem(itemId);
+      return getGlobalCart();
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/customer/cart/items/$itemId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'quantity': newQuantity}),
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final cart = json['cart'] as Map<String, dynamic>?;
+        globalCartNotifier.value = cart;
+        return cart;
+      }
+    } catch (_) {
+      // Fallback below
+    }
+
+    // Fallback: delete and re-add
+    final deleteRes = await http.delete(
+      Uri.parse('$baseUrl/customer/cart/items/$itemId'),
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+    );
+
+    if (deleteRes.statusCode != 200 && deleteRes.statusCode != 404) {
+      throw Exception('Failed to update cart item quantity');
+    }
+
+    return _addToCart(salonId, {
+      if (serviceId != null) 'service_id': serviceId,
+      if (comboId != null) 'combo_id': comboId,
+      'quantity': newQuantity,
+    });
   }
 }

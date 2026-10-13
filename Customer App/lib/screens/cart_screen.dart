@@ -108,12 +108,25 @@ class _CartScreenState extends State<CartScreen> {
   /// Label on the left, figure on the right — the same row style the booking
   /// dialogs use, so every confirmation in the app reads the same.
   Widget _dialogRow(String label, String value, Color valueColor) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: valueColor)),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: GoogleFonts.outfit(
+          fontSize: 14,
+          color: context.colors.textSecondary,
+        ),
+      ),
+      Text(
+        value,
+        style: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: valueColor,
+        ),
+      ),
+    ],
+  );
 
   /// One tap here hard-deletes the line and re-prices the whole cart, so the
   /// customer is told what is going and what it costs them before it happens.
@@ -132,7 +145,9 @@ class _CartScreenState extends State<CartScreen> {
 
     final summary = _cart?['summary'] as Map<String, dynamic>?;
     final saving = double.tryParse('${summary?['saving'] ?? 0}') ?? 0.0;
-    final hasOffers = ((_cart?['applied_combos'] as List?) ?? const []).isNotEmpty || saving > 0;
+    final hasOffers =
+        ((_cart?['applied_combos'] as List?) ?? const []).isNotEmpty ||
+        saving > 0;
 
     AppHaptics.lightImpact();
 
@@ -142,16 +157,32 @@ class _CartScreenState extends State<CartScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: surface,
         titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        title: Text('Remove this item?',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20, color: textHeading)),
+        title: Text(
+          'Remove this item?',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: textHeading,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: textHeading)),
+            Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: textHeading,
+              ),
+            ),
             SizedBox(height: 12),
-            _dialogRow('Item price', '₹${lineTotal.toStringAsFixed(0)}', textHeading),
+            _dialogRow(
+              'Item price',
+              '₹${lineTotal.toStringAsFixed(0)}',
+              textHeading,
+            ),
             if (isCombo) ...[
               SizedBox(height: 6),
               _dialogRow('Type', 'Package', textBody),
@@ -161,7 +192,10 @@ class _CartScreenState extends State<CartScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: dangerBg, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                  color: dangerBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -202,8 +236,13 @@ class _CartScreenState extends State<CartScreen> {
               AppHaptics.lightImpact();
               Navigator.pop(dialogContext, true);
             },
-            child: Text('Remove item',
-                style: GoogleFonts.outfit(color: danger, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Remove item',
+              style: GoogleFonts.outfit(
+                color: danger,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -218,7 +257,12 @@ class _CartScreenState extends State<CartScreen> {
       _loadCart(); // Reload cart after removing item
     } catch (e) {
       AppHaptics.error();
-      _showError(describeError(e, fallback: 'Could not remove that item. Please try again.'));
+      _showError(
+        describeError(
+          e,
+          fallback: 'Could not remove that item. Please try again.',
+        ),
+      );
     }
   }
 
@@ -227,33 +271,56 @@ class _CartScreenState extends State<CartScreen> {
     final bgColor = context.colors.surfaceMuted;
     final textHeading = context.colors.textPrimary;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      },
+      child: Scaffold(
         backgroundColor: bgColor,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          _cart != null && _cart!['salon'] != null ? 'Cart - ${_cart!['salon']['name']}' : 'Your Cart',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: textHeading),
-        ),
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: context.colors.accentSoft,
-              shape: BoxShape.circle,
+        appBar: AppBar(
+          backgroundColor: bgColor,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            _cart != null && _cart!['salon'] != null
+                ? 'Cart - ${_cart!['salon']['name']}'
+                : 'Your Cart',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: textHeading,
             ),
-            child: IconButton(
-              tooltip: 'Back',
-              icon: Icon(Icons.arrow_back, color: textHeading, size: 20),
-              onPressed: () => Navigator.pop(context),
+          ),
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.colors.accentSoft,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                tooltip: 'Back',
+                icon: Icon(Icons.arrow_back, color: textHeading, size: 20),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context, rootNavigator: true).maybePop();
+                  }
+                },
+              ),
             ),
           ),
         ),
+        body: _buildBody(),
+        bottomNavigationBar: _buildCheckoutBar(),
       ),
-      body: _buildBody(),
-      bottomNavigationBar: _buildCheckoutBar(),
     );
   }
 
@@ -284,7 +351,13 @@ class _CartScreenState extends State<CartScreen> {
         title: 'Your cart is empty',
         message: 'Add services from a salon to book them together.',
         actionLabel: 'Browse salons',
-        onAction: () => Navigator.pop(context),
+        onAction: () {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context, rootNavigator: true).maybePop();
+          }
+        },
       );
     }
 
@@ -320,14 +393,16 @@ class _CartScreenState extends State<CartScreen> {
 
           if (offers.isNotEmpty) ...[
             SizedBox(height: 20),
-            ...offers.map((offer) => Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: ComboOfferCard(
-                    offer: offer as Map<String, dynamic>,
-                    onAddService: _isAdding ? null : _addService,
-                    onCompletePackage: _isAdding ? null : _addAll,
-                  ),
-                )),
+            ...offers.map(
+              (offer) => Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: ComboOfferCard(
+                  offer: offer as Map<String, dynamic>,
+                  onAddService: _isAdding ? null : _addService,
+                  onCompletePackage: _isAdding ? null : _addAll,
+                ),
+              ),
+            ),
           ],
 
           if (suggestions.isNotEmpty) ...[
@@ -344,94 +419,283 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Future<void> _incrementItem(Map<String, dynamic> item) async {
+    final salonId = _cart?['salon_id']?.toString();
+    if (salonId == null || _isAdding) return;
+
+    final serviceId = item['service_id']?.toString();
+    final comboId = item['combo_id']?.toString();
+
+    setState(() => _isAdding = true);
+    try {
+      AppHaptics.lightImpact();
+      if (serviceId != null) {
+        await _cartService.addItem(salonId, serviceId, quantity: 1);
+      } else if (comboId != null) {
+        await _cartService.addCombo(salonId, comboId, quantity: 1);
+      }
+      await _loadCart();
+      if (mounted) setState(() => _actionError = null);
+    } catch (e) {
+      AppHaptics.error();
+      _showError(describeError(e, fallback: 'Could not update item quantity.'));
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
+
+  Future<void> _decrementItem(Map<String, dynamic> item) async {
+    final salonId = _cart?['salon_id']?.toString();
+    if (salonId == null || _isAdding) return;
+
+    final qty = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
+    final itemId = item['id'].toString();
+    final serviceId = item['service_id']?.toString() ?? item['service']?['id']?.toString();
+    final comboId = item['combo_id']?.toString() ?? item['combo']?['id']?.toString();
+    final isCombo = comboId != null;
+    final title = isCombo
+        ? (item['combo']?['name'] ?? 'Package')
+        : (item['service']?['template']?['name'] ?? 'Service');
+
+    if (qty <= 1) {
+      await _removeItem(
+        itemId,
+        title: title,
+        lineTotal: _lineTotal(item),
+        isCombo: isCombo,
+      );
+      return;
+    }
+
+    setState(() => _isAdding = true);
+    try {
+      AppHaptics.lightImpact();
+      await _cartService.updateQuantity(
+        salonId,
+        itemId,
+        serviceId: serviceId,
+        comboId: comboId,
+        newQuantity: qty - 1,
+      );
+      await _loadCart();
+      if (mounted) setState(() => _actionError = null);
+    } catch (e) {
+      AppHaptics.error();
+      _showError(describeError(e, fallback: 'Could not update item quantity.'));
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
+
   Widget _buildItemTile(dynamic raw) {
     final item = raw as Map<String, dynamic>;
-    {
-      {
-        final service = item['service'];
-        final combo = item['combo'];
-        final isCombo = combo != null;
-        final title = isCombo
-            ? (combo['name'] ?? 'Package')
-            : (service != null ? (service['template']?['name'] ?? 'Unknown Service') : 'Unknown Service');
-        final subtitle = isCombo
-            ? '${(combo['services'] as List?)?.length ?? 0} services in this package'
-            : null;
+    final service = item['service'];
+    final combo = item['combo'];
+    final isCombo = combo != null;
+    final title = isCombo
+        ? (combo['name'] ?? 'Package')
+        : (service != null
+              ? (service['template']?['name'] ?? 'Unknown Service')
+              : 'Unknown Service');
+    final subtitle = isCombo
+        ? '${(combo['services'] as List?)?.length ?? 0} services in this package'
+        : null;
+    final quantity = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
+    final singlePrice = _singleItemPrice(item);
+    final totalPrice = _lineTotal(item);
 
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Container(
-          margin: EdgeInsets.only(bottom: 14),
-          padding: EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: context.colors.border, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.03),
-                blurRadius: 16,
-                offset: Offset(0, 4),
-              ),
-            ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.colors.border, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 64,
-                height: 64,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(isCombo ? Icons.card_giftcard : Icons.spa_outlined, color: AppTheme.accentColor, size: 28),
+                child: Icon(
+                  isCombo ? Icons.card_giftcard : Icons.spa_outlined,
+                  color: AppTheme.accentColor,
+                  size: 26,
+                ),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.textPrimary,
+                      ),
                     ),
                     if (subtitle != null) ...[
-                      SizedBox(height: 4),
-                      Text(subtitle, style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
                     ],
-                    SizedBox(height: 8),
-                    Text(
-                      '₹${_lineTotal(item).toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
-                    ),
+                    const SizedBox(height: 4),
+                    if (quantity > 1)
+                      Text(
+                        '₹${singlePrice.toStringAsFixed(0)} each',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
                   ],
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline, color: context.colors.danger),
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: context.colors.danger,
+                  size: 22,
+                ),
                 tooltip: 'Remove from cart',
                 onPressed: () => _removeItem(
                   item['id'].toString(),
                   title: title,
-                  lineTotal: _lineTotal(item),
+                  lineTotal: totalPrice,
                   isCombo: isCombo,
                 ),
-              )
+              ),
             ],
           ),
-        );
+          const SizedBox(height: 12),
+          Divider(color: context.colors.border, height: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '₹${totalPrice.toStringAsFixed(0)}',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.accentColor,
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: context.colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.colors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _isAdding ? null : () => _decrementItem(item),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Icon(
+                          quantity <= 1 ? Icons.delete_outline : Icons.remove,
+                          size: 18,
+                          color: quantity <= 1
+                              ? context.colors.danger
+                              : context.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '$quantity',
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _isAdding ? null : () => _incrementItem(item),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Icon(
+                          Icons.add,
+                          size: 18,
+                          color: AppTheme.accentColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _singleItemPrice(dynamic item) {
+    if (item['combo'] != null) {
+      double comboPrice = 0.0;
+      for (final service in (item['combo']['services'] as List? ?? [])) {
+        final special =
+            service['pivot']?['combo_special_price'] ?? service['price'];
+        comboPrice += double.tryParse('$special') ?? 0.0;
       }
+      return comboPrice;
     }
+
+    if (item['service'] != null) {
+      return double.tryParse('${item['service']['price']}') ?? 0.0;
+    }
+
+    return 0.0;
   }
 
   /// Price of one cart line. A combo is priced from its own special prices,
   /// not from the services' list prices.
   double _lineTotal(dynamic item) {
-    final quantity = (item['quantity'] ?? 1) as int;
+    final quantity = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
 
     if (item['combo'] != null) {
       double comboPrice = 0.0;
       for (final service in (item['combo']['services'] as List? ?? [])) {
-        final special = service['pivot']?['combo_special_price'] ?? service['price'];
+        final special =
+            service['pivot']?['combo_special_price'] ?? service['price'];
         comboPrice += double.tryParse('$special') ?? 0.0;
       }
       return comboPrice * quantity;
@@ -477,10 +741,12 @@ class _CartScreenState extends State<CartScreen> {
         boxShadow: [
           if (!context.colors.prefersOutline)
             BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.06),
               offset: Offset(0, -6),
               blurRadius: 24,
-            )
+            ),
         ],
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
@@ -492,35 +758,46 @@ class _CartScreenState extends State<CartScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: textBody)),
+                Text(
+                  'Total',
+                  style: GoogleFonts.outfit(fontSize: 14, color: textBody),
+                ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('₹${total.toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: textHeading)),
+                    Text(
+                      '₹${total.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: textHeading,
+                      ),
+                    ),
                     if (saving > 0) ...[
                       SizedBox(width: 8),
                       Padding(
                         padding: EdgeInsets.only(bottom: 4),
-                        child: Text('₹${listTotal.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 15,
-                              color: textLight,
-                              decoration: TextDecoration.lineThrough,
-                            )),
+                        child: Text(
+                          '₹${listTotal.toStringAsFixed(0)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            color: textLight,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
                       ),
                     ],
                   ],
                 ),
                 if (saving > 0)
-                  Text('You save ₹${saving.toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.success)),
+                  Text(
+                    'You save ₹${saving.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.success,
+                    ),
+                  ),
               ],
             ),
             ElevatedButton(
@@ -528,19 +805,28 @@ class _CartScreenState extends State<CartScreen> {
                 AppHaptics.lightImpact();
                 final token = await AuthService.getToken();
                 if (token == null || token.isEmpty) {
-                  final loggedIn = await Navigator.of(context, rootNavigator: true).push<bool>(
-                    MaterialPageRoute(builder: (context) => PhoneScreen(isModal: true))
-                  );
+                  final loggedIn =
+                      await Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).push<bool>(
+                        MaterialPageRoute(
+                          builder: (context) => PhoneScreen(isModal: true),
+                        ),
+                      );
                   if (loggedIn != true) return;
                 }
 
                 if (!mounted) return;
-                final booked = await Navigator.push<bool>(context, MaterialPageRoute(
-                  builder: (context) => CheckoutScreen(salonId: _cart!['salon_id'].toString())
-                ));
+                final booked = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        CheckoutScreen(salonId: _cart!['salon_id'].toString()),
+                  ),
+                );
                 if (booked == true) {
-                  Navigator.of(context, rootNavigator: true)
-                      .pushAndRemoveUntil(
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (context) => const MainScreen(initialIndex: 2),
                     ),
@@ -554,11 +840,19 @@ class _CartScreenState extends State<CartScreen> {
                 backgroundColor: AppTheme.accentColor,
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 0,
               ),
-              child: Text('Checkout', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-            )
+              child: Text(
+                'Checkout',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
       ),

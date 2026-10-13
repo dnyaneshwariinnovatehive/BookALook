@@ -167,7 +167,13 @@ class _AnimatedSearchFieldState extends State<AnimatedSearchField>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Search "', style: hintStyle),
-              Text(_currentHint, style: hintStyle),
+              Flexible(
+                child: Text(
+                  _currentHint,
+                  style: hintStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               AnimatedBuilder(
                 animation: _cursorController,
                 builder: (context, child) {

@@ -126,6 +126,12 @@ Future<http_real.Response> put(Uri url, {Map<String, String>? headers, Object? b
   return response;
 }
 
+Future<http_real.Response> patch(Uri url, {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
+  final response = await _client.patch(url, headers: headers, body: body, encoding: encoding);
+  await _handle401(response);
+  return response;
+}
+
 Future<http_real.Response> delete(Uri url, {Map<String, String>? headers, Object? body, Encoding? encoding}) async {
   final response = await _client.delete(url, headers: headers, body: body, encoding: encoding);
   await _handle401(response);

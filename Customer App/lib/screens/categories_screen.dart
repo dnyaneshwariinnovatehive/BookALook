@@ -189,48 +189,70 @@ class _CategoryCard extends StatelessWidget {
                 color: isDark ? foreground.withValues(alpha: 0.16) : background,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: category.name.toLowerCase().contains('combo')
-                  ? Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Image.asset(
-                        'assets/images/combo_icon.jpg',
-                        fit: BoxFit.contain,
+              child: category.name.toLowerCase().contains('combo') && !hasIcon
+                  ? Center(
+                      child: FractionallySizedBox(
+                        widthFactor: 0.55,
+                        heightFactor: 0.55,
+                        child: Image.asset(
+                          'assets/images/combo_icon.jpg',
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     )
                   : (hasIcon
-                      ? Image.network(
-                          category.iconUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stack) => Icon(
-                            CategoryGrid.fallbackIcon(category.name),
-                            color: foreground,
-                            size: 26,
+                      ? Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.55,
+                            heightFactor: 0.55,
+                            child: Image.network(
+                              category.iconUrl!,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                              errorBuilder: (context, error, stack) => FittedBox(
+                                fit: BoxFit.contain,
+                                child: Icon(
+                                  CategoryGrid.fallbackIcon(category.name),
+                                  color: foreground,
+                                ),
+                              ),
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: Icon(
+                                    CategoryGrid.fallbackIcon(category.name),
+                                    color: foreground.withValues(alpha: 0.35),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return Icon(
-                              CategoryGrid.fallbackIcon(category.name),
-                              color: foreground.withValues(alpha: 0.35),
-                              size: 26,
-                            );
-                          },
                         )
-                      : Icon(
-                          CategoryGrid.fallbackIcon(category.name),
-                          color: foreground,
-                          size: 26,
+                      : Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.55,
+                            heightFactor: 0.55,
+                            child: FittedBox(
+                              fit: BoxFit.contain,
+                              child: Icon(
+                                CategoryGrid.fallbackIcon(category.name),
+                                color: foreground,
+                              ),
+                            ),
+                          ),
                         )),
             ),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 6),
           Text(
             category.name,
-            maxLines: 2,
+            maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              height: 1.25,
+              height: 1.2,
               fontWeight: FontWeight.w600,
               color: context.colors.textPrimary,
             ),

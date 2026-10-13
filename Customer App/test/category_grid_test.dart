@@ -8,12 +8,12 @@ void main() {
   const viewportWidth = 390.0;
 
   List<ServiceCategory> categories() => [
-        ServiceCategory(id: '1', name: 'Hair'),
-        ServiceCategory(id: '2', name: 'Skin'),
-        ServiceCategory(id: '3', name: 'Nails'),
-        ServiceCategory(id: '4', name: 'Spa'),
-        ServiceCategory(id: '5', name: 'Grooming'),
-      ];
+    ServiceCategory(id: '1', name: 'Hair'),
+    ServiceCategory(id: '2', name: 'Skin'),
+    ServiceCategory(id: '3', name: 'Nails'),
+    ServiceCategory(id: '4', name: 'Spa'),
+    ServiceCategory(id: '5', name: 'Grooming'),
+  ];
 
   Widget harness(
     List<ServiceCategory> cats, {
@@ -47,10 +47,14 @@ void main() {
       for (var i = 0; i < boxes.length; i++)
         (
           tester
-              .widget<Text>(find.descendant(
-                of: find.byType(CategoryGrid).at(0),
-                matching: find.byType(Text),
-              ).at(i))
+              .widget<Text>(
+                find
+                    .descendant(
+                      of: find.byType(CategoryGrid).at(0),
+                      matching: find.byType(Text),
+                    )
+                    .at(i),
+              )
               .data!,
           boxes[i].localToGlobal(Offset.zero).dx - origin,
         ),
@@ -58,10 +62,12 @@ void main() {
   }
 
   List<String> labels(WidgetTester tester) => tester
-      .widgetList<Text>(find.descendant(
-        of: find.byType(CategoryGrid),
-        matching: find.byType(Text),
-      ))
+      .widgetList<Text>(
+        find.descendant(
+          of: find.byType(CategoryGrid),
+          matching: find.byType(Text),
+        ),
+      )
       .map((t) => t.data!)
       .toList();
 
@@ -71,8 +77,9 @@ void main() {
     expect(labels(tester), ['Combo', 'Hair', 'Grooming', 'View More']);
   });
 
-  testWidgets('the four cards fill the row edge to edge and never move',
-      (tester) async {
+  testWidgets('the four cards fill the row edge to edge and never move', (
+    tester,
+  ) async {
     await tester.pumpWidget(harness(categories()));
 
     final laidOut = cards(tester);
@@ -82,17 +89,16 @@ void main() {
     // Half a second is several whole marquee loops in the old implementation.
     // Nothing may have moved.
     await tester.pump(const Duration(milliseconds: 500));
-    expect(cards(tester).map((c) => c.$2).toList(),
-        [0, 100.5, 201, 301.5]);
+    expect(cards(tester).map((c) => c.$2).toList(), [0, 100.5, 201, 301.5]);
   });
 
-  testWidgets('Combo carries the sentinel id rather than a category uuid',
-      (tester) async {
+  testWidgets('Combo carries the sentinel id rather than a category uuid', (
+    tester,
+  ) async {
     final tapped = <String>[];
-    await tester.pumpWidget(harness(
-      categories(),
-      onTap: (c) => tapped.add(c.id),
-    ));
+    await tester.pumpWidget(
+      harness(categories(), onTap: (c) => tapped.add(c.id)),
+    );
 
     await tester.tap(find.text('Combo'));
     await tester.pump();
@@ -100,12 +106,13 @@ void main() {
     expect(tapped, [CategoryGrid.comboSentinelId]);
   });
 
-  testWidgets('Hair and Grooming resolve to their catalogue ids', (tester) async {
+  testWidgets('Hair and Grooming resolve to their catalogue ids', (
+    tester,
+  ) async {
     final tapped = <String>[];
-    await tester.pumpWidget(harness(
-      categories(),
-      onTap: (c) => tapped.add('${c.id}:${c.name}'),
-    ));
+    await tester.pumpWidget(
+      harness(categories(), onTap: (c) => tapped.add('${c.id}:${c.name}')),
+    );
 
     await tester.tap(find.text('Hair'));
     await tester.pump();
@@ -115,16 +122,16 @@ void main() {
     expect(tapped, ['1:Hair', '5:Grooming']);
   });
 
-  testWidgets('a renamed category still lands on the right card',
-      (tester) async {
+  testWidgets('a renamed category still lands on the right card', (
+    tester,
+  ) async {
     final tapped = <String>[];
-    await tester.pumpWidget(harness(
-      [
+    await tester.pumpWidget(
+      harness([
         ServiceCategory(id: '7', name: 'Hair Services'),
         ServiceCategory(id: '8', name: 'Beard & Moustache'),
-      ],
-      onTap: (c) => tapped.add(c.id),
-    ));
+      ], onTap: (c) => tapped.add(c.id)),
+    );
 
     expect(labels(tester), ['Combo', 'Hair', 'Grooming', 'View More']);
 
@@ -136,17 +143,20 @@ void main() {
     expect(tapped, ['7', '8']);
   });
 
-  testWidgets('View More opens the category list, not a salon filter',
-      (tester) async {
+  testWidgets('View More opens the category list, not a salon filter', (
+    tester,
+  ) async {
     var viewMoreTaps = 0;
     final tapped = <String>[];
 
-    await tester.pumpWidget(harness(
-      // No Hair row at all, so the fixed card has no category behind it.
-      [ServiceCategory(id: '2', name: 'Skin')],
-      onTap: (c) => tapped.add(c.id),
-      onViewMore: () => viewMoreTaps++,
-    ));
+    await tester.pumpWidget(
+      harness(
+        // No Hair row at all, so the fixed card has no category behind it.
+        [ServiceCategory(id: '2', name: 'Skin')],
+        onTap: (c) => tapped.add(c.id),
+        onViewMore: () => viewMoreTaps++,
+      ),
+    );
 
     await tester.tap(find.text('View More'));
     await tester.pump();
@@ -160,21 +170,100 @@ void main() {
     expect(tapped, isEmpty);
   });
 
-  testWidgets('shows a label-less fallback icon when a category has no image',
-      (tester) async {
-    await tester.pumpWidget(harness([
-      ServiceCategory(id: '9', name: 'Bridal Makeup'),
-    ]));
+  testWidgets('shows a label-less fallback icon when a category has no image', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      harness([ServiceCategory(id: '9', name: 'Bridal Makeup')]),
+    );
 
     expect(find.byType(CategoryGrid), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders nothing for an empty list instead of throwing',
-      (tester) async {
+  testWidgets('renders nothing for an empty list instead of throwing', (
+    tester,
+  ) async {
     await tester.pumpWidget(harness([]));
 
     expect(tester.takeException(), isNull);
     expect(find.byType(CategoryGrid), findsOneWidget);
   });
+
+  testWidgets('cards are compact, square, and reduced by ~20-25%', (
+    tester,
+  ) async {
+    // Standard phone screen with 20dp margin on each side (viewport = 350)
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 350,
+            child: CategoryGrid(
+              categories: categories(),
+              onTap: (_) {},
+              onViewMore: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final cardBoxes = tester
+        .renderObjectList<RenderBox>(find.byType(AspectRatio))
+        .toList();
+
+    expect(cardBoxes.length, 4);
+
+    // Previously slot was 78.5 and card filled 78.5 x 78.5.
+    // Now card size is reduced by ~23% to ~60.4 x 60.4.
+    for (final box in cardBoxes) {
+      expect(box.size.width, closeTo(60.4, 1.0));
+      expect(box.size.height, closeTo(box.size.width, 0.01)); // square
+    }
+
+    // Section height is compact (~82dp instead of 102.5dp)
+    final gridBox = tester.renderObject<RenderBox>(find.byType(CategoryGrid));
+    expect(gridBox.size.height, lessThan(85.0));
+  });
+
+  testWidgets(
+    'all four cards stay in a single row without overflow on narrow screens',
+    (tester) async {
+      // Narrow 320dp viewport
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: CategoryGrid(
+                categories: categories(),
+                onTap: (_) {},
+                onViewMore: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+
+      final cardBoxes = tester
+          .renderObjectList<RenderBox>(find.byType(AspectRatio))
+          .toList();
+      expect(cardBoxes.length, 4);
+
+      // Equal compact size on narrow screen (~55dp)
+      for (final box in cardBoxes) {
+        expect(box.size.width, closeTo(54.7, 1.0));
+        expect(box.size.height, closeTo(box.size.width, 0.01));
+      }
+
+      // All labels visible without truncation/overflow
+      expect(find.text('Combo'), findsOneWidget);
+      expect(find.text('Hair'), findsOneWidget);
+      expect(find.text('Grooming'), findsOneWidget);
+      expect(find.text('View More'), findsOneWidget);
+    },
+  );
 }

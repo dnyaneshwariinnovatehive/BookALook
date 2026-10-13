@@ -56,9 +56,6 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
       await _cartService.addCombo(salonId, comboId);
       if (!mounted) return;
       AppHaptics.lightImpact();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('${combo['name'] ?? 'Combo'} added to cart')));
     } on CartConflictException catch (e) {
       if (!mounted) return;
       AppHaptics.error();
@@ -68,7 +65,11 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
       AppHaptics.error();
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(describeError(e, fallback: 'Could not add to cart.'))));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(describeError(e, fallback: 'Could not add to cart.')),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _adding.remove(comboId));
     }
@@ -79,7 +80,10 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Replace cart items?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Replace cart items?',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
         content: Text(
           'Your cart contains items from ${e.otherSalonName}. '
           'Do you want to discard that selection and add items from this salon?',
@@ -91,7 +95,10 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
               AppHaptics.lightImpact();
               Navigator.pop(ctx);
             },
-            child: Text('Cancel', style: GoogleFonts.outfit(color: context.colors.textSecondary)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -101,14 +108,21 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                 await _cartService.clearGlobalCart();
               } catch (_) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not clear cart.')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not clear cart.')),
+                );
                 return;
               }
               if (!mounted) return;
               await _addCombo(combo);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-            child: Text('Replace', style: GoogleFonts.outfit(color: context.colors.onAccent)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+            ),
+            child: Text(
+              'Replace',
+              style: GoogleFonts.outfit(color: context.colors.onAccent),
+            ),
           ),
         ],
       ),
@@ -118,7 +132,9 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
   @override
   Widget build(BuildContext context) {
     final surfaceColor = context.colors.surface;
-    final borderColor = context.colors.listBorder;
+    final cardBorderColor = Theme.of(context).brightness == Brightness.dark
+        ? context.colors.border
+        : const Color(0xFFE2DCF0);
     final headingColor = context.colors.textPrimary;
     final bodyColor = context.colors.textSecondary;
     final isServiceable = widget.salon['is_serviceable'] != false;
@@ -127,7 +143,9 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
     final distance = widget.salon['distance_km'];
     final id = widget.salon['id'].toString();
 
-    final combos = (widget.salon['combos'] as List<dynamic>? ?? const []).whereType<Map<String, dynamic>>().toList();
+    final combos = (widget.salon['combos'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -150,10 +168,12 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
           decoration: BoxDecoration(
             color: surfaceColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor, width: 1.5),
+            border: Border.all(color: cardBorderColor, width: 1.0),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.04),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -175,9 +195,13 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                           Image.network(
                             widget.salon['cover_photo_url'] ?? '',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (_, _, _) => Container(
                               color: context.colors.imagePlaceholder,
-                              child: const Icon(Icons.storefront, color: AppTheme.accentColor, size: 32),
+                              child: const Icon(
+                                Icons.storefront,
+                                color: AppTheme.accentColor,
+                                size: 32,
+                              ),
                             ),
                           ),
                           if (widget.showFavourite)
@@ -186,23 +210,32 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                               right: 6 - _favouriteSlop,
                               child: Semantics(
                                 button: true,
-                                label: widget.isFavourited ? 'Remove from favourites' : 'Add to favourites',
+                                label: widget.isFavourited
+                                    ? 'Remove from favourites'
+                                    : 'Add to favourites',
                                 excludeSemantics: true,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
                                   onTap: widget.onToggleFavourite,
                                   child: Padding(
-                                    padding: const EdgeInsets.all(_favouriteSlop),
+                                    padding: const EdgeInsets.all(
+                                      _favouriteSlop,
+                                    ),
                                     child: Container(
                                       padding: const EdgeInsets.all(5),
                                       decoration: BoxDecoration(
-                                        color: context.colors.surface.withValues(alpha: 0.85),
+                                        color: context.colors.surface
+                                            .withValues(alpha: 0.85),
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        widget.isFavourited ? Icons.favorite : Icons.favorite_border,
+                                        widget.isFavourited
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
                                         size: 16,
-                                        color: widget.isFavourited ? context.colors.danger : context.colors.iconIdle,
+                                        color: widget.isFavourited
+                                            ? context.colors.danger
+                                            : context.colors.iconIdle,
                                       ),
                                     ),
                                   ),
@@ -226,32 +259,58 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                                     widget.salon['name'] ?? 'Unnamed Salon',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: headingColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: headingColor,
+                                    ),
                                   ),
                                 ),
                                 if (count > 0) ...[
-                                  const Icon(Icons.star, size: 15, color: AppTheme.starRating),
+                                  const Icon(
+                                    Icons.star,
+                                    size: 15,
+                                    color: AppTheme.starRating,
+                                  ),
                                   const SizedBox(width: 3),
                                   Text(
                                     avg.toStringAsFixed(1),
-                                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: headingColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: headingColor,
+                                    ),
                                   ),
                                 ] else
-                                  Text('New', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: bodyColor)),
+                                  Text(
+                                    'New',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: bodyColor,
+                                    ),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.location_on_outlined, size: 15, color: AppTheme.accentColor),
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 15,
+                                  color: AppTheme.accentColor,
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     widget.salon['address'] ?? 'No address',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.outfit(fontSize: 13, color: bodyColor),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      color: bodyColor,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -259,33 +318,53 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                             const SizedBox(height: 8),
                             if (!isServiceable)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: context.colors.warningBg,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  widget.salon['unavailable_reason'] ?? 'Not taking bookings',
+                                  widget.salon['unavailable_reason'] ??
+                                      'Not taking bookings',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: context.colors.warning),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.colors.warning,
+                                  ),
                                 ),
                               )
                             else
                               Row(
                                 children: [
-                                  const Icon(Icons.check_circle, size: 13, color: AppTheme.statusAvailable),
+                                  const Icon(
+                                    Icons.check_circle,
+                                    size: 13,
+                                    color: AppTheme.statusAvailable,
+                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       'Bookable online',
-                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: bodyColor),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: bodyColor,
+                                      ),
                                     ),
                                   ),
                                   if (distance != null)
                                     Text(
                                       '${widget.salon['distance_is_approximate'] == true ? '~' : ''}$distance km',
-                                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.accentColor),
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.accentColor,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -296,8 +375,7 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                   ],
                 ),
               ),
-              if (combos.isNotEmpty)
-                _buildComboList(combos, isServiceable),
+              if (combos.isNotEmpty) _buildComboList(combos, isServiceable),
             ],
           ),
         ),
@@ -305,8 +383,13 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
     );
   }
 
-  Widget _buildComboList(List<Map<String, dynamic>> combos, bool isServiceable) {
-    final visibleCount = _expanded ? combos.length : (combos.length > 2 ? 2 : combos.length);
+  Widget _buildComboList(
+    List<Map<String, dynamic>> combos,
+    bool isServiceable,
+  ) {
+    final visibleCount = _expanded
+        ? combos.length
+        : (combos.length > 2 ? 2 : combos.length);
     final visibleCombos = combos.take(visibleCount).toList();
 
     return Container(
@@ -341,7 +424,9 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _expanded ? 'Show less' : '+ ${combos.length - 2} more combos',
+                      _expanded
+                          ? 'Show less'
+                          : '+ ${combos.length - 2} more combos',
                       style: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -350,7 +435,9 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      _expanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
                       size: 16,
                       color: AppTheme.accentColor,
                     ),
@@ -358,7 +445,7 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                 ),
               ),
             ),
-          ]
+          ],
         ],
       ),
     );
@@ -366,8 +453,13 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
 
   Widget _buildComboItem(Map<String, dynamic> combo, bool isServiceable) {
     final isAdding = _adding.contains(combo['id'].toString());
-    final services = (combo['services'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
-    final serviceNames = services.map((s) => s['name'] as String?).whereType<String>().join(' + ');
+    final services = (combo['services'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final serviceNames = services
+        .map((s) => s['name'] as String?)
+        .whereType<String>()
+        .join(' + ');
 
     final price = (combo['price'] as num?)?.toDouble() ?? 0;
     final originalPrice = (combo['original_price'] as num?)?.toDouble() ?? 0;
@@ -382,10 +474,8 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ComboDetailScreen(
-              salon: widget.salon,
-              combo: combo,
-            ),
+            builder: (_) =>
+                ComboDetailScreen(salon: widget.salon, combo: combo),
           ),
         );
       },
@@ -399,84 +489,112 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  combo['name'] ?? 'Combo',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  serviceNames.isEmpty ? 'Multiple services' : serviceNames,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      '₹${price.toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.accentColor),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    combo['name'] ?? 'Combo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: context.colors.textPrimary,
                     ),
-                    if (originalPrice > price) ...[
-                      const SizedBox(width: 6),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    serviceNames.isEmpty ? 'Multiple services' : serviceNames,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                       Text(
-                        '₹${originalPrice.toStringAsFixed(0)}',
+                        '₹${price.toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textSecondary,
-                          decoration: TextDecoration.lineThrough,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.accentColor,
                         ),
                       ),
-                    ],
-                    if (discountPercent > 0) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
+                      if (originalPrice > price) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '₹${originalPrice.toStringAsFixed(0)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.textSecondary,
+                            decoration: TextDecoration.lineThrough,
+                          ),
                         ),
-                        child: Text(
-                          '$discountPercent% OFF',
-                          style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
+                      ],
+                      if (discountPercent > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$discountPercent% OFF',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: isServiceable && !isAdding ? () => _addCombo(combo) : null,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: isServiceable ? AppTheme.accentColor : context.colors.iconIdle,
-                borderRadius: BorderRadius.circular(10),
+                  ),
+                ],
               ),
-              alignment: Alignment.center,
-              child: isAdding
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.onAccent),
-                    )
-                  : Icon(Icons.arrow_forward, color: context.colors.onAccent, size: 18),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: isServiceable && !isAdding ? () => _addCombo(combo) : null,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isServiceable
+                      ? AppTheme.accentColor
+                      : context.colors.iconIdle,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: isAdding
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.colors.onAccent,
+                        ),
+                      )
+                    : Icon(
+                        Icons.arrow_forward,
+                        color: context.colors.onAccent,
+                        size: 18,
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }

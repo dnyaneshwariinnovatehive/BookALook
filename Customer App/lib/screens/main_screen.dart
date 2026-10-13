@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/review_service.dart';
 import '../services/explore_request_bus.dart';
 import '../services/cart_service.dart';
@@ -14,7 +15,6 @@ import 'tabs/bookings_tab.dart';
 import '../utils/app_haptics.dart';
 import 'tabs/profile_tab.dart';
 import 'my_bookings_screen.dart';
-import '../theme/app_colors.dart';
 import '../services/deep_link_service.dart';
 import '../services/location_service.dart';
 import '../widgets/city_picker_sheet.dart';
@@ -39,6 +39,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final List<int> _tabHistory = [];
 
   late final List<Widget> _tabs;
 
@@ -70,11 +71,16 @@ class _MainScreenState extends State<MainScreen> {
 
   String _getLoadingMessage(int index) {
     switch (index) {
-      case 0: return "Finding salons near you";
-      case 1: return "Discovering beauty services";
-      case 2: return "Loading your appointments";
-      case 3: return "Loading your profile";
-      default: return "";
+      case 0:
+        return "Finding salons near you";
+      case 1:
+        return "Discovering beauty services";
+      case 2:
+        return "Loading your appointments";
+      case 3:
+        return "Loading your profile";
+      default:
+        return "";
     }
   }
 
@@ -119,8 +125,8 @@ class _MainScreenState extends State<MainScreen> {
     final hasPerm = await LocationService.instance.hasPermission();
     if (hasPerm) return;
 
-    final hasPrompted =
-        await LocationService.instance.hasPromptedInitialLocation();
+    final hasPrompted = await LocationService.instance
+        .hasPromptedInitialLocation();
     if (!hasPrompted) {
       await LocationService.instance.markInitialLocationPrompted();
       if (!mounted) return;
@@ -167,6 +173,9 @@ class _MainScreenState extends State<MainScreen> {
     );
 
     if (_currentIndex != 1) {
+      if (_tabHistory.isEmpty || _tabHistory.last != _currentIndex) {
+        _tabHistory.add(_currentIndex);
+      }
       setState(() => _currentIndex = 1);
     }
   }
@@ -188,14 +197,15 @@ class _MainScreenState extends State<MainScreen> {
     Future<void> realOperation = Future.value();
 
     if (index == 2 && !widget.isGuest) {
-      realOperation = _bookingsKey.currentState?.loadBookings() ?? Future.value();
+      realOperation =
+          _bookingsKey.currentState?.loadBookings() ?? Future.value();
     } else if (index == 1) {
       _exploreKey.currentState?.clearCategoryFilter();
     }
 
     bool isFast = false;
     final fastTimer = Future.delayed(const Duration(milliseconds: 150));
-    
+
     await Future.any([
       realOperation.then((_) => isFast = true).catchError((_) => isFast = true),
       fastTimer,
@@ -205,14 +215,26 @@ class _MainScreenState extends State<MainScreen> {
 
     if (isFast) {
       // Network is fast, switch instantly without overlay
+      final target = _targetTabIndex ?? index;
+      if (target != _currentIndex) {
+        if (_tabHistory.isEmpty || _tabHistory.last != _currentIndex) {
+          _tabHistory.add(_currentIndex);
+        }
+      }
       setState(() {
-        _currentIndex = _targetTabIndex ?? index;
+        _currentIndex = target;
         _targetTabIndex = null;
       });
       return;
     }
 
     // Network is slow, show the loading overlay
+    final slowTarget = index;
+    if (slowTarget != _currentIndex) {
+      if (_tabHistory.isEmpty || _tabHistory.last != _currentIndex) {
+        _tabHistory.add(_currentIndex);
+      }
+    }
     setState(() {
       _isTabLoading = true;
       _targetTabIndex = index;
@@ -235,6 +257,9 @@ class _MainScreenState extends State<MainScreen> {
       _isTabLoading = false;
       _targetTabIndex = null;
       if (_currentIndex != finalIndex) {
+        if (_tabHistory.isEmpty || _tabHistory.last != _currentIndex) {
+          _tabHistory.add(_currentIndex);
+        }
         _currentIndex = finalIndex;
       }
     });
@@ -244,14 +269,23 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  /// Back unwinds the active tab first, then falls back to the Home tab and
-  /// only then leaves the app.
+  /// Back unwinds the active tab first, then falls back through tab history,
+  /// and only leaves the app from the Home tab with no history.
   void _handleBack(bool didPop, Object? result) {
     if (didPop) return;
 
     final navigator = _navigatorKeys[_currentIndex].currentState;
     if (navigator != null && navigator.canPop()) {
       navigator.pop();
+      return;
+    }
+
+    while (_tabHistory.isNotEmpty && _tabHistory.last == _currentIndex) {
+      _tabHistory.removeLast();
+    }
+    if (_tabHistory.isNotEmpty) {
+      final prevTab = _tabHistory.removeLast();
+      setState(() => _currentIndex = prevTab);
       return;
     }
 
@@ -302,8 +336,9 @@ class _MainScreenState extends State<MainScreen> {
       body: ValueListenableBuilder<Map<String, dynamic>?>(
         valueListenable: CartService.globalCartNotifier,
         builder: (context, cart, _) {
-          final bool hasItems = cart != null && ((cart['items'] as List?)?.isNotEmpty ?? false);
-          
+          final bool hasItems =
+              cart != null && ((cart['items'] as List?)?.isNotEmpty ?? false);
+
           return Stack(
             alignment: Alignment.bottomCenter,
             children: [
@@ -312,7 +347,7 @@ class _MainScreenState extends State<MainScreen> {
                   final mediaQuery = MediaQuery.of(context);
                   // Approximate CTA capsule height (48) + padding (12) + buffer (8) = 68
                   final extraPadding = hasItems ? 68.0 : 0.0;
-                  
+
                   return Stack(
                     children: [
                       MediaQuery(
@@ -351,7 +386,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   );
-                }
+                },
               ),
               Align(
                 alignment: Alignment.bottomCenter,
@@ -364,13 +399,19 @@ class _MainScreenState extends State<MainScreen> {
                       return FadeTransition(
                         opacity: animation,
                         child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
+                          scale: Tween<double>(
+                            begin: 0.9,
+                            end: 1.0,
+                          ).animate(animation),
                           child: child,
                         ),
                       );
                     },
                     child: hasItems
-                        ? PersistentCartCTA(key: const ValueKey('cart_cta'), cart: cart)
+                        ? PersistentCartCTA(
+                            key: const ValueKey('cart_cta'),
+                            cart: cart,
+                          )
                         : const SizedBox.shrink(key: ValueKey('empty_cta')),
                   ),
                 ),
@@ -380,84 +421,111 @@ class _MainScreenState extends State<MainScreen> {
         },
       ),
       bottomNavigationBar: SafeArea(
-            child: Container(
-              margin: const EdgeInsets.only(
-                left: MainScreen.navPillMargin,
-                right: MainScreen.navPillMargin,
-                bottom: MainScreen.navPillMargin,
-              ),
-              height: MainScreen.navPillHeight,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(30),
-            // Only drawn when the theme has an outline to show: a border adds
-            // padding even when transparent, which would shift the bar 1px.
-            border: context.colors.raisedOutline.a > 0
-                ? Border.all(color: context.colors.raisedOutline, width: 1)
-                : null,
+        child: Container(
+          margin: const EdgeInsets.only(
+            left: MainScreen.navPillMargin,
+            right: MainScreen.navPillMargin,
+            bottom: MainScreen.navPillMargin,
+          ),
+          height: MainScreen.navPillHeight,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: const Color(0xFFECEAF2), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
+                color: const Color(0xFF9850F1).withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: _onTabTapped,
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              selectedItemColor: AppTheme.accentColor,
-              unselectedItemColor: context.colors.navIdle,
-              selectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 11,
-              ),
-              elevation: 0,
-              items: [
-                BottomNavigationBarItem(
-                  icon: _AnimatedTabIcon(
-                    icon: Icons.home_outlined,
-                    activeIcon: Icons.home_rounded,
-                    isSelected: _currentIndex == 0,
-                  ),
+            borderRadius: BorderRadius.circular(32),
+            child: Row(
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
                   label: 'Home',
                 ),
-                BottomNavigationBarItem(
-                  icon: _AnimatedTabIcon(
-                    icon: Icons.explore_outlined,
-                    activeIcon: Icons.explore_rounded,
-                    isSelected: _currentIndex == 1,
-                  ),
+                _buildNavItem(
+                  index: 1,
+                  icon: Icons.explore_outlined,
+                  activeIcon: Icons.explore_rounded,
                   label: 'Explore',
                 ),
-                BottomNavigationBarItem(
-                  icon: _AnimatedTabIcon(
-                    icon: Icons.calendar_today_outlined,
-                    activeIcon: Icons.calendar_month_rounded,
-                    isSelected: _currentIndex == 2,
-                  ),
+                _buildNavItem(
+                  index: 2,
+                  icon: Icons.calendar_today_outlined,
+                  activeIcon: Icons.calendar_month_rounded,
                   label: 'Bookings',
                 ),
-                BottomNavigationBarItem(
-                  icon: _AnimatedTabIcon(
-                    icon: Icons.person_outline,
-                    activeIcon: Icons.person_rounded,
-                    isSelected: _currentIndex == 3,
-                  ),
+                _buildNavItem(
+                  index: 3,
+                  icon: Icons.person_outline,
+                  activeIcon: Icons.person_rounded,
                   label: 'Profile',
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+  }) {
+    final isSelected = _currentIndex == index;
+    final color = isSelected ? AppTheme.accentColor : const Color(0xFF7C758D);
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onTabTapped(index),
+          splashColor: AppTheme.accentColor.withValues(alpha: 0.1),
+          highlightColor: Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _AnimatedTabIcon(
+                icon: icon,
+                activeIcon: activeIcon,
+                isSelected: isSelected,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: isSelected ? 5 : 0,
+                height: isSelected ? 5 : 0,
+                decoration: const BoxDecoration(
+                  color: AppTheme.accentColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -480,7 +548,8 @@ class _AnimatedTabIcon extends StatefulWidget {
   State<_AnimatedTabIcon> createState() => _AnimatedTabIconState();
 }
 
-class _AnimatedTabIconState extends State<_AnimatedTabIcon> with SingleTickerProviderStateMixin {
+class _AnimatedTabIconState extends State<_AnimatedTabIcon>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _yOffsetAnimation;
@@ -494,13 +563,37 @@ class _AnimatedTabIconState extends State<_AnimatedTabIcon> with SingleTickerPro
     );
 
     _scaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.easeOutCubic)), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.0,
+          end: 1.15,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.15,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 60,
+      ),
     ]).animate(_controller);
 
     _yOffsetAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -3.0).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: -3.0, end: 0.0).chain(CurveTween(curve: Curves.easeOutCubic)), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.0,
+          end: -3.0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: -3.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 60,
+      ),
     ]).animate(_controller);
   }
 
@@ -543,6 +636,9 @@ class _AnimatedTabIconState extends State<_AnimatedTabIcon> with SingleTickerPro
                   widget.isSelected ? widget.activeIcon : widget.icon,
                   key: ValueKey<bool>(widget.isSelected),
                   size: 22,
+                  color: widget.isSelected
+                      ? AppTheme.accentColor
+                      : const Color(0xFF7C758D),
                 ),
               ),
             ),
@@ -552,4 +648,3 @@ class _AnimatedTabIconState extends State<_AnimatedTabIcon> with SingleTickerPro
     );
   }
 }
-

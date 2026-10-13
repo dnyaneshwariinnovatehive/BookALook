@@ -77,7 +77,6 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
         _added[serviceId] = (_added[serviceId] ?? 0) + 1;
       });
       setState(() => _error = null);
-      _toast('${service['name'] ?? 'Service'} added to cart');
     } on CartConflictException catch (e) {
       if (!mounted) return;
       AppHaptics.error();
@@ -145,15 +144,8 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
     );
   }
 
-  /// A failed add, shown under the strip. Confirmations ("added to cart")
-  /// stay as a SnackBar via [_toast].
+  /// A failed add, shown under the strip.
   String? _error;
-
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
 
   @override
   Widget build(BuildContext context) {

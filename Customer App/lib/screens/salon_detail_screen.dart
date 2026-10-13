@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
 import '../services/cart_service.dart';
@@ -8,13 +9,11 @@ import '../services/review_service.dart';
 import 'phone_screen.dart';
 import 'cart_screen.dart';
 import 'salon_reviews_screen.dart';
-import '../widgets/cart_offers.dart';
 import '../widgets/initials_avatar.dart';
 import '../widgets/rating_bars.dart';
 import '../utils/app_haptics.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
-import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 
@@ -62,7 +61,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   /// null = the "All Services" tab.
   String? _selectedCategoryId;
-  int _galleryPage = 0;
   bool _hoursExpanded = false;
 
   /// The exact template a discovery sub-service pick points at, so its card (if
@@ -85,13 +83,90 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     _loadSalonDetails();
     _loadCart();
     _loadAllReviews();
+    CartService.globalCartNotifier.addListener(_onGlobalCartChanged);
   }
 
   @override
   void dispose() {
+    CartService.globalCartNotifier.removeListener(_onGlobalCartChanged);
     _galleryController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onGlobalCartChanged() {
+    if (!mounted) return;
+    setState(() {
+      _cart = CartService.globalCartNotifier.value;
+    });
+  }
+
+  int _getServiceQuantity(dynamic serviceId) {
+    if (_cart == null) return 0;
+    final items = (_cart!['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final sId = item['service_id'] ?? item['service']?['id'];
+        if (sId != null && sId.toString() == serviceId.toString()) {
+          return (item['quantity'] as num?)?.toInt() ?? 1;
+        }
+      }
+    }
+    return 0;
+  }
+
+  Map<String, dynamic>? _getServiceCartItem(dynamic serviceId) {
+    if (_cart == null) return null;
+    final items = (_cart!['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final sId = item['service_id'] ?? item['service']?['id'];
+        if (sId != null && sId.toString() == serviceId.toString()) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
+  int _getComboQuantity(dynamic comboId) {
+    if (_cart == null) return 0;
+    final items = (_cart!['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final cId = item['combo_id'] ?? item['combo']?['id'];
+        if (cId != null && cId.toString() == comboId.toString()) {
+          return (item['quantity'] as num?)?.toInt() ?? 1;
+        }
+      }
+    }
+    return 0;
+  }
+
+  Map<String, dynamic>? _getComboCartItem(dynamic comboId) {
+    if (_cart == null) return null;
+    final items = (_cart!['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map<String, dynamic>) {
+        final cId = item['combo_id'] ?? item['combo']?['id'];
+        if (cId != null && cId.toString() == comboId.toString()) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
+  int get _cartItemCount {
+    if (_cart == null) return 0;
+    final items = (_cart!['items'] as List?) ?? const [];
+    int count = 0;
+    for (final item in items) {
+      if (item is Map) {
+        count += (item['quantity'] as num?)?.toInt() ?? 1;
+      }
+    }
+    return count;
   }
 
   /// Pages through the existing review endpoint until every real review is
@@ -126,12 +201,18 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       case _ReviewFilter.five:
         return all.where((r) => (r['rating'] as num?)?.toInt() == 5).toList();
       case _ReviewFilter.fourPlus:
-        return all.where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 4).toList();
+        return all
+            .where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 4)
+            .toList();
       case _ReviewFilter.threePlus:
-        return all.where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 3).toList();
+        return all
+            .where((r) => ((r['rating'] as num?)?.toInt() ?? 0) >= 3)
+            .toList();
       case _ReviewFilter.topRated:
         final rated = all.where((r) => (r['rating'] as num?) != null).toList();
-        rated.sort((a, b) => (b['rating'] as num).compareTo(a['rating'] as num));
+        rated.sort(
+          (a, b) => (b['rating'] as num).compareTo(a['rating'] as num),
+        );
         return rated;
     }
   }
@@ -181,8 +262,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           return;
         }
         _scrollController.jumpTo(
-          (_scrollController.offset + 600)
-              .clamp(0.0, _scrollController.position.maxScrollExtent),
+          (_scrollController.offset + 600).clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          ),
         );
         await WidgetsBinding.instance.endOfFrame;
       }
@@ -196,7 +279,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       if (!mounted) return;
       setState(() {
         _salon = data;
-        _isFavourited = data['is_favourited'] == true || data['is_favourited'] == 1 || data['is_favourited'] == '1';
+        _isFavourited =
+            data['is_favourited'] == true ||
+            data['is_favourited'] == 1 ||
+            data['is_favourited'] == '1';
         // Land on the category the customer came in through, so unrelated
         // categories stay out of the way until they switch tabs themselves.
         _selectedCategoryId = widget.categoryId;
@@ -204,7 +290,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         _isLoading = false;
       });
       if (widget.serviceId != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _revealHighlightedService());
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _revealHighlightedService(),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -232,14 +320,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       if (!mounted) return;
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+        MaterialPageRoute(
+          builder: (context) => const PhoneScreen(isModal: true),
+        ),
       );
       if (loggedIn != true) return;
     }
 
     if (_isTogglingFavourite) return;
     final bool currentFav = _isFavourited;
-    
+
     // Optimistic UI update
     setState(() {
       _isTogglingFavourite = true;
@@ -261,7 +351,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       setState(() {
         _isFavourited = currentFav;
       });
-      _showError(describeError(e, fallback: 'Could not update your favourites.'));
+      _showError(
+        describeError(e, fallback: 'Could not update your favourites.'),
+      );
     } finally {
       if (mounted) {
         setState(() => _isTogglingFavourite = false);
@@ -269,21 +361,36 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     }
   }
 
-  Future<void> _addToCart({String? serviceId, String? comboId, required String label}) async {
+  Future<void> _addToCart({
+    String? serviceId,
+    String? comboId,
+    required String label,
+    int quantity = 1,
+  }) async {
     final token = await AuthService.getToken();
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       final loggedIn = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (context) => const PhoneScreen(isModal: true)),
+        MaterialPageRoute(
+          builder: (context) => const PhoneScreen(isModal: true),
+        ),
       );
       if (loggedIn != true) return;
     }
 
     try {
       final cart = serviceId != null
-          ? await _cartService.addItem(widget.salonId, serviceId)
-          : await _cartService.addCombo(widget.salonId, comboId!);
+          ? await _cartService.addItem(
+              widget.salonId,
+              serviceId,
+              quantity: quantity,
+            )
+          : await _cartService.addCombo(
+              widget.salonId,
+              comboId!,
+              quantity: quantity,
+            );
 
       if (!mounted) return;
 
@@ -292,20 +399,19 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         _cart = cart;
         _actionError = null;
       });
-
-      // The moment after adding is when a package nudge is worth anything, so
-      // it is shown here rather than waiting for the cart screen.
-      if (!_showOffersFor(cart, label)) {
-        _toast('$label added to cart');
-      }
     } on CartConflictException catch (e) {
       if (!mounted) return;
       AppHaptics.error();
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Replace cart items?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Replace cart items?',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
           content: Text(
             'Your cart contains items from ${e.otherSalonName}. Do you want to discard that selection and add items from this salon?',
             style: GoogleFonts.outfit(),
@@ -316,17 +422,30 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 AppHaptics.lightImpact();
                 Navigator.pop(ctx);
               },
-              child: Text('Cancel', style: GoogleFonts.outfit(color: context.colors.textSecondary)),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.outfit(color: context.colors.textSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
                 AppHaptics.lightImpact();
                 Navigator.pop(ctx);
                 await _cartService.clearGlobalCart();
-                _addToCart(serviceId: serviceId, comboId: comboId, label: label);
+                _addToCart(
+                  serviceId: serviceId,
+                  comboId: comboId,
+                  label: label,
+                  quantity: quantity,
+                );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-              child: Text('Replace', style: GoogleFonts.outfit(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+              ),
+              child: Text(
+                'Replace',
+                style: GoogleFonts.outfit(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -334,129 +453,107 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      _showError(describeError(e, fallback: 'Could not add that to your cart.'));
+      _showError(
+        describeError(e, fallback: 'Could not add that to your cart.'),
+      );
+    }
+  }
+
+  Future<void> _decrementService(String serviceId, String label) async {
+    final cartItem = _getServiceCartItem(serviceId);
+    if (cartItem == null) return;
+
+    final currentQty = (cartItem['quantity'] as num?)?.toInt() ?? 1;
+    final itemId = cartItem['id'].toString();
+
+    try {
+      AppHaptics.lightImpact();
+      final updatedCart = await _cartService.updateQuantity(
+        widget.salonId,
+        itemId,
+        serviceId: serviceId,
+        newQuantity: currentQty - 1,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _cart = updatedCart;
+        _actionError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
+      _showError(describeError(e, fallback: 'Could not update quantity.'));
+    }
+  }
+
+  Future<void> _decrementCombo(String comboId, String label) async {
+    final cartItem = _getComboCartItem(comboId);
+    if (cartItem == null) return;
+
+    final currentQty = (cartItem['quantity'] as num?)?.toInt() ?? 1;
+    final itemId = cartItem['id'].toString();
+
+    try {
+      AppHaptics.lightImpact();
+      final updatedCart = await _cartService.updateQuantity(
+        widget.salonId,
+        itemId,
+        comboId: comboId,
+        newQuantity: currentQty - 1,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _cart = updatedCart;
+        _actionError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      AppHaptics.error();
+      _showError(
+        describeError(e, fallback: 'Could not update package quantity.'),
+      );
+    }
+  }
+
+  /// Opens turn-by-turn navigation or map location for the salon.
+  Future<void> _openDirections() async {
+    if (_salon == null) return;
+    AppHaptics.selectionClick();
+    final lat = (_salon!['latitude'] as num?)?.toDouble();
+    final lng = (_salon!['longitude'] as num?)?.toDouble();
+    final address = [
+      _salon!['address'],
+      _salon!['city'],
+      _salon!['pincode'],
+    ].where((part) => part != null && '$part'.trim().isNotEmpty).join(', ');
+    final name = _salon!['name']?.toString().trim() ?? 'Salon';
+
+    final query = (lat != null && lng != null)
+        ? '$lat,$lng'
+        : (address.isNotEmpty
+            ? Uri.encodeComponent('$name, $address')
+            : Uri.encodeComponent(name));
+
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+
+    try {
+      if (!await canLaunchUrl(uri) ||
+          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        _toast('Could not open maps.');
+      }
+    } catch (_) {
+      _toast('Could not open maps.');
     }
   }
 
   Future<void> _openCart() async {
-    await Navigator.push(context, MaterialPageRoute(builder: (context) => CartScreen()));
+    await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(MaterialPageRoute(builder: (context) => const CartScreen()));
     _loadCart();
-  }
-
-  /// Surfaces what the add unlocked. Returns true when something was shown, so
-  /// the caller does not also fire a plain confirmation.
-  bool _showOffersFor(Map<String, dynamic>? cart, String label) {
-    if (cart == null) return false;
-
-    final applied = (cart['applied_combos'] as List?) ?? const [];
-    final offers = (cart['combo_offers'] as List?) ?? const [];
-    final saving = _toDouble((cart['summary'] as Map<String, dynamic>?)?['saving']);
-
-    // Completing a package is the better news, so it wins.
-    if (applied.isNotEmpty && saving > 0) {
-      final names = applied
-          .map((c) => (c as Map<String, dynamic>)['name'] ?? 'Package')
-          .join(', ');
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        backgroundColor: context.colors.success,
-        duration: const Duration(seconds: 4),
-        content: Text(
-          'That completes "$names" — you save ₹${saving.toStringAsFixed(0)}',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-        ),
-      ));
-      return true;
-    }
-
-    if (offers.isNotEmpty) {
-      _showComboOfferSheet(offers.first as Map<String, dynamic>, label);
-      return true;
-    }
-
-    return false;
-  }
-
-  /// A near-miss package, shown as a sheet so the missing services can be added
-  /// without leaving the salon page.
-  ///
-  /// On the root navigator, so it sits over the navigation pill rather than
-  /// behind it: this sheet's whole job is to be read and acted on, and the pill
-  /// is still there the moment it is dismissed.
-  void _showComboOfferSheet(Map<String, dynamic> offer, String label) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Container(
-          padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + sheetBottomInset(sheetContext)),
-          decoration: BoxDecoration(
-            color: context.colors.surfaceMuted,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: EdgeInsets.only(bottom: 14),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text('$label added',
-                  style: GoogleFonts.outfit(
-                      fontSize: 15, color: context.colors.textSecondary)),
-              SizedBox(height: 14),
-              ComboOfferCard(
-                offer: offer,
-                onAddService: (serviceId) async {
-                  Navigator.pop(sheetContext);
-                  await _addToCart(serviceId: serviceId, label: 'Service');
-                },
-                onCompletePackage: (serviceIds) async {
-                  Navigator.pop(sheetContext);
-                  await _addMany(serviceIds);
-                },
-              ),
-              SizedBox(height: 10),
-              TextButton(
-                onPressed: () => Navigator.pop(sheetContext),
-                child: Text('No thanks',
-                    style: GoogleFonts.outfit(color: context.colors.textSecondary)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Adds every remaining service of a package in one go.
-  Future<void> _addMany(List<String> serviceIds) async {
-    Map<String, dynamic>? cart;
-
-    try {
-      for (final id in serviceIds) {
-        cart = await _cartService.addItem(widget.salonId, id);
-      }
-    } catch (e) {
-      AppHaptics.error();
-      _showError(describeError(e, fallback: 'Could not add the whole package to your cart.'));
-      await _loadCart();
-      return;
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _cart = cart;
-      _actionError = null;
-    });
-    _showOffersFor(cart, 'Package');
   }
 
   /// Confirmations only ("added to cart", favourites): passing news.
@@ -507,7 +604,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   List<dynamic> get _visibleServices {
     final services = (_salon?['services'] as List?) ?? [];
     if (_selectedCategoryId == null) return services;
-    return services.where((s) => s['category_id'] == _selectedCategoryId).toList();
+    return services
+        .where((s) => s['category_id'] == _selectedCategoryId)
+        .toList();
   }
 
   @override
@@ -538,36 +637,53 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 title: 'Salon not found',
                 message: 'It may have closed or stopped taking bookings.',
                 actionLabel: 'Go back',
-                onAction: () => Navigator.maybePop(context),
+                onAction: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context, rootNavigator: true).maybePop();
+                  }
+                },
               ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      body: RefreshIndicator(
-        color: AppTheme.accentColor,
-        onRefresh: () async {
-          await _loadSalonDetails();
-          await _loadCart();
-        },
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            _buildAppBar(),
-            SliverToBoxAdapter(child: _buildHeaderCard()),
-            SliverToBoxAdapter(child: _buildNotices()),
-            SliverToBoxAdapter(child: _buildHoursPanel()),
-            SliverToBoxAdapter(child: _buildCombos()),
-            SliverToBoxAdapter(child: _buildCategoryTabs()),
-            _buildServiceSliver(),
-            SliverToBoxAdapter(child: _buildTeam()),
-            SliverToBoxAdapter(key: _reviewsKey, child: _buildReviews()),
-            SliverToBoxAdapter(child: SizedBox(height: 120)),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: bgColor,
+        body: RefreshIndicator(
+          color: AppTheme.accentColor,
+          onRefresh: () async {
+            await _loadSalonDetails();
+            await _loadCart();
+          },
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              _buildAppBar(),
+              SliverToBoxAdapter(child: _buildHeaderCard()),
+              SliverToBoxAdapter(child: _buildNotices()),
+              SliverToBoxAdapter(child: _buildHoursPanel()),
+              SliverToBoxAdapter(child: _buildCombos()),
+              SliverToBoxAdapter(child: _buildCategoryTabs()),
+              _buildServiceSliver(),
+              SliverToBoxAdapter(child: _buildTeam()),
+              SliverToBoxAdapter(key: _reviewsKey, child: _buildReviews()),
+              SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
         ),
+        bottomNavigationBar: _buildBottomArea(),
       ),
-      bottomNavigationBar: _buildBottomArea(),
     );
   }
 
@@ -582,19 +698,29 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       backgroundColor: context.colors.surface,
       foregroundColor: context.colors.textPrimary,
       elevation: 0,
-      title: Text(_salon!['name'] ?? 'Salon',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
+      title: Text(
+        _salon!['name'] ?? 'Salon',
+        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
       leading: Padding(
         padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.35),
             shape: BoxShape.circle,
           ),
           child: IconButton(
             tooltip: 'Back',
-            icon: Icon(Icons.arrow_back, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                Navigator.of(context, rootNavigator: true).maybePop();
+              }
+            },
           ),
         ),
       ),
@@ -604,34 +730,78 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           child: Container(
             width: 44,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              tooltip: _isFavourited ? 'Remove from favourites' : 'Add to favourites',
-              icon: Icon(_isFavourited ? Icons.favorite : Icons.favorite_border, size: 20),
+              tooltip: _isFavourited
+                  ? 'Remove from favourites'
+                  : 'Add to favourites',
+              icon: Icon(
+                _isFavourited ? Icons.favorite : Icons.favorite_border,
+                size: 20,
+              ),
               color: _isFavourited ? Colors.redAccent : Colors.white,
               onPressed: _toggleFavourite,
             ),
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6.0),
-          child: Container(
-            width: 44,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              tooltip: 'Open cart',
-              icon: Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
-              onPressed: _openCart,
-            ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 44,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  tooltip: 'Open cart',
+                  icon: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  onPressed: _openCart,
+                ),
+              ),
+              if (_cartItemCount > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$_cartItemCount',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
       ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -681,25 +851,37 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }
 
   Widget _galleryPlaceholder() => Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.accentGradientLightEnd, AppTheme.accentGradientEnd],
-          ),
-        ),
-        child: Center(child: Icon(Icons.storefront, size: 90, color: Colors.white.withValues(alpha: 0.45))),
-      );
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppTheme.accentGradientLightEnd, AppTheme.accentGradientEnd],
+      ),
+    ),
+    child: Center(
+      child: Icon(
+        Icons.storefront,
+        size: 90,
+        color: Colors.white.withValues(alpha: 0.45),
+      ),
+    ),
+  );
 
   Widget _glassChip(String text) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(text,
-            style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-      );
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Text(
+      text,
+      style: GoogleFonts.outfit(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 
   Widget _buildRatingPill() {
     final rating = _salon!['rating'] ?? {};
@@ -712,7 +894,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: count > 0 ? context.colors.success : Colors.black.withValues(alpha: 0.45),
+          color: count > 0
+              ? context.colors.success
+              : Colors.black.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -722,11 +906,19 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             SizedBox(width: 4),
             Text(
               count > 0 ? '${average.toStringAsFixed(1)} ($count)' : 'New',
-              style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             if (count > 0) ...[
               SizedBox(width: 3),
-              Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 15),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Colors.white,
+                size: 15,
+              ),
             ],
           ],
         ),
@@ -738,9 +930,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _buildHeaderCard() {
     final isOpen = _salon!['is_open_now'] == true;
-    final address = [_salon!['address'], _salon!['city'], _salon!['pincode']]
-        .where((part) => part != null && '$part'.isNotEmpty)
-        .join(', ');
+    final address = [
+      _salon!['address'],
+      _salon!['city'],
+      _salon!['pincode'],
+    ].where((part) => part != null && '$part'.isNotEmpty).join(', ');
 
     return Container(
       margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -749,9 +943,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_salon!['name'] ?? 'Salon',
-              style: GoogleFonts.outfit(
-                  fontSize: 22, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+          Text(
+            _salon!['name'] ?? 'Salon',
+            style: GoogleFonts.outfit(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: context.colors.textPrimary,
+            ),
+          ),
           SizedBox(height: 10),
 
           Row(
@@ -760,7 +959,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isOpen ? context.colors.success : context.colors.danger,
+                  color: isOpen
+                      ? context.colors.success
+                      : context.colors.danger,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -771,7 +972,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isOpen ? context.colors.success : context.colors.danger,
+                    color: isOpen
+                        ? context.colors.success
+                        : context.colors.danger,
                   ),
                 ),
               ),
@@ -779,17 +982,67 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ),
 
           if (address.isNotEmpty) ...[
-            SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.location_on_outlined, size: 18, color: context.colors.textSecondary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(address,
-                      style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
+            SizedBox(height: 12),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: _openDirections,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 20,
+                      color: AppTheme.accentColor,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        address,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: context.colors.textPrimary,
+                          decoration: TextDecoration.underline,
+                          decorationColor: AppTheme.accentColor.withValues(alpha: 0.35),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: context.colors.accentSoft,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.accentColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.directions_outlined,
+                            size: 15,
+                            color: AppTheme.accentColor,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Directions',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ],
 
@@ -797,28 +1050,40 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           // to customers. The description takes its place here.
           if ((_salon!['description'] ?? '').toString().isNotEmpty) ...[
             SizedBox(height: 14),
-            Text(_salon!['description'],
-                style: GoogleFonts.outfit(fontSize: 14, height: 1.5, color: context.colors.textSecondary)),
+            Text(
+              _salon!['description'],
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                height: 1.5,
+                color: context.colors.textSecondary,
+              ),
+            ),
           ],
 
           SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _statTile(
-                Icons.spa_outlined,
-                '${(_salon!['services'] as List?)?.length ?? 0}',
-                'Services',
-              )),
-              Expanded(child: _statTile(
-                Icons.people_outline,
-                '${(_salon!['team'] as List?)?.length ?? 0}',
-                'Staff',
-              )),
-              Expanded(child: _statTile(
-                Icons.percent,
-                '${_toDouble(_salon!['advance_percentage_default']).toStringAsFixed(0)}%',
-                'Advance',
-              )),
+              Expanded(
+                child: _statTile(
+                  Icons.spa_outlined,
+                  '${(_salon!['services'] as List?)?.length ?? 0}',
+                  'Services',
+                ),
+              ),
+              Expanded(
+                child: _statTile(
+                  Icons.people_outline,
+                  '${(_salon!['team'] as List?)?.length ?? 0}',
+                  'Staff',
+                ),
+              ),
+              Expanded(
+                child: _statTile(
+                  Icons.percent,
+                  '${_toDouble(_salon!['advance_percentage_default']).toStringAsFixed(0)}%',
+                  'Advance',
+                ),
+              ),
             ],
           ),
         ],
@@ -831,10 +1096,21 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       children: [
         Icon(icon, size: 20, color: AppTheme.accentColor),
         SizedBox(height: 6),
-        Text(value,
-            style: GoogleFonts.outfit(
-                fontSize: 16, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary)),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: context.colors.textPrimary,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            color: context.colors.textTertiary,
+          ),
+        ),
       ],
     );
   }
@@ -852,7 +1128,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             color: context.colors.danger,
             background: context.colors.dangerBg,
             title: 'Temporarily unavailable',
-            body: _salon!['unavailable_reason'] ??
+            body:
+                _salon!['unavailable_reason'] ??
                 'This salon is not accepting online bookings right now.',
           ),
         if (closures.isNotEmpty)
@@ -873,32 +1150,39 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     required Color background,
     required String title,
     required String body,
-  }) =>
-      Container(
-        width: double.infinity,
-        margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(16)),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 20),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-                  SizedBox(height: 2),
-                  Text(body, style: GoogleFonts.outfit(fontSize: 13, color: color)),
-                ],
+  }) => Container(
+    width: double.infinity,
+    margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 20),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 2),
+              Text(body, style: GoogleFonts.outfit(fontSize: 13, color: color)),
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   // ------------------------------------------------------------------ hours
 
@@ -917,9 +1201,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           tilePadding: EdgeInsets.symmetric(horizontal: 20),
           childrenPadding: EdgeInsets.fromLTRB(20, 0, 20, 16),
           leading: Icon(Icons.schedule, color: AppTheme.accentColor),
-          title: Text('Opening hours',
-              style: GoogleFonts.outfit(
-                  fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+          title: Text(
+            'Opening hours',
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+            ),
+          ),
           children: week.map<Widget>((day) {
             final isToday = day['is_today'] == true;
             final closed = day['is_closed'] == true;
@@ -929,20 +1218,28 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(day['day_name'],
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                        color: isToday ? AppTheme.accentColor : context.colors.textSecondary,
-                      )),
                   Text(
-                    closed ? 'Closed' : '${day['open_time']} – ${day['close_time']}',
+                    day['day_name'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                      color: isToday
+                          ? AppTheme.accentColor
+                          : context.colors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    closed
+                        ? 'Closed'
+                        : '${day['open_time']} – ${day['close_time']}',
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                       color: closed
                           ? context.colors.textTertiary
-                          : (isToday ? AppTheme.accentColor : context.colors.textPrimary),
+                          : (isToday
+                                ? AppTheme.accentColor
+                                : context.colors.textPrimary),
                     ),
                   ),
                 ],
@@ -974,7 +1271,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 final index = e.key;
                 final combo = e.value;
                 return Padding(
-                  padding: EdgeInsets.only(right: index == combos.length - 1 ? 0 : 12),
+                  padding: EdgeInsets.only(
+                    right: index == combos.length - 1 ? 0 : 12,
+                  ),
                   child: _comboCard(combo),
                 );
               }).toList(),
@@ -988,7 +1287,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Widget _comboCard(Map<String, dynamic> combo) {
     final savings = _toDouble(combo['savings']);
     final lines = (combo['services'] as List?) ?? [];
-    
+    final comboId = combo['id'].toString();
+    final comboQty = _getComboQuantity(comboId);
+    final isComboSelected = comboQty > 0;
+
     final bgColor = context.colors.accentSoft;
     final borderColor = context.colors.accentSoftHover;
     final textHeading = context.colors.textPrimary;
@@ -997,11 +1299,22 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
     return Container(
       width: 280,
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: isComboSelected ? context.colors.accentSoft : bgColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: 1.5),
+        border: isComboSelected
+            ? Border.all(color: AppTheme.accentColor, width: 2.0)
+            : Border.all(color: borderColor, width: 1.5),
+        boxShadow: isComboSelected
+            ? [
+                BoxShadow(
+                  color: AppTheme.accentColor.withValues(alpha: 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1009,54 +1322,112 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(combo['name'] ?? 'Package',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
-                        fontSize: 18, fontWeight: FontWeight.bold, color: textHeading)),
+                child: Text(
+                  combo['name'] ?? 'Package',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textHeading,
+                  ),
+                ),
               ),
+              if (isComboSelected) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        comboQty > 1 ? 'Selected ($comboQty)' : 'Selected',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
               if (savings > 0)
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: context.colors.success,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text('SAVE ₹${savings.toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text(
+                    'SAVE ₹${savings.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
             ],
           ),
-          SizedBox(height: 8),
-          Text('${combo['duration_minutes']} mins · ${lines.length} services',
-              style: GoogleFonts.outfit(fontSize: 13, color: textBody)),
-          SizedBox(height: 14),
+          const SizedBox(height: 8),
+          Text(
+            '${combo['duration_minutes']} mins · ${lines.length} services',
+            style: GoogleFonts.outfit(fontSize: 13, color: textBody),
+          ),
+          const SizedBox(height: 14),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: lines
-                .map<Widget>((line) => Padding(
-                      padding: EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Icon(Icons.check_circle, size: 14, color: AppTheme.accentColor),
+                .map<Widget>(
+                  (line) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.check_circle,
+                            size: 14,
+                            color: AppTheme.accentColor,
                           ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(line['name'] ?? '',
-                                style: GoogleFonts.outfit(
-                                    fontSize: 13, color: textBody, height: 1.3)),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            line['name'] ?? '',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: textBody,
+                              height: 1.3,
+                            ),
                           ),
-                        ],
-                      ),
-                    ))
+                        ),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
           ),
-          Spacer(),
-          SizedBox(height: 8),
+          const Spacer(),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1066,21 +1437,51 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (savings > 0)
-                    Text('₹${_toDouble(combo['original_price']).toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 13,
-                          color: textLight,
-                          decoration: TextDecoration.lineThrough,
-                        )),
-                  Text('₹${_toDouble(combo['price']).toStringAsFixed(0)}',
+                    Text(
+                      '₹${_toDouble(combo['original_price']).toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
-                          fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                        fontSize: 13,
+                        color: textLight,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                  Text(
+                    '₹${_toDouble(combo['price']).toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                  if (comboQty > 1)
+                    Text(
+                      'Total: ₹${(_toDouble(combo['price']) * comboQty).toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
                 ],
               ),
-              _addButton(
-                enabled: _isBookable,
-                onTap: () => _addToCart(comboId: combo['id'].toString(), label: combo['name'] ?? 'Package'),
-              ),
+              if (isComboSelected)
+                _quantityStepper(
+                  quantity: comboQty,
+                  onIncrement: () => _addToCart(
+                    comboId: comboId,
+                    label: combo['name'] ?? 'Package',
+                  ),
+                  onDecrement: () =>
+                      _decrementCombo(comboId, combo['name'] ?? 'Package'),
+                )
+              else
+                _addButton(
+                  enabled: _isBookable,
+                  onTap: () => _addToCart(
+                    comboId: comboId,
+                    label: combo['name'] ?? 'Package',
+                  ),
+                ),
             ],
           ),
         ],
@@ -1094,7 +1495,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final categories = (_salon!['categories'] as List?) ?? [];
     final allCount = (_salon!['services'] as List?)?.length ?? 0;
 
-    if (allCount == 0) return _sectionHeader('Services', 'Nothing published yet');
+    if (allCount == 0)
+      return _sectionHeader('Services', 'Nothing published yet');
 
     final tabs = <Map<String, dynamic>>[
       {'id': null, 'name': 'All Services', 'service_count': allCount},
@@ -1115,22 +1517,28 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             itemBuilder: (context, index) {
               final tab = tabs[index];
               final isSelected = _selectedCategoryId == tab['id'];
-              final textColor = isSelected 
-                  ? AppTheme.accentColor 
+              final textColor = isSelected
+                  ? AppTheme.accentColor
                   : (context.colors.textSecondary);
 
               return GestureDetector(
-                onTap: () => setState(() => _selectedCategoryId = tab['id'] as String?),
+                onTap: () =>
+                    setState(() => _selectedCategoryId = tab['id'] as String?),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       child: Text(
                         '${tab['name']} (${tab['service_count']})',
                         style: GoogleFonts.outfit(
                           fontSize: 15,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w600,
                           color: textColor,
                         ),
                       ),
@@ -1165,8 +1573,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Center(
-            child: Text('No services in this category.',
-                style: GoogleFonts.outfit(color: context.colors.textTertiary)),
+            child: Text(
+              'No services in this category.',
+              style: GoogleFonts.outfit(color: context.colors.textTertiary),
+            ),
           ),
         ),
       );
@@ -1187,45 +1597,99 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final hasStaff = (service['provider_count'] ?? 0) > 0;
     final canAdd = _isBookable && hasStaff;
     final description = (service['description'] ?? '').toString();
+    final serviceId = service['id'].toString();
+    final qty = _getServiceQuantity(serviceId);
+    final isSelected = qty > 0;
 
     // Highlight came-from-category service: matched on the real template_id so
     // the salon + service relationship stays exact, never a name guess.
-    final isHighlighted = _highlightServiceId != null &&
+    final isHighlighted =
+        _highlightServiceId != null &&
         service['template_id']?.toString() == _highlightServiceId;
 
     return Opacity(
       opacity: canAdd ? 1.0 : 0.6,
       child: Container(
         key: isHighlighted ? _highlightServiceKey : null,
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: _cardDecoration(
           accentBorder: isHighlighted,
+          isSelected: isSelected,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isHighlighted)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.35)),
-                ),
+            if (isHighlighted || isSelected)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Icon(Icons.touch_app, size: 13, color: AppTheme.accentColor),
-                    const SizedBox(width: 5),
-                    Text(
-                      widget.categoryName ?? 'From category',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.accentColor,
+                    if (isHighlighted)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppTheme.accentColor.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.touch_app,
+                              size: 13,
+                              color: AppTheme.accentColor,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              widget.categoryName ?? 'From category',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    if (isSelected)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              qty > 1 ? 'Selected ($qty)' : 'Selected',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1236,30 +1700,47 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: context.colors.accentSoft,
+                    color: isSelected
+                        ? AppTheme.accentColor.withValues(alpha: 0.15)
+                        : context.colors.accentSoft,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(Icons.spa_outlined, color: AppTheme.accentColor, size: 28),
+                  child: Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.spa_outlined,
+                    color: AppTheme.accentColor,
+                    size: 28,
+                  ),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(service['name'] ?? 'Service',
-                          style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: context.colors.textPrimary)),
-                      SizedBox(height: 8),
+                      Text(
+                        service['name'] ?? 'Service',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 6,
                         children: [
-                          _metaChip(Icons.access_time, '${service['duration_minutes']} mins'),
+                          _metaChip(
+                            Icons.access_time,
+                            '${service['duration_minutes']} mins',
+                          ),
                           if (service['gender_focus'] != null &&
                               service['gender_focus'] != 'Unisex')
-                            _metaChip(Icons.person_outline, service['gender_focus']),
+                            _metaChip(
+                              Icons.person_outline,
+                              service['gender_focus'],
+                            ),
                           if (service['refundable_advance'] == true)
                             _metaChip(Icons.replay, 'Refundable advance'),
                         ],
@@ -1271,34 +1752,76 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             ),
 
             if (description.isNotEmpty) ...[
-              SizedBox(height: 16),
-              Text(description,
-                  style: GoogleFonts.outfit(
-                      fontSize: 14, height: 1.5, color: context.colors.textSecondary)),
+              const SizedBox(height: 16),
+              Text(
+                description,
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: context.colors.textSecondary,
+                ),
+              ),
             ],
 
             if (!hasStaff) ...[
-              SizedBox(height: 12),
-              Text('No staff available for this service right now',
-                  style: GoogleFonts.outfit(fontSize: 13, color: context.colors.danger)),
+              const SizedBox(height: 12),
+              Text(
+                'No staff available for this service right now',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: context.colors.danger,
+                ),
+              ),
             ],
 
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Divider(color: context.colors.border, height: 1),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('₹${_toDouble(service['price']).toStringAsFixed(0)}',
-                    style: GoogleFonts.outfit(
-                        fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
-                _addButton(
-                  enabled: canAdd,
-                  onTap: () => _addToCart(
-                    serviceId: service['id'].toString(),
-                    label: service['name'] ?? 'Service',
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '₹${_toDouble(service['price']).toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accentColor,
+                      ),
+                    ),
+                    if (qty > 1)
+                      Text(
+                        'Total: ₹${(_toDouble(service['price']) * qty).toStringAsFixed(0)}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
+                if (isSelected)
+                  _quantityStepper(
+                    quantity: qty,
+                    onIncrement: () => _addToCart(
+                      serviceId: serviceId,
+                      label: service['name'] ?? 'Service',
+                    ),
+                    onDecrement: () => _decrementService(
+                      serviceId,
+                      service['name'] ?? 'Service',
+                    ),
+                  )
+                else
+                  _addButton(
+                    enabled: canAdd,
+                    onTap: () => _addToCart(
+                      serviceId: serviceId,
+                      label: service['name'] ?? 'Service',
+                    ),
+                  ),
               ],
             ),
           ],
@@ -1319,7 +1842,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         children: [
           Icon(icon, size: 14, color: context.colors.textSecondary),
           SizedBox(width: 6),
-          Text(text, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: context.colors.textSecondary)),
+          Text(
+            text,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: context.colors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -1329,7 +1859,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     return ElevatedButton.icon(
       onPressed: enabled ? onTap : null,
       icon: Icon(Icons.add, size: 18),
-      label: Text('ADD', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
+      label: Text(
+        'ADD',
+        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
+      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.accentColor,
         foregroundColor: Colors.white,
@@ -1338,6 +1871,62 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         elevation: 0,
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
+  Widget _quantityStepper({
+    required int quantity,
+    required VoidCallback onIncrement,
+    required VoidCallback onDecrement,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(14),
+            ),
+            onTap: onDecrement,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Icon(Icons.remove, size: 18, color: Colors.white),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '$quantity',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          InkWell(
+            borderRadius: const BorderRadius.horizontal(
+              right: Radius.circular(14),
+            ),
+            onTap: onIncrement,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Icon(Icons.add, size: 18, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1375,23 +1964,33 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       child: Text(
                         InitialsAvatar.initialsOf(name),
                         style: GoogleFonts.outfit(
-                            fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.accentColor),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.accentColor,
+                        ),
                       ),
                     ),
                     SizedBox(height: 8),
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textPrimary)),
-                    SizedBox(height: 2),
                     Text(
-                      member['specialization'] ?? '${member['service_count']} services',
+                      name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 11, color: context.colors.textTertiary),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      member['specialization'] ??
+                          '${member['service_count']} services',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: context.colors.textTertiary,
+                      ),
                     ),
                   ],
                 ),
@@ -1420,7 +2019,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Ratings & reviews', count > 0 ? '$count customer ratings' : null),
+        _sectionHeader(
+          'Ratings & reviews',
+          count > 0 ? '$count customer ratings' : null,
+        ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: RatingSummaryCard(summary: rating),
@@ -1486,11 +2088,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                   foregroundColor: AppTheme.accentColor,
                   padding: EdgeInsets.symmetric(vertical: 13),
                   side: BorderSide(color: context.colors.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: Text(
                   count == 1 ? 'See the 1 review' : 'See all $count reviews',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -1518,7 +2125,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           decoration: BoxDecoration(
             color: selected ? AppTheme.accentColor : idleBg,
             borderRadius: BorderRadius.circular(999),
-            border: selected ? null : Border.all(color: borderColor, width: 1.2),
+            border: selected
+                ? null
+                : Border.all(color: borderColor, width: 1.2),
           ),
           child: Text(
             label,
@@ -1569,56 +2178,49 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     );
   }
 
-  // ------------------------------------------------------------- sticky bar
-
-  /// Price of one cart line. A combo is priced from its own special prices,
-  /// not from the member services' list prices.
-  double _lineTotal(dynamic item) {
-    final quantity = (item['quantity'] ?? 1) as int;
-
-    if (item['combo'] != null) {
-      double comboPrice = 0;
-      for (final service in (item['combo']['services'] as List? ?? [])) {
-        comboPrice += _toDouble(service['pivot']?['combo_special_price'] ?? service['price']);
-      }
-      return comboPrice * quantity;
-    }
-
-    if (item['service'] != null) {
-      return _toDouble(item['service']['price']) * quantity;
-    }
-
-    return 0;
-  }
-
-
   // ------------------------------------------------------------------ shared
 
   Widget _sectionHeader(String title, String? subtitle) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 28, 20, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: GoogleFonts.outfit(
-                    fontSize: 20, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
-            if (subtitle != null) ...[
-              SizedBox(height: 2),
-              Text(subtitle,
-                  style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textTertiary)),
-            ],
-          ],
+    padding: EdgeInsets.fromLTRB(20, 28, 20, 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.outfit(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: context.colors.textPrimary,
+          ),
         ),
-      );
+        if (subtitle != null) ...[
+          SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              color: context.colors.textTertiary,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 
-  BoxDecoration _cardDecoration({bool accentBorder = false}) {
+  BoxDecoration _cardDecoration({
+    bool accentBorder = false,
+    bool isSelected = false,
+  }) {
     return BoxDecoration(
-      color: context.colors.surface,
+      color: isSelected ? context.colors.accentSoft : context.colors.surface,
       borderRadius: BorderRadius.circular(24),
-      border: accentBorder
-          ? Border.all(color: AppTheme.accentColor, width: 1.8)
+      border: (isSelected || accentBorder)
+          ? Border.all(
+              color: AppTheme.accentColor,
+              width: isSelected ? 2.0 : 1.8,
+            )
           : Border.all(color: context.colors.border),
-      boxShadow: accentBorder
+      boxShadow: (isSelected || accentBorder)
           ? [
               BoxShadow(
                 color: AppTheme.accentColor.withValues(alpha: 0.18),
@@ -1627,7 +2229,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               ),
             ]
           : [
-              BoxShadow(color: context.colors.cardShadow, blurRadius: 16, offset: Offset(0, 4)),
+              BoxShadow(
+                color: context.colors.cardShadow,
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
             ],
     );
   }

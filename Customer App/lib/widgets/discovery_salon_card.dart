@@ -37,7 +37,9 @@ class DiscoverySalonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final surfaceColor = context.colors.surface;
-    final borderColor = context.colors.listBorder;
+    final cardBorderColor = Theme.of(context).brightness == Brightness.dark
+        ? context.colors.border
+        : const Color(0xFFE2DCF0);
     final headingColor = context.colors.textPrimary;
     final bodyColor = context.colors.textSecondary;
     final isServiceable = salon['is_serviceable'] != false;
@@ -54,228 +56,234 @@ class DiscoverySalonCard extends StatelessWidget {
             .toList();
 
     return InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SalonDetailScreen(
-                salonId: id,
-                categoryId: categoryId,
-                categoryName: categoryName,
-                serviceId: serviceId,
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SalonDetailScreen(
+              salonId: id,
+              categoryId: categoryId,
+              categoryName: categoryName,
+              serviceId: serviceId,
+            ),
+          ),
+        );
+      },
+      child: Opacity(
+        opacity: isServiceable ? 1.0 : 0.65,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardBorderColor, width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-            ),
-          );
-        },
-        child: Opacity(
-          opacity: isServiceable ? 1.0 : 0.65,
-          child: Container(
-            clipBehavior: Clip.hardEdge,
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: 125,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.network(
-                              salon['cover_photo_url'] ?? '',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: context.colors.imagePlaceholder,
-                                child: const Icon(
-                                  Icons.storefront,
-                                  color: AppTheme.accentColor,
-                                  size: 32,
-                                ),
+            ],
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: cardBorderColor, width: 1.0),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 125,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.network(
+                            salon['cover_photo_url'] ?? '',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: context.colors.imagePlaceholder,
+                              child: const Icon(
+                                Icons.storefront,
+                                color: AppTheme.accentColor,
+                                size: 32,
                               ),
                             ),
-                            if (showFavourite)
-                              // 48dp to tap, drawn exactly where the 26dp
-                              // heart always was: the extra is transparent
-                              // padding, offset by the same amount.
-                              Positioned(
-                                top: 6 - _favouriteSlop,
-                                right: 6 - _favouriteSlop,
-                                child: Semantics(
-                                  button: true,
-                                  label: isFavourited
-                                      ? 'Remove from favourites'
-                                      : 'Add to favourites',
-                                  excludeSemantics: true,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: onToggleFavourite,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(_favouriteSlop),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(5),
-                                        decoration: BoxDecoration(
-                                          color: context.colors.surface
-                                              .withValues(alpha: 0.85),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          isFavourited
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          size: 16,
-                                          color: isFavourited
-                                              ? context.colors.danger
-                                              : context.colors.iconIdle,
-                                        ),
+                          ),
+                          if (showFavourite)
+                            // 48dp to tap, drawn exactly where the 26dp
+                            // heart always was: the extra is transparent
+                            // padding, offset by the same amount.
+                            Positioned(
+                              top: 6 - _favouriteSlop,
+                              right: 6 - _favouriteSlop,
+                              child: Semantics(
+                                button: true,
+                                label: isFavourited
+                                    ? 'Remove from favourites'
+                                    : 'Add to favourites',
+                                excludeSemantics: true,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: onToggleFavourite,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(
+                                      _favouriteSlop,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: context.colors.surface
+                                            .withValues(alpha: 0.85),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        isFavourited
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 16,
+                                        color: isFavourited
+                                            ? context.colors.danger
+                                            : context.colors.iconIdle,
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  salon['name'] ?? 'Unnamed Salon',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: headingColor,
-                                  ),
-                                ),
-                              ),
-                              if (count > 0) ...[
-                                const Icon(
-                                  Icons.star,
-                                  size: 15,
-                                  color: AppTheme.starRating,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  avg.toStringAsFixed(1),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: headingColor,
-                                  ),
-                                ),
-                              ] else
-                                Text(
-                                  'New',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: bodyColor,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                size: 15,
-                                color: AppTheme.accentColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  salon['address'] ?? 'No address',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 13,
-                                    color: bodyColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (!isServiceable)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: context.colors.warningBg,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                salon['unavailable_reason'] ??
-                                    'Not taking bookings',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: context.colors.warning,
-                                ),
-                              ),
-                            )
-                          else
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  size: 13,
-                                  color: AppTheme.statusAvailable,
-                                ),
-                                const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    'Bookable online',
+                                    salon['name'] ?? 'Unnamed Salon',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.outfit(
-                                      fontSize: 12,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: headingColor,
+                                    ),
+                                  ),
+                                ),
+                                if (count > 0) ...[
+                                  const Icon(
+                                    Icons.star,
+                                    size: 15,
+                                    color: AppTheme.starRating,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    avg.toStringAsFixed(1),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: headingColor,
+                                    ),
+                                  ),
+                                ] else
+                                  Text(
+                                    'New',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       color: bodyColor,
                                     ),
                                   ),
-                                ),
-                                if (distance != null)
-                                  Text(
-                                    '${salon['distance_is_approximate'] == true ? '~' : ''}$distance km',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.accentColor,
-                                    ),
-                                  ),
                               ],
                             ),
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 15,
+                                  color: AppTheme.accentColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    salon['address'] ?? 'No address',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      color: bodyColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (!isServiceable)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.colors.warningBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  salon['unavailable_reason'] ??
+                                      'Not taking bookings',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.colors.warning,
+                                  ),
+                                ),
+                              )
+                            else
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    size: 13,
+                                    color: AppTheme.statusAvailable,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Bookable online',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: bodyColor,
+                                      ),
+                                    ),
+                                  ),
+                                  if (distance != null)
+                                    Text(
+                                      '${salon['distance_is_approximate'] == true ? '~' : ''}$distance km',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.accentColor,
+                                      ),
+                                    ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -283,18 +291,18 @@ class DiscoverySalonCard extends StatelessWidget {
                   ],
                 ),
               ),
-                // Full width below the card's own row, so the strip is not
-                // squeezed into the column beside the photo.
-                if (categoryServices.isNotEmpty)
-                  CategoryServiceStrip(
-                    salonId: id,
-                    services: categoryServices,
-                    categoryName: categoryName,
-                  ),
-              ],
-            ),
+              // Full width below the card's own row, so the strip is not
+              // squeezed into the column beside the photo.
+              if (categoryServices.isNotEmpty)
+                CategoryServiceStrip(
+                  salonId: id,
+                  services: categoryServices,
+                  categoryName: categoryName,
+                ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 }

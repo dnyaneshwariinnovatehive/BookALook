@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../services/cart_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
 import '../theme/app_colors.dart';
@@ -24,7 +25,11 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final AppointmentService _appointmentService = AppointmentService();
+  final CartService _cartService = CartService();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _appointmentSectionKey = GlobalKey();
 
+  Map<String, dynamic>? _cart;
   List<dynamic> _providers = [];
   bool _isLoadingProviders = true;
   String _providersError = '';
@@ -57,29 +62,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadProviders();
+    _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    try {
+      final cart = await _cartService.getCart(widget.salonId);
+      if (mounted) setState(() => _cart = cart);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _razorpay.clear();
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     if (_pendingPaymentAppointmentId == null) return;
-    
+
     setState(() => _isBooking = true);
     try {
       await _appointmentService.confirmPayment(
         _pendingPaymentAppointmentId!,
         response.paymentId ?? '',
-        response.signature ?? ''
+        response.signature ?? '',
       );
       _showSuccessDialog();
     } catch (e) {
-      _setBookingError(describeError(e,
-          fallback: 'We could not confirm your booking yet. If the payment went through, '
-              'it will appear in My Bookings shortly.'));
+      _setBookingError(
+        describeError(
+          e,
+          fallback:
+              'We could not confirm your booking yet. If the payment went through, '
+              'it will appear in My Bookings shortly.',
+        ),
+      );
     } finally {
       setState(() => _isBooking = false);
     }
@@ -87,7 +106,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _handlePaymentError(PaymentFailureResponse response) {
     final reason = response.message?.trim() ?? '';
-    _setBookingError(reason.isNotEmpty ? reason : 'Payment did not go through. Please try again.');
+    _setBookingError(
+      reason.isNotEmpty
+          ? reason
+          : 'Payment did not go through. Please try again.',
+    );
     if (_pendingPaymentAppointmentId != null) {
       _appointmentService.abandonPayment(_pendingPaymentAppointmentId!);
       _pendingPaymentAppointmentId = null;
@@ -147,15 +170,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final processedSlots = (data['slots'] as List? ?? []).where((slot) {
         if (isToday) {
-           final timeStr = slot['time'] as String;
-           final parts = timeStr.split(':');
-           if (parts.length >= 2) {
-             final hour = int.tryParse(parts[0]) ?? 0;
-             final minute = int.tryParse(parts[1]) ?? 0;
-             if (hour < nowTime.hour || (hour == nowTime.hour && minute <= nowTime.minute)) {
-                return false;
-             }
-           }
+          final timeStr = slot['time'] as String;
+          final parts = timeStr.split(':');
+          if (parts.length >= 2) {
+            final hour = int.tryParse(parts[0]) ?? 0;
+            final minute = int.tryParse(parts[1]) ?? 0;
+            if (hour < nowTime.hour ||
+                (hour == nowTime.hour && minute <= nowTime.minute)) {
+              return false;
+            }
+          }
         }
         return true;
       }).toList();
@@ -166,7 +190,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _closedReason = data['closed_reason'];
         _totalAmount = _toDouble(data['total_amount']);
         _advanceAmount = _toDouble(data['advance_amount']);
-        _totalDuration = (data['total_duration_minutes'] ?? _totalDuration) as int;
+        _totalDuration =
+            (data['total_duration_minutes'] ?? _totalDuration) as int;
         _isLoadingSlots = false;
       });
     } catch (e) {
@@ -175,7 +200,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _isLoadingSlots = false;
       });
       if (mounted) {
-        setState(() => _slotsError = describeError(e, fallback: 'Could not load the time slots.'));
+        setState(
+          () => _slotsError = describeError(
+            e,
+            fallback: 'Could not load the time slots.',
+          ),
+        );
       }
     }
   }
@@ -190,6 +220,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _selectedTime = null;
     });
     _fetchSlots();
+
+    // Smoothly glide down to the appointment / time slot section
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentCtx = _appointmentSectionKey.currentContext;
+      if (currentCtx != null && currentCtx.mounted) {
+        Scrollable.ensureVisible(
+          currentCtx,
+          duration: const Duration(milliseconds: 550),
+          curve: Curves.easeInOutCubic,
+          alignment: 0.05,
+        );
+      }
+    });
   }
 
   /// Midnight today, so date comparisons are not skewed by the clock.
@@ -255,7 +298,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _isBooking = false);
 
       final isPaymentRequired = response['payment_required'] == true;
-      
+
       if (!isPaymentRequired) {
         _showSuccessDialog();
         return;
@@ -272,7 +315,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           barrierDismissible: false,
           builder: (dialogContext) => AlertDialog(
             title: Text('Demo Payment'),
-            content: Text('Simulate a successful payment for ₹${payment['amount']}?'),
+            content: Text(
+              'Simulate a successful payment for ₹${payment['amount']}?',
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -292,7 +337,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     await _appointmentService.demoPay(appointmentId);
                     _showSuccessDialog();
                   } catch (e) {
-                    _setBookingError(describeError(e, fallback: 'Payment did not go through. Please try again.'));
+                    _setBookingError(
+                      describeError(
+                        e,
+                        fallback:
+                            'Payment did not go through. Please try again.',
+                      ),
+                    );
                   } finally {
                     setState(() => _isBooking = false);
                   }
@@ -315,7 +366,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       AppHaptics.error();
       setState(() => _isBooking = false);
-      _setBookingError(describeError(e, fallback: 'We could not book that slot. Please try again.'));
+      _setBookingError(
+        describeError(
+          e,
+          fallback: 'We could not book that slot. Please try again.',
+        ),
+      );
       // The slot may have been taken while the customer was deciding.
       _fetchSlots();
     }
@@ -335,9 +391,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             Icon(Icons.check_circle, color: context.colors.success, size: 80),
             SizedBox(height: 16),
-            Text('Booking Confirmed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(
+              'Booking Confirmed!',
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             SizedBox(height: 8),
-            Text('Your appointment has been successfully booked.', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: context.colors.textSecondary)),
+            Text(
+              'Your appointment has been successfully booked.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
+            ),
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
@@ -347,7 +413,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               },
               style: Theme.of(context).elevatedButtonTheme.style,
               child: Center(child: Text('View My Bookings')),
-            )
+            ),
           ],
         ),
       ),
@@ -380,7 +446,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (text == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 10),
-      child: InlineStatus(message: text, kind: StatusKind.info, onDismiss: onDismiss),
+      child: InlineStatus(
+        message: text,
+        kind: StatusKind.info,
+        onDismiss: onDismiss,
+      ),
     );
   }
 
@@ -432,85 +502,320 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Book Appointment')),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('1. Choose Service Provider'),
-            SizedBox(height: 4),
-            Text(
-              'Staff who cannot perform every service in your cart are shown greyed out.',
-              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'Book Appointment',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: context.colors.textPrimary,
             ),
-            SizedBox(height: 12),
-            _buildProviderList(),
-            _hint(_providerHint, () => setState(() => _providerHint = null)),
-
-            SizedBox(height: 32),
-
-            _sectionTitle('2. Select Date'),
-            SizedBox(height: 12),
-            _buildDatePicker(),
-            _hint(_dateHint, () => setState(() => _dateHint = null)),
-
-            SizedBox(height: 32),
-
-            _sectionTitle('3. Select Time'),
-            if (_totalDuration > 0) ...[
-              SizedBox(height: 4),
-              Text(
-                'Your services take about $_totalDuration minutes.',
-                style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
+          ),
+          backgroundColor: context.colors.surfaceMuted,
+          elevation: 0,
+          centerTitle: true,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12.0, top: 6.0, bottom: 6.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.colors.accentSoft,
+                shape: BoxShape.circle,
               ),
-            ],
-            SizedBox(height: 16),
-            _buildSlots(),
-            _hint(_slotHint, () => setState(() => _slotHint = null)),
+              child: IconButton(
+                tooltip: 'Back',
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: context.colors.textPrimary,
+                  size: 20,
+                ),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context, rootNavigator: true).maybePop();
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+        body: SingleChildScrollView(
+          controller: _scrollController,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionTitle('1. Choose Service Provider'),
+              const SizedBox(height: 4),
+              Text(
+                'Staff who cannot perform every service in your cart are shown greyed out.',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildProviderList(),
+              _hint(_providerHint, () => setState(() => _providerHint = null)),
 
-            SizedBox(height: 24),
+              const SizedBox(height: 32),
+
+              KeyedSubtree(
+                key: _appointmentSectionKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle('2. Select Date'),
+                    const SizedBox(height: 12),
+                    _buildDatePicker(),
+                    _hint(_dateHint, () => setState(() => _dateHint = null)),
+
+                    const SizedBox(height: 32),
+
+                    _sectionTitle('3. Select Time'),
+                    if (_totalDuration > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your services take about $_totalDuration minutes.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    _buildSlots(),
+                    _hint(_slotHint, () => setState(() => _slotHint = null)),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              _sectionTitle('4. Booking Summary'),
+              const SizedBox(height: 12),
+              _buildBookingSummary(),
+
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _buildBottomBar(),
+      ),
+    );
+  }
+
+  Widget _buildBookingSummary() {
+    if (_cart == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Total estimated duration',
+              style: GoogleFonts.outfit(color: context.colors.textSecondary),
+            ),
+            Text(
+              '$_totalDuration mins',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: context.colors.textPrimary,
+              ),
+            ),
           ],
         ),
+      );
+    }
+
+    final items = (_cart!['items'] as List?) ?? [];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: context.colors.cardShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...items.map((raw) {
+            final item = raw as Map<String, dynamic>;
+            final service = item['service'];
+            final combo = item['combo'];
+            final isCombo = combo != null;
+            final title = isCombo
+                ? (combo['name'] ?? 'Package')
+                : (service != null
+                      ? (service['template']?['name'] ?? 'Service')
+                      : 'Service');
+            final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+            final singlePrice = isCombo
+                ? (_toDouble(combo['price']))
+                : (_toDouble(service?['price']));
+            final lineTotal = singlePrice * qty;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: context.colors.accentSoft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      isCombo ? Icons.card_giftcard : Icons.spa_outlined,
+                      color: AppTheme.accentColor,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          qty > 1
+                              ? '₹${singlePrice.toStringAsFixed(0)} × $qty'
+                              : 'Qty: 1',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: context.colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '₹${lineTotal.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          Divider(color: context.colors.border, height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 16,
+                    color: context.colors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Estimated duration',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '$_totalDuration mins',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _sectionTitle(String text) => Text(
-        text,
-        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
-      );
+    text,
+    style: GoogleFonts.outfit(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: context.colors.textPrimary,
+    ),
+  );
 
   Widget _buildProviderList() {
     if (_isLoadingProviders) {
-      return Center(child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: CircularProgressIndicator(color: AppTheme.accentColor),
-      ));
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(color: AppTheme.accentColor),
+        ),
+      );
     }
 
     if (_providersError.isNotEmpty) {
-      return Text(_providersError, style: GoogleFonts.outfit(color: context.colors.danger));
+      return Text(
+        _providersError,
+        style: GoogleFonts.outfit(color: context.colors.danger),
+      );
     }
 
     if (_providers.isEmpty) {
-      return Text('This salon has no staff available right now.',
-          style: GoogleFonts.outfit(color: context.colors.textSecondary));
+      return Text(
+        'This salon has no staff available right now.',
+        style: GoogleFonts.outfit(color: context.colors.textSecondary),
+      );
     }
 
     return Column(
       children: [
         ..._providers.map((provider) {
           final isEligible = provider['is_eligible'] == true;
-          final missing = (provider['missing_service_names'] as List?)?.cast<String>() ?? [];
+          final missing =
+              (provider['missing_service_names'] as List?)?.cast<String>() ??
+              [];
 
           return _providerTile(
             key: provider['id'].toString(),
             name: provider['name'] ?? 'Staff',
             subtitle: isEligible
-                ? (provider['specialization'] ?? 'Available for all your services')
+                ? (provider['specialization'] ??
+                      'Available for all your services')
                 : 'Does not perform: ${missing.join(', ')}',
             isEligible: isEligible,
           );
@@ -535,16 +840,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ? () => _selectProvider(key)
             : () {
                 AppHaptics.error();
-                setState(() => _providerHint = '$name cannot perform every service in your cart.');
+                setState(
+                  () => _providerHint =
+                      '$name cannot perform every service in your cart.',
+                );
               },
         child: Opacity(
           opacity: isEligible ? 1.0 : 0.5,
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isSelected ? context.colors.accentSoft : context.colors.surface,
+              color: isSelected
+                  ? context.colors.accentSoft
+                  : context.colors.surface,
               border: Border.all(
-                color: isSelected ? AppTheme.accentColor : context.colors.border,
+                color: isSelected
+                    ? AppTheme.accentColor
+                    : context.colors.border,
                 width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(14),
@@ -559,22 +871,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name,
-                          style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.textPrimary)),
+                      Text(
+                        name,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
                       if (subtitle != null && subtitle.isNotEmpty) ...[
                         SizedBox(height: 2),
-                        Text(subtitle,
-                            style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                color: isEligible ? context.colors.textSecondary : context.colors.danger)),
+                        Text(
+                          subtitle,
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: isEligible
+                                ? context.colors.textSecondary
+                                : context.colors.danger,
+                          ),
+                        ),
                       ],
                     ],
                   ),
                 ),
-                if (isSelected) Icon(Icons.check_circle, color: AppTheme.accentColor),
+                if (isSelected)
+                  Icon(Icons.check_circle, color: AppTheme.accentColor),
               ],
             ),
           ),
@@ -590,7 +911,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final today = _today();
     final tomorrow = today.add(const Duration(days: 1));
     final selected = _dateKey(_selectedDate);
-    final isCustom = selected != _dateKey(today) && selected != _dateKey(tomorrow);
+    final isCustom =
+        selected != _dateKey(today) && selected != _dateKey(tomorrow);
 
     void guard(void Function() action) {
       if (!enabled) {
@@ -637,7 +959,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             isCustom
                 ? 'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)}'
                 : 'Pick Today or Tomorrow, or tap the calendar to choose any other date.',
-            style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: context.colors.textTertiary,
+            ),
           ),
         ],
       ),
@@ -656,7 +981,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? context.colors.accentSoft : context.colors.surface,
+          color: isSelected
+              ? context.colors.accentSoft
+              : context.colors.surface,
           border: Border.all(
             color: isSelected ? AppTheme.accentColor : context.colors.border,
             width: isSelected ? 2 : 1,
@@ -675,25 +1002,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? AppTheme.accentColor : context.colors.textPrimary,
+                      color: isSelected
+                          ? AppTheme.accentColor
+                          : context.colors.textPrimary,
                     ),
                   ),
                   SizedBox(height: 2),
                   Text(
                     DateFormat('EEE, MMM d').format(date),
-                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary),
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
-            if (isSelected) Icon(Icons.check_circle, color: AppTheme.accentColor, size: 18),
+            if (isSelected)
+              Icon(Icons.check_circle, color: AppTheme.accentColor, size: 18),
           ],
         ),
       ),
     );
   }
 
-  Widget _calendarButton({required bool isActive, required VoidCallback onTap}) {
+  Widget _calendarButton({
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
@@ -709,7 +1045,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           borderRadius: BorderRadius.circular(14),
         ),
         child: Center(
-          child: Icon(Icons.calendar_today, size: 20, color: AppTheme.accentColor),
+          child: Icon(
+            Icons.calendar_today,
+            size: 20,
+            color: AppTheme.accentColor,
+          ),
         ),
       ),
     );
@@ -717,14 +1057,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildSlots() {
     if (_selectedProviderKey == null) {
-      return _hintBox('Choose a service provider above to see their free time slots.');
+      return _hintBox(
+        'Choose a service provider above to see their free time slots.',
+      );
     }
 
     if (_isLoadingSlots) {
-      return Center(child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: CircularProgressIndicator(color: AppTheme.accentColor),
-      ));
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(color: AppTheme.accentColor),
+        ),
+      );
     }
 
     if (_slotsError != null) {
@@ -749,7 +1093,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
               'This staff member is fully booked on this date. Try another date or provider.',
-              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.warning),
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                color: context.colors.warning,
+              ),
             ),
           ),
         Wrap(
@@ -761,7 +1108,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // Blocks the chosen start time will run into. They are filled the
             // same purple as the start block so the whole appointment reads as
             // one continuous booking.
-            final isOccupied = !isSelected && _isWithinSelectedBooking(slot['time']);
+            final isOccupied =
+                !isSelected && _isWithinSelectedBooking(slot['time']);
 
             Color background;
             Color textColor;
@@ -793,7 +1141,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     }
                   : () {
                       AppHaptics.error();
-                      setState(() => _slotHint = '${slot['time']} — ${_reasonLabel(slot['reason'])}');
+                      setState(
+                        () => _slotHint =
+                            '${slot['time']} — ${_reasonLabel(slot['reason'])}',
+                      );
                     },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -810,7 +1161,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             color: AppTheme.accentColor.withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ]
                       : [],
                 ),
@@ -819,7 +1170,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     duration: const Duration(milliseconds: 200),
                     style: GoogleFonts.outfit(
                       fontSize: 16,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
                       color: textColor,
                       decoration: isAvailable || isOccupied
                           ? TextDecoration.none
@@ -837,24 +1190,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _selectedTime != null && _totalDuration > _kSlotMinutes
               ? 'All the purple blocks together are your $_totalDuration minute appointment, starting at $_selectedTime.'
               : 'Greyed out slots are outside working hours or already booked. Tap one to see why.',
-          style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textTertiary),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            color: context.colors.textTertiary,
+          ),
         ),
       ],
     );
   }
 
   Widget _hintBox(String text) => Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: context.colors.accentSoft,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(text, style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
-      );
+    width: double.infinity,
+    padding: EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: context.colors.accentSoft,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      text,
+      style: GoogleFonts.outfit(
+        fontSize: 14,
+        color: context.colors.textSecondary,
+      ),
+    ),
+  );
 
   Widget _buildBottomBar() {
-    final canBook = _selectedProviderKey != null && _selectedTime != null && !_isBooking;
+    final canBook =
+        _selectedProviderKey != null && _selectedTime != null && !_isBooking;
 
     return SafeArea(
       child: Padding(
@@ -872,34 +1235,75 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
-                Text('₹${_totalAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.textPrimary)),
+                Text(
+                  'Total',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                Text(
+                  '₹${_totalAmount.toStringAsFixed(2)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Advance payable now', style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary)),
-                Text('₹${_advanceAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.accentColor)),
+                Text(
+                  'Advance payable now',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                Text(
+                  '₹${_advanceAmount.toStringAsFixed(2)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.accentColor,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: canBook ? () {
-                  AppHaptics.lightImpact();
-                  _bookAppointment();
-                } : null,
+                onPressed: canBook
+                    ? () {
+                        AppHaptics.lightImpact();
+                        _bookAppointment();
+                      }
+                    : null,
                 style: Theme.of(context).elevatedButtonTheme.style?.copyWith(
-                  padding: MaterialStateProperty.all(EdgeInsets.symmetric(vertical: 16)),
+                  padding: MaterialStateProperty.all(
+                    EdgeInsets.symmetric(vertical: 16),
+                  ),
                 ),
                 child: _isBooking
-                    ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text('Confirm & Pay Advance', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        'Confirm & Pay Advance',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],

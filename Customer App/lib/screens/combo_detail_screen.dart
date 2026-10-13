@@ -49,12 +49,6 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
       await _cartService.addCombo(salonId, comboId);
       if (!mounted) return;
       AppHaptics.lightImpact();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text('${widget.combo['name'] ?? 'Combo'} added to cart'),
-          backgroundColor: context.colors.success,
-        ));
     } on CartConflictException catch (e) {
       if (!mounted) return;
       AppHaptics.error();
