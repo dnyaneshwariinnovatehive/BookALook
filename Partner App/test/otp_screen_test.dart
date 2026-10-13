@@ -437,4 +437,66 @@ void main() {
   test('the resend window is 30 seconds', () {
     expect(OtpScreen.resendSeconds, 30);
   });
+
+  group('clipboard auto-detection', () {
+    testWidgets('clipboard with 6-digit code auto-fills on mount', (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': '847291'};
+          }
+          return null;
+        },
+      );
+
+      final h = _Harness();
+      await _open(tester, h);
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(h.auth.verified, ['847291']);
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('clipboard with WhatsApp message text extracts the 6-digit code', (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': 'Your BookALook verification code is 519283. Do not share.'};
+          }
+          return null;
+        },
+      );
+
+      final h = _Harness();
+      await _open(tester, h);
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(h.auth.verified, ['519283']);
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('clipboard with non-OTP text (e.g. phone number) is ignored', (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': 'Call me at 9876543210 or visit https://example.com'};
+          }
+          return null;
+        },
+      );
+
+      final h = _Harness();
+      await _open(tester, h);
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(h.auth.verified, isEmpty);
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+  });
 }

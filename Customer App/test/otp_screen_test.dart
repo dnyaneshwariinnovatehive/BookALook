@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -163,4 +165,108 @@ void main() {
     expect((idle.border as Border).top.color, AppTheme.darkBorder,
         reason: 'idle box border must follow the dark theme');
   });
+
+  group('clipboard auto-detection', () {
+    testWidgets('clipboard with 6-digit code auto-fills and verifies on mount', (tester) async {
+      String? verifiedCode;
+      dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+      api.debugSetClient(MockClient((request) async {
+        if (request.url.path.endsWith('/verify-otp')) {
+          final body = jsonDecode(request.body);
+          verifiedCode = body['otp']?.toString();
+          return http.Response(
+            jsonEncode({'access_token': 'token', 'user': {'id': '1', 'role': 'customer'}}),
+            200,
+          );
+        }
+        return http.Response('{}', 200);
+      }));
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': '847291'};
+          }
+          return null;
+        },
+      );
+
+      await tester.pumpWidget(_wrap(const OtpScreen(phone: '9876543210')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(verifiedCode, '847291');
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('clipboard with WhatsApp message text extracts the 6-digit code', (tester) async {
+      String? verifiedCode;
+      dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+      api.debugSetClient(MockClient((request) async {
+        if (request.url.path.endsWith('/verify-otp')) {
+          final body = jsonDecode(request.body);
+          verifiedCode = body['otp']?.toString();
+          return http.Response(
+            jsonEncode({'access_token': 'token', 'user': {'id': '1', 'role': 'customer'}}),
+            200,
+          );
+        }
+        return http.Response('{}', 200);
+      }));
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': 'Your BookALook verification code is 519283. Do not share.'};
+          }
+          return null;
+        },
+      );
+
+      await tester.pumpWidget(_wrap(const OtpScreen(phone: '9876543210')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(verifiedCode, '519283');
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    testWidgets('clipboard with non-OTP text (e.g. phone number) is ignored', (tester) async {
+      String? verifiedCode;
+      dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+      api.debugSetClient(MockClient((request) async {
+        if (request.url.path.endsWith('/verify-otp')) {
+          final body = jsonDecode(request.body);
+          verifiedCode = body['otp']?.toString();
+          return http.Response('{}', 200);
+        }
+        return http.Response('{}', 200);
+      }));
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': 'Call me at 9876543210 or visit https://example.com'};
+          }
+          return null;
+        },
+      );
+
+      await tester.pumpWidget(_wrap(const OtpScreen(phone: '9876543210')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(verifiedCode, isNull);
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.controller?.text, '');
+
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+  });
 }
+

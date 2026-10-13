@@ -26,7 +26,7 @@ class OtpScreen extends StatefulWidget {
   _OtpScreenState createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends State<OtpScreen> with WidgetsBindingObserver {
   final _otpController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
@@ -41,6 +41,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
   int? _resendIn;
   Timer? _resendTimer;
+
+  /// Tracks the last code attempted or autofilled from clipboard to avoid duplicate loops.
+  String? _lastAttemptedOtp;
 
   /// Single cancellable periodic timer rather than a chain of awaits, so
   /// leaving the screen cannot leave a pending timer behind.
@@ -65,14 +68,72 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startResendCountdown(30);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkClipboardForOtp();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _resendTimer?.cancel();
     _otpController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkClipboardForOtp();
+    }
+  }
+
+  /// Extracts a clean 6-digit OTP from text.
+  /// Handles pure 6-digit code ("123456") or a single 6-digit code inside a sentence.
+  static String? _extractOtp(String? text) {
+    if (text == null) return null;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+
+    if (RegExp(r'^\d{6}$').hasMatch(trimmed)) {
+      return trimmed;
+    }
+
+    final matches = RegExp(r'\b\d{6}\b').allMatches(trimmed);
+    if (matches.length == 1) {
+      return matches.first.group(0);
+    }
+
+    return null;
+  }
+
+  /// Auto-detects 6-digit OTP copied to clipboard (e.g. from WhatsApp "Copy Code" button).
+  Future<void> _checkClipboardForOtp() async {
+    if (!mounted || _verified || _isLoading) return;
+
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (!mounted || _verified || _isLoading) return;
+
+      final text = data?.text;
+      final code = _extractOtp(text);
+
+      // Edge Cases:
+      // 1. No valid 6-digit code found in clipboard -> do nothing
+      // 2. Code matches what was already attempted -> do not re-attempt (prevents loops)
+      // 3. Code matches what is already typed in the controller -> do nothing
+      if (code == null || code == _lastAttemptedOtp || _otpController.text == code) {
+        return;
+      }
+
+      _lastAttemptedOtp = code;
+      AppHaptics.lightImpact();
+      _otpController.text = code;
+    } catch (_) {
+      // Ignore clipboard access issues or platform permission restrictions
+    }
   }
 
   void _fail(String message) {
@@ -86,6 +147,7 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _resend() async {
+    _lastAttemptedOtp = null; // Clear so a new incoming code can be auto-detected
     FocusScope.of(context).unfocus();
     setState(() {
       _error = null;
@@ -117,6 +179,7 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _verifyOtp() async {
+    if (_isLoading) return;
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
       _fail('Enter all 6 digits to continue.');
