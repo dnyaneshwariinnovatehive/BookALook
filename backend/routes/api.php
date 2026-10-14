@@ -164,6 +164,16 @@ Route::prefix('superadmin')->group(function () {
     // Protected superadmin routes
         Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
+
+        // First-Time Customer Offers
+        Route::get('/offers/options', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'options']);
+        Route::get('/offers', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'index']);
+        Route::post('/offers', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'store']);
+        Route::get('/offers/{id}', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'show']);
+        Route::put('/offers/{id}', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'update']);
+        Route::post('/offers/{id}/toggle-active', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'toggleActive']);
+        Route::delete('/offers/{id}', [\App\Http\Controllers\Api\SuperAdmin\FirstTimeOfferController::class, 'destroy']);
+
         Route::apiResource('banners', \App\Http\Controllers\Api\SuperAdmin\BannerController::class);
         Route::post('/banners/preview', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'preview']);
         Route::post('/banners/{id}/track', [\App\Http\Controllers\Api\SuperAdmin\BannerController::class, 'track']);

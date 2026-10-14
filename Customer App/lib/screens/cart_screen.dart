@@ -391,6 +391,8 @@ class _CartScreenState extends State<CartScreen> {
 
           ...items.map(_buildItemTile),
 
+          _buildBillBreakdownCard(summary),
+
           if (offers.isNotEmpty) ...[
             SizedBox(height: 20),
             ...offers.map(
@@ -598,14 +600,70 @@ class _CartScreenState extends State<CartScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '₹${totalPrice.toStringAsFixed(0)}',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.accentColor,
-                ),
-              ),
+              Builder(builder: (context) {
+                final summary = _cart?['summary'] as Map<String, dynamic>?;
+                final ftd = summary?['first_time_discount'] is Map<String, dynamic>
+                    ? summary!['first_time_discount'] as Map<String, dynamic>
+                    : (summary?['first_time_discount'] is Map
+                        ? Map<String, dynamic>.from(summary!['first_time_discount'] as Map)
+                        : null);
+                final serviceId = item['service_id']?.toString() ?? item['service']?['id']?.toString();
+                final lineFtd = (!isCombo && ftd != null && ftd['lines'] is Map && serviceId != null)
+                    ? (ftd['lines'] as Map)[serviceId] as Map<String, dynamic>?
+                    : null;
+                final lineDiscount = lineFtd != null ? (double.tryParse('${lineFtd['line_discount'] ?? 0}') ?? 0.0) : 0.0;
+                final finalLinePrice = lineFtd != null && lineFtd['final_line_price'] != null
+                    ? (double.tryParse('${lineFtd['final_line_price']}') ?? totalPrice)
+                    : (lineDiscount > 0 ? (totalPrice - lineDiscount) : totalPrice);
+
+                if (lineDiscount > 0) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '₹${finalLinePrice.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '₹${totalPrice.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              decoration: TextDecoration.lineThrough,
+                              color: context.colors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'First visit: save ₹${lineDiscount.toStringAsFixed(0)}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.success,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Text(
+                  '₹${totalPrice.toStringAsFixed(0)}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.accentColor,
+                  ),
+                );
+              }),
               Container(
                 decoration: BoxDecoration(
                   color: context.colors.surfaceMuted,
@@ -665,6 +723,159 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBillBreakdownCard(Map<String, dynamic> summary) {
+    final listTotal = double.tryParse('${summary['list_total'] ?? 0}') ?? 0.0;
+    final totalAmount = double.tryParse('${summary['total_amount'] ?? 0}') ?? 0.0;
+    final totalSaving = double.tryParse('${summary['saving'] ?? 0}') ?? 0.0;
+
+    final ftd = summary['first_time_discount'] is Map<String, dynamic>
+        ? summary['first_time_discount'] as Map<String, dynamic>
+        : (summary['first_time_discount'] is Map
+            ? Map<String, dynamic>.from(summary['first_time_discount'] as Map)
+            : null);
+    final bool hasFtd = ftd != null && ftd['applied'] == true;
+    final double ftdAmount = hasFtd ? (double.tryParse('${ftd['total_discount'] ?? 0}') ?? 0.0) : 0.0;
+    final String? ftdOfferName = ftd?['offer_name']?.toString();
+    final double comboSavings = (totalSaving - ftdAmount) > 0 ? (totalSaving - ftdAmount) : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.colors.border, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_outlined, size: 18, color: AppTheme.accentColor),
+              const SizedBox(width: 8),
+              Text(
+                'Bill details',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _summaryRow('Item total', '₹${listTotal.toStringAsFixed(0)}'),
+          if (comboSavings > 0) ...[
+            const SizedBox(height: 8),
+            _summaryRow(
+              'Package savings',
+              '-₹${comboSavings.toStringAsFixed(0)}',
+              valueColor: context.colors.success,
+            ),
+          ],
+          if (hasFtd && ftdAmount > 0) ...[
+            const SizedBox(height: 8),
+            _summaryRow(
+              ftdOfferName != null && ftdOfferName.isNotEmpty
+                  ? 'First-time offer ($ftdOfferName)'
+                  : 'First-time customer discount',
+              '-₹${ftdAmount.toStringAsFixed(0)}',
+              valueColor: context.colors.success,
+              isBadge: true,
+            ),
+          ],
+          const SizedBox(height: 12),
+          Divider(color: context.colors.border, height: 1),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'To pay',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+              Text(
+                '₹${totalAmount.toStringAsFixed(0)}',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.accentColor,
+                ),
+              ),
+            ],
+          ),
+          if (totalSaving > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: context.colors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.savings_outlined, size: 15, color: context.colors.success),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'You are saving ₹${totalSaving.toStringAsFixed(0)} on this order',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.success,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isBadge = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isBadge) ...[
+              const Icon(Icons.auto_awesome, size: 14, color: AppTheme.accentColor),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                color: context.colors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? context.colors.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 

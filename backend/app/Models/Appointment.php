@@ -11,8 +11,22 @@ class Appointment extends Model
 
     protected $guarded = [];
 
-    /** The QR hash is a credential — never ship it to a client. */
-    protected $hidden = ['qr_token_hash'];
+    protected $casts = [
+        'first_time_discount_amount' => 'decimal:2',
+    ];
+
+    /** The QR hash and internal phone hash are credentials/internal identifiers — never ship them to a client. */
+    protected $hidden = ['qr_token_hash', 'customer_phone_hash'];
+
+    public function firstTimeOffer()
+    {
+        return $this->belongsTo(FirstTimeOffer::class, 'first_time_offer_id');
+    }
+
+    public function firstTimeOfferRedemption()
+    {
+        return $this->hasOne(FirstTimeOfferRedemption::class, 'appointment_id');
+    }
 
     public function salon()
     {

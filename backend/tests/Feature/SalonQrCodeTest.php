@@ -129,7 +129,14 @@ class SalonQrCodeTest extends TestCase
 
     public function test_superadmin_can_move_the_address_every_poster_points_at(): void
     {
-        $superAdmin = User::where('role', 'superadmin')->firstOrFail();
+        $superAdmin = User::where('role', 'superadmin')->first() ?? User::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Super Admin',
+            'phone' => '9999999999',
+            'password_hash' => 'x',
+            'role' => 'superadmin',
+            'is_active' => true,
+        ]);
 
         $this->actingAs($superAdmin, 'sanctum')
             ->putJson('/api/superadmin/settings/policy', [
@@ -207,21 +214,24 @@ class SalonQrCodeTest extends TestCase
             'status' => 'active',
         ]);
 
-        $plan = SubscriptionPlan::first();
+        $plan = SubscriptionPlan::first() ?? SubscriptionPlan::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Standard Plan',
+            'price' => 999,
+            'is_active' => true,
+        ]);
 
-        if ($plan) {
-            SalonSubscription::create([
-                'salon_id' => $salon->id,
-                'plan_id' => $plan->id,
-                'billing_type' => BillingModel::SUBSCRIPTION,
-                'plan_price_snapshot' => $plan->price,
-                'start_date' => Carbon::today()->subDays(10),
-                // A lapsed plan is what makes a salon unbookable while its
-                // poster is still on the wall.
-                'end_date' => $bookable ? Carbon::today()->addDays(20) : Carbon::yesterday(),
-                'status' => $bookable ? 'active' : 'expired',
-            ]);
-        }
+        SalonSubscription::create([
+            'salon_id' => $salon->id,
+            'plan_id' => $plan->id,
+            'billing_type' => BillingModel::SUBSCRIPTION,
+            'plan_price_snapshot' => $plan->price,
+            'start_date' => Carbon::today()->subDays(10),
+            // A lapsed plan is what makes a salon unbookable while its
+            // poster is still on the wall.
+            'end_date' => $bookable ? Carbon::today()->addDays(20) : Carbon::yesterday(),
+            'status' => $bookable ? 'active' : 'expired',
+        ]);
 
         return [$salon, $owner];
     }

@@ -298,19 +298,22 @@ class DistanceAndLocationTest extends TestCase
             'location_source' => $at === null ? null : $source,
         ]);
 
-        $plan = SubscriptionPlan::first();
+        $plan = SubscriptionPlan::first() ?? SubscriptionPlan::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Standard Plan',
+            'price' => 999,
+            'is_active' => true,
+        ]);
 
-        if ($plan) {
-            SalonSubscription::create([
-                'salon_id' => $salon->id,
-                'plan_id' => $plan->id,
-                'billing_type' => BillingModel::SUBSCRIPTION,
-                'plan_price_snapshot' => $plan->price,
-                'start_date' => Carbon::today()->subDay(),
-                'end_date' => Carbon::today()->addDays(30),
-                'status' => 'active',
-            ]);
-        }
+        SalonSubscription::create([
+            'salon_id' => $salon->id,
+            'plan_id' => $plan->id,
+            'billing_type' => BillingModel::SUBSCRIPTION,
+            'plan_price_snapshot' => $plan->price,
+            'start_date' => Carbon::today()->subDay(),
+            'end_date' => Carbon::today()->addDays(30),
+            'status' => 'active',
+        ]);
 
         return $salon;
     }

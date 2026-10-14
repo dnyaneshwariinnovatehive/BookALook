@@ -105,7 +105,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_a_lapsed_salon_is_reported_daily_and_deduplicated_within_the_day(): void
     {
-        [$salon, $collaborator] = $this->fixture();
+        [$salon, , $collaborator] = $this->fixture();
         $this->givenSubscription($salon, endedDaysAgo: 2);
 
         $this->runReminders();
@@ -142,7 +142,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_a_renewal_tells_the_collaborator_the_call_landed(): void
     {
-        [$salon, $collaborator] = $this->fixture();
+        [$salon, , $collaborator] = $this->fixture();
         $this->givenSubscription($salon, endedDaysAgo: 2);
 
         $this->runReminders();
@@ -163,8 +163,8 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_one_renewal_is_confirmed_once_even_if_the_caller_retries(): void
     {
-        [$salon, $collaborator] = $this->fixture();
-        $this->givenSubscription($salon, endsInDays: 30);
+        [$salon, , $collaborator] = $this->fixture();
+        $subscription = $this->givenSubscription($salon, endsInDays: 30);
 
         $service = app(NotificationService::class);
 
@@ -180,7 +180,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_a_salon_reassigned_away_is_never_reported_again(): void
     {
-        [$salon, $collaborator] = $this->fixture();
+        [$salon, , $collaborator] = $this->fixture();
         $this->givenSubscription($salon, endsInDays: 7);
 
         $salon->update(['assigned_collaborator_id' => null]);
@@ -194,9 +194,8 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_the_inbox_holds_notices_for_the_salons_still_assigned(): void
     {
-        [$mine] = $this->fixture();
+        [$mine, , $collaborator] = $this->fixture();
         [$theirs] = $this->fixture();
-        [$collaborator] = $this->fixtureCollaborator();
 
         $this->givenNotice($mine, $collaborator, NotificationType::ASSIGNED_SALON_EXPIRING);
         $this->givenNotice($theirs, $collaborator, NotificationType::ASSIGNED_SALON_EXPIRING);
@@ -213,8 +212,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_the_bell_counts_only_the_notices_worth_interrupting_for(): void
     {
-        [$salon] = $this->fixture();
-        [$collaborator] = $this->fixtureCollaborator();
+        [$salon, , $collaborator] = $this->fixture();
 
         $this->givenNotice($salon, $collaborator, NotificationType::ASSIGNED_SALON_EXPIRING);
         $this->givenNotice($salon, $collaborator, NotificationType::ASSIGNED_SALON_RENEWED);
@@ -231,8 +229,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_a_notice_is_newest_first_and_reading_one_drops_the_badge(): void
     {
-        [$salon] = $this->fixture();
-        [$collaborator] = $this->fixtureCollaborator();
+        [$salon, , $collaborator] = $this->fixture();
 
         $older = $this->givenNotice($salon, $collaborator, NotificationType::ASSIGNED_SALON_EXPIRING);
         $newer = $this->givenNotice($salon, $collaborator, NotificationType::ASSIGNED_SALON_RENEWED);
@@ -259,8 +256,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 
     public function test_a_collaborator_cannot_read_a_notice_belonging_to_somebody_elses_salon(): void
     {
-        [$salon] = $this->fixture();
-        [$collaborator] = $this->fixtureCollaborator();
+        [$salon, , $collaborator] = $this->fixture();
 
         // Reassigned away, so the salon is out of scope but the id is guessable.
         $notice = $this->givenNotice($salon, $collaborator, NotificationType::ASSIGNED_SALON_EXPIRING);
@@ -277,6 +273,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
     {
         [$salon] = $this->fixture();
         [$mine, $theirs] = [$this->fixtureCollaborator(), $this->fixtureCollaborator()];
+        $salon->update(['assigned_collaborator_id' => $mine->id]);
 
         $a = $this->givenNotice($salon, $mine, NotificationType::ASSIGNED_SALON_EXPIRING);
         $b = $this->givenNotice($salon, $theirs, NotificationType::ASSIGNED_SALON_EXPIRING);
@@ -435,11 +432,12 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
         ?int $endedDaysAgo = null,
         ?int $endsInDays = null
     ): SalonSubscription {
-        $plan = SubscriptionPlan::first();
-
-        if (! $plan) {
-            $this->markTestSkipped('needs a subscription plan');
-        }
+        $plan = SubscriptionPlan::first() ?? SubscriptionPlan::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Standard Plan',
+            'price' => 999,
+            'is_active' => true,
+        ]);
 
         SalonSubscription::where('salon_id', $salon->id)->update(['status' => 'cancelled']);
 
@@ -466,8 +464,10 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
     {
         $unique = substr(bin2hex(random_bytes(6)), 0, 10);
 
-        $enquiryId = DB::table('salon_enquiries')->insertGetId([
-            'id' => (string) Str::uuid(),
+        $uuid = (string) Str::uuid();
+
+        DB::table('salon_enquiries')->insert([
+            'id' => $uuid,
             'salon_name' => $salon->name,
             'owner_name' => 'Owner',
             'phone' => '9000000000',
@@ -476,7 +476,7 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $salon->update(['enquiry_id' => $enquiryId]);
+        $salon->update(['enquiry_id' => $uuid]);
     }
 
     /**

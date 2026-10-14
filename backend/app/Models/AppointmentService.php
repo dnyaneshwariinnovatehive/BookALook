@@ -11,6 +11,10 @@ class AppointmentService extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'first_time_discount_amount' => 'decimal:2',
+    ];
+
     public function appointment()
     {
         return $this->belongsTo(Appointment::class);

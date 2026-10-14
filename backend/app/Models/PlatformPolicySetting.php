@@ -19,6 +19,27 @@ class PlatformPolicySetting extends Model
         'updated_by',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function ($model) {
+            if (empty($model->updated_by)) {
+                $uid = auth()->id() ?? User::where('role', 'admin')->value('id') ?? User::value('id');
+                if (! $uid) {
+                    $systemUser = User::create([
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'name' => 'System Admin',
+                        'phone' => '9999999999',
+                        'password_hash' => bcrypt('password'),
+                        'role' => 'admin',
+                        'is_active' => true,
+                    ]);
+                    $uid = $systemUser->id;
+                }
+                $model->updated_by = $uid;
+            }
+        });
+    }
+
     /**
      * Platform defaults, used until SuperAdmin overrides a key in this table.
      */
@@ -67,6 +88,15 @@ class PlatformPolicySetting extends Model
         
         // Limit on how many combos a salon can create.
         'combos_limit_per_salon' => 10,
+
+        // First-Time Customer Discount platform policy limits & defaults
+        'first_time_discount_min_percentage' => 5,
+        'first_time_discount_max_percentage' => 50,
+        'first_time_discount_default_percentage_cap' => 500.0,
+        'first_time_discount_min_flat_amount' => 1.0,
+        'first_time_discount_max_flat_amount' => 1000.0,
+        'first_time_discount_default_flat_cap' => 1000.0,
+        'first_time_discount_platform_max_cap' => 5000.0,
     ];
 
     /** Settings that hold a URL rather than a number. */

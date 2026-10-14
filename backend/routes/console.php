@@ -17,6 +17,9 @@ Schedule::command('app:check-subscriptions')->hourly();
 // the payment sheet has ten minutes, the next customer should not wait longer.
 Schedule::command('app:release-payment-holds')->everyMinute()->withoutOverlapping();
 
+// Reconcile and retry pending payment refunds that timed out or failed previously.
+Schedule::command('app:reconcile-pending-refunds')->everyTenMinutes()->withoutOverlapping();
+
 // Early each morning, before anyone opens the payouts screen. The command
 // decides what is due: the weekly run every day, the monthly commission run
 // only on the 1st. Nothing here moves money — it prepares the figures.

@@ -1,0 +1,325 @@
+/* ============================================================
+   Offers & Discounts Management Styles
+   Uses theme tokens from globals.css
+   ============================================================ */
+
+.container {
+  width: 100%;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.tableShell {
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.searchField {
+  flex: 1 1 220px;
+  max-width: 380px;
+  min-width: 180px;
+}
+
+.filterSelect {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-color);
+  color: var(--text-heading);
+  font-size: 13.5px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent-color);
+}
+
+.offerNameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.offerTitle {
+  font-weight: 650;
+  color: var(--text-heading);
+  font-size: 14px;
+}
+
+.offerDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.discountValueCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.discountMain {
+  font-weight: 700;
+  color: var(--accent-text);
+  font-size: 14px;
+}
+
+.discountSub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.actionsCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Modal Form Styles */
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 75vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.formSection {
+  background: var(--surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.sectionTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-heading);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.formGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.formGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .formGrid2, .formGrid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.radioGroup {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.radioCard {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.radioCard:hover {
+  border-color: var(--border-strong);
+}
+
+.radioCardSelected {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+}
+
+.radioCard input {
+  margin-top: 3px;
+  accent-color: var(--accent-color);
+}
+
+.radioContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radioLabel {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-heading);
+}
+
+.radioDesc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.selectorContainer {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-color);
+  overflow: hidden;
+}
+
+.selectorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border-color);
+  gap: 10px;
+}
+
+.selectorSearch {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-color);
+  color: var(--text-heading);
+  flex: 1;
+}
+
+.selectorList {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selectorItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.selectorItem:hover {
+  background: var(--surface-2);
+}
+
+.selectorItem input {
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.itemMeta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.categoryGroup {
+  margin-bottom: 6px;
+}
+
+.categoryTitle {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  background: var(--surface-3);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.previewBox {
+  border: 1px dashed var(--accent-ring);
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.previewTitle {
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.previewText {
+  font-size: 13px;
+  color: var(--text-heading);
+  line-height: 1.5;
+}
+
+.validationWarning {
+  color: var(--color-danger, #ef4444);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

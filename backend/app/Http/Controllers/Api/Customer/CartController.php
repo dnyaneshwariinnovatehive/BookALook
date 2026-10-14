@@ -67,6 +67,37 @@ class CartController extends Controller
 
         $payload = $cart->toArray();
 
+        if (!empty($payload['items'])) {
+            foreach ($payload['items'] as &$item) {
+                $qty = max(1, (int) ($item['quantity'] ?? 1));
+                if (!empty($item['combo'])) {
+                    $itemPrice = (float) ($item['combo']['price'] ?? 0);
+                    if ($itemPrice <= 0 && !empty($item['combo']['services'])) {
+                        $itemPrice = (float) array_sum(array_map(function ($s) {
+                            return (float) ($s['pivot']['combo_special_price'] ?? $s['price'] ?? 0);
+                        }, $item['combo']['services']));
+                        $item['combo']['price'] = round($itemPrice, 2);
+                    }
+                    $item['price'] = round($itemPrice, 2);
+                    $item['line_total'] = round($itemPrice * $qty, 2);
+                } elseif (!empty($item['service'])) {
+                    $itemPrice = (float) ($item['service']['price'] ?? 0);
+                    $lineTotal = round($itemPrice * $qty, 2);
+                    $item['price'] = round($itemPrice, 2);
+                    $item['line_total'] = $lineTotal;
+
+                    $ftoLine = $priced['first_time_discount']['lines'][$item['service_id']] ?? null;
+                    if ($ftoLine && ($ftoLine['line_discount'] ?? 0) > 0) {
+                        $item['first_time_discount_amount'] = (float) $ftoLine['line_discount'];
+                        $item['final_price'] = (float) $ftoLine['final_line_price'];
+                    } else {
+                        $item['first_time_discount_amount'] = 0.0;
+                        $item['final_price'] = $lineTotal;
+                    }
+                }
+            }
+        }
+
         $payload['summary'] = [
             'item_count' => $priced['item_count'],
             'total_amount' => $priced['total'],
@@ -76,6 +107,7 @@ class CartController extends Controller
             'saving' => $priced['saving'],
             'advance_amount' => $priced['advance'],
             'total_duration_minutes' => $priced['duration'],
+            'first_time_discount' => $priced['first_time_discount'] ?? null,
         ];
 
         // Packages the cart already qualifies for, applied automatically.

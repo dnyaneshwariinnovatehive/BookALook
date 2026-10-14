@@ -27,6 +27,33 @@ class Combo extends Model
         'advance_percentage' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'price',
+        'original_price',
+    ];
+
+    public function getPriceAttribute(): float
+    {
+        if ($this->relationLoaded('services')) {
+            return (float) round($this->services->sum(function ($service) {
+                return (float) ($service->pivot->combo_special_price ?? $service->price);
+            }), 2);
+        }
+
+        return 0.0;
+    }
+
+    public function getOriginalPriceAttribute(): float
+    {
+        if ($this->relationLoaded('services')) {
+            return (float) round($this->services->sum(function ($service) {
+                return (float) $service->price;
+            }), 2);
+        }
+
+        return 0.0;
+    }
+
     public function salon()
     {
         return $this->belongsTo(Salon::class);

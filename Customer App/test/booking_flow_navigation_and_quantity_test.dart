@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/theme/app_colors.dart';
 
@@ -476,6 +475,97 @@ void main() {
         expect(calculatedDuration, (45 * 2) + (60 * 1)); // 150 mins
         final advancePayable = calculatedTotal * 0.20; // 20% advance rule
         expect(advancePayable, 560.0);
+      },
+    );
+
+    test(
+      'booking summary correctly prices combos when price is in combo or computed from services',
+      () {
+        double getItemSinglePrice(Map<String, dynamic> item) {
+          final combo = item['combo'];
+          if (combo != null && combo is Map<String, dynamic>) {
+            if (combo['price'] != null) {
+              final p = double.tryParse('${combo['price']}') ?? 0.0;
+              if (p > 0) return p;
+            }
+            double comboPrice = 0.0;
+            final services = combo['services'] as List? ?? [];
+            for (final s in services) {
+              if (s is Map<String, dynamic>) {
+                final special =
+                    s['pivot']?['combo_special_price'] ?? s['price'];
+                comboPrice += double.tryParse('$special') ?? 0.0;
+              }
+            }
+            if (comboPrice > 0) return comboPrice;
+          }
+
+          final service = item['service'];
+          if (service != null && service is Map<String, dynamic>) {
+            return double.tryParse('${service['price']}') ?? 0.0;
+          }
+
+          if (item['price'] != null) {
+            return double.tryParse('${item['price']}') ?? 0.0;
+          }
+
+          return 0.0;
+        }
+
+        // Case A: combo with explicit price
+        final comboWithPrice = {
+          'id': 1,
+          'combo_id': 'combo-1',
+          'quantity': 2,
+          'combo': {
+            'id': 'combo-1',
+            'name': 'Grooming Pack',
+            'price': 650.0,
+            'services': [],
+          },
+        };
+        final priceA = getItemSinglePrice(comboWithPrice);
+        expect(priceA, 650.0);
+        expect(priceA * (comboWithPrice['quantity'] as int), 1300.0);
+
+        // Case B: combo without price property but with constituent services
+        final comboWithoutDirectPrice = {
+          'id': 2,
+          'combo_id': 'combo-2',
+          'quantity': 1,
+          'combo': {
+            'id': 'combo-2',
+            'name': 'Spa Package',
+            'services': [
+              {
+                'id': 's1',
+                'name': 'Massage',
+                'price': 1000.0,
+                'pivot': {'combo_special_price': 800.0},
+              },
+              {
+                'id': 's2',
+                'name': 'Facial',
+                'price': 500.0,
+                'pivot': {'combo_special_price': 400.0},
+              },
+            ],
+          },
+        };
+        final priceB = getItemSinglePrice(comboWithoutDirectPrice);
+        expect(priceB, 1200.0); // 800 + 400
+        expect(priceB * (comboWithoutDirectPrice['quantity'] as int), 1200.0);
+
+        // Case C: item with direct price key from backend enrichment
+        final itemWithDirectPrice = {
+          'id': 3,
+          'combo_id': 'combo-3',
+          'quantity': 1,
+          'price': 999.0,
+          'combo': {'id': 'combo-3', 'name': 'Special Deal'},
+        };
+        final priceC = getItemSinglePrice(itemWithDirectPrice);
+        expect(priceC, 999.0);
       },
     );
   });

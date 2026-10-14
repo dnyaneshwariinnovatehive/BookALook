@@ -210,6 +210,95 @@ class AppointmentController extends Controller
             $servicesById = $cart->items->filter(fn ($i) => $i->service)
                 ->mapWithKeys(fn ($i) => [$i->service_id => $i->service]);
 
+            // Handle first-time customer offer reservation inside the transaction
+            $ftd = $priced['first_time_discount'] ?? null;
+            $phoneHash = \App\Models\FirstTimeOffer::hashPhone($user->phone);
+
+            if ($ftd && ! empty($ftd['applied']) && ! empty($ftd['offer_id'])) {
+                $offer = \App\Models\FirstTimeOffer::where('id', $ftd['offer_id'])->lockForUpdate()->first();
+                $eligibilityService = app(\App\Services\CustomerOfferEligibilityService::class);
+
+                if (! $offer || ! $offer->is_active || ! $offer->isCurrentlyValid()) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'The promotional offer has expired or is no longer active.',
+                        'offer_invalid' => true,
+                    ], 422);
+                }
+
+                if ($eligibilityService->isCampaignLimitReached($offer, true)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'This promotional offer has reached its maximum redemption capacity.',
+                        'offer_limit_reached' => true,
+                    ], 409);
+                }
+
+                if ($eligibilityService->hasQualifyingBooking($user, $offer->scope, $salon_id)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'You are not eligible for this first-time customer offer.',
+                        'ineligible_offer' => true,
+                    ], 422);
+                }
+
+                if ($eligibilityService->hasCommittedRedemption($user, $offer->id)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'This first-time offer has already been redeemed.',
+                        'already_redeemed' => true,
+                    ], 422);
+                }
+
+                if ($eligibilityService->hasActiveReservation($user, $offer->id)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'An active reservation for this offer is already in progress.',
+                        'conflict' => 'active_reservation_in_progress',
+                    ], 409);
+                }
+
+                $entitlementKey = $offer->makeEntitlementKey($user, $salon_id);
+
+                $appointment->forceFill([
+                    'first_time_offer_id' => $offer->id,
+                    'first_time_discount_amount' => (float) $ftd['total_discount'],
+                    'customer_phone_hash' => $phoneHash,
+                ])->save();
+
+                try {
+                    \App\Models\FirstTimeOfferRedemption::create([
+                        'offer_id' => $offer->id,
+                        'customer_id' => $user->id,
+                        'customer_phone_hash' => $phoneHash,
+                        'salon_id' => $salon_id,
+                        'appointment_id' => $appointment->id,
+                        'status' => \App\Models\FirstTimeOfferRedemption::STATUS_RESERVED,
+                        'active_entitlement_key' => $entitlementKey,
+                        'scope' => $offer->scope,
+                        'discount_amount' => (float) $ftd['total_discount'],
+                        'reserved_at' => now(),
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    DB::rollBack();
+
+                    $isUniqueViolation = $e->getCode() === '23505'
+                        || ($e->getCode() === '23000' && str_contains(strtolower($e->getMessage()), 'unique'))
+                        || str_contains(strtolower($e->getMessage()), 'duplicate');
+
+                    if ($isUniqueViolation) {
+                        return response()->json([
+                            'message' => 'An active booking attempt is already in progress for this offer.',
+                            'conflict' => true,
+                        ], 409);
+                    }
+
+                    throw $e;
+                }
+            } elseif ($phoneHash) {
+                $appointment->forceFill(['customer_phone_hash' => $phoneHash])->save();
+            }
+
             foreach ($priced['applied_combos'] as $match) {
                 for ($i = 0; $i < $match['applications']; $i++) {
                     foreach ($match['services'] as $line) {
@@ -234,8 +323,22 @@ class AppointmentController extends Controller
                     continue;
                 }
 
-                for ($i = 0; $i < $line['quantity']; $i++) {
-                    $this->createAppointmentService($appointment->id, $service, (float) $line['price']);
+                $lineDiscount = 0.0;
+                if ($ftd && ! empty($ftd['lines'][$line['service_id']])) {
+                    $lineDiscount = (float) $ftd['lines'][$line['service_id']]['line_discount'];
+                }
+
+                $qty = max(1, (int) $line['quantity']);
+                $unitDiscount = $qty > 0 ? round($lineDiscount / $qty, 2) : 0.0;
+
+                for ($i = 0; $i < $qty; $i++) {
+                    $this->createAppointmentService(
+                        $appointment->id,
+                        $service,
+                        (float) $line['price'],
+                        null,
+                        $unitDiscount
+                    );
                 }
             }
 
@@ -392,30 +495,30 @@ class AppointmentController extends Controller
             ]);
         }
 
-        if ($appointment->status !== 'pending_payment') {
-            return response()->json(['message' => 'This booking is not awaiting payment.'], 400);
-        }
-
-        if ($appointment->payment_hold_expires_at && now()->greaterThan($appointment->payment_hold_expires_at)) {
-            $this->payments->release($appointment, 'Payment was not completed in time.');
-
-            return response()->json([
-                'message' => 'The hold on your slot expired before the payment came through. Please book again.',
-                'hold_expired' => true,
-            ], 409);
-        }
-
+        // Delegate payment verification, race reconciliation, and atomic settlement to BookingPaymentService
         $result = $this->payments->confirm($appointment, $paymentId, $signature, $request->user()->id);
 
         if (! $result['ok']) {
+            if (! empty($result['hold_expired'])) {
+                return response()->json([
+                    'message' => $result['message'],
+                    'hold_expired' => true,
+                    'refunded' => $result['refunded'] ?? false,
+                    'refund_pending' => $result['refund_pending'] ?? false,
+                    'already_refunded' => $result['already_refunded'] ?? false,
+                ], 409);
+            }
+
             return response()->json(['message' => $result['message']], 422);
         }
 
-        $this->settleBooking($appointment, $this->activeCart($request, $appointment->salon_id));
+        $freshAppointment = $appointment->fresh();
+
+        $this->settleBooking($freshAppointment, $this->activeCart($request, $freshAppointment->salon_id));
 
         return response()->json([
             'message' => 'Payment received. Your appointment is confirmed.',
-            'appointment' => $this->presentBooking($appointment->fresh()->load($this->bookingRelations())),
+            'appointment' => $this->presentBooking($freshAppointment->load($this->bookingRelations())),
         ]);
     }
 
@@ -434,6 +537,15 @@ class AppointmentController extends Controller
                 'status' => 'scheduled',
                 'payment_hold_expires_at' => null,
             ])->save();
+
+            // If the appointment has an active reservation, commit it
+            $redemption = \App\Models\FirstTimeOfferRedemption::where('appointment_id', $appointment->id)
+                ->where('status', \App\Models\FirstTimeOfferRedemption::STATUS_RESERVED)
+                ->first();
+
+            if ($redemption) {
+                $redemption->commit();
+            }
 
             if ($cart) {
                 $cart->items()->delete();
@@ -519,14 +631,20 @@ class AppointmentController extends Controller
         return [$providerId];
     }
 
-    private function createAppointmentService(string $appointmentId, $service, float $price, ?string $comboId = null): void
-    {
+    private function createAppointmentService(
+        string $appointmentId,
+        $service,
+        float $price,
+        ?string $comboId = null,
+        float $firstTimeDiscount = 0.0
+    ): void {
         AppointmentService::create([
             'appointment_id' => $appointmentId,
             'service_id' => $service->id,
             'combo_id' => $comboId,
             'price_at_booking' => $price,
             'original_service_price' => $service->price,
+            'first_time_discount_amount' => $firstTimeDiscount,
             'duration_minutes_at_booking' => $service->template->estimated_duration_minutes ?? AvailabilityService::SLOT_MINUTES,
             'line_status' => 'booked',
         ]);
@@ -622,6 +740,8 @@ class AppointmentController extends Controller
 
         $refund = $this->policy->refundBreakdown($appointment);
 
+        $pendingRefundIds = [];
+
         DB::beginTransaction();
         try {
             $releasedBySalon = $this->policy->wasReleasedBySalon($appointment);
@@ -638,7 +758,7 @@ class AppointmentController extends Controller
             // Any invoice associated with a cancelled booking is removed.
             Invoice::where('appointment_id', $appointment->id)->delete();
 
-            $this->raiseRefund(
+            $pendingRefundIds = $this->createPendingRefundRecords(
                 $appointment,
                 $refund['refundable'],
                 $releasedBySalon
@@ -651,6 +771,11 @@ class AppointmentController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to cancel appointment.', 'error' => $e->getMessage()], 500);
+        }
+
+        // Post-commit: Execute gateway refunds outside the open database transaction
+        foreach ($pendingRefundIds as $refundId) {
+            $this->payments->processPendingRefund($refundId);
         }
 
         $date = Carbon::parse($appointment->appointment_date)->format('Y-m-d');
@@ -929,6 +1054,7 @@ class AppointmentController extends Controller
             // So the bookings list can offer the receipt without a query per
             // card.
             'invoice:id,appointment_id,invoice_number,issued_at',
+            'firstTimeOffer:id,name,discount_type,discount_value',
         ];
     }
 
@@ -987,6 +1113,8 @@ class AppointmentController extends Controller
             'name' => $line->service->template->name ?? 'Service',
             'combo_name' => $line->combo->name ?? null,
             'price' => (float) $line->price_at_booking,
+            'original_price' => (float) ($line->original_service_price ?? $line->price_at_booking),
+            'first_time_discount_amount' => (float) ($line->first_time_discount_amount ?? 0),
             'duration_minutes' => (int) $line->duration_minutes_at_booking,
             'line_status' => $line->line_status,
         ])->values();
@@ -1053,6 +1181,14 @@ class AppointmentController extends Controller
                 ? (float) $appointment->final_billed_amount
                 : null,
             'payment_option' => $appointment->payment_option,
+            'first_time_discount_amount' => (float) ($appointment->first_time_discount_amount ?? 0),
+            'first_time_offer_id' => $appointment->first_time_offer_id,
+            'first_time_offer' => $appointment->firstTimeOffer ? [
+                'id' => $appointment->firstTimeOffer->id,
+                'name' => $appointment->firstTimeOffer->name,
+                'discount_type' => $appointment->firstTimeOffer->discount_type,
+                'discount_value' => (float) $appointment->firstTimeOffer->discount_value,
+            ] : null,
             'invoice' => $this->invoiceState($appointment),
             'cancellation_reason' => $appointment->cancellation_reason,
             'rescheduled_from_id' => $appointment->rescheduled_from_id,
@@ -1126,8 +1262,16 @@ class AppointmentController extends Controller
      */
     private function raiseRefund(Appointment $appointment, float $amount, string $reason, string $userId): void
     {
+        $ids = $this->createPendingRefundRecords($appointment, $amount, $reason, $userId);
+        foreach ($ids as $id) {
+            $this->payments->processPendingRefund($id);
+        }
+    }
+
+    private function createPendingRefundRecords(Appointment $appointment, float $amount, string $reason, string $userId): array
+    {
         if ($amount <= 0) {
-            return;
+            return [];
         }
 
         $payments = DB::table('payments')
@@ -1137,6 +1281,7 @@ class AppointmentController extends Controller
             ->get();
 
         $remaining = $amount;
+        $createdIds = [];
 
         foreach ($payments as $payment) {
             if ($remaining <= 0) {
@@ -1144,27 +1289,29 @@ class AppointmentController extends Controller
             }
 
             $slice = min($remaining, (float) $payment->amount);
-
-            $refundId = $payment->gateway_transaction_id
-                ? $this->payments->refund($payment->gateway_transaction_id, $slice, $reason)
-                : null;
+            $refundRecordId = (string) Str::uuid();
 
             DB::table('payment_refunds')->insert([
-                'id' => (string) Str::uuid(),
+                'id' => $refundRecordId,
                 'payment_id' => $payment->id,
                 'appointment_id' => $appointment->id,
                 'amount' => $slice,
                 'reason' => $reason,
-                'gateway_refund_id' => $refundId,
-                'status' => $refundId ? 'processed' : 'pending',
-                'processed_at' => $refundId ? now() : null,
+                'gateway_refund_id' => null,
+                'status' => 'pending',
                 'initiated_by' => $userId,
+                'metadata' => json_encode([
+                    'idempotency_key' => "refund:{$payment->id}",
+                ]),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
+            $createdIds[] = $refundRecordId;
             $remaining -= $slice;
         }
+
+        return $createdIds;
     }
 
     /**

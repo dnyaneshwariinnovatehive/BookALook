@@ -115,7 +115,7 @@ class BookingPaymentService
      * The signature is the whole security model: without it the client could
      * simply claim to have paid. Everything else here is bookkeeping.
      *
-     * @return array{ok: bool, message: ?string}
+     * @return array{ok: bool, message: ?string, hold_expired?: bool, refunded?: bool, refund_id?: ?string, already_confirmed?: bool, recommitted?: bool}
      */
     public function confirm(
         Appointment $appointment,
@@ -133,41 +133,323 @@ class BookingPaymentService
         }
 
         if ($order->status === 'paid') {
+            $existingApp = Appointment::find($appointment->id);
+            if ($existingApp && $existingApp->status === 'cancelled') {
+                $refundRecord = DB::table('payment_refunds')
+                    ->where('appointment_id', $appointment->id)
+                    ->orderByDesc('created_at')
+                    ->first();
+
+                if ($refundRecord) {
+                    if ($refundRecord->status === 'processed') {
+                        return [
+                            'ok' => false,
+                            'hold_expired' => true,
+                            'reconciled' => false,
+                            'refunded' => true,
+                            'already_refunded' => true,
+                            'refund_id' => $refundRecord->gateway_refund_id,
+                            'message' => 'The hold on your slot expired and the offer could not be applied. Your payment was already refunded.',
+                        ];
+                    }
+
+                    // Retry pending refund outside transaction
+                    $retryResult = $this->processPendingRefund($refundRecord->id);
+
+                    return [
+                        'ok' => false,
+                        'hold_expired' => true,
+                        'reconciled' => false,
+                        'refunded' => $retryResult['success'],
+                        'refund_pending' => ! $retryResult['success'],
+                        'refund_id' => $retryResult['refund_id'] ?? null,
+                        'message' => $retryResult['success']
+                            ? 'The hold on your slot expired and the offer could not be applied. Your payment has been refunded.'
+                            : 'The hold on your slot expired and the offer could not be applied. Your refund is pending.',
+                    ];
+                }
+            }
+
             // A retried callback must not charge or book twice.
-            return ['ok' => true, 'message' => 'This payment was already confirmed.'];
+            return ['ok' => true, 'already_confirmed' => true, 'message' => 'This payment was already confirmed.'];
         }
 
+        // Cryptographic signature verification outside database locks
         if (! $this->gateway->verifySignature($order->gateway_order_id, $gatewayPaymentId, $signature)) {
             return ['ok' => false, 'message' => 'That payment could not be verified.'];
         }
 
-        DB::transaction(function () use ($appointment, $order, $gatewayPaymentId, $signature, $actorId) {
+        $txResult = DB::transaction(function () use ($appointment, $order, $gatewayPaymentId, $signature, $actorId) {
+            // Consistent locking order:
+            // 1. Lock Appointment
+            $lockedApp = Appointment::where('id', $appointment->id)->lockForUpdate()->first();
+            if (! $lockedApp) {
+                return ['ok' => false, 'message' => 'Appointment not found.'];
+            }
+
+            // 2. Lock Offer (if appointment is associated with a first-time offer)
+            $offer = null;
+            if ($lockedApp->first_time_offer_id) {
+                $offer = \App\Models\FirstTimeOffer::where('id', $lockedApp->first_time_offer_id)->lockForUpdate()->first();
+            }
+
+            // 3. Lock Redemption (if redemption exists for this appointment)
+            $redemption = \App\Models\FirstTimeOfferRedemption::where('appointment_id', $lockedApp->id)->lockForUpdate()->first();
+
+            // 4. Re-check order status inside transaction (idempotency under concurrent callbacks)
+            $freshOrder = DB::table('payment_orders')->where('id', $order->id)->lockForUpdate()->first();
+            if ($freshOrder->status === 'paid') {
+                if ($lockedApp->status === 'cancelled') {
+                    $refundRecord = DB::table('payment_refunds')
+                        ->where('appointment_id', $lockedApp->id)
+                        ->orderByDesc('created_at')
+                        ->first();
+
+                    if ($refundRecord) {
+                        return [
+                            'action' => 'already_refunded_or_pending',
+                            'refund_record_id' => $refundRecord->id,
+                            'status' => $refundRecord->status,
+                            'gateway_refund_id' => $refundRecord->gateway_refund_id,
+                        ];
+                    }
+                }
+
+                return ['ok' => true, 'already_confirmed' => true, 'message' => 'This payment was already confirmed.'];
+            }
+
+            // DB-level idempotency key protects against duplicate payment insertions
+            $existingPayment = DB::table('payments')
+                ->where('idempotency_key', 'advance:' . $lockedApp->id)
+                ->first();
+
+            $paymentRecordId = $existingPayment?->id ?? (string) Str::uuid();
+
+            if (! $existingPayment) {
+                DB::table('payments')->insert([
+                    'id' => $paymentRecordId,
+                    'appointment_id' => $lockedApp->id,
+                    'payment_order_id' => $freshOrder->id,
+                    'amount' => $freshOrder->amount,
+                    'currency' => $freshOrder->currency,
+                    'payment_type' => $this->paymentType($lockedApp, (float) $freshOrder->amount),
+                    'payment_mode' => 'online',
+                    'gateway' => $freshOrder->gateway,
+                    'gateway_transaction_id' => $gatewayPaymentId,
+                    'gateway_signature' => $signature,
+                    'status' => 'success',
+                    'paid_at' => now(),
+                    'idempotency_key' => 'advance:' . $lockedApp->id,
+                    'metadata' => json_encode(['confirmed_by' => $actorId]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             DB::table('payment_orders')
-                ->where('id', $order->id)
+                ->where('id', $freshOrder->id)
                 ->update(['status' => 'paid', 'updated_at' => now()]);
 
-            DB::table('payments')->insert([
-                'id' => (string) Str::uuid(),
-                'appointment_id' => $appointment->id,
-                'payment_order_id' => $order->id,
-                'amount' => $order->amount,
-                'currency' => $order->currency,
-                'payment_type' => $this->paymentType($appointment, (float) $order->amount),
-                'payment_mode' => 'online',
-                'gateway' => $order->gateway,
-                'gateway_transaction_id' => $gatewayPaymentId,
-                'gateway_signature' => $signature,
-                'status' => 'success',
-                'paid_at' => now(),
-                // Makes a duplicate callback a no-op at the database level too.
-                'idempotency_key' => 'advance:' . $appointment->id,
-                'metadata' => json_encode(['confirmed_by' => $actorId]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Handle First-Time Offer Redemption & Appointment State Reconciliation
+            if ($redemption) {
+                if ($redemption->status === \App\Models\FirstTimeOfferRedemption::STATUS_RESERVED) {
+                    // Normal path: reservation was active, commit it
+                    $redemption->commit();
+
+                    $lockedApp->forceFill([
+                        'status' => 'scheduled',
+                        'cancelled_by' => null,
+                        'cancelled_by_user_id' => null,
+                        'cancellation_reason' => null,
+                        'cancelled_at' => null,
+                        'payment_hold_expires_at' => null,
+                    ])->save();
+
+                    $lockedApp->services()->update(['line_status' => 'confirmed']);
+
+                    return ['ok' => true, 'message' => null];
+                }
+
+                if ($redemption->status === \App\Models\FirstTimeOfferRedemption::STATUS_COMMITTED) {
+                    // Already committed (duplicate callback)
+                    return ['ok' => true, 'already_confirmed' => true, 'message' => 'This payment was already confirmed.'];
+                }
+
+                if ($redemption->status === \App\Models\FirstTimeOfferRedemption::STATUS_RELEASED) {
+                    // Expiration won the earlier race, but payment genuinely succeeded at the gateway.
+                    // Deterministically evaluate whether we can safely recommit the reservation:
+                    $canRecommit = false;
+                    $rejectionReason = null;
+
+                    if (! $offer || ! $offer->is_active || ! $offer->isCurrentlyValid()) {
+                        $rejectionReason = 'The promotional offer has expired or is no longer active.';
+                    } elseif ($offer->max_redemptions !== null && (int) $offer->current_redemptions >= (int) $offer->max_redemptions) {
+                        $rejectionReason = 'The promotional offer reached its maximum redemption capacity.';
+                    } else {
+                        // Check if the customer has committed this offer elsewhere
+                        $customer = $lockedApp->customer ?? \App\Models\User::find($lockedApp->customer_id);
+                        $phoneHash = $lockedApp->customer_phone_hash ?? \App\Models\FirstTimeOffer::hashPhone($customer?->phone);
+
+                        $hasOtherCommitted = \App\Models\FirstTimeOfferRedemption::where('offer_id', $offer->id)
+                            ->where('status', \App\Models\FirstTimeOfferRedemption::STATUS_COMMITTED)
+                            ->where('appointment_id', '!=', $lockedApp->id)
+                            ->where(function ($q) use ($lockedApp, $phoneHash) {
+                                $q->where('customer_id', $lockedApp->customer_id);
+                                if ($phoneHash) {
+                                    $q->orWhere('customer_phone_hash', $phoneHash);
+                                }
+                            })
+                            ->exists();
+
+                        if ($hasOtherCommitted) {
+                            $rejectionReason = 'This promotional offer has already been redeemed on another booking.';
+                        } else {
+                            $canRecommit = true;
+                        }
+                    }
+
+                    if ($canRecommit) {
+                        // Safely recommit reservation and increment campaign accounting
+                        $customer = $lockedApp->customer ?? \App\Models\User::find($lockedApp->customer_id);
+                        $entitlementKey = $offer->makeEntitlementKey($customer ?? $lockedApp->customer_id, $lockedApp->salon_id);
+                        $redemption->recommit($entitlementKey);
+
+                        $lockedApp->forceFill([
+                            'status' => 'scheduled',
+                            'cancelled_by' => null,
+                            'cancelled_by_user_id' => null,
+                            'cancellation_reason' => null,
+                            'cancelled_at' => null,
+                            'payment_hold_expires_at' => null,
+                        ])->save();
+
+                        $lockedApp->services()->update(['line_status' => 'confirmed']);
+
+                        return [
+                            'ok' => true,
+                            'recommitted' => true,
+                            'message' => 'Payment received. Your appointment is confirmed.',
+                        ];
+                    }
+
+                    // Cannot safely recommit (capacity exhausted or offer claimed elsewhere).
+                    // Safe, durable recovery: create pending refund record in DB first, keep redemption released, keep appointment cancelled.
+                    $refundRecordId = (string) Str::uuid();
+
+                    DB::table('payment_refunds')->insert([
+                        'id' => $refundRecordId,
+                        'payment_id' => $paymentRecordId,
+                        'appointment_id' => $lockedApp->id,
+                        'amount' => (float) $freshOrder->amount,
+                        'reason' => 'Hold expired and offer is no longer available: ' . $rejectionReason,
+                        'gateway_refund_id' => null,
+                        'status' => 'pending',
+                        'initiated_by' => $actorId,
+                        'metadata' => json_encode([
+                            'idempotency_key' => "refund:{$paymentRecordId}",
+                            'rejection_reason' => $rejectionReason,
+                            'gateway_payment_id' => $gatewayPaymentId,
+                        ]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    DB::table('payments')
+                        ->where('id', $paymentRecordId)
+                        ->update([
+                            'metadata' => json_encode([
+                                'confirmed_by' => $actorId,
+                                'reconciliation_failed' => true,
+                                'rejection_reason' => $rejectionReason,
+                                'refund_record_id' => $refundRecordId,
+                                'refund_id' => null,
+                                'refund_status' => 'pending',
+                            ]),
+                        ]);
+
+                    return [
+                        'action' => 'refund_required',
+                        'refund_record_id' => $refundRecordId,
+                        'payment_record_id' => $paymentRecordId,
+                        'rejection_reason' => $rejectionReason,
+                        'amount' => (float) $freshOrder->amount,
+                    ];
+                }
+            }
+
+            // Regular booking without first-time offer
+            if ($lockedApp->status === 'cancelled') {
+                $lockedApp->forceFill([
+                    'status' => 'scheduled',
+                    'cancelled_by' => null,
+                    'cancelled_by_user_id' => null,
+                    'cancellation_reason' => null,
+                    'cancelled_at' => null,
+                    'payment_hold_expires_at' => null,
+                ])->save();
+
+                $lockedApp->services()->update(['line_status' => 'confirmed']);
+
+                return ['ok' => true, 'reinstated' => true, 'message' => null];
+            }
+
+            $lockedApp->forceFill([
+                'status' => 'scheduled',
+                'payment_hold_expires_at' => null,
+            ])->save();
+
+            $lockedApp->services()->update(['line_status' => 'confirmed']);
+
+            return ['ok' => true, 'message' => null];
         });
 
-        return ['ok' => true, 'message' => null];
+        if (isset($txResult['action'])) {
+            if ($txResult['action'] === 'refund_required') {
+                $processResult = $this->processPendingRefund($txResult['refund_record_id']);
+
+                return [
+                    'ok' => false,
+                    'hold_expired' => true,
+                    'reconciled' => false,
+                    'refunded' => $processResult['success'],
+                    'refund_pending' => ! $processResult['success'],
+                    'refund_id' => $processResult['refund_id'] ?? null,
+                    'message' => $processResult['success']
+                        ? "The hold on your slot expired and the offer could not be applied ({$txResult['rejection_reason']}). Your payment has been refunded."
+                        : "The hold on your slot expired and the offer could not be applied ({$txResult['rejection_reason']}). Your payment has been recorded and your refund is pending.",
+                ];
+            }
+
+            if ($txResult['action'] === 'already_refunded_or_pending') {
+                if ($txResult['status'] === 'processed') {
+                    return [
+                        'ok' => false,
+                        'hold_expired' => true,
+                        'reconciled' => false,
+                        'refunded' => true,
+                        'already_refunded' => true,
+                        'refund_id' => $txResult['gateway_refund_id'],
+                        'message' => 'The hold on your slot expired and the offer could not be applied. Your payment was already refunded.',
+                    ];
+                }
+
+                $retryResult = $this->processPendingRefund($txResult['refund_record_id']);
+
+                return [
+                    'ok' => false,
+                    'hold_expired' => true,
+                    'reconciled' => false,
+                    'refunded' => $retryResult['success'],
+                    'refund_pending' => ! $retryResult['success'],
+                    'refund_id' => $retryResult['refund_id'] ?? null,
+                    'message' => $retryResult['success']
+                        ? 'The hold on your slot expired and the offer could not be applied. Your payment has been refunded.'
+                        : 'The hold on your slot expired and the offer could not be applied. Your refund is pending.',
+                ];
+            }
+        }
+
+        return $txResult;
     }
 
     /**
@@ -190,7 +472,7 @@ class BookingPaymentService
 
         $order = DB::table('payment_orders')
             ->where('appointment_id', $appointment->id)
-            ->where('status', 'created')
+            ->whereIn('status', ['created', 'paid', 'abandoned'])
             ->orderByDesc('created_at')
             ->first();
 
@@ -209,24 +491,62 @@ class BookingPaymentService
     /**
      * Release a held slot the customer walked away from.
      */
-    public function release(Appointment $appointment, string $reason): void
+    public function release(Appointment $appointment, string $reason): bool
     {
-        DB::transaction(function () use ($appointment, $reason) {
+        return DB::transaction(function () use ($appointment, $reason) {
+            $lockedApp = Appointment::where('id', $appointment->id)->lockForUpdate()->first();
+            if (! $lockedApp) {
+                return false;
+            }
+
+            // An expiration worker must not cancel or release a booking after successful payment has been verified or scheduled.
+            if ($lockedApp->status === 'scheduled') {
+                return false;
+            }
+
+            $hasPaidOrder = DB::table('payment_orders')
+                ->where('appointment_id', $lockedApp->id)
+                ->where('status', 'paid')
+                ->exists();
+            if ($hasPaidOrder) {
+                return false;
+            }
+
+            $hasSuccessPayment = DB::table('payments')
+                ->where('appointment_id', $lockedApp->id)
+                ->where('status', 'success')
+                ->exists();
+            if ($hasSuccessPayment) {
+                return false;
+            }
+
             DB::table('payment_orders')
-                ->where('appointment_id', $appointment->id)
+                ->where('appointment_id', $lockedApp->id)
                 ->where('status', 'created')
                 ->update(['status' => 'abandoned', 'updated_at' => now()]);
 
             // Cancelled rather than deleted: an abandoned checkout is still
             // something the salon may want to see.
-            $appointment->forceFill([
+            $lockedApp->forceFill([
                 'status' => 'cancelled',
                 'cancelled_by' => 'system',
                 'cancellation_reason' => $reason,
                 'cancelled_at' => now(),
             ])->save();
 
-            $appointment->services()->update(['line_status' => 'cancelled']);
+            $lockedApp->services()->update(['line_status' => 'cancelled']);
+
+            // Release any active first-time offer reservation
+            $redemption = \App\Models\FirstTimeOfferRedemption::where('appointment_id', $lockedApp->id)
+                ->where('status', \App\Models\FirstTimeOfferRedemption::STATUS_RESERVED)
+                ->lockForUpdate()
+                ->first();
+
+            if ($redemption) {
+                $redemption->release($reason);
+            }
+
+            return true;
         });
     }
 
@@ -235,16 +555,158 @@ class BookingPaymentService
      */
     public function releaseExpiredHolds(): int
     {
-        $stale = Appointment::where('status', 'pending_payment')
+        $staleIds = Appointment::where('status', 'pending_payment')
             ->whereNotNull('payment_hold_expires_at')
             ->where('payment_hold_expires_at', '<', now())
-            ->get();
+            ->pluck('id');
 
-        foreach ($stale as $appointment) {
-            $this->release($appointment, 'Payment was not completed in time.');
+        $releasedCount = 0;
+        foreach ($staleIds as $id) {
+            $app = Appointment::find($id);
+            if ($app && $this->release($app, 'Payment was not completed in time.')) {
+                $releasedCount++;
+            }
         }
 
-        return $stale->count();
+        return $releasedCount;
+    }
+
+    /**
+     * Process a pending refund outside of any database transaction locks.
+     *
+     * Uses atomic CAS on payment_refunds (status pending -> processing)
+     * so that concurrent callers or background reconciliation jobs cannot
+     * call the external gateway simultaneously for the same refund.
+     *
+     * @return array{success: bool, refund_id?: ?string, already_processed?: bool, error?: ?string}
+     */
+    public function processPendingRefund(string $refundRecordId): array
+    {
+        $refund = DB::table('payment_refunds')->where('id', $refundRecordId)->first();
+        if (! $refund) {
+            return ['success' => false, 'error' => 'Refund record not found.'];
+        }
+
+        if ($refund->status === 'processed') {
+            return [
+                'success' => true,
+                'already_processed' => true,
+                'refund_id' => $refund->gateway_refund_id,
+            ];
+        }
+
+        // Atomic check-and-claim: only transition if still pending
+        $claimed = DB::table('payment_refunds')
+            ->where('id', $refundRecordId)
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'processing',
+                'updated_at' => now(),
+            ]);
+
+        if ($claimed === 0) {
+            // Another worker claimed it or it transitioned already
+            $fresh = DB::table('payment_refunds')->where('id', $refundRecordId)->first();
+
+            return [
+                'success' => $fresh?->status === 'processed',
+                'already_processed' => $fresh?->status === 'processed',
+                'refund_id' => $fresh?->gateway_refund_id,
+            ];
+        }
+
+        $payment = DB::table('payments')->where('id', $refund->payment_id)->first();
+        $gatewayPaymentId = $payment?->gateway_transaction_id;
+
+        if (! $gatewayPaymentId) {
+            DB::table('payment_refunds')
+                ->where('id', $refundRecordId)
+                ->update([
+                    'status' => 'failed',
+                    'failure_reason' => 'Missing gateway payment ID.',
+                    'updated_at' => now(),
+                ]);
+
+            return ['success' => false, 'error' => 'Missing gateway payment ID.'];
+        }
+
+        // Network call outside any database transaction
+        $gatewayRefundId = $this->refund(
+            $gatewayPaymentId,
+            (float) $refund->amount,
+            $refund->reason
+        );
+
+        if ($gatewayRefundId !== null) {
+            DB::table('payment_refunds')
+                ->where('id', $refundRecordId)
+                ->update([
+                    'status' => 'processed',
+                    'gateway_refund_id' => $gatewayRefundId,
+                    'processed_at' => now(),
+                    'failure_reason' => null,
+                    'updated_at' => now(),
+                ]);
+
+            if ($payment) {
+                $meta = json_decode($payment->metadata ?? '{}', true) ?: [];
+                $meta['refund_id'] = $gatewayRefundId;
+                $meta['refund_status'] = 'processed';
+
+                DB::table('payments')
+                    ->where('id', $payment->id)
+                    ->update([
+                        'metadata' => json_encode($meta),
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            return ['success' => true, 'refund_id' => $gatewayRefundId];
+        }
+
+        // Gateway call timed out or returned error: retain durable pending status for reconciliation
+        DB::table('payment_refunds')
+            ->where('id', $refundRecordId)
+            ->update([
+                'status' => 'pending',
+                'failure_reason' => 'Gateway refund request timed out or returned an error. Kept pending for reconciliation retry.',
+                'updated_at' => now(),
+            ]);
+
+        if ($payment) {
+            $meta = json_decode($payment->metadata ?? '{}', true) ?: [];
+            $meta['refund_status'] = 'pending_retry';
+
+            DB::table('payments')
+                ->where('id', $payment->id)
+                ->update([
+                    'metadata' => json_encode($meta),
+                    'updated_at' => now(),
+                ]);
+        }
+
+        return ['success' => false, 'error' => 'Gateway refund failed or timed out.'];
+    }
+
+    /**
+     * Sweep through pending payment refunds and attempt recovery.
+     */
+    public function reconcilePendingRefunds(): int
+    {
+        $pendingRefunds = DB::table('payment_refunds')
+            ->where('status', 'pending')
+            ->orderBy('created_at')
+            ->get();
+
+        $recovered = 0;
+        foreach ($pendingRefunds as $pending) {
+            $result = $this->processPendingRefund($pending->id);
+            if (! empty($result['success'])) {
+                $recovered++;
+            }
+        }
+
+        return $recovered;
     }
 
     /**

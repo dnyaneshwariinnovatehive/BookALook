@@ -38,13 +38,41 @@ class SalonController extends Controller
             return response()->json(['message' => 'Salon not found.'], 404);
         }
 
-        $services = $this->services($salon->id);
+        $user = $request->user('sanctum') ?: $request->user() ?: auth('sanctum')->user() ?: auth()->user();
+
+        $services = $this->services($salon->id, $user);
         $availability = $this->availabilityToday($salon);
         $bookable = $this->bookability($salon, $services);
 
         $isFavourited = false;
-        if ($request->user()) {
-            $isFavourited = $request->user()->favouriteSalons()->where('salon_id', $salon->id)->exists();
+        if ($user) {
+            $isFavourited = $user->favouriteSalons()->where('salon_id', $salon->id)->exists();
+        }
+
+        $firstTimeOffer = null;
+        if ($user && class_exists(\App\Services\CustomerOfferEligibilityService::class)) {
+            $eligibleOffers = app(\App\Services\CustomerOfferEligibilityService::class)
+                ->getEligibleOffersForCustomerAndSalon($user, $salon->id);
+
+            if ($eligibleOffers->isNotEmpty()) {
+                $topOffer = $eligibleOffers->first();
+                $firstTimeOffer = [
+                    'eligible' => true,
+                    'offer_id' => $topOffer->id,
+                    'offer_name' => $topOffer->name,
+                    'scope' => $topOffer->scope,
+                    'discount_type' => $topOffer->discount_type,
+                    'discount_value' => (float) $topOffer->discount_value,
+                    'max_discount_cap' => $topOffer->max_discount_cap ? (float) $topOffer->max_discount_cap : null,
+                    'label' => (function () use ($topOffer) {
+                        $val = (float) $topOffer->discount_value;
+                        $formatted = ($val == (int) $val) ? (string) (int) $val : (string) $val;
+                        return $topOffer->discount_type === \App\Models\FirstTimeOffer::TYPE_PERCENTAGE
+                            ? "{$formatted}% OFF on First Visit"
+                            : "Flat ₹{$formatted} OFF on First Visit";
+                    })(),
+                ];
+            }
         }
 
         return response()->json([
@@ -74,6 +102,7 @@ class SalonController extends Controller
                 'advance_percentage_default' => (float) $salon->advance_percentage_default,
 
                 'is_favourited' => $isFavourited,
+                'first_time_offer' => $firstTimeOffer,
 
                 'is_bookable' => $bookable['is_bookable'],
                 'unavailable_reason' => $bookable['reason'],
@@ -96,7 +125,7 @@ class SalonController extends Controller
      * Active, bookable services with their template detail and how many staff
      * can actually perform each one.
      */
-    private function services(string $salonId): array
+    private function services(string $salonId, ?\App\Models\User $user = null): array
     {
         $rows = Service::with('template.category:id,name,icon_url')
             ->where('salon_id', $salonId)
@@ -113,24 +142,57 @@ class SalonController extends Controller
             ->pluck(DB::raw('count(*) as total'), 'provider_services.service_id')
             ->all();
 
-        return $rows->map(fn (Service $service) => [
-            'id' => $service->id,
-            'template_id' => $service->template_id,
-            'name' => $service->template->name ?? 'Service',
-            'description' => $service->description,
-            'price' => (float) $service->price,
-            'duration_minutes' => (int) ($service->template->estimated_duration_minutes ?? 30),
-            'category_id' => $service->template->category_id ?? null,
-            'category_name' => $service->template->category->name ?? 'Other',
-            'gender_focus' => $service->gender_focus,
-            'advance_percentage' => $service->advance_percentage !== null
-                ? (float) $service->advance_percentage
-                : null,
-            'refundable_advance' => (bool) $service->will_refund_advance_if_cancelled,
-            // Zero means nobody at this salon is trained for it — the app greys
-            // it out rather than letting the customer hit a dead end at checkout.
-            'provider_count' => (int) ($providerCounts[$service->id] ?? 0),
-        ])->all();
+        $eligibilityService = class_exists(\App\Services\CustomerOfferEligibilityService::class)
+            ? app(\App\Services\CustomerOfferEligibilityService::class)
+            : null;
+
+        return $rows->map(function (Service $service) use ($providerCounts, $salonId, $user, $eligibilityService) {
+            $discountInfo = null;
+            $discountedPrice = (float) $service->price;
+
+            if ($user && $eligibilityService) {
+                $offerData = $eligibilityService->findBestOfferForSingleService($user, $salonId, $service);
+                if ($offerData) {
+                    $discountInfo = [
+                        'offer_id' => $offerData['offer_id'],
+                        'offer_name' => $offerData['offer_name'],
+                        'scope' => $offerData['scope'],
+                        'discount_type' => $offerData['discount_type'],
+                        'discount_value' => $offerData['discount_value'],
+                        'discount_amount' => $offerData['discount_amount'],
+                        'discount_label' => $offerData['discount_label'],
+                        'is_capped' => $offerData['is_capped'],
+                        'max_discount_cap' => $offerData['max_discount_cap'],
+                        'min_service_price' => $offerData['min_service_price'],
+                        'min_eligible_subtotal' => $offerData['min_eligible_subtotal'],
+                        'min_total_booking_subtotal' => $offerData['min_total_booking_subtotal'],
+                    ];
+                    $discountedPrice = $offerData['discounted_price'];
+                }
+            }
+
+            return [
+                'id' => $service->id,
+                'template_id' => $service->template_id,
+                'name' => $service->template->name ?? 'Service',
+                'description' => $service->description,
+                'price' => (float) $service->price,
+                'original_price' => (float) $service->price,
+                'discounted_price' => $discountedPrice,
+                'first_time_discount' => $discountInfo,
+                'duration_minutes' => (int) ($service->template->estimated_duration_minutes ?? 30),
+                'category_id' => $service->template->category_id ?? null,
+                'category_name' => $service->template->category->name ?? 'Other',
+                'gender_focus' => $service->gender_focus,
+                'advance_percentage' => $service->advance_percentage !== null
+                    ? (float) $service->advance_percentage
+                    : null,
+                'refundable_advance' => (bool) $service->will_refund_advance_if_cancelled,
+                // Zero means nobody at this salon is trained for it — the app greys
+                // it out rather than letting the customer hit a dead end at checkout.
+                'provider_count' => (int) ($providerCounts[$service->id] ?? 0),
+            ];
+        })->all();
     }
 
     /**

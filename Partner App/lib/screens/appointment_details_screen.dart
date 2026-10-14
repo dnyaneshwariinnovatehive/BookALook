@@ -239,8 +239,51 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 _buildInfoRow('Assigned Provider', appointment['appointed_provider']?['user']?['name'] ?? appointment['appointed_provider']?['name'] ?? 'Any Staff'),
                 const Divider(height: 24),
                 Text('Booked Services', style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Text(serviceNames, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                if (services.isNotEmpty)
+                  Column(
+                    children: services.map<Widget>((s) {
+                      final name = s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service';
+                      final priceAtBooking = s['price_at_booking'] ?? s['price'];
+                      final origPrice = s['original_service_price'] ?? priceAtBooking;
+                      final sFtd = num.tryParse(s['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+                      final hasLineDisc = sFtd > 0 || (origPrice != null && priceAtBooking != null && num.tryParse('$origPrice') != num.tryParse('$priceAtBooking'));
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(name, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hasLineDisc && origPrice != null) ...[
+                                  Text(
+                                    '₹$origPrice',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  priceAtBooking != null ? '₹$priceAtBooking' : '',
+                                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  )
+                else
+                  Text(serviceNames, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 16),
@@ -249,21 +292,35 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               _buildSuggestedAddonsSection(serviceNames),
 
             // Financial Info
-            _buildSection(
-              title: 'Billing Information',
-              children: [
-                _buildInfoRow('Total Amount', '₹$totalAmount'),
-                _buildInfoRow('Advance Paid', '₹$advancePaid'),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Balance Due', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text('₹$balanceDue', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
-                  ],
-                )
-              ],
-            ),
+            Builder(builder: (context) {
+              final num ftdAmount = num.tryParse(appointment['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+              final offerName = appointment['first_time_offer']?['name']?.toString();
+
+              return _buildSection(
+                title: 'Billing Information',
+                children: [
+                  _buildInfoRow('Total Amount', '₹$totalAmount'),
+                  if (ftdAmount > 0)
+                    _buildInfoRow(
+                      offerName != null && offerName.isNotEmpty
+                          ? 'First-Time Discount ($offerName)'
+                          : 'First-Time Discount',
+                      '-₹$ftdAmount',
+                      valueColor: const Color(0xFF16A34A),
+                      isBold: true,
+                    ),
+                  _buildInfoRow('Advance Paid', '₹$advancePaid'),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Balance Due', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('₹$balanceDue', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
+                    ],
+                  )
+                ],
+              );
+            }),
           ],
         ),
       ),
@@ -289,14 +346,14 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {Color? valueColor, bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: GoogleFonts.outfit(color: Colors.grey.shade600, fontSize: 14)),
-          Text(value, style: GoogleFonts.outfit(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(value, style: GoogleFonts.outfit(color: valueColor ?? Colors.black87, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: 14)),
         ],
       ),
     );

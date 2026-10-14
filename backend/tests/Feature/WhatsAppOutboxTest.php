@@ -46,6 +46,13 @@ class WhatsAppOutboxTest extends TestCase
 
     private ?Appointment $appointment = null;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        \App\Models\WhatsappAutomation::query()->update(['is_enabled' => true]);
+    }
+
     public function test_every_message_carries_the_placeholders_its_template_expects(): void
     {
         Bus::fake([SendWhatsAppMessageJob::class]);
@@ -104,7 +111,7 @@ class WhatsAppOutboxTest extends TestCase
 
         $message = WhatsAppMessage::where('template', config('services.whatsapp.templates.salon_closure'))->firstOrFail();
 
-        $this->assertCount(3, $message->payload['parameters']);
+        $this->assertCount(4, $message->payload['parameters']);
         $this->assertNotSame('', trim($message->payload['parameters'][2]));
     }
 

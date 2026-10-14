@@ -26,13 +26,20 @@ class CartPricingService
     /** Fallback advance % when neither service nor combo defines one. */
     public const DEFAULT_ADVANCE_PERCENTAGE = AvailabilityService::DEFAULT_ADVANCE_PERCENTAGE;
 
+    public function __construct(
+        private ?CustomerOfferEligibilityService $eligibility = null
+    ) {
+        $this->eligibility = $this->eligibility ?? app(CustomerOfferEligibilityService::class);
+    }
+
     /**
      * Everything the cart is worth, and why.
      *
      * @return array{
      *   service_ids: string[], duration: int, total: float, list_total: float,
      *   saving: float, advance: float, item_count: int,
-     *   applied_combos: array, loose_services: array
+     *   applied_combos: array, loose_services: array,
+     *   first_time_discount: array
      * }
      */
     public function price(Cart $cart): array
@@ -97,6 +104,9 @@ class CartPricingService
                 'name' => $service->template->name ?? 'Service',
                 'price' => (float) $service->price,
                 'quantity' => $quantity,
+                'line_total' => round($price, 2),
+                'first_time_discount_amount' => 0.0,
+                'final_price' => round($price, 2),
             ];
         }
 
@@ -123,16 +133,89 @@ class CartPricingService
             $itemCount += $quantity;
         }
 
+        // 4. Authoritative First-Time Customer Discount evaluation on loose lines
+        $firstTimeOfferData = [
+            'applied' => false,
+            'offer_id' => null,
+            'offer_name' => null,
+            'discount_type' => null,
+            'discount_value' => null,
+            'total_discount' => 0.0,
+            'scope' => null,
+            'lines' => [],
+        ];
+
+        $customerId = $cart->customer_id;
+        if ($customerId && ! empty($looseLines) && $this->eligibility) {
+            $candidateLines = array_map(function ($line) use ($serviceById) {
+                $srv = $serviceById[$line['service_id']];
+
+                return [
+                    'service_id' => $line['service_id'],
+                    'template_id' => $srv->template_id,
+                    'price' => (float) $srv->price,
+                    'quantity' => $line['quantity'],
+                    'line_total' => (float) $srv->price * $line['quantity'],
+                ];
+            }, $looseLines);
+
+            $bestOffer = $this->eligibility->findBestOfferForCart(
+                $customerId,
+                $cart->salon_id,
+                $candidateLines,
+                $listTotal
+            );
+
+            if ($bestOffer && $bestOffer['total_discount'] > 0) {
+                $offerModel = $bestOffer['offer'];
+                $firstTimeDiscountAmount = $bestOffer['total_discount'];
+
+                $firstTimeOfferData = [
+                    'applied' => true,
+                    'offer_id' => $offerModel->id,
+                    'offer_name' => $offerModel->name,
+                    'discount_type' => $offerModel->discount_type,
+                    'discount_value' => (float) $offerModel->discount_value,
+                    'total_discount' => $firstTimeDiscountAmount,
+                    'max_discount_cap' => $offerModel->max_discount_cap ? (float) $offerModel->max_discount_cap : null,
+                    'scope' => $offerModel->scope,
+                    'lines' => $bestOffer['allocated_lines'],
+                ];
+
+                // Update looseLines with line discounts and adjust advance proportionally
+                foreach ($looseLines as &$line) {
+                    $alloc = $bestOffer['allocated_lines'][$line['service_id']] ?? null;
+                    $lineDiscount = $alloc ? $alloc['line_discount'] : 0.0;
+                    $lineFinal = $alloc ? $alloc['final_line_price'] : round($line['price'] * $line['quantity'], 2);
+
+                    $line['first_time_discount_amount'] = $lineDiscount;
+                    $line['final_price'] = $lineFinal;
+
+                    // Adjust advance for this line
+                    $srv = $serviceById[$line['service_id']];
+                    $advancePct = $this->advancePercentage($srv->advance_percentage);
+                    $originalLineAdvance = ($line['price'] * $line['quantity']) * $advancePct / 100;
+                    $newLineAdvance = $lineFinal * $advancePct / 100;
+                    $advance = $advance - $originalLineAdvance + $newLineAdvance;
+                }
+                unset($line);
+
+                // Deduct first-time discount from total
+                $total = max(0.0, $total - $firstTimeDiscountAmount);
+            }
+        }
+
         return [
             'service_ids' => array_values(array_unique($serviceIds)),
             'duration' => max($duration, AvailabilityService::SLOT_MINUTES),
             'total' => round($total, 2),
             'list_total' => round($listTotal, 2),
             'saving' => round(max($listTotal - $total, 0), 2),
-            'advance' => round(min($advance, $total), 2),
+            'advance' => round(min(max(0.0, $advance), $total), 2),
             'item_count' => $itemCount,
             'applied_combos' => $applied['combos'],
             'loose_services' => $looseLines,
+            'first_time_discount' => $firstTimeOfferData,
         ];
     }
 

@@ -228,7 +228,15 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
     final serviceId = service['id'].toString();
     final isAdding = _adding.contains(serviceId);
     final quantity = _added[serviceId] ?? 0;
-    final price = (service['price'] as num?)?.toDouble() ?? 0;
+    final double rawPrice = (service['price'] as num?)?.toDouble() ?? 0;
+    final double? origPrice = (service['original_price'] as num?)?.toDouble();
+    final double? discPrice = (service['discounted_price'] as num?)?.toDouble();
+    final bool hasDiscount = service['first_time_discount'] != null &&
+        origPrice != null &&
+        discPrice != null &&
+        origPrice > discPrice &&
+        discPrice > 0;
+    final double displayPrice = hasDiscount ? discPrice : rawPrice;
 
     // Zero trained staff means it cannot be booked, so the salon page greys
     // these out and so must the strip — an enabled button here would only
@@ -261,13 +269,28 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  isBookable ? '₹${price.toStringAsFixed(0)}' : 'Unavailable',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: isBookable ? AppTheme.accentColor : bodyColor,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      isBookable ? '₹${displayPrice.toStringAsFixed(0)}' : 'Unavailable',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isBookable ? AppTheme.accentColor : bodyColor,
+                      ),
+                    ),
+                    if (isBookable && hasDiscount) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '₹${origPrice.toStringAsFixed(0)}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: bodyColor,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

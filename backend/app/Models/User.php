@@ -95,4 +95,9 @@ class User extends Authenticatable
     {
         return $this->belongsTo(SubArea::class);
     }
+
+    public function firstTimeOfferRedemptions()
+    {
+        return $this->hasMany(FirstTimeOfferRedemption::class, 'customer_id');
+    }
 }

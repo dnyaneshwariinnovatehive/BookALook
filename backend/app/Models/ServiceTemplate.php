@@ -26,4 +26,14 @@ class ServiceTemplate extends Model
     {
         return $this->belongsTo(ServiceCategory::class, 'category_id');
     }
+
+    public function firstTimeOffers()
+    {
+        return $this->belongsToMany(
+            FirstTimeOffer::class,
+            'first_time_offer_services',
+            'service_template_id',
+            'offer_id'
+        );
+    }
 }

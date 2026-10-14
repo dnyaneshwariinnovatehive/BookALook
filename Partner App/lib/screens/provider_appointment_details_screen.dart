@@ -204,6 +204,11 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                   child: Column(
                     children: services.map((s) {
                       final srv = s['service'] ?? {};
+                      final priceAtBooking = s['price_at_booking'] ?? s['price'];
+                      final origPrice = s['original_service_price'] ?? priceAtBooking;
+                      final sFtd = num.tryParse(s['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+                      final hasLineDisc = sFtd > 0 || (origPrice != null && priceAtBooking != null && num.tryParse('$origPrice') != num.tryParse('$priceAtBooking'));
+
                       return Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Row(
@@ -219,7 +224,26 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                                 ],
                               ),
                             ),
-                            Text('₹${s['price_at_booking']}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1F2937))),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hasLineDisc && origPrice != null) ...[
+                                  Text(
+                                    '₹$origPrice',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      color: const Color(0xFF9CA3AF),
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  priceAtBooking != null ? '₹$priceAtBooking' : '',
+                                  style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1F2937)),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       );
@@ -229,20 +253,33 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                 const SizedBox(height: 16),
 
                 // Financial Details Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                  child: Column(
-                    children: [
-                      _buildInfoRow('Time Slot', TimeFmt.slot(apt['start_time'], apt['end_time'])),
-                      _buildInfoRow('Payment Method', apt['payment_option'] == 'full_at_venue' ? 'Pay at Venue' : 'Prepaid'),
-                      _buildInfoRow('Total Amount', '₹$totalAmount'),
-                      _buildInfoRow('Advance Paid', '₹$advancePaid', valueColor: const Color(0xFF16A34A)),
-                      const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1, color: Color(0xFFF3F4F6))),
-                      _buildInfoRow('Balance Due', '₹$balanceDue', isBold: true, valueColor: const Color(0xFFDC2626)),
-                    ],
-                  ),
-                ),
+                Builder(builder: (context) {
+                  final num ftdAmount = num.tryParse(apt['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+                  final offerName = apt['first_time_offer']?['name']?.toString();
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                    child: Column(
+                      children: [
+                        _buildInfoRow('Time Slot', TimeFmt.slot(apt['start_time'], apt['end_time'])),
+                        _buildInfoRow('Payment Method', apt['payment_option'] == 'full_at_venue' ? 'Pay at Venue' : 'Prepaid'),
+                        _buildInfoRow('Total Amount', '₹$totalAmount'),
+                        if (ftdAmount > 0)
+                          _buildInfoRow(
+                            offerName != null && offerName.isNotEmpty
+                                ? 'First-Time Discount ($offerName)'
+                                : 'First-Time Discount',
+                            '-₹$ftdAmount',
+                            valueColor: const Color(0xFF16A34A),
+                          ),
+                        _buildInfoRow('Advance Paid', '₹$advancePaid', valueColor: const Color(0xFF16A34A)),
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1, color: Color(0xFFF3F4F6))),
+                        _buildInfoRow('Balance Due', '₹$balanceDue', isBold: true, valueColor: const Color(0xFFDC2626)),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
 
                 // Notes / Warnings

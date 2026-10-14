@@ -301,11 +301,31 @@ class CartComboPricingTest extends TestCase
     private function fixture(): array
     {
         $customer = User::where('role', 'customer')->first();
-        $template = ServiceTemplate::first();
-
-        if (! $customer || ! $template) {
-            $this->markTestSkipped('needs a customer and a service template');
+        if (! $customer) {
+            $customer = User::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Test Customer',
+                'phone' => '9876543210',
+                'password_hash' => bcrypt('password'),
+                'role' => 'customer',
+                'is_active' => true,
+            ]);
         }
+
+        $category = \App\Models\ServiceCategory::firstOrCreate(
+            ['name' => 'Hair Care'],
+            ['id' => (string) \Illuminate\Support\Str::uuid(), 'is_active' => true]
+        );
+
+        while (ServiceTemplate::count() < 3) {
+            ServiceTemplate::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Template ' . \Illuminate\Support\Str::random(5),
+                'category_id' => $category->id,
+                'is_active' => true,
+            ]);
+        }
+        $template = ServiceTemplate::first();
 
         $unique = substr(bin2hex(random_bytes(6)), 0, 10);
 
@@ -407,7 +427,20 @@ class CartComboPricingTest extends TestCase
         $provider = \App\Models\ServiceProvider::first();
 
         if (! $provider) {
-            $this->markTestSkipped('needs at least one service provider');
+            $user = User::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Provider Test',
+                'phone' => '98' . rand(10000000, 99999999),
+                'password_hash' => bcrypt('password'),
+                'role' => 'provider',
+                'is_active' => true,
+            ]);
+            $provider = \App\Models\ServiceProvider::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'user_id' => $user->id,
+                'salon_id' => $salon->id,
+                'is_active' => true,
+            ]);
         }
 
         return $provider->id;

@@ -446,21 +446,51 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         SizedBox(height: 10),
                       ],
                       if (services.isNotEmpty)
-                        ...services.map((service) => Padding(
-                              padding: EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      service['combo_name'] != null ? '${service['name']}  ·  ${service['combo_name']}' : service['name'],
-                                      style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
-                                    ),
+                        ...services.map((service) {
+                          final origPrice = _toDouble(service['original_price'] ?? service['price']);
+                          final priceAtBooking = _toDouble(service['price']);
+                          final ftdLine = _toDouble(service['first_time_discount_amount'] ?? 0);
+                          final bool hasLineDiscount = ftdLine > 0 || origPrice > priceAtBooking;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    service['combo_name'] != null ? '${service['name']}  ·  ${service['combo_name']}' : service['name'],
+                                    style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
                                   ),
-                                  Text('₹${_toDouble(service['price']).toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: headingColor)),
-                                ],
-                              ),
-                            )),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (hasLineDiscount) ...[
+                                      Text(
+                                        '₹${origPrice.toStringAsFixed(0)}',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          color: bodyColor,
+                                          decoration: TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                    ],
+                                    Text(
+                                      '₹${priceAtBooking.toStringAsFixed(0)}',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: headingColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                       if (addedServices.isNotEmpty) ...[
                         SizedBox(height: 12),
                         Row(
@@ -494,6 +524,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         SizedBox(height: 6),
                         _moneyRow('Added at the salon', _toDouble(_booking['added_total']), AppTheme.accentColor),
                       ],
+
+                      Builder(builder: (context) {
+                        final ftdBooking = _toDouble(_booking['first_time_discount_amount'] ?? 0);
+                        final offerName = _booking['first_time_offer']?['name']?.toString();
+                        if (ftdBooking <= 0) return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: _moneyRow(
+                            offerName != null && offerName.isNotEmpty
+                                ? 'First-time offer ($offerName)'
+                                : 'First-time customer discount',
+                            -ftdBooking,
+                            context.colors.success,
+                          ),
+                        );
+                      }),
                       
                       SizedBox(height: 12),
                       Divider(color: context.colors.border),

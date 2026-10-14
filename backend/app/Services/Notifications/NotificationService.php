@@ -299,6 +299,7 @@ class NotificationService
                     $dateLabel,
                     $advanceFormatted,
                 ],
+                'attachment' => self::ATTACHMENT_INVOICE,
             ], 'booking_confirmed');
         }
 
@@ -792,10 +793,10 @@ class NotificationService
 
         $liveUntilMsg = $subscription?->end_date
             ? sprintf(
-                'It is live until %s — no call needed.',
+                'It is live until %s.',
                 Carbon::parse($subscription->end_date)->format('j M Y')
             )
-            : 'No call needed.';
+            : 'Active.';
 
         $resolved = $this->templates->resolve('assigned_salon_renewed_partner', [
             'salon_name' => $salon->name,

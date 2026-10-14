@@ -28,7 +28,7 @@ abstract class TestCase extends BaseTestCase
     {
         $this->app->instance(Cloudinary::class, new class
         {
-            public function __call(string $method, array $arguments): never
+            public function __call(string $method, array $arguments)
             {
                 throw new \RuntimeException(
                     "Cloudinary::{$method}() was called without being faked. "

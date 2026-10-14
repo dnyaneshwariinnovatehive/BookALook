@@ -106,6 +106,37 @@ class InvoicePdfService
      */
     private function upload(string $pdf, string $invoiceNumber): string
     {
+        if (config('filesystems.disks.cloudinary.url') || app()->bound(\Cloudinary\Cloudinary::class)) {
+            $stream = fopen('php://temp', 'r+b');
+
+            if ($stream === false) {
+                throw new RuntimeException('Could not open a temporary stream for the invoice PDF.');
+            }
+
+            try {
+                fwrite($stream, $pdf);
+                rewind($stream);
+
+                $response = Cloudinary::uploadApi()->upload($stream, [
+                    'public_id' => self::PREFIX.'/'.$invoiceNumber.'-'.Str::lower(Str::random(8)).'.pdf',
+                    'resource_type' => 'raw',
+                    'filename' => $invoiceNumber.'.pdf',
+                ]);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
+
+            $url = $response['secure_url'] ?? null;
+
+            if (! is_string($url) || $url === '') {
+                throw new RuntimeException('Cloudinary accepted the invoice PDF but returned no URL.');
+            }
+
+            return $url;
+        }
+
         $path = self::PREFIX.'/'.$invoiceNumber.'-'.Str::lower(Str::random(8)).'.pdf';
         
         \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf);

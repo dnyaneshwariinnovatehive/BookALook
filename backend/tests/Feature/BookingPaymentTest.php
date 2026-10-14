@@ -232,13 +232,108 @@ class BookingPaymentTest extends TestCase
     private function readyToBook(): array
     {
         $customer = User::where('role', 'customer')->first();
+        if (! $customer) {
+            $customer = User::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Payment Customer',
+                'phone' => '9876543299',
+                'password_hash' => bcrypt('password'),
+                'role' => 'customer',
+                'is_active' => true,
+            ]);
+        }
+
         $provider = ServiceProvider::with(['user', 'services'])
             ->whereHas('services')
             ->where('is_active', true)
             ->first();
 
-        if (! $customer || ! $provider) {
-            $this->markTestSkipped('needs a seeded salon with staff and a customer');
+        if (! $provider) {
+            $admin = User::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Payment Admin',
+                'phone' => '98' . rand(10000000, 99999999),
+                'password_hash' => bcrypt('password'),
+                'role' => 'admin',
+                'is_active' => true,
+            ]);
+            $salon = \App\Models\Salon::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'admin_id' => $admin->id,
+                'name' => 'Payment Test Salon',
+                'slug' => 'payment-test-salon-' . \Illuminate\Support\Str::random(5),
+                'address' => '123 Test St',
+                'status' => 'active',
+                'submitted_by' => $admin->id,
+            ]);
+
+            $plan = \App\Models\SubscriptionPlan::first();
+            if ($plan) {
+                \App\Models\SalonSubscription::create([
+                    'salon_id' => $salon->id,
+                    'plan_id' => $plan->id,
+                    'billing_type' => \App\Support\BillingModel::SUBSCRIPTION,
+                    'plan_price_snapshot' => $plan->price,
+                    'start_date' => Carbon::today()->subDay(),
+                    'end_date' => Carbon::today()->addDays(30),
+                    'status' => 'active',
+                ]);
+            }
+
+            for ($d = 0; $d <= 6; $d++) {
+                SalonWorkingHour::create([
+                    'salon_id' => $salon->id,
+                    'day_of_week' => $d,
+                    'open_time' => '09:00:00',
+                    'close_time' => '19:00:00',
+                    'is_closed' => false,
+                ]);
+            }
+
+            $providerUser = User::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => 'Payment Staff',
+                'phone' => '98' . rand(10000000, 99999999),
+                'password_hash' => bcrypt('password'),
+                'role' => 'provider',
+                'is_active' => true,
+            ]);
+            $provider = ServiceProvider::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'user_id' => $providerUser->id,
+                'salon_id' => $salon->id,
+                'is_active' => true,
+            ]);
+
+            for ($d = 0; $d <= 6; $d++) {
+                \App\Models\ProviderWorkingHour::create([
+                    'provider_id' => $provider->id,
+                    'day_of_week' => $d,
+                    'shift_start' => '09:00:00',
+                    'shift_end' => '19:00:00',
+                    'is_weekly_off' => false,
+                ]);
+            }
+
+            $category = \App\Models\ServiceCategory::firstOrCreate(
+                ['name' => 'Hair Care'],
+                ['id' => (string) \Illuminate\Support\Str::uuid(), 'is_active' => true]
+            );
+            $template = \App\Models\ServiceTemplate::firstOrCreate(
+                ['name' => 'Payment Cut'],
+                ['id' => (string) \Illuminate\Support\Str::uuid(), 'category_id' => $category->id, 'is_active' => true]
+            );
+            $service = \App\Models\Service::create([
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'salon_id' => $salon->id,
+                'template_id' => $template->id,
+                'price' => 500,
+                'duration_minutes' => 30,
+                'advance_percentage' => 20,
+                'is_active' => true,
+            ]);
+            $provider->services()->attach($service->id);
+            $provider->load(['user', 'services']);
         }
 
         $service = $provider->services->first();

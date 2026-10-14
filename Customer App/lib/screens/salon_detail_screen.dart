@@ -16,6 +16,7 @@ import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/discount_badge.dart';
 
 /// Which reviews the inline Ratings & reviews preview is showing.
 enum _ReviewFilter { topRated, five, fourPlus, threePlus }
@@ -521,22 +522,49 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   Future<void> _openDirections() async {
     if (_salon == null) return;
     AppHaptics.selectionClick();
-    final lat = (_salon!['latitude'] as num?)?.toDouble();
-    final lng = (_salon!['longitude'] as num?)?.toDouble();
+
+    final rawLat = _salon!['latitude'];
+    final rawLng = _salon!['longitude'];
+    final lat = rawLat != null ? double.tryParse('$rawLat') : null;
+    final lng = rawLng != null ? double.tryParse('$rawLng') : null;
+    final bool hasValidCoords =
+        lat != null &&
+        lng != null &&
+        lat >= -90.0 &&
+        lat <= 90.0 &&
+        lng >= -180.0 &&
+        lng <= 180.0 &&
+        !(lat == 0.0 && lng == 0.0);
+
     final address = [
       _salon!['address'],
       _salon!['city'],
       _salon!['pincode'],
     ].where((part) => part != null && '$part'.trim().isNotEmpty).join(', ');
-    final name = _salon!['name']?.toString().trim() ?? 'Salon';
+    final name = _salon!['name']?.toString().trim() ?? '';
+    final mapUrl = _salon!['map_url']?.toString().trim() ?? '';
 
-    final query = (lat != null && lng != null)
-        ? '$lat,$lng'
-        : (address.isNotEmpty
-            ? Uri.encodeComponent('$name, $address')
-            : Uri.encodeComponent(name));
-
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final Uri uri;
+    if (hasValidCoords) {
+      uri = Uri.https('www.google.com', '/maps/search/', {
+        'api': '1',
+        'query': '$lat,$lng',
+      });
+    } else if (mapUrl.isNotEmpty &&
+        (mapUrl.startsWith('http://') || mapUrl.startsWith('https://'))) {
+      uri = Uri.parse(mapUrl);
+    } else if (address.isNotEmpty || name.isNotEmpty) {
+      final String queryTarget = address.isNotEmpty
+          ? (name.isNotEmpty ? '$name, $address' : address)
+          : name;
+      uri = Uri.https('www.google.com', '/maps/search/', {
+        'api': '1',
+        'query': queryTarget,
+      });
+    } else {
+      _toast('Location details are unavailable for this salon.');
+      return;
+    }
 
     try {
       if (!await canLaunchUrl(uri) ||
@@ -672,6 +700,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               _buildAppBar(),
               SliverToBoxAdapter(child: _buildHeaderCard()),
               SliverToBoxAdapter(child: _buildNotices()),
+              SliverToBoxAdapter(child: _buildFirstTimeOfferBanner()),
               SliverToBoxAdapter(child: _buildHoursPanel()),
               SliverToBoxAdapter(child: _buildCombos()),
               SliverToBoxAdapter(child: _buildCategoryTabs()),
@@ -934,47 +963,92 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       _salon!['address'],
       _salon!['city'],
       _salon!['pincode'],
-    ].where((part) => part != null && '$part'.isNotEmpty).join(', ');
+    ].where((part) => part != null && '$part'.trim().isNotEmpty).join(', ');
 
     return Container(
-      margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: EdgeInsets.all(20),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(20),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _salon!['name'] ?? 'Salon',
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: context.colors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 10),
-
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isOpen
-                      ? context.colors.success
-                      : context.colors.danger,
-                  shape: BoxShape.circle,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _salon!['name'] ?? 'Salon',
+                      style: GoogleFonts.outfit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: isOpen
+                                ? context.colors.success
+                                : context.colors.danger,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _salon!['open_status_label'] ?? '',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isOpen
+                                  ? context.colors.success
+                                  : context.colors.danger,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _salon!['open_status_label'] ?? '',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isOpen
-                        ? context.colors.success
-                        : context.colors.danger,
+              const SizedBox(width: 12),
+              Tooltip(
+                message: 'Get directions',
+                child: Semantics(
+                  button: true,
+                  label: 'Get directions',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: _openDirections,
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: context.colors.accentSoft,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppTheme.accentColor.withValues(alpha: 0.25),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.directions_outlined,
+                            size: 24,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -982,67 +1056,67 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
           ),
 
           if (address.isNotEmpty) ...[
-            SizedBox(height: 12),
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: _openDirections,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 20,
-                      color: AppTheme.accentColor,
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        address,
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: context.colors.textPrimary,
-                          decoration: TextDecoration.underline,
-                          decorationColor: AppTheme.accentColor.withValues(alpha: 0.35),
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: context.colors.accentSoft,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppTheme.accentColor.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.directions_outlined,
-                            size: 15,
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Tooltip(
+                  message: 'Open in maps',
+                  child: Semantics(
+                    button: true,
+                    label: 'Open location in maps',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _openDirections,
+                        child: Padding(
+                          padding: const EdgeInsets.all(6.0),
+                          child: Icon(
+                            Icons.location_on_outlined,
+                            size: 20,
                             color: AppTheme.accentColor,
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Directions',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.accentColor,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Tooltip(
+                    message: 'Open in maps',
+                    child: Semantics(
+                      button: true,
+                      label: 'Open address in maps: $address',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: _openDirections,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 6.0,
+                              horizontal: 4.0,
+                            ),
+                            child: Text(
+                              address,
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                color: context.colors.textPrimary,
+                                decoration: TextDecoration.underline,
+                                decorationColor: AppTheme.accentColor
+                                    .withValues(alpha: 0.35),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
 
@@ -1601,6 +1675,20 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final qty = _getServiceQuantity(serviceId);
     final isSelected = qty > 0;
 
+    final ftd = service['first_time_discount'] is Map<String, dynamic>
+        ? service['first_time_discount'] as Map<String, dynamic>
+        : (service['first_time_discount'] is Map
+            ? Map<String, dynamic>.from(service['first_time_discount'] as Map)
+            : null);
+    final double rawPrice = _toDouble(service['price']);
+    final double? origPriceNullable = service['original_price'] != null ? _toDouble(service['original_price']) : null;
+    final double? discPriceNullable = service['discounted_price'] != null ? _toDouble(service['discounted_price']) : null;
+    final double origPrice = origPriceNullable ?? rawPrice;
+    final double discPrice = discPriceNullable ?? (ftd != null && ftd['discount_amount'] != null ? (origPrice - _toDouble(ftd['discount_amount'])) : rawPrice);
+    final bool isDiscounted = ftd != null && origPrice > discPrice && discPrice > 0;
+    final double effectivePrice = isDiscounted ? discPrice : rawPrice;
+    final String? discountLabel = ftd?['discount_label']?.toString();
+
     // Highlight came-from-category service: matched on the real template_id so
     // the salon + service relationship stays exact, never a name guess.
     final isHighlighted =
@@ -1743,6 +1831,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                             ),
                           if (service['refundable_advance'] == true)
                             _metaChip(Icons.replay, 'Refundable advance'),
+                          if (isDiscounted)
+                            _firstTimeOfferChip(discountLabel),
                         ],
                       ),
                     ],
@@ -1783,17 +1873,49 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '₹${_toDouble(service['price']).toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.accentColor,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '₹${effectivePrice.toStringAsFixed(0)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                        if (isDiscounted) ...[
+                          const SizedBox(width: 8),
+                          AnimatedOriginalPrice(
+                            originalPrice: origPrice,
+                            price: effectivePrice,
+                          ),
+                          const SizedBox(width: 8),
+                          DiscountBadge(
+                            originalPrice: origPrice,
+                            price: effectivePrice,
+                            customLabel: discountLabel,
+                            style: DiscountBadgeStyle.compact,
+                          ),
+                        ],
+                      ],
                     ),
+                    if (isDiscounted)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Save ₹${(origPrice - effectivePrice).toStringAsFixed(0)} · First visit',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.success,
+                          ),
+                        ),
+                      ),
                     if (qty > 1)
                       Text(
-                        'Total: ₹${(_toDouble(service['price']) * qty).toStringAsFixed(0)}',
+                        'Total: ₹${(effectivePrice * qty).toStringAsFixed(0)}',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1832,7 +1954,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _metaChip(IconData icon, String text) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: context.colors.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
@@ -1841,13 +1963,137 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: context.colors.textSecondary),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: context.colors.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _firstTimeOfferChip(String? label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.auto_awesome,
+            size: 12,
+            color: AppTheme.accentColor,
+          ),
+          const SizedBox(width: 4),
           Text(
-            text,
+            label ?? 'First visit offer',
             style: GoogleFonts.outfit(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: context.colors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.accentColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFirstTimeOfferBanner() {
+    final offer = _salon?['first_time_offer'] as Map<String, dynamic>?;
+    if (offer == null || offer['eligible'] != true) {
+      return const SizedBox.shrink();
+    }
+
+    final name = offer['offer_name']?.toString() ?? 'First-Time Customer Offer';
+    final label = offer['label']?.toString() ?? 'Special discount on select services for your first booking';
+    final discountType = offer['discount_type']?.toString();
+    final discountVal = offer['discount_value'];
+    final badgeText = discountType == 'percentage'
+        ? '${discountVal ?? 20}% OFF'
+        : '₹${discountVal ?? 0} OFF';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEE3ED).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.accentColor.withValues(alpha: 0.25),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.auto_awesome,
+              color: AppTheme.accentColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: context.colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -56,6 +56,16 @@ class Salon extends Model
         return $this->belongsTo(SalonEnquiry::class, 'enquiry_id');
     }
 
+    public function firstTimeOffers()
+    {
+        return $this->belongsToMany(
+            FirstTimeOffer::class,
+            'first_time_offer_salons',
+            'salon_id',
+            'offer_id'
+        );
+    }
+
     public function media()
     {
         return $this->hasMany(SalonMedia::class)->orderBy('sort_order');

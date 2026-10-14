@@ -68,7 +68,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _loadCart() async {
     try {
       final cart = await _cartService.getCart(widget.salonId);
-      if (mounted) setState(() => _cart = cart);
+      if (mounted) {
+        setState(() {
+          _cart = cart;
+          if (cart != null && cart['summary'] != null) {
+            if (_totalAmount == 0) {
+              _totalAmount = _toDouble(cart['summary']['total_amount']);
+            }
+            if (_advanceAmount == 0) {
+              _advanceAmount = _toDouble(cart['summary']['advance_amount']);
+            }
+            if (_totalDuration == 0) {
+              _totalDuration =
+                  (cart['summary']['total_duration_minutes'] ?? 0) as int;
+            }
+          }
+        });
+      }
     } catch (_) {}
   }
 
@@ -131,9 +147,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final data = await _appointmentService.getSalonProviders(widget.salonId);
       setState(() {
         _providers = data['providers'] ?? [];
-        _totalAmount = _toDouble(data['total_amount']);
-        _advanceAmount = _toDouble(data['advance_amount']);
-        _totalDuration = (data['total_duration_minutes'] ?? 0) as int;
+        final returnedTotal = _toDouble(data['total_amount']);
+        if (returnedTotal > 0 || _totalAmount == 0) {
+          _totalAmount = returnedTotal;
+        }
+        final returnedAdvance = _toDouble(data['advance_amount']);
+        if (returnedAdvance > 0 || _advanceAmount == 0) {
+          _advanceAmount = returnedAdvance;
+        }
+        final duration = (data['total_duration_minutes'] ?? 0) as int;
+        if (duration > 0 || _totalDuration == 0) {
+          _totalDuration = duration;
+        }
         _isLoadingProviders = false;
       });
     } catch (e) {
@@ -188,10 +213,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _slots = processedSlots;
         _isClosed = data['closed'] == true;
         _closedReason = data['closed_reason'];
-        _totalAmount = _toDouble(data['total_amount']);
-        _advanceAmount = _toDouble(data['advance_amount']);
-        _totalDuration =
-            (data['total_duration_minutes'] ?? _totalDuration) as int;
+        final returnedTotal = _toDouble(data['total_amount']);
+        if (returnedTotal > 0 || _totalAmount == 0) {
+          _totalAmount = returnedTotal;
+        }
+        final returnedAdvance = _toDouble(data['advance_amount']);
+        if (returnedAdvance > 0 || _advanceAmount == 0) {
+          _advanceAmount = returnedAdvance;
+        }
+        final duration = data['total_duration_minutes'];
+        if (duration is int && duration > 0) {
+          _totalDuration = duration;
+        }
         _isLoadingSlots = false;
       });
     } catch (e) {
@@ -372,8 +405,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           fallback: 'We could not book that slot. Please try again.',
         ),
       );
-      // The slot may have been taken while the customer was deciding.
+      // The slot may have been taken while the customer was deciding, or cart price changed.
       _fetchSlots();
+      _loadCart();
     }
   }
 
@@ -616,6 +650,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  double _getItemSinglePrice(Map<String, dynamic> item) {
+    final combo = item['combo'];
+    if (combo != null && combo is Map<String, dynamic>) {
+      if (combo['price'] != null) {
+        final p = _toDouble(combo['price']);
+        if (p > 0) return p;
+      }
+      // Sum constituent combo services if combo['price'] is not directly present
+      double comboPrice = 0.0;
+      final services = combo['services'] as List? ?? [];
+      for (final s in services) {
+        if (s is Map<String, dynamic>) {
+          final special = s['pivot']?['combo_special_price'] ?? s['price'];
+          comboPrice += _toDouble(special);
+        }
+      }
+      if (comboPrice > 0) return comboPrice;
+    }
+
+    final service = item['service'];
+    if (service != null && service is Map<String, dynamic>) {
+      return _toDouble(service['price']);
+    }
+
+    if (item['price'] != null) {
+      return _toDouble(item['price']);
+    }
+
+    return 0.0;
+  }
+
   Widget _buildBookingSummary() {
     if (_cart == null) {
       return Container(
@@ -673,9 +738,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ? (service['template']?['name'] ?? 'Service')
                       : 'Service');
             final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-            final singlePrice = isCombo
-                ? (_toDouble(combo['price']))
-                : (_toDouble(service?['price']));
+            final singlePrice = _getItemSinglePrice(item);
             final lineTotal = singlePrice * qty;
 
             return Padding(
@@ -764,6 +827,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ],
           ),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Item Total',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                Builder(
+                  builder: (_) {
+                    final itemsTotal = items.fold<double>(0.0, (sum, raw) {
+                      final item = raw as Map<String, dynamic>;
+                      final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                      return sum + (_getItemSinglePrice(item) * qty);
+                    });
+                    final displayTotal =
+                        _totalAmount > 0 ? _totalAmount : itemsTotal;
+                    return Text(
+                      '₹${displayTotal.toStringAsFixed(0)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.textPrimary,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1219,6 +1316,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final canBook =
         _selectedProviderKey != null && _selectedTime != null && !_isBooking;
 
+    final cartSummary = _cart?['summary'] as Map<String, dynamic>?;
+    final fallbackTotal = cartSummary != null
+        ? _toDouble(cartSummary['total_amount'])
+        : 0.0;
+    final fallbackAdvance = cartSummary != null
+        ? _toDouble(cartSummary['advance_amount'])
+        : 0.0;
+    final displayTotal = _totalAmount > 0 ? _totalAmount : fallbackTotal;
+    final displayAdvance =
+        _advanceAmount > 0 ? _advanceAmount : fallbackAdvance;
+
+    final ftd = cartSummary?['first_time_discount'] is Map<String, dynamic>
+        ? cartSummary!['first_time_discount'] as Map<String, dynamic>
+        : (cartSummary?['first_time_discount'] is Map
+            ? Map<String, dynamic>.from(cartSummary!['first_time_discount'] as Map)
+            : null);
+    final bool hasFtd = ftd != null && ftd['applied'] == true;
+    final double ftdDiscount = hasFtd ? _toDouble(ftd['total_discount']) : 0.0;
+
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.all(20),
@@ -1232,6 +1348,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               SizedBox(height: 12),
             ],
+            if (hasFtd && ftdDiscount > 0) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.auto_awesome, size: 14, color: AppTheme.accentColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        'First-time offer included',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '-₹${ftdDiscount.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: context.colors.success,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1243,7 +1390,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 Text(
-                  '₹${_totalAmount.toStringAsFixed(2)}',
+                  '₹${displayTotal.toStringAsFixed(2)}',
                   style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1264,7 +1411,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 Text(
-                  '₹${_advanceAmount.toStringAsFixed(2)}',
+                  '₹${displayAdvance.toStringAsFixed(2)}',
                   style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
