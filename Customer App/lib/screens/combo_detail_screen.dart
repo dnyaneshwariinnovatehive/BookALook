@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 import '../utils/error_text.dart';
 import '../utils/bottom_clearance.dart';
+import '../widgets/discount_badge.dart';
 
 class ComboDetailScreen extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -371,8 +372,9 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (originalPrice > price) ...[
-                    Text(
-                      '₹${originalPrice.toStringAsFixed(0)}',
+                    AnimatedOriginalPrice(
+                      originalPrice: originalPrice,
+                      price: price,
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -395,17 +397,11 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                       ),
                       if (discountPercent > 0) ...[
                         const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentColor,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$discountPercent% OFF',
-                            style: GoogleFonts.outfit(
-                                fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
+                        DiscountBadge(
+                          originalPrice: originalPrice,
+                          price: price,
+                          discountPercent: discountPercent,
+                          style: DiscountBadgeStyle.prominent,
                         ),
                       ],
                     ],

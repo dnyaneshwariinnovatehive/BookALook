@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 import '../utils/error_text.dart';
+import 'discount_badge.dart';
 
 class ComboDiscoveryCard extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -527,8 +528,9 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                       ),
                       if (originalPrice > price) ...[
                         const SizedBox(width: 6),
-                        Text(
-                          '₹${originalPrice.toStringAsFixed(0)}',
+                        AnimatedOriginalPrice(
+                          originalPrice: originalPrice,
+                          price: price,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -539,23 +541,11 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                       ],
                       if (discountPercent > 0) ...[
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '$discountPercent% OFF',
-                            style: GoogleFonts.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.accentColor,
-                            ),
-                          ),
+                        DiscountBadge(
+                          originalPrice: originalPrice,
+                          price: price,
+                          discountPercent: discountPercent,
+                          style: DiscountBadgeStyle.compact,
                         ),
                       ],
                     ],
