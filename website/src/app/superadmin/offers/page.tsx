@@ -772,24 +772,51 @@ export default function OffersPage() {
           <div className={styles.formSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionTitle}>
-                <Icon name="sliders" size={16} /> 1. Offer Identity & Eligibility Scope
+                <Icon name="sliders" size={16} /> 1. Offer Identity &amp; Eligibility Scope
               </span>
             </div>
 
             <div className={styles.formGrid2}>
-              <Field label="Offer Name" hint="Appears internally and on customer discount tags">
+              <Field
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Offer Name</span>
+                    <span className={styles.requiredBadge}>* Required</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Customer-facing title and internal dashboard identifier.</span>
+                    <div className={styles.hintExample}>
+                      💡 Example: &quot;Welcome 20% Off Platform First Booking&quot;
+                    </div>
+                  </div>
+                }
+              >
                 <input
                   type="text"
                   className={ui.control}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Welcome 20% Off Platform First Booking"
+                  placeholder="e.g. Welcome 20% Off First Booking"
                   required
                   maxLength={255}
                 />
               </Field>
 
-              <Field label="Optional Description" hint="Internal notes or customer-facing terms">
+              <Field
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Offer Description</span>
+                    <span className={styles.optionalBadge}>(Optional)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Internal notes for your team or customer-facing terms explaining what is included.</span>
+                  </div>
+                }
+              >
                 <input
                   type="text"
                   className={ui.control}
@@ -800,7 +827,19 @@ export default function OffersPage() {
               </Field>
             </div>
 
-            <Field label="Eligibility Scope" hint="Determine which customers qualify for this offer">
+            <Field
+              label={
+                <div className={styles.fieldLabelRow}>
+                  <span>Eligibility Scope</span>
+                  <span className={styles.requiredBadge}>* Required</span>
+                </div>
+              }
+              hint={
+                <div className={styles.fieldHintBox}>
+                  <span>Choose who qualifies for this discount: Platform first-timers or Salon first-timers.</span>
+                </div>
+              }
+            >
               <div className={styles.radioGroup}>
                 <label
                   className={cx(styles.radioCard, scope === 'new_to_platform' && styles.radioCardSelected)}
@@ -815,7 +854,7 @@ export default function OffersPage() {
                   <div className={styles.radioContent}>
                     <span className={styles.radioLabel}>New to Platform</span>
                     <span className={styles.radioDesc}>
-                      Only customers with zero prior completed or in-progress bookings across all salons.
+                      Only for customers who have <strong>never booked any salon</strong> on BookALook before (0 prior bookings anywhere).
                     </span>
                   </div>
                 </label>
@@ -833,7 +872,7 @@ export default function OffersPage() {
                   <div className={styles.radioContent}>
                     <span className={styles.radioLabel}>New to Salon</span>
                     <span className={styles.radioDesc}>
-                      Customers who have never completed a booking at the specific participating salon(s).
+                      For customers who are <strong>new to the specific participating salon(s)</strong>, even if they have booked other salons on BookALook before.
                     </span>
                   </div>
                 </label>
@@ -845,11 +884,18 @@ export default function OffersPage() {
           <div className={styles.formSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionTitle}>
-                <Icon name="percent" size={16} /> 2. Discount Model & Policy Limits
+                <Icon name="percent" size={16} /> 2. Discount Model &amp; Policy Limits
               </span>
             </div>
 
-            <Field label="Discount Type">
+            <Field
+              label={
+                <div className={styles.fieldLabelRow}>
+                  <span>Discount Type</span>
+                  <span className={styles.requiredBadge}>* Required</span>
+                </div>
+              }
+            >
               <div className={styles.radioGroup}>
                 <label
                   className={cx(styles.radioCard, discountType === 'percentage' && styles.radioCardSelected)}
@@ -864,7 +910,7 @@ export default function OffersPage() {
                   <div className={styles.radioContent}>
                     <span className={styles.radioLabel}>Percentage Discount (%)</span>
                     <span className={styles.radioDesc}>
-                      Calculates a percentage savings per eligible service line, bounded by a maximum monetary cap.
+                      Deducts a percentage (e.g. 20%) from each qualifying service, bounded by a maximum rupee cap.
                     </span>
                   </div>
                 </label>
@@ -882,7 +928,7 @@ export default function OffersPage() {
                   <div className={styles.radioContent}>
                     <span className={styles.radioLabel}>Flat Amount (₹)</span>
                     <span className={styles.radioDesc}>
-                      Applies a fixed ₹ discount per eligible service line, capped by total booking limit.
+                      Deducts a fixed ₹ amount (e.g. ₹200) per qualifying service, capped by a total booking limit.
                     </span>
                   </div>
                 </label>
@@ -892,8 +938,17 @@ export default function OffersPage() {
             {discountType === 'percentage' ? (
               <div className={styles.formGrid2}>
                 <Field
-                  label={`Percentage Value (${policy.min_percentage}% – ${policy.max_percentage}%)`}
-                  hint={`Platform policy range: ${policy.min_percentage}% to ${policy.max_percentage}%`}
+                  label={
+                    <div className={styles.fieldLabelRow}>
+                      <span>Percentage Value (%)</span>
+                      <span className={styles.requiredBadge}>* Required</span>
+                    </div>
+                  }
+                  hint={
+                    <div className={styles.fieldHintBox}>
+                      <span>Platform policy allowed range: <strong>{policy.min_percentage}% to {policy.max_percentage}%</strong>.</span>
+                    </div>
+                  }
                 >
                   <input
                     type="number"
@@ -908,8 +963,20 @@ export default function OffersPage() {
                 </Field>
 
                 <Field
-                  label="Maximum Discount Cap (₹)"
-                  hint={`Ceiling limit per booking (Max: ₹${policy.platform_max_cap})`}
+                  label={
+                    <div className={styles.fieldLabelRow}>
+                      <span>Maximum Discount Cap (₹)</span>
+                      <span className={styles.optionalBadge}>(Optional · Default: ₹{policy.default_percentage_cap || 500})</span>
+                    </div>
+                  }
+                  hint={
+                    <div className={styles.fieldHintBox}>
+                      <span>Highest total ₹ discount allowed on one bill. Protects against huge losses on expensive services.</span>
+                      <div className={styles.hintExample}>
+                        💡 Example: If 50% of a ₹3,000 service is ₹1,500, setting a ₹500 cap ensures the customer only gets ₹500 off (they pay ₹2,500).
+                      </div>
+                    </div>
+                  }
                 >
                   <input
                     type="number"
@@ -918,15 +985,24 @@ export default function OffersPage() {
                     onChange={(e) => setMaxDiscountCap(e.target.value === '' ? '' : Number(e.target.value))}
                     min={0}
                     max={policy.platform_max_cap}
-                    placeholder="e.g. 500"
+                    placeholder={`Default ₹${policy.default_percentage_cap || 500}`}
                   />
                 </Field>
               </div>
             ) : (
               <div className={styles.formGrid2}>
                 <Field
-                  label={`Flat Amount Per Eligible Service (₹${policy.min_flat_amount} – ₹${policy.max_flat_amount})`}
-                  hint="Applied to each qualifying service line in the customer's cart"
+                  label={
+                    <div className={styles.fieldLabelRow}>
+                      <span>Flat Amount Per Service (₹)</span>
+                      <span className={styles.requiredBadge}>* Required</span>
+                    </div>
+                  }
+                  hint={
+                    <div className={styles.fieldHintBox}>
+                      <span>Rupees deducted from each qualifying service (Allowed: <strong>₹{policy.min_flat_amount} – ₹{policy.max_flat_amount}</strong>).</span>
+                    </div>
+                  }
                 >
                   <input
                     type="number"
@@ -941,8 +1017,20 @@ export default function OffersPage() {
                 </Field>
 
                 <Field
-                  label="Maximum Total Discount Per Booking (₹)"
-                  hint={`Overall booking cap (Max: ₹${policy.platform_max_cap})`}
+                  label={
+                    <div className={styles.fieldLabelRow}>
+                      <span>Maximum Total Discount Per Booking (₹)</span>
+                      <span className={styles.optionalBadge}>(Optional · Default: ₹{policy.default_flat_cap || 1000})</span>
+                    </div>
+                  }
+                  hint={
+                    <div className={styles.fieldHintBox}>
+                      <span>Ceiling limit across all discounted services in one booking (Max: ₹{policy.platform_max_cap}).</span>
+                      <div className={styles.hintExample}>
+                        💡 Example: If offering ₹200 off per service and customer books 5 services (₹1,000 discount), a ₹600 cap limits the total discount to ₹600.
+                      </div>
+                    </div>
+                  }
                 >
                   <input
                     type="number"
@@ -951,7 +1039,7 @@ export default function OffersPage() {
                     onChange={(e) => setFlatBookingCap(e.target.value === '' ? '' : Number(e.target.value))}
                     min={0}
                     max={policy.platform_max_cap}
-                    placeholder="e.g. 1000"
+                    placeholder={`Default ₹${policy.default_flat_cap || 1000}`}
                   />
                 </Field>
               </div>
@@ -968,8 +1056,20 @@ export default function OffersPage() {
 
             <div className={styles.formGrid3}>
               <Field
-                label="Min Service Price (₹)"
-                hint="Service must cost at least this amount to qualify"
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Min Service Price (₹)</span>
+                    <span className={styles.optionalBadge}>(Optional · 0 = No Min)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>An individual service must cost at least this amount to get discounted.</span>
+                    <div className={styles.hintExample}>
+                      💡 Example: Setting ₹300 excludes low-cost services like ₹100 eyebrow threading from the discount.
+                    </div>
+                  </div>
+                }
               >
                 <input
                   type="number"
@@ -977,12 +1077,25 @@ export default function OffersPage() {
                   value={minServicePrice}
                   onChange={(e) => setMinServicePrice(e.target.value === '' ? '' : Number(e.target.value))}
                   min={0}
+                  placeholder="0"
                 />
               </Field>
 
               <Field
-                label="Min Eligible Subtotal (₹)"
-                hint="Sum of qualifying services must meet this"
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Min Eligible Subtotal (₹)</span>
+                    <span className={styles.optionalBadge}>(Optional · 0 = No Min)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Minimum spend required ONLY on the qualifying services to activate the offer.</span>
+                    <div className={styles.hintExample}>
+                      💡 Example: Setting ₹1,000 means customer must choose at least ₹1,000 worth of qualifying services.
+                    </div>
+                  </div>
+                }
               >
                 <input
                   type="number"
@@ -990,12 +1103,25 @@ export default function OffersPage() {
                   value={minEligibleSubtotal}
                   onChange={(e) => setMinEligibleSubtotal(e.target.value === '' ? '' : Number(e.target.value))}
                   min={0}
+                  placeholder="0"
                 />
               </Field>
 
               <Field
-                label="Min Total Booking Subtotal (₹)"
-                hint="Total cart booking subtotal must meet this"
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Min Total Booking Subtotal (₹)</span>
+                    <span className={styles.optionalBadge}>(Optional · 0 = No Min)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Minimum total cart value (qualifying + non-qualifying items) required to unlock offer.</span>
+                    <div className={styles.hintExample}>
+                      💡 Example: Setting ₹1,500 means the customer&apos;s grand total bill must reach at least ₹1,500.
+                    </div>
+                  </div>
+                }
               >
                 <input
                   type="number"
@@ -1003,6 +1129,7 @@ export default function OffersPage() {
                   value={minTotalSubtotal}
                   onChange={(e) => setMinTotalSubtotal(e.target.value === '' ? '' : Number(e.target.value))}
                   min={0}
+                  placeholder="0"
                 />
               </Field>
             </div>
@@ -1014,13 +1141,16 @@ export default function OffersPage() {
               <span className={styles.sectionTitle}>
                 <Icon name="catalog" size={16} /> 4. Explicitly Targeted Service Templates
               </span>
-              <span style={{ fontSize: '12px', color: selectedTemplateIds.length > 0 ? 'var(--text-muted)' : 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
-                {selectedTemplateIds.length > 0 ? `${selectedTemplateIds.length} service(s) selected` : 'At least 1 service required *'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className={styles.requiredBadge}>* Required (At least 1)</span>
+                <span style={{ fontSize: '12px', color: selectedTemplateIds.length > 0 ? 'var(--text-muted)' : 'var(--color-danger, #ef4444)', fontWeight: 600 }}>
+                  {selectedTemplateIds.length > 0 ? `(${selectedTemplateIds.length} selected)` : '(0 selected)'}
+                </span>
+              </div>
             </div>
 
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px 0' }}>
-              Policy requires first-time discount offers to explicitly target specific service templates. Use the selector below to check eligible services or click "Select All" to enroll all current templates.
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px 0', lineHeight: 1.45 }}>
+              Check the specific services that qualify for this discount. Blanket / unselected offers are not permitted. Click <strong>&quot;Select All&quot;</strong> to enroll every service template across the platform.
             </p>
 
             <div className={styles.selectorContainer}>
@@ -1087,22 +1217,29 @@ export default function OffersPage() {
               <span className={styles.sectionTitle}>
                 <Icon name="store" size={16} /> 5. Participating Salons
               </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {scope === 'new_to_platform' && selectedSalonIds.length === 0
-                  ? 'All platform salons included'
-                  : `${selectedSalonIds.length} salon(s) selected`}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {scope === 'new_to_salon' ? (
+                  <span className={styles.requiredBadge}>* Required (At least 1 salon)</span>
+                ) : (
+                  <span className={styles.optionalBadge}>(Optional · All Salons by Default)</span>
+                )}
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {scope === 'new_to_platform' && selectedSalonIds.length === 0
+                    ? 'All platform salons included'
+                    : `${selectedSalonIds.length} salon(s) selected`}
+                </span>
+              </div>
             </div>
 
             {scope === 'new_to_platform' && (
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0' }}>
-                For platform-wide offers, leaving all salons unselected applies the offer across all salons on BookALook. Alternatively, select specific salons below.
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.45 }}>
+                💡 <strong>Platform-wide mode:</strong> Leaving all salons unselected automatically includes <strong>every active salon</strong> on BookALook. Or check specific salons below to restrict it.
               </p>
             )}
 
             {scope === 'new_to_salon' && (
-              <p style={{ fontSize: '12px', color: 'var(--accent-text)', margin: '0 0 8px 0', fontWeight: 600 }}>
-                ⚠️ Requirement: You must explicitly select at least one participating salon for "New to Salon" offers.
+              <p style={{ fontSize: '12px', color: 'var(--accent-text)', margin: '0 0 8px 0', fontWeight: 600, lineHeight: 1.45 }}>
+                ⚠️ <strong>Requirement:</strong> For &quot;New to Salon&quot; offers, you must explicitly check at least one salon where first-time visitors get this deal.
               </p>
             )}
 
@@ -1163,12 +1300,24 @@ export default function OffersPage() {
           <div className={styles.formSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionTitle}>
-                <Icon name="calendar" size={16} /> 6. Schedule, Redemption Limits & Status
+                <Icon name="calendar" size={16} /> 6. Schedule, Redemption Limits &amp; Status
               </span>
             </div>
 
             <div className={styles.formGrid3}>
-              <Field label="Starts At" hint="Offer becomes active from this moment">
+              <Field
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Starts At</span>
+                    <span className={styles.optionalBadge}>(Optional · Starts Now)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>When the offer goes live. Defaults to current time.</span>
+                  </div>
+                }
+              >
                 <input
                   type="datetime-local"
                   className={ui.control}
@@ -1177,7 +1326,19 @@ export default function OffersPage() {
                 />
               </Field>
 
-              <Field label="Ends At (Optional)" hint="Leave blank for continuous run">
+              <Field
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Ends At</span>
+                    <span className={styles.optionalBadge}>(Optional · No Expiry)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Expiry date &amp; time. Leave blank for continuous ongoing run.</span>
+                  </div>
+                }
+              >
                 <input
                   type="datetime-local"
                   className={ui.control}
@@ -1186,25 +1347,45 @@ export default function OffersPage() {
                 />
               </Field>
 
-              <Field label="Campaign Redemption Cap" hint="Max times this offer can be claimed">
+              <Field
+                label={
+                  <div className={styles.fieldLabelRow}>
+                    <span>Campaign Redemption Cap</span>
+                    <span className={styles.optionalBadge}>(Optional · Unlimited)</span>
+                  </div>
+                }
+                hint={
+                  <div className={styles.fieldHintBox}>
+                    <span>Max times this offer can be claimed before it auto-stops.</span>
+                    <div className={styles.hintExample}>
+                      💡 Example: 500 = First 500 customers get it.
+                    </div>
+                  </div>
+                }
+              >
                 <input
                   type="number"
                   className={ui.control}
                   value={maxRedemptions}
                   onChange={(e) => setMaxRedemptions(e.target.value === '' ? '' : Number(e.target.value))}
                   min={1}
-                  placeholder="e.g. 500 (Optional)"
+                  placeholder="e.g. 500 (Blank = Unlimited)"
                 />
               </Field>
             </div>
 
-            <label className={ui.check} style={{ marginTop: '8px' }}>
+            <label className={ui.check} style={{ marginTop: '10px' }}>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
-              <span>Activate this offer immediately upon saving</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 600 }}>Activate this offer immediately upon saving</span>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  If unchecked, the offer will be saved as &quot;Paused&quot; and won&apos;t apply to customer bookings until you manually activate it.
+                </span>
+              </div>
             </label>
           </div>
 
