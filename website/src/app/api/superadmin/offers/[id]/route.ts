@@ -3,13 +3,24 @@ import { cookies } from 'next/headers';
 
 const BACKEND_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.bookalook.in').replace(/\/$/, '');
 
+async function resolveToken(request: Request): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const tokenFromCookie = cookieStore.get('superadmin_token')?.value;
+  if (tokenFromCookie) return tokenFromCookie;
+
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return undefined;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const token = cookieStore.get('superadmin_token')?.value;
+  const token = await resolveToken(request);
 
   if (!token) {
     return NextResponse.json({ message: 'Unauthenticated' }, { status: 401 });
@@ -45,8 +56,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const token = cookieStore.get('superadmin_token')?.value;
+  const token = await resolveToken(request);
 
   if (!token) {
     return NextResponse.json({ message: 'Unauthenticated' }, { status: 401 });
@@ -85,8 +95,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const token = cookieStore.get('superadmin_token')?.value;
+  const token = await resolveToken(request);
 
   if (!token) {
     return NextResponse.json({ message: 'Unauthenticated' }, { status: 401 });

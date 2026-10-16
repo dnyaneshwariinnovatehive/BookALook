@@ -37,6 +37,7 @@ export const navGroups: NavGroup[] = [
     label: 'Customers',
     items: [
       { name: 'Customers', path: '/superadmin/customers', icon: 'users', keywords: 'users clients' },
+      { name: 'First-Time Offers', path: '/superadmin/offers', icon: 'percent', keywords: 'offers discounts promotions first-time deals first time customer acquisition' },
       { name: 'Ratings', path: '/superadmin/reviews', icon: 'star', keywords: 'reviews feedback' },
       { name: 'Complaints', path: '/superadmin/complaints', icon: 'alert', keywords: 'issues disputes' },
     ],
@@ -47,7 +48,6 @@ export const navGroups: NavGroup[] = [
       { name: 'Master Catalog', path: '/superadmin/catalog', icon: 'catalog', keywords: 'services categories templates' },
       { name: 'Areas', path: '/superadmin/areas', icon: 'pin', keywords: 'localities cities sub-areas' },
       { name: 'Banners', path: '/superadmin/banners', icon: 'image', keywords: 'promotions ads' },
-      { name: 'Offers & Discounts', path: '/superadmin/offers', icon: 'percent', keywords: 'offers discounts promotions first-time deals' },
       { name: 'WhatsApp Marketing', path: '/superadmin/marketing', icon: 'message', keywords: 'campaigns templates' },
       { name: 'Policy Settings', path: '/superadmin/settings/policy', icon: 'sliders', keywords: 'rules configuration' },
       { name: 'Invoice Format', path: '/superadmin/settings/invoice', icon: 'receipt', keywords: 'invoice receipt branding tax letterhead' },

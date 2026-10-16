@@ -9,19 +9,31 @@ export async function POST(
 ) {
   const { id } = await params;
   const cookieStore = await cookies();
-  const token = cookieStore.get('superadmin_token')?.value;
+  const token = cookieStore.get('superadmin_token')?.value || request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
 
   if (!token) {
     return NextResponse.json({ message: 'Unauthenticated' }, { status: 401 });
   }
 
   try {
+    let bodyText: string | undefined = undefined;
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      bodyText = await request.text();
+    }
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+    if (bodyText) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const backendRes = await fetch(`${BACKEND_BASE}/api/superadmin/offers/${id}/toggle-active`, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers,
+      body: bodyText,
     });
 
     const textData = await backendRes.text();

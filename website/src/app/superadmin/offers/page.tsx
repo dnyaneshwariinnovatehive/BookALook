@@ -75,6 +75,14 @@ const DEFAULT_POLICY: PolicyDefaults = {
   platform_max_cap: 5000,
 };
 
+const toLocalISOString = (dateInput: string | Date | null | undefined): string => {
+  if (!dateInput) return '';
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 export default function OffersPage() {
   const [offers, setOffers] = useState<OfferData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,7 +175,7 @@ export default function OffersPage() {
     const active = offers.filter((o) => o.is_active && (o.is_valid_now ?? true)).length;
     const platformWide = offers.filter((o) => o.scope === 'new_to_platform').length;
     const salonSpecific = offers.filter((o) => o.scope === 'new_to_salon').length;
-    const redemptions = offers.reduce((sum, o) => sum + (o.redemptions_count || 0), 0);
+    const redemptions = offers.reduce((sum, o) => sum + (Number(o.redemptions_count) || 0), 0);
     return { total, active, platformWide, salonSpecific, redemptions };
   }, [offers]);
 
@@ -204,7 +212,7 @@ export default function OffersPage() {
     setMinServicePrice(0);
     setMinEligibleSubtotal(0);
     setMinTotalSubtotal(0);
-    setStartsAt(new Date().toISOString().slice(0, 16));
+    setStartsAt(toLocalISOString(new Date()));
     setEndsAt('');
     setMaxRedemptions('');
     setIsActive(true);
@@ -235,8 +243,8 @@ export default function OffersPage() {
     setMinServicePrice(offer.min_service_price ?? 0);
     setMinEligibleSubtotal(offer.min_eligible_subtotal ?? 0);
     setMinTotalSubtotal(offer.min_total_booking_subtotal ?? offer.min_total_subtotal ?? 0);
-    setStartsAt(offer.starts_at ? new Date(offer.starts_at).toISOString().slice(0, 16) : '');
-    setEndsAt(offer.ends_at ? new Date(offer.ends_at).toISOString().slice(0, 16) : '');
+    setStartsAt(toLocalISOString(offer.starts_at));
+    setEndsAt(toLocalISOString(offer.ends_at));
     setMaxRedemptions(offer.max_redemptions ?? '');
     setIsActive(offer.is_active);
 
@@ -246,8 +254,16 @@ export default function OffersPage() {
       const json = await res.json();
       if (res.ok && json.success && json.data) {
         const full = json.data;
-        const sIds = (full.service_templates || []).map((st: { service_template_id: string }) => st.service_template_id);
-        const salIds = (full.participating_salons || []).map((ps: { salon_id: string }) => ps.salon_id);
+        const sIds = (full.service_templates || [])
+          .map((st: { id?: string; service_template_id?: string; pivot?: { service_template_id?: string } }) =>
+            st.service_template_id || st.id || st.pivot?.service_template_id,
+          )
+          .filter(Boolean) as string[];
+        const salIds = (full.participating_salons || [])
+          .map((ps: { id?: string; salon_id?: string; pivot?: { salon_id?: string } }) =>
+            ps.salon_id || ps.id || ps.pivot?.salon_id,
+          )
+          .filter(Boolean) as string[];
         setSelectedTemplateIds(sIds);
         setSelectedSalonIds(salIds);
       }
@@ -275,6 +291,11 @@ export default function OffersPage() {
     try {
       const res = await fetch(`/api/superadmin/offers/${offer.id}/toggle-active`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ is_active: nextState }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -487,7 +508,7 @@ export default function OffersPage() {
             <span className={styles.discountSub}>
               {o.discount_type === 'percentage'
                 ? `Cap: ₹${o.max_discount_cap ?? 'No Cap'}`
-                : `Booking Cap: ₹${o.flat_booking_cap ?? 'No Cap'}`}
+                : `Booking Cap: ₹${o.flat_booking_cap ?? o.max_discount_cap ?? 'No Cap'}`}
             </span>
           </div>
         ),
