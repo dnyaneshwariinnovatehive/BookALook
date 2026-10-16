@@ -662,6 +662,20 @@ class AppointmentController extends Controller
             // listing it would tell the customer they have an appointment they
             // have not actually paid for.
             ->where('status', '!=', 'pending_payment')
+            // Abandoned unpaid holds that were released by the system without ever being confirmed
+            // must not be listed as cancelled appointments in the customer's history.
+            // An appointment only shows as cancelled if it was a real booking cancelled by the customer
+            // (e.g. by pressing cancel button), salon admin, or had an actual successful payment record.
+            ->where(function ($q) {
+                $q->where('status', '!=', 'cancelled')
+                    ->orWhere('cancelled_by', '!=', 'system')
+                    ->orWhereExists(function ($sub) {
+                        $sub->select(DB::raw(1))
+                            ->from('payments')
+                            ->whereColumn('payments.appointment_id', 'appointments.id')
+                            ->where('payments.status', 'success');
+                    });
+            })
             ->orderBy('appointment_date', 'desc')
             ->orderBy('start_time', 'desc')
             ->get();

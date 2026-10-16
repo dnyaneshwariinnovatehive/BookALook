@@ -204,6 +204,29 @@ class BookingPaymentTest extends TestCase
         $this->assertNotContains($appointmentId, $ids, 'an unpaid hold was listed as a booking');
     }
 
+    public function test_an_abandoned_unpaid_hold_is_never_shown_in_customer_history_as_cancelled(): void
+    {
+        [$customer, $provider, $date, $time] = $this->readyToBook();
+
+        $appointmentId = $this->book($customer, $provider, $date, $time)
+            ->assertStatus(201)
+            ->json('appointment.id');
+
+        // Customer backs out / cancels payment
+        $this->actingAs($customer, 'sanctum')
+            ->postJson("/api/customer/appointments/{$appointmentId}/payment/abandon")
+            ->assertStatus(200);
+
+        $listed = $this->actingAs($customer, 'sanctum')
+            ->getJson('/api/customer/appointments')
+            ->assertStatus(200)
+            ->json();
+
+        $ids = collect($listed['upcoming'] ?? [])->concat($listed['past'] ?? [])->pluck('id');
+
+        $this->assertNotContains($appointmentId, $ids, 'an abandoned unpaid hold was listed in customer history');
+    }
+
     public function test_subscription_payments_do_not_touch_the_gateway(): void
     {
         // The rule this whole feature is scoped by: Razorpay is for appointment
