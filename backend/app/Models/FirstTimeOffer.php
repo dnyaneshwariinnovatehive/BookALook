@@ -23,6 +23,7 @@ class FirstTimeOffer extends Model
     public const TYPE_FLAT = 'flat';
 
     protected $fillable = [
+        'salon_id',
         'name',
         'description',
         'scope',
@@ -71,6 +72,14 @@ class FirstTimeOffer extends Model
     public function offerServices(): HasMany
     {
         return $this->hasMany(FirstTimeOfferService::class, 'offer_id');
+    }
+
+    /**
+     * Direct salon owner (if null, platform-wide offer owned by SuperAdmin).
+     */
+    public function salon()
+    {
+        return $this->belongsTo(Salon::class, 'salon_id');
     }
 
     /**
@@ -157,6 +166,10 @@ class FirstTimeOffer extends Model
      */
     public function participates(string $salonId): bool
     {
+        if ($this->salon_id !== null) {
+            return $this->salon_id === $salonId;
+        }
+
         if ($this->scope === self::SCOPE_NEW_TO_SALON) {
             return $this->participatingSalons()->where('salons.id', $salonId)->exists();
         }
@@ -245,7 +258,7 @@ class FirstTimeOffer extends Model
      * @param  array<string, mixed>  $input
      * @return array<string, array<int, mixed>>
      */
-    public static function validationRules(array $input = []): array
+    public static function validationRules(array $input = [], bool $isSalonScoped = false): array
     {
         $discountType = $input['discount_type'] ?? self::TYPE_PERCENTAGE;
 
@@ -263,9 +276,11 @@ class FirstTimeOffer extends Model
         };
 
         $scope = $input['scope'] ?? null;
-        $salonRules = $scope === self::SCOPE_NEW_TO_SALON
-            ? ['required', 'array', 'min:1']
-            : ['nullable', 'array'];
+        $salonRules = $isSalonScoped
+            ? ['nullable', 'array']
+            : ($scope === self::SCOPE_NEW_TO_SALON
+                ? ['required', 'array', 'min:1']
+                : ['nullable', 'array']);
 
         return [
             'name' => ['required', 'string', 'max:150'],

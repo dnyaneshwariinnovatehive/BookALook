@@ -291,6 +291,9 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             if (_insights != null && !isCompleted)
               _buildSuggestedAddonsSection(serviceNames),
 
+            // Dedicated Offer & Discount Section
+            _buildOfferDiscountSection(),
+
             // Financial Info
             Builder(builder: (context) {
               final num ftdAmount = num.tryParse(appointment['first_time_discount_amount']?.toString() ?? '0') ?? 0;
@@ -324,6 +327,276 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOfferDiscountSection() {
+    final num ftdAmount = num.tryParse(appointment['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+    final Map<String, dynamic>? offer = appointment['first_time_offer'] is Map
+        ? Map<String, dynamic>.from(appointment['first_time_offer'])
+        : null;
+    final String? offerId = appointment['first_time_offer_id']?.toString() ?? offer?['id']?.toString();
+    final bool hasOffer = ftdAmount > 0 || offer != null;
+
+    if (!hasOffer) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSection(
+            title: 'Offer & Discount',
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.local_offer_outlined, color: Colors.grey, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No offer applied',
+                          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Standard service pricing was applied at booking.',
+                          style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+
+    final String offerName = offer?['name']?.toString() ?? 'First-Time Customer Offer';
+    final String? scope = offer?['scope']?.toString();
+    final String? discountType = offer?['discount_type']?.toString();
+    final dynamic discountVal = offer?['discount_value'];
+
+    String discountSummary = '';
+    if (discountType == 'percentage' && discountVal != null) {
+      discountSummary = '$discountVal% OFF';
+    } else if (discountType == 'flat' && discountVal != null) {
+      discountSummary = '₹$discountVal FLAT OFF';
+    } else {
+      discountSummary = '₹$ftdAmount saved';
+    }
+
+    String scopeLabel = 'First-Time Customer Offer';
+    if (scope == 'new_to_platform') {
+      scopeLabel = 'First Booking on BookALook';
+    } else if (scope == 'new_to_salon') {
+      scopeLabel = 'First Booking at this Salon';
+    }
+
+    // Extract discounted service lines
+    final List allServices = appointment['services'] ?? [];
+    final List discountedLines = allServices.where((s) {
+      final sFtd = num.tryParse(s['first_time_discount_amount']?.toString() ?? '0') ?? 0;
+      final priceAtBooking = s['price_at_booking'] ?? s['price'];
+      final origPrice = s['original_service_price'] ?? priceAtBooking;
+      return sFtd > 0 || (origPrice != null && priceAtBooking != null && num.tryParse('$origPrice') != num.tryParse('$priceAtBooking'));
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSection(
+          title: 'Offer & Discount',
+          children: [
+            // Badge & Offer Header
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF15803D)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'First-Time Customer Offer Applied',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF15803D),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        offerName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        scopeLabel,
+                        style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFD8B4FE)),
+                  ),
+                  child: Text(
+                    discountSummary,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF7E22CE),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            if (offerId != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'Offer ID: ',
+                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade500),
+                  ),
+                  Expanded(
+                    child: Text(
+                      offerId,
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const Divider(height: 20),
+
+            // Line items breakdown
+            Text(
+              'Discounted Services Breakdown',
+              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 8),
+
+            if (discountedLines.isNotEmpty)
+              ...discountedLines.map<Widget>((s) {
+                final name = s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service';
+                final priceAtBooking = s['price_at_booking'] ?? s['price'];
+                final origPrice = s['original_service_price'] ?? priceAtBooking;
+                final sFtd = num.tryParse(s['first_time_discount_amount']?.toString() ?? '0') ??
+                    ((origPrice != null && priceAtBooking != null)
+                        ? (num.tryParse('$origPrice') ?? 0) - (num.tryParse('$priceAtBooking') ?? 0)
+                        : 0);
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(name, style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w500)),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (origPrice != null) ...[
+                            Text(
+                              '₹$origPrice',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: Colors.grey,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          if (sFtd > 0) ...[
+                            Text(
+                              '-₹$sFtd',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: const Color(0xFF16A34A),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            '₹$priceAtBooking',
+                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              })
+            else
+              Text(
+                'Discount applied across booking subtotal',
+                style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade600),
+              ),
+
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Offer Savings',
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF15803D)),
+                  ),
+                  Text(
+                    '-₹$ftdAmount',
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF15803D)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 

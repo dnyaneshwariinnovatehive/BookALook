@@ -20,6 +20,7 @@ import '../../../services/push_notification_service.dart';
 import '../../../widgets/push_notification_toggle.dart';
 import '../../../widgets/logout_confirmation_dialog.dart';
 import '../more/automated_messaging_screen.dart';
+import '../more/salon_offers_screen.dart';
 
 class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -312,6 +313,19 @@ class _MoreTabState extends State<MoreTab> {
               MaterialPageRoute(
                 builder: (_) =>
                     SalonQrScreen(salonId: salonData['id'].toString()),
+              ),
+            ),
+          ),
+          _buildDivider(),
+          _buildOptionTile(
+            icon: Icons.local_offer_outlined,
+            iconColor: const Color(0xFF9850F1),
+            title: 'Offers & Discounts',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    SalonOffersScreen(salonId: salonData['id'].toString()),
               ),
             ),
           ),

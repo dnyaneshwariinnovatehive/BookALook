@@ -23,7 +23,7 @@ class AppointmentController extends Controller
                 'servingProvider.user',
                 'services.service.template',
                 'serviceAdditions.service.template',
-                'firstTimeOffer:id,name,discount_type,discount_value',
+                'firstTimeOffer:id,name,discount_type,discount_value,scope',
             ])
             ->where('salon_id', $salon_id)
             // Slots held while a customer is mid-payment block the time but are

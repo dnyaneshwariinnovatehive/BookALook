@@ -456,5 +456,14 @@ Route::prefix('partner')->group(function () {
         // Automated Messaging
         Route::get('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'getSettings']);
         Route::put('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'updateSettings']);
+
+        // Salon Offers & Discounts Management
+        Route::get('/salons/{salon_id}/offers/options', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'options']);
+        Route::get('/salons/{salon_id}/offers', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'index']);
+        Route::post('/salons/{salon_id}/offers', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'store']);
+        Route::get('/salons/{salon_id}/offers/{id}', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'show']);
+        Route::put('/salons/{salon_id}/offers/{id}', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'update']);
+        Route::post('/salons/{salon_id}/offers/{id}/toggle-active', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'toggleActive']);
+        Route::delete('/salons/{salon_id}/offers/{id}', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'destroy']);
     });
 });
