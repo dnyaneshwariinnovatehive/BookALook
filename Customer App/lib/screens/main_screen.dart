@@ -19,6 +19,10 @@ import '../services/deep_link_service.dart';
 import '../services/location_service.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../widgets/location_permission_modal.dart';
+import '../services/app_version_service.dart';
+import '../services/http_client.dart' show mandatoryUpdateRouteName;
+import '../widgets/optional_update_dialog.dart';
+import 'mandatory_update_screen.dart';
 
 class MainScreen extends StatefulWidget {
   /// The floating navigation pill: 75 tall, held 20 off the sides and the
@@ -37,7 +41,7 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final List<int> _tabHistory = [];
 
@@ -87,11 +91,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialIndex;
 
     // After the first frame: the shell has to exist before a modal or sheet can sit on
     // top of it.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Check for available or mandatory updates first
+      await _checkAppUpdates();
+
       // Restore saved city first so one-time permissions or manual selections are loaded
       await LocationService.instance.restore();
 
@@ -117,6 +125,40 @@ class _MainScreenState extends State<MainScreen> {
     ];
 
     ExploreRequestBus.instance.addListener(_onExploreRequested);
+  }
+
+  Future<void> _checkAppUpdates() async {
+    if (!mounted) return;
+    try {
+      final updateInfo = await AppVersionService.instance.checkUpdate();
+      if (!mounted) return;
+
+      if (updateInfo.isMandatory) {
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(
+            settings: const RouteSettings(name: mandatoryUpdateRouteName),
+            builder: (_) => MandatoryUpdateScreen(updateInfo: updateInfo),
+          ),
+          (route) => false,
+        );
+      } else if (updateInfo.isOptional) {
+        OptionalUpdateDialog.showIfEligible(context, updateInfo);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAppUpdates();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ExploreRequestBus.instance.removeListener(_onExploreRequested);
+    super.dispose();
   }
 
   Future<void> _checkLocationPermission() async {
@@ -145,12 +187,6 @@ class _MainScreenState extends State<MainScreen> {
         await showCityPicker(context);
       }
     }
-  }
-
-  @override
-  void dispose() {
-    ExploreRequestBus.instance.removeListener(_onExploreRequested);
-    super.dispose();
   }
 
   /// A category was picked somewhere else in the app — the home screen's fixed

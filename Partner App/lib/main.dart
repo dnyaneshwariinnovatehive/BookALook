@@ -3,7 +3,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/mandatory_update_screen.dart';
+import 'services/api_config.dart' show mandatoryUpdateRouteName;
+import 'services/app_version_service.dart';
 import 'services/push_notification_service.dart';
+import 'widgets/optional_update_dialog.dart';
 
 // Global notifier for theme mode
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
@@ -25,8 +29,53 @@ Future<void> main() async {
   runApp(const PartnerApp());
 }
 
-class PartnerApp extends StatelessWidget {
+class PartnerApp extends StatefulWidget {
   const PartnerApp({super.key});
+
+  @override
+  State<PartnerApp> createState() => _PartnerAppState();
+}
+
+class _PartnerAppState extends State<PartnerApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkVersionOnResume();
+    }
+  }
+
+  Future<void> _checkVersionOnResume() async {
+    try {
+      final info = await AppVersionService.instance.checkUpdate();
+      if (!mounted) return;
+      final nav = navigatorKey.currentState;
+      final ctx = navigatorKey.currentContext;
+
+      if (info.isMandatory && nav != null && ctx != null) {
+        nav.pushAndRemoveUntil(
+          MaterialPageRoute(
+            settings: const RouteSettings(name: mandatoryUpdateRouteName),
+            builder: (_) => MandatoryUpdateScreen(updateInfo: info),
+          ),
+          (route) => false,
+        );
+      } else if (info.isOptional && ctx != null) {
+        OptionalUpdateDialog.showIfEligible(ctx, info);
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -83,6 +83,9 @@ class AuditLog extends Model
     public const INVOICE_SETTINGS_UPDATED = 'invoice_settings.updated';
     public const SUB_AREAS_IMPORTED = 'sub_area.imported';
     public const CAMPAIGN_TEMPLATE_UPDATED = 'campaign_template.updated';
+    public const APP_RELEASE_CREATED = 'app_release.created';
+    public const APP_RELEASE_UPDATED = 'app_release.updated';
+    public const APP_UPDATE_POLICY_UPDATED = 'app_update_policy.updated';
 
     // People.
     public const COLLABORATOR_CREATED = 'collaborator.created';
@@ -123,6 +126,9 @@ class AuditLog extends Model
         self::SUB_AREAS_IMPORTED => ['label' => 'Imported areas from a file', 'category' => 'Settings', 'severity' => 'high'],
         // What every salon on the platform is allowed to send.
         self::CAMPAIGN_TEMPLATE_UPDATED => ['label' => 'Changed a campaign template', 'category' => 'Settings', 'severity' => 'high'],
+        self::APP_RELEASE_CREATED => ['label' => 'Registered an app release', 'category' => 'Settings', 'severity' => 'normal'],
+        self::APP_RELEASE_UPDATED => ['label' => 'Updated an app release', 'category' => 'Settings', 'severity' => 'normal'],
+        self::APP_UPDATE_POLICY_UPDATED => ['label' => 'Changed app update policy', 'category' => 'Settings', 'severity' => 'high'],
 
         self::COLLABORATOR_CREATED => ['label' => 'Added a collaborator', 'category' => 'People', 'severity' => 'normal'],
     ];

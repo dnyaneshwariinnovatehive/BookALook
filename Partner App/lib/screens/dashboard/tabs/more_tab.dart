@@ -1,26 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../phone_screen.dart';
-import '../../../main.dart';
-import 'settings/salon_timings_screen.dart';
-import '../more/subscription_billing_screen.dart';
-import '../more/wallet_screen.dart';
-import '../more/salon_location_screen.dart';
-import '../more/salon_qr_screen.dart';
-import '../more/salon_reviews_screen.dart';
-import '../more/insights_screen.dart';
-import '../more/payroll_screen.dart';
-import '../more/salon_payouts_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../../notifications_screen.dart';
-import '../../help_support_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
-import '../../../services/push_notification_service.dart';
-import '../../../widgets/push_notification_toggle.dart';
-import '../../../widgets/logout_confirmation_dialog.dart';
-import '../more/automated_messaging_screen.dart';
-import '../more/salon_offers_screen.dart';
+import 'more/more_menu_catalog.dart';
+import 'more/more_search_engine.dart';
+import 'more/widgets/more_search_bar.dart';
+import 'more/widgets/more_search_results_view.dart';
 
 class MoreTab extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -43,42 +29,42 @@ class MoreTab extends StatefulWidget {
 class _MoreTabState extends State<MoreTab> {
   late Map<String, dynamic> salonData;
 
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  List<MoreSearchResult> _searchResults = [];
+  bool get _isSearching => _searchController.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
     salonData = Map.from(widget.salonData);
   }
 
-  /// `Switch Salon` and `Switch Account` are still standing in for this one
-  /// method, so the dialog says plainly what the tap actually does instead of
-  /// guessing at an intent the code does not implement yet.
-  Future<void> _logout(BuildContext context, {required String action}) async {
-    String? adminName;
-    String? adminPhone;
-    if (salonData['admin'] is Map) {
-      adminName = salonData['admin']['name']?.toString();
-      adminPhone = salonData['admin']['phone']?.toString();
-    }
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
-    final confirmed = await LogoutConfirmationDialog.show(
-      context,
-      name: adminName,
-      phone: adminPhone,
-      secondaryNote: 'Your bookings and salon data stay saved to your account.',
-    );
+  void _onSearchQueryChanged(String query) {
+    setState(() {
+      if (query.trim().isEmpty) {
+        _searchResults = [];
+      } else {
+        final allItems = MoreMenuCatalog.getAllSearchableItems(context);
+        _searchResults = MoreSearchEngine.search(query: query, items: allItems);
+      }
+    });
+  }
 
-    if (confirmed != true) return;
-
-    await PushNotificationService().unregisterDevice();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (context.mounted) {
-      // Logging out has to replace the whole shell, not just this tab's stack.
-      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const PhoneScreen()),
-        (route) => false,
-      );
-    }
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchResults = [];
+      _searchFocusNode.unfocus();
+    });
   }
 
   Widget _buildPlanBadge() {
@@ -114,398 +100,290 @@ class _MoreTabState extends State<MoreTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          'More',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28),
-        ),
+    return PopScope(
+      canPop: !_isSearching,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_isSearching) {
+          _clearSearch();
+        }
+      },
+      child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        centerTitle: false,
-        actions: [
-          WalletCoinPill(salonId: salonData['id'].toString(), compact: true),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(
-          top: 8,
-          bottom: 100,
-        ), // padding for bottom nav
-        children: [
-          // Top Card (Salon Profile)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(
-                      alpha: isDark ? 0.2 : 0.05,
-                    ),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        appBar: AppBar(
+          title: const Text(
+            'More',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 28),
+          ),
+          backgroundColor: theme.scaffoldBackgroundColor,
+          elevation: 0,
+          centerTitle: false,
+          actions: [
+            WalletCoinPill(salonId: salonData['id'].toString(), compact: true),
+            const SizedBox(width: 16),
+          ],
+        ),
+        body: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.only(
+            top: 4,
+            bottom: 100, // padding for bottom nav
+          ),
+          children: [
+            // 1. Search Bar (Sticky at the top of More tab)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: MoreSearchBar(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: _onSearchQueryChanged,
+                onClear: _clearSearch,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: Container(
-                      height: 120,
-                      color: theme.dividerColor,
-                      child: salonData['cover_photo_url'] != null
-                          ? Image.network(
-                              salonData['cover_photo_url'],
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                    Icons.image,
-                                    size: 50,
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.5),
-                                  ),
-                            )
-                          : Icon(
-                              Icons.image,
-                              size: 50,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
-                    ),
+            ),
+
+            // 2. Either search results or normal More screen
+            if (_isSearching)
+              MoreSearchResultsView(
+                results: _searchResults,
+                query: _searchController.text.trim(),
+                salonData: salonData,
+                onSalonUpdated: (updatedData) {
+                  setState(() => salonData.addAll(updatedData));
+                  widget.onSalonUpdated?.call(updatedData);
+                },
+                onQuerySelected: (suggestedQuery) {
+                  _searchController.text = suggestedQuery;
+                  _searchController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: suggestedQuery.length),
+                  );
+                  _onSearchQueryChanged(suggestedQuery);
+                },
+                onClear: _clearSearch,
+              )
+            else ...[
+              // Top Card (Salon Profile)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: isDark ? 0.2 : 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      salonData['name']?.toString() ??
-                                          'Salon Name',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: Container(
+                          height: 120,
+                          color: theme.dividerColor,
+                          child: salonData['cover_photo_url'] != null
+                              ? Image.network(
+                                  salonData['cover_photo_url'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(
+                                        Icons.image,
+                                        size: 50,
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.5),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
+                                )
+                              : Icon(
+                                  Icons.image,
+                                  size: 50,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          salonData['name']?.toString() ??
+                                              'Salon Name',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildPlanBadge(),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    salonData['city']?['name']?.toString() ??
+                                        'City not specified',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.textTheme.bodyMedium?.color,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  _buildPlanBadge(),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                salonData['city']?['name']?.toString() ??
-                                    'City not specified',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: theme.textTheme.bodyMedium?.color,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditSalonProfileScreen(
-                                  salonData: salonData,
-                                ),
-                              ),
-                            ).then((updatedData) {
-                              if (updatedData != null &&
-                                  updatedData is Map<String, dynamic>) {
-                                setState(() {
-                                  salonData.addAll(updatedData);
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        EditSalonProfileScreen(
+                                          salonData: salonData,
+                                        ),
+                                  ),
+                                ).then((updatedData) {
+                                  if (updatedData != null &&
+                                      updatedData is Map<String, dynamic>) {
+                                    setState(() {
+                                      salonData.addAll(updatedData);
+                                    });
+                                    if (widget.onSalonUpdated != null) {
+                                      widget.onSalonUpdated!(updatedData);
+                                    }
+                                  }
                                 });
-                                if (widget.onSalonUpdated != null) {
-                                  widget.onSalonUpdated!(updatedData);
-                                }
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppTheme.darkAccentSoft
-                                  : AppTheme.lightAccentSoft,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Edit',
-                              style: TextStyle(
-                                color: AppTheme.accentColor,
-                                fontWeight: FontWeight.bold,
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? AppTheme.darkAccentSoft
+                                      : AppTheme.lightAccentSoft,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    color: AppTheme.accentColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Categorized Menu Sections from Single Source of Truth
+              ..._buildSections(context),
+
+              const SizedBox(height: 16),
+
+              // Logout Button
+              InkWell(
+                onTap: () => MoreMenuCatalog.logout(
+                  context,
+                  action: 'Logging out',
+                  salonData: salonData,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 24,
+                  ),
+                  child: Text(
+                    'Log out',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppTheme.darkDanger
+                          : AppTheme.lightDanger,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildSectionHeading('Salon management'),
-          _buildOptionTile(
-            icon: Icons.storefront,
-            iconColor: Colors.purple,
-            title: 'Switch Salon',
-            onTap: () => _logout(context, action: 'Switch Salon'),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.place_outlined,
-            iconColor: AppTheme.accentColor,
-            title: 'Salon Location',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonLocationScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.access_time,
-            iconColor: isDark ? AppTheme.darkWarning : AppTheme.lightWarning,
-            title: 'Change Salon Timings',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonTimingsScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.qr_code_2,
-            iconColor: AppTheme.accentColor,
-            title: 'Your QR Code',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonQrScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.local_offer_outlined,
-            iconColor: const Color(0xFF9850F1),
-            title: 'Offers & Discounts',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonOffersScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-
-          _buildSectionHeading('Insights & communication'),
-          _buildOptionTile(
-            icon: Icons.insights_outlined,
-            iconColor: Colors.deepPurple,
-            title: 'Business Insights',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    InsightsScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.star_outline_rounded,
-            iconColor: const Color(0xFFF5A623),
-            title: 'Customer Reviews',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonReviewsScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.notifications_outlined,
-            iconColor: isDark ? AppTheme.darkWarning : AppTheme.lightWarning,
-            title: 'Notifications',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.mark_chat_read,
-            iconColor: Colors.green,
-            title: 'Automated Messaging',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AutomatedMessagingScreen(
-                  salonId: salonData['id'].toString(),
                 ),
               ),
-            ),
-          ),
-
-          _buildSectionHeading('Payments & payroll'),
-          _buildOptionTile(
-            icon: Icons.account_balance_wallet,
-            iconColor: Colors.amber,
-            title: 'My Wallet',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    WalletScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.account_balance,
-            iconColor: Colors.blueGrey,
-            title: 'Payouts from BookALook',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SalonPayoutsScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.groups,
-            iconColor: Colors.indigo,
-            title: 'Staff Payroll',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    PayrollScreen(salonId: salonData['id'].toString()),
-              ),
-            ),
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.receipt_long,
-            iconColor: Colors.teal,
-            title: 'Subscription & Billing',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SubscriptionBillingScreen(
-                  salonId: salonData['id'].toString(),
-                ),
-              ),
-            ),
-          ),
-
-          _buildSectionHeading('Account & app settings'),
-          _buildOptionTile(
-            icon: Icons.manage_accounts,
-            iconColor: isDark ? AppTheme.darkInfo : AppTheme.lightInfo,
-            title: 'Switch Account',
-            onTap: () => _logout(context, action: 'Switch Account'),
-          ),
-          _buildDivider(),
-          const PushNotificationToggle(
-            contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-          ),
-          _buildDivider(),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: themeNotifier,
-            builder: (context, currentMode, _) {
-              final isDark = currentMode == ThemeMode.dark;
-              return SwitchListTile(
-                value: isDark,
-                onChanged: (val) async {
-                  themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('isDarkMode', val);
-                },
-                secondary: Icon(
-                  isDark ? Icons.dark_mode : Icons.light_mode,
-                  color: isDark ? Colors.yellow : Colors.orange,
-                  size: 26,
-                ),
-                title: const Text(
-                  'Dark Mode',
-                  style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 2,
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildOptionTile(
-            icon: Icons.help_outline,
-            iconColor: isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess,
-            title: 'Help & Support',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Logout Button
-          InkWell(
-            onTap: () => _logout(context, action: 'Logging out'),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Text(
-                'Log out',
-                style: TextStyle(
-                  color: isDark ? AppTheme.darkDanger : AppTheme.lightDanger,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
+              const SizedBox(height: 24),
+            ],
+          ],
+        ),
       ),
     );
+  }
+
+  List<Widget> _buildSections(BuildContext context) {
+    final sections = MoreMenuCatalog.getMenuSections(context);
+    final widgets = <Widget>[];
+
+    for (var i = 0; i < sections.length; i++) {
+      final section = sections[i];
+      widgets.add(_buildSectionHeading(section.title));
+
+      for (var j = 0; j < section.items.length; j++) {
+        final item = section.items[j];
+        if (item.type == MenuItemType.inlineToggle &&
+            item.inlineWidgetBuilder != null) {
+          widgets.add(
+            ListTile(
+              leading: Icon(item.icon, color: item.iconColor, size: 26),
+              title: Text(
+                item.title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              trailing: item.inlineWidgetBuilder!(context, salonData),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 2,
+              ),
+            ),
+          );
+        } else {
+          widgets.add(
+            _buildOptionTile(
+              icon: item.icon,
+              iconColor: item.iconColor,
+              title: item.title,
+              onTap: () => item.onSelect?.call(
+                context,
+                salonData,
+                widget.onSalonUpdated,
+              ),
+            ),
+          );
+        }
+
+        if (j < section.items.length - 1) {
+          widgets.add(_buildDivider());
+        }
+      }
+    }
+
+    return widgets;
   }
 
   Widget _buildSectionHeading(String title) {

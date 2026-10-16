@@ -50,6 +50,7 @@ export const navGroups: NavGroup[] = [
       { name: 'Banners', path: '/superadmin/banners', icon: 'image', keywords: 'promotions ads' },
       { name: 'WhatsApp Marketing', path: '/superadmin/marketing', icon: 'message', keywords: 'campaigns templates' },
       { name: 'Policy Settings', path: '/superadmin/settings/policy', icon: 'sliders', keywords: 'rules configuration' },
+      { name: 'App Versions', path: '/superadmin/app-versions', icon: 'smartphone', keywords: 'releases updates force update version build customer partner' },
       { name: 'Invoice Format', path: '/superadmin/settings/invoice', icon: 'receipt', keywords: 'invoice receipt branding tax letterhead' },
       { name: 'Notifications', path: '/superadmin/notifications', icon: 'bell', keywords: 'messages alerts templates' },
       { name: 'Audit Log', path: '/superadmin/audit-log', icon: 'history', keywords: 'activity trail' },

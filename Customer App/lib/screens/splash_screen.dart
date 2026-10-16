@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import '../services/app_version_service.dart';
 import '../services/auth_service.dart';
+import '../services/http_client.dart' show mandatoryUpdateRouteName;
+import 'mandatory_update_screen.dart';
 import 'main_screen.dart';
 import '../theme/app_theme.dart';
 
@@ -16,7 +19,9 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   String? _cachedToken;
+  AppUpdateInfo? _updateInfo;
   bool _authCheckComplete = false;
+  bool _versionCheckComplete = false;
 
   @override
   void initState() {
@@ -35,22 +40,44 @@ class _SplashScreenState extends State<SplashScreen>
       }
     });
 
-    // Start auth check immediately so we don't wait for disk I/O after animation completes
-    _preloadAuth();
+    // Start auth and version checks immediately so we don't wait for network after animation completes
+    _preloadAuthAndVersion();
   }
 
-  void _preloadAuth() async {
-    _cachedToken = await AuthService.getToken();
-    _authCheckComplete = true;
+  void _preloadAuthAndVersion() async {
+    final futures = await Future.wait([
+      AuthService.getToken(),
+      AppVersionService.instance.checkUpdate(),
+    ]);
 
-    // In the rare case auth took longer than 2.6s, navigate as soon as it's ready.
+    _cachedToken = futures[0] as String?;
+    _updateInfo = futures[1] as AppUpdateInfo?;
+    _authCheckComplete = true;
+    _versionCheckComplete = true;
+
+    // In the rare case checks took longer than 2.6s, navigate as soon as it's ready.
     if (_controller.isCompleted) {
       _navigate();
     }
   }
 
   void _navigate() {
-    if (!mounted || !_authCheckComplete) return;
+    if (!mounted || !_authCheckComplete || !_versionCheckComplete) return;
+
+    // If update is mandatory, block immediately — do not expose normal app screens.
+    if (_updateInfo != null && _updateInfo!.isMandatory) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          settings: const RouteSettings(name: mandatoryUpdateRouteName),
+          pageBuilder: (_, __, ___) => MandatoryUpdateScreen(updateInfo: _updateInfo!),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+      return;
+    }
 
     if (_cachedToken != null && _cachedToken!.isNotEmpty) {
       Navigator.pushReplacement(

@@ -6,6 +6,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:partner_app/services/api_config.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:partner_app/models/subscription_plan.dart';
+import 'package:partner_app/widgets/subscription/plan_feature_item.dart';
 import 'upgrade_plan_screen.dart';
 
 class SubscriptionBillingScreen extends StatefulWidget {
@@ -19,6 +22,7 @@ class SubscriptionBillingScreen extends StatefulWidget {
 class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   bool _isLoading = true;
   bool _hasSubscription = false;
+  bool _isPlanFeaturesExpanded = false;
   Map<String, dynamic>? _subscription;
   int _daysRemaining = 0;
   Map<String, dynamic>? _pendingRequest;
@@ -367,6 +371,18 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                         _formatDate(_subscription!['end_date'], relative: true),
                         colorScheme,
                       ),
+                      if (_subscription!['plan'] != null) ...[
+                        const SizedBox(height: 16),
+                        Divider(height: 1, color: theme.dividerColor),
+                        const SizedBox(height: 16),
+                        _buildCurrentPlanFeatures(
+                          SubscriptionPlan.fromJson(
+                            Map<String, dynamic>.from(_subscription!['plan']),
+                          ),
+                          colorScheme,
+                          isDark,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -584,6 +600,120 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       children: [
         Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      ],
+    );
+  }
+
+  Widget _buildCurrentPlanFeatures(
+    SubscriptionPlan plan,
+    ColorScheme colorScheme,
+    bool isDark,
+  ) {
+    final included = plan.includedFeatures;
+    final isExpired = _daysRemaining < 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.verified_outlined,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Features included in this plan',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            if (included.length > 2)
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isPlanFeaturesExpanded = !_isPlanFeaturesExpanded;
+                  });
+                },
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isPlanFeaturesExpanded
+                            ? 'Collapse'
+                            : 'View all (${included.length})',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accentColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        _isPlanFeaturesExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppTheme.accentColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (included.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Standard salon booking, catalog, staff, and wallet features included.',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else ...[
+          // When collapsed show top 2 features, when expanded show all features
+          ...((_isPlanFeaturesExpanded ? included : included.take(2))
+              .map((f) => PlanFeatureItem(feature: f, isCompact: true))),
+        ],
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            isExpired
+                ? 'Features configured for this plan. Renewal is required to restore active access to campaigns, booking, and insights.'
+                : 'Features configured for this plan. Active for your salon while this subscription is valid.',
+            style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              height: 1.35,
+              color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody,
+            ),
+          ),
+        ),
       ],
     );
   }

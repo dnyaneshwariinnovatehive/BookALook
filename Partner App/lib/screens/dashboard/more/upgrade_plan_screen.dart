@@ -6,6 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:partner_app/services/api_config.dart';
 
+import 'package:google_fonts/google_fonts.dart';
+import 'package:partner_app/models/subscription_plan.dart';
+import 'package:partner_app/widgets/subscription/subscription_plan_card.dart';
+
 class UpgradePlanScreen extends StatefulWidget {
   final String salonId;
 
@@ -28,6 +32,8 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool _isLoading = true;
   bool _isProcessing = false;
   List<dynamic> _plans = [];
+  List<SubscriptionPlan> _parsedPlans = [];
+  String? _currentPlanId;
   double _walletBalance = 0;
 
   /// What one coin is worth in rupees, as the server says. Read rather than
@@ -65,30 +71,38 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
-      // Note: Ideal implementation would fetch everything in one API call for this screen, 
-      // but we will fetch plans and wallet balance for the demo.
-      final plansRes = await http.get(Uri.parse('$_baseUrl/partner/subscription/plans'), headers: {
+      final headers = {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
-      });
-      final walletRes = await http.get(Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/wallet'), headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      });
+      };
+
+      final plansRes = await http.get(Uri.parse('$_baseUrl/partner/subscription/plans'), headers: headers);
+      final walletRes = await http.get(Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/wallet'), headers: headers);
+      final subRes = await http.get(Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/subscription'), headers: headers);
 
       final plansData = jsonDecode(plansRes.body);
       final walletData = jsonDecode(walletRes.body);
+      final subData = subRes.statusCode == 200 ? jsonDecode(subRes.body) : null;
 
       setState(() {
         if (plansData != null && plansData['success'] == true) {
           _plans = plansData['plans'] as List<dynamic>? ?? [];
-          if (_plans.isNotEmpty) _selectedPlanId = _plans.first['id'].toString();
+          _parsedPlans = _plans
+              .map((p) => SubscriptionPlan.fromJson(Map<String, dynamic>.from(p)))
+              .toList();
+          if (_plans.isNotEmpty && _selectedPlanId == null) {
+            _selectedPlanId = _plans.first['id'].toString();
+          }
         }
         if (walletData != null && walletData['success'] == true) {
           final balance = walletData['balance'] ?? 0;
           _walletBalance = balance is num ? balance.toDouble() : (double.tryParse(balance.toString()) ?? 0.0);
           final rate = walletData['coin_value_inr'];
           if (rate is num && rate > 0) _coinValue = rate.toDouble();
+        }
+        if (subData != null && subData['success'] == true && subData['has_subscription'] == true) {
+          _currentPlanId = subData['subscription']?['plan_id']?.toString() ??
+              subData['subscription']?['plan']?['id']?.toString();
         }
       });
     } catch (e) {
@@ -335,20 +349,52 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Select a Master Plan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Select a Plan',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose a plan tier that fits your salon\'s client base and marketing goals.',
+              style: GoogleFonts.outfit(
+                fontSize: 13.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
-            ..._plans.map((plan) {
-              return RadioListTile<String>(
-                title: Text('${plan['name']} - ₹${plan['price']}'),
-                subtitle: Text('WhatsApp Limit: ${plan['whatsapp_campaign_limit']}'),
-                value: plan['id'].toString(),
-                groupValue: _selectedPlanId,
-                onChanged: (val) {
-                  setState(() => _selectedPlanId = val);
+            if (_parsedPlans.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    'No active subscription plans available.',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _parsedPlans.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 16),
+                itemBuilder: (context, index) {
+                  final plan = _parsedPlans[index];
+                  return SubscriptionPlanCard(
+                    plan: plan,
+                    isSelected: plan.id == _selectedPlanId,
+                    isCurrentPlan: plan.id == _currentPlanId,
+                    onSelect: () {
+                      setState(() => _selectedPlanId = plan.id);
+                    },
+                  );
                 },
-              );
-            }),
-            Divider(height: 48),
+              ),
+            const Divider(height: 48),
             
             Text('Payment Summary', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),

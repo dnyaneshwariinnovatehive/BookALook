@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../services/api_config.dart' show mandatoryUpdateRouteName;
+import '../services/app_version_service.dart';
+import 'mandatory_update_screen.dart';
 import 'phone_screen.dart';
 import 'dashboard/salon_selection_screen.dart';
 import 'dashboard/service_provider_dashboard.dart';
@@ -20,7 +23,9 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _controller;
   String? _cachedToken;
   String? _cachedAuthStateStr;
+  AppUpdateInfo? _updateInfo;
   bool _authCheckComplete = false;
+  bool _versionCheckComplete = false;
 
   @override
   void initState() {
@@ -39,14 +44,17 @@ class _SplashScreenState extends State<SplashScreen>
       }
     });
 
-    _preloadAuth();
+    _preloadAuthAndVersion();
   }
 
-  void _preloadAuth() async {
+  void _preloadAuthAndVersion() async {
     final prefs = await SharedPreferences.getInstance();
     _cachedToken = prefs.getString('auth_token');
     _cachedAuthStateStr = prefs.getString('auth_state');
     _authCheckComplete = true;
+
+    _updateInfo = await AppVersionService.instance.checkUpdate();
+    _versionCheckComplete = true;
 
     if (_controller.isCompleted) {
       _navigate();
@@ -54,7 +62,22 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigate() {
-    if (!mounted || !_authCheckComplete) return;
+    if (!mounted || !_authCheckComplete || !_versionCheckComplete) return;
+
+    // If update is mandatory, block immediately
+    if (_updateInfo != null && _updateInfo!.isMandatory) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          settings: const RouteSettings(name: mandatoryUpdateRouteName),
+          pageBuilder: (_, __, ___) => MandatoryUpdateScreen(updateInfo: _updateInfo!),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+      return;
+    }
 
     if (_cachedToken != null &&
         _cachedToken!.isNotEmpty &&

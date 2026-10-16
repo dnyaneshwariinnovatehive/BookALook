@@ -134,6 +134,9 @@ Route::post('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookContr
 Route::get('/public/salons/{slug}', [\App\Http\Controllers\Api\PublicSalonController::class, 'show']);
 Route::get('/public/app-links', [\App\Http\Controllers\Api\PublicSalonController::class, 'appLinks']);
 
+// App version & update policy (public unauthenticated endpoint for Customer & Partner apps)
+Route::get('/app-version/{app}', [\App\Http\Controllers\Api\AppVersionController::class, 'show']);
+
 Route::prefix('superadmin')->group(function () {
     Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
 
@@ -206,6 +209,12 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/settings/invoice', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getInvoiceSettings']);
         Route::put('/settings/invoice', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updateInvoiceSettings']);
         
+        // App Version Management & Force Update Policies
+        Route::get('/app-versions', [\App\Http\Controllers\Api\SuperAdmin\AppVersionManagementController::class, 'index']);
+        Route::post('/app-versions/releases', [\App\Http\Controllers\Api\SuperAdmin\AppVersionManagementController::class, 'storeRelease']);
+        Route::put('/app-versions/releases/{id}', [\App\Http\Controllers\Api\SuperAdmin\AppVersionManagementController::class, 'updateRelease']);
+        Route::put('/app-versions/policies/{app}', [\App\Http\Controllers\Api\SuperAdmin\AppVersionManagementController::class, 'updatePolicy']);
+
         Route::apiResource('wallet-schemes', \App\Http\Controllers\Api\SuperAdmin\WalletSchemeController::class);
 
         // Payout runs: weekly for Subscription Plan salons, monthly for the

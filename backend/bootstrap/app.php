@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             // Closes a salon's features when its plan has lapsed.
             'salon.active' => \App\Http\Middleware\EnsureSalonSubscriptionActive::class,
+            'app.version' => \App\Http\Middleware\EnforceAppVersion::class,
+        ]);
+
+        $middleware->api(append: [
+            \App\Http\Middleware\EnforceAppVersion::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

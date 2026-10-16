@@ -21,21 +21,16 @@ class ApiService {
   }
 
   static Future<http.Response> post(String path, dynamic body) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
-    }
+    final headers = await ApiConfig.headers();
 
-    return await http.post(
+    final response = await http.post(
       Uri.parse('$baseUrl$path'),
       headers: headers,
       body: jsonEncode(body),
     );
+
+    await ApiConfig.handleResponse(response);
+    return response;
   }
 
   static Future<Map<String, dynamic>> registerSalon(Map<String, dynamic> data) async {
