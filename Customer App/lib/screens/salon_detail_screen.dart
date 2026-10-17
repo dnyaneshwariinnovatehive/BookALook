@@ -17,6 +17,7 @@ import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/discount_badge.dart';
+import '../widgets/flipping_savings_badge.dart';
 
 /// Which reviews the inline Ratings & reviews preview is showing.
 enum _ReviewFilter { topRated, five, fourPlus, threePlus }
@@ -1439,25 +1440,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                 ),
                 const SizedBox(width: 6),
               ],
-              if (savings > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.colors.success,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'SAVE ₹${savings.toStringAsFixed(0)}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+              if (savings > 0) FlippingSavingsBadge(savings: savings),
             ],
           ),
           const SizedBox(height: 8),
@@ -1678,14 +1661,23 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final ftd = service['first_time_discount'] is Map<String, dynamic>
         ? service['first_time_discount'] as Map<String, dynamic>
         : (service['first_time_discount'] is Map
-            ? Map<String, dynamic>.from(service['first_time_discount'] as Map)
-            : null);
+              ? Map<String, dynamic>.from(service['first_time_discount'] as Map)
+              : null);
     final double rawPrice = _toDouble(service['price']);
-    final double? origPriceNullable = service['original_price'] != null ? _toDouble(service['original_price']) : null;
-    final double? discPriceNullable = service['discounted_price'] != null ? _toDouble(service['discounted_price']) : null;
+    final double? origPriceNullable = service['original_price'] != null
+        ? _toDouble(service['original_price'])
+        : null;
+    final double? discPriceNullable = service['discounted_price'] != null
+        ? _toDouble(service['discounted_price'])
+        : null;
     final double origPrice = origPriceNullable ?? rawPrice;
-    final double discPrice = discPriceNullable ?? (ftd != null && ftd['discount_amount'] != null ? (origPrice - _toDouble(ftd['discount_amount'])) : rawPrice);
-    final bool isDiscounted = ftd != null && origPrice > discPrice && discPrice > 0;
+    final double discPrice =
+        discPriceNullable ??
+        (ftd != null && ftd['discount_amount'] != null
+            ? (origPrice - _toDouble(ftd['discount_amount']))
+            : rawPrice);
+    final bool isDiscounted =
+        ftd != null && origPrice > discPrice && discPrice > 0;
     final double effectivePrice = isDiscounted ? discPrice : rawPrice;
     final String? discountLabel = ftd?['discount_label']?.toString();
 
@@ -1831,8 +1823,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                             ),
                           if (service['refundable_advance'] == true)
                             _metaChip(Icons.replay, 'Refundable advance'),
-                          if (isDiscounted)
-                            _firstTimeOfferChip(discountLabel),
+                          if (isDiscounted) _firstTimeOfferChip(discountLabel),
                         ],
                       ),
                     ],
@@ -1992,11 +1983,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.auto_awesome,
-            size: 12,
-            color: AppTheme.accentColor,
-          ),
+          const Icon(Icons.auto_awesome, size: 12, color: AppTheme.accentColor),
           const SizedBox(width: 4),
           Text(
             label ?? 'First visit offer',
@@ -2018,7 +2005,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     }
 
     final name = offer['offer_name']?.toString() ?? 'First-Time Customer Offer';
-    final label = offer['label']?.toString() ?? 'Special discount on select services for your first booking';
+    final label =
+        offer['label']?.toString() ??
+        'Special discount on select services for your first booking';
     final discountType = offer['discount_type']?.toString();
     final discountVal = offer['discount_value'];
     final badgeText = discountType == 'percentage'
@@ -2069,7 +2058,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.accentColor,
                         borderRadius: BorderRadius.circular(6),

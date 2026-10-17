@@ -149,7 +149,9 @@
 }
 
 @media (max-width: 640px) {
-  .formGrid2, .formGrid3 {
+
+  .formGrid2,
+  .formGrid3 {
     grid-template-columns: 1fr;
   }
 }
