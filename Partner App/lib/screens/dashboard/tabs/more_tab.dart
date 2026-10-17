@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:partner_app/theme/app_theme.dart';
-import '../../notifications_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../more/edit_salon_profile_screen.dart';
 import 'more/more_menu_catalog.dart';

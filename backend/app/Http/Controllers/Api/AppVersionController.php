@@ -52,7 +52,7 @@ class AppVersionController extends Controller
             return [
                 'app' => $app,
                 'has_policy' => true,
-                'enforcement_active' => $policy->isEnforcementActive(),
+                'is_enforced' => (bool) $policy->is_enforced,
                 'update_mode' => $policy->update_mode,
                 'enforce_at' => $policy->enforce_at?->toIso8601String(),
                 'message' => $policy->update_message,
@@ -77,6 +77,12 @@ class AppVersionController extends Controller
                 ],
             ];
         });
+
+        // Compute enforcement_active dynamically against now() so scheduled enforcement activates immediately
+        $isEnforced = (bool) ($data['is_enforced'] ?? false);
+        $enforceAt = ! empty($data['enforce_at']) ? \Illuminate\Support\Carbon::parse($data['enforce_at']) : null;
+        $data['enforcement_active'] = $isEnforced && ($enforceAt === null || now()->greaterThanOrEqualTo($enforceAt));
+        unset($data['is_enforced']);
 
         // Add optional platform-specific store_url helper for convenience
         $storeUrl = match ($platform) {

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/notification_service.dart';
 
+import '../theme/app_theme.dart';
+
 class PushNotificationToggle extends StatefulWidget {
   final EdgeInsetsGeometry contentPadding;
+  final bool compact;
 
   const PushNotificationToggle({
     super.key,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
+    this.compact = false,
   });
 
   @override
@@ -117,6 +121,21 @@ class _PushNotificationToggleState extends State<PushNotificationToggle> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.compact) {
+      if (_isLoading) {
+        return const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+      }
+      return Switch.adaptive(
+        value: _pushEnabled,
+        activeTrackColor: AppTheme.accentColor,
+        onChanged: _togglePush,
+      );
+    }
+
     if (_isLoading) {
       return ListTile(
         leading: const Icon(

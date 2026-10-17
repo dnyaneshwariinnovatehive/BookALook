@@ -32,6 +32,27 @@ void main() {
       expect(AppVersionService.compareVersions('1.0.0', 1, '1.0.1', 1), lessThan(0));
       expect(AppVersionService.compareVersions('1.2.0', 5, '1.1.9', 50), greaterThan(0));
       expect(AppVersionService.compareVersions('v2.0.0', 10, '2.0.0', 10), equals(0));
+
+      // 2.9.0 vs 2.10.0
+      expect(AppVersionService.compareVersions('2.9.0', 1, '2.10.0', 1), lessThan(0));
+      expect(AppVersionService.compareVersions('2.10.0', 1, '2.9.0', 1), greaterThan(0));
+
+      // Equal visible versions with different build numbers
+      expect(AppVersionService.compareVersions('2.0.0', 10, '2.0.0', 20), lessThan(0));
+      expect(AppVersionService.compareVersions('2.0.0', 20, '2.0.0', 10), greaterThan(0));
+
+      // Build suffixes (+build)
+      expect(AppVersionService.compareVersions('2.0.0+10', 0, '2.0.0+20', 0), lessThan(0));
+      expect(AppVersionService.compareVersions('2.0.0+10', 0, '2.0.0', 10), equals(0));
+
+      // Below, equal to, above minimum
+      const minVer = '2.5.0';
+      const minBuild = 50;
+      expect(AppVersionService.compareVersions('2.4.9', 99, minVer, minBuild), lessThan(0));
+      expect(AppVersionService.compareVersions('2.5.0', 49, minVer, minBuild), lessThan(0));
+      expect(AppVersionService.compareVersions('2.5.0', 50, minVer, minBuild), equals(0));
+      expect(AppVersionService.compareVersions('2.5.0', 51, minVer, minBuild), greaterThan(0));
+      expect(AppVersionService.compareVersions('2.5.1', 1, minVer, minBuild), greaterThan(0));
     });
   });
 

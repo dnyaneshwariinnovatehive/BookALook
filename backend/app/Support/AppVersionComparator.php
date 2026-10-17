@@ -7,12 +7,26 @@ use App\Models\AppRelease;
 class AppVersionComparator
 {
     /**
-     * Normalize version string (strips whitespace and leading 'v'/'V').
+     * Normalize version string (strips whitespace, leading 'v'/'V', and build/prerelease suffixes).
      */
     public static function normalizeVersion(string $version): string
     {
         $trimmed = trim($version);
-        return ltrim($trimmed, 'vV');
+        $clean = ltrim($trimmed, 'vV');
+        $parts = preg_split('/[+-]/', $clean);
+        return $parts[0] ?? $clean;
+    }
+
+    /**
+     * Extract effective build number from parameter or '+build' suffix.
+     */
+    public static function extractBuildNumber(string $version, int $build): int
+    {
+        if ($build <= 0 && str_contains($version, '+')) {
+            $parts = explode('+', $version);
+            return (int) ($parts[1] ?? 0);
+        }
+        return $build;
     }
 
     /**
@@ -33,7 +47,10 @@ class AppVersionComparator
             return $vComp;
         }
 
-        return $build1 <=> $build2;
+        $b1 = self::extractBuildNumber($version1, $build1);
+        $b2 = self::extractBuildNumber($version2, $build2);
+
+        return $b1 <=> $b2;
     }
 
     /**

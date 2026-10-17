@@ -71,8 +71,11 @@ class AppVersionService {
     final clean1 = v1.replaceAll(RegExp(r'^[vV]'), '').trim();
     final clean2 = v2.replaceAll(RegExp(r'^[vV]'), '').trim();
 
-    final parts1 = clean1.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-    final parts2 = clean2.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final semver1 = clean1.split(RegExp(r'[+-]')).first;
+    final semver2 = clean2.split(RegExp(r'[+-]')).first;
+
+    final parts1 = semver1.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final parts2 = semver2.split('.').map((p) => int.tryParse(p) ?? 0).toList();
 
     final maxLen = parts1.length > parts2.length ? parts1.length : parts2.length;
     for (int i = 0; i < maxLen; i++) {
@@ -83,8 +86,21 @@ class AppVersionService {
       }
     }
 
-    return b1.compareTo(b2);
+    int effectiveB1 = b1;
+    if (effectiveB1 <= 0 && clean1.contains('+')) {
+      final buildPart = clean1.split('+').last;
+      effectiveB1 = int.tryParse(buildPart) ?? 0;
+    }
+    int effectiveB2 = b2;
+    if (effectiveB2 <= 0 && clean2.contains('+')) {
+      final buildPart = clean2.split('+').last;
+      effectiveB2 = int.tryParse(buildPart) ?? 0;
+    }
+
+    return effectiveB1.compareTo(effectiveB2);
   }
+
+  Map<String, dynamic>? _installedVersionCache;
 
   /// Get currently installed version and build number.
   Future<Map<String, dynamic>> getInstalledVersion() async {
@@ -95,14 +111,20 @@ class AppVersionService {
       };
     }
 
+    if (_installedVersionCache != null) {
+      return _installedVersionCache!;
+    }
+
     try {
-      final info = await PackageInfo.fromPlatform();
-      return {
+      final info = await PackageInfo.fromPlatform()
+          .timeout(const Duration(milliseconds: 250));
+      _installedVersionCache = {
         'version': info.version.isNotEmpty ? info.version : '1.0.0',
         'build_number': int.tryParse(info.buildNumber) ?? 1,
       };
+      return _installedVersionCache!;
     } catch (e) {
-      // In tests or unsupported desktop platforms
+      // In tests or unsupported desktop platforms or channel timeout
       return {
         'version': debugVersion ?? '1.0.0',
         'build_number': debugBuildNumber ?? 1,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/main.dart';
-import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/screens/phone_screen.dart';
 import 'package:partner_app/screens/notifications_screen.dart';
 import 'package:partner_app/screens/help_support_screen.dart';
@@ -572,7 +571,7 @@ class MoreMenuCatalog {
               'device notification',
             ],
             inlineWidgetBuilder: (ctx, _) =>
-                const PushNotificationToggle(contentPadding: EdgeInsets.zero),
+                const PushNotificationToggle(compact: true),
           ),
           MoreMenuItem(
             id: 'dark_mode',
@@ -598,7 +597,7 @@ class MoreMenuCatalog {
                   final dark = currentMode == ThemeMode.dark;
                   return Switch.adaptive(
                     value: dark,
-                    activeColor: AppTheme.accentColor,
+                    activeTrackColor: AppTheme.accentColor,
                     onChanged: (val) async {
                       themeNotifier.value = val
                           ? ThemeMode.dark

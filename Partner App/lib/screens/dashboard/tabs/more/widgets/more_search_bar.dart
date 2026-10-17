@@ -2,19 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/utils/app_haptics.dart';
+import 'package:partner_app/widgets/animated_search_field.dart';
 
-/// An Instagram Settings-style search bar for the More tab.
-///
-/// Features:
-/// - Prominent rounded container with theme-aware borders and background.
-/// - Prefix search icon and animated clear button.
-/// - Accessible semantics and Outfit typography.
+/// A search bar for the More tab featuring the same pill-shaped stadium UI,
+/// drop shadows, and animated typewriter suggestion hints from the Customer App,
+/// while preserving 100% of the existing Partner search logic.
 class MoreSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onClear;
   final String hintText;
+  final List<String> suggestions;
 
   const MoreSearchBar({
     super.key,
@@ -23,6 +22,22 @@ class MoreSearchBar extends StatelessWidget {
     this.onChanged,
     this.onClear,
     this.hintText = 'Search settings and features',
+    this.suggestions = const [
+      "offers",
+      "discount",
+      "timings",
+      "working hours",
+      "staff",
+      "salary",
+      "payroll",
+      "wallet",
+      "payout",
+      "whatsapp",
+      "subscription",
+      "services",
+      "holidays",
+      "bank details",
+    ],
   });
 
   @override
@@ -30,7 +45,7 @@ class MoreSearchBar extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder.withValues(alpha: 0.6);
     final surfaceColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
     final hintColor = isDark ? AppTheme.darkTextLight : AppTheme.lightTextLight;
     final textColor = isDark
@@ -41,45 +56,49 @@ class MoreSearchBar extends StatelessWidget {
       label: 'Search settings and features',
       textField: true,
       child: Container(
-        height: 48,
+        height: 50,
         decoration: BoxDecoration(
           color: surfaceColor,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(100),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.25)
+                  : const Color(0x0F000000),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            Icon(Icons.search_rounded, size: 20, color: hintColor),
+            Icon(Icons.search_rounded, size: 22, color: hintColor),
             const SizedBox(width: 10),
             Expanded(
-              child: TextField(
+              child: AnimatedSearchField(
                 controller: controller,
                 focusNode: focusNode,
                 onChanged: onChanged,
                 textInputAction: TextInputAction.search,
-                autocorrect: false,
-                enableSuggestions: true,
+                suggestions: suggestions,
                 style: GoogleFonts.outfit(
-                  fontSize: 14,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w500,
                   color: textColor,
                 ),
                 decoration: InputDecoration(
                   hintText: hintText,
                   hintStyle: GoogleFonts.outfit(
-                    fontSize: 14,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w400,
                     color: hintColor,
                   ),
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),

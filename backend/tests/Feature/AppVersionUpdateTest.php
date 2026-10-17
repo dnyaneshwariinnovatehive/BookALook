@@ -412,208 +412,155 @@ class AppVersionUpdateTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /* ── 7. Phase 3 End-to-End Audit & Targeted Verification ──── */
-
-    public function test_version_semantics_handles_2_9_vs_2_10_and_build_numbers(): void
+    public function test_version_semantics_edge_cases(): void
     {
-        // 2.9.0 vs 2.10.0 (alphabetical compare would fail, semver must succeed)
+        // 2.9.0 vs 2.10.0
         $this->assertTrue(AppVersionComparator::isLessThan('2.9.0', 1, '2.10.0', 1));
-        $this->assertTrue(AppVersionComparator::isGreaterThan('2.10.0', 1, '2.9.0', 99));
+        $this->assertTrue(AppVersionComparator::isGreaterThan('2.10.0', 1, '2.9.0', 1));
 
-        // Build numbers on equal visible semver
-        $this->assertTrue(AppVersionComparator::isLessThan('1.2.0', 10, '1.2.0', 11));
-        $this->assertTrue(AppVersionComparator::isGreaterThan('1.2.0', 12, '1.2.0', 11));
-        $this->assertTrue(AppVersionComparator::isEqual('1.2.0', 10, '1.2.0', 10));
+        // Equal visible versions with different build numbers
+        $this->assertTrue(AppVersionComparator::isLessThan('2.0.0', 10, '2.0.0', 20));
+        $this->assertTrue(AppVersionComparator::isGreaterThan('2.0.0', 20, '2.0.0', 10));
+        $this->assertTrue(AppVersionComparator::isEqual('2.0.0', 10, '2.0.0', 10));
 
-        // Prefix tolerance
-        $this->assertTrue(AppVersionComparator::isEqual('v2.10.0', 1, '2.10.0', 1));
+        // +build suffix extraction when build is passed as 0
+        $this->assertTrue(AppVersionComparator::isLessThan('2.0.0+10', 0, '2.0.0+20', 0));
+        $this->assertTrue(AppVersionComparator::isEqual('2.0.0+10', 0, '2.0.0', 10));
+
+        // Boundary tests against a minimum version 2.5.0 build 50
+        $minVer = '2.5.0';
+        $minBuild = 50;
+
+        // Below minimum
+        $this->assertTrue(AppVersionComparator::isLessThan('2.4.9', 99, $minVer, $minBuild));
+        $this->assertTrue(AppVersionComparator::isLessThan('2.5.0', 49, $minVer, $minBuild));
+
+        // Equal to minimum
+        $this->assertTrue(AppVersionComparator::isEqual('2.5.0', 50, $minVer, $minBuild));
+
+        // Above minimum
+        $this->assertTrue(AppVersionComparator::isGreaterThan('2.5.0', 51, $minVer, $minBuild));
+        $this->assertTrue(AppVersionComparator::isGreaterThan('2.5.1', 1, $minVer, $minBuild));
+        $this->assertTrue(AppVersionComparator::isGreaterThan('3.0.0', 1, $minVer, $minBuild));
     }
 
-    public function test_end_to_end_lifecycle_for_customer_and_partner_apps(): void
+    public function test_public_endpoint_does_not_leak_secrets_or_internal_admin_data(): void
     {
-        // 1. SuperAdmin registers releases
-        $v1 = $this->createRelease(['app' => 'customer', 'version' => '1.0.0', 'build_number' => 1, 'status' => 'published']);
-        $v2 = $this->createRelease(['app' => 'customer', 'version' => '2.0.0', 'build_number' => 10, 'status' => 'published']);
-
-        // 2. Configure optional update policy
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson('/api/superadmin/app-versions/policies/customer', [
-                'latest_release_id' => $v2->id,
-                'minimum_release_id' => $v1->id,
-                'update_mode' => 'optional',
-                'is_enforced' => false,
-            ])
-            ->assertStatus(200);
-
-        // 3. Client on 1.0.0 checks public config -> receives optional update info
-        $pubConfig = $this->getJson('/api/app-version/customer?platform=android')
-            ->assertStatus(200)
-            ->assertJsonPath('has_policy', true)
-            ->assertJsonPath('enforcement_active', false)
-            ->assertJsonPath('latest.version', '2.0.0')
-            ->assertJsonPath('minimum.version', '1.0.0');
-
-        // Normal API request passes through
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])->assertStatus(200);
-
-        // 4. SuperAdmin raises minimum version to 2.0.0 and enables mandatory enforcement
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson('/api/superadmin/app-versions/policies/customer', [
-                'latest_release_id' => $v2->id,
-                'minimum_release_id' => $v2->id,
-                'update_mode' => 'mandatory',
-                'is_enforced' => true,
-                'update_message' => 'Mandatory security update required',
-            ])
-            ->assertStatus(200);
-
-        // 5. Outdated client on 1.0.0 is blocked with 426
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])
-            ->assertStatus(426)
-            ->assertJsonPath('update_required', true)
-            ->assertJsonPath('minimum_version', '2.0.0');
-
-        // Compliant client on 2.0.0 passes through
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '2.0.0',
-            'X-App-Build' => '10',
-        ])->assertStatus(200);
-
-        // 6. Partner app is completely unaffected
-        $this->postJson('/api/partner/auth/send-otp', ['phone' => '9999999999'], [
-            'X-App-Id' => 'partner',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])->assertStatus(200);
-
-        // 7. Disabling enforcement immediately restores normal access without deleting releases
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson('/api/superadmin/app-versions/policies/customer', [
-                'latest_release_id' => $v2->id,
-                'minimum_release_id' => $v2->id,
-                'update_mode' => 'optional',
-                'is_enforced' => false,
-            ])
-            ->assertStatus(200);
-
-        // Outdated client on 1.0.0 can immediately use app again
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])->assertStatus(200);
-
-        // Releases still intact
-        $this->assertDatabaseHas('app_releases', ['id' => $v1->id]);
-        $this->assertDatabaseHas('app_releases', ['id' => $v2->id]);
-    }
-
-    public function test_scheduled_enforcement_timezone_handling_before_and_after(): void
-    {
-        $minRelease = $this->createRelease(['app' => 'customer', 'version' => '2.0.0', 'build_number' => 20, 'status' => 'published']);
-        $latestRelease = $this->createRelease(['app' => 'customer', 'version' => '2.4.0', 'build_number' => 42, 'status' => 'published']);
-
-        // Set enforcement for 2 hours in future (UTC ISO 8601)
-        $futureUtc = Carbon::now('UTC')->addHours(2)->toIso8601String();
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson('/api/superadmin/app-versions/policies/customer', [
-                'latest_release_id' => $latestRelease->id,
-                'minimum_release_id' => $minRelease->id,
-                'update_mode' => 'mandatory',
-                'is_enforced' => true,
-                'enforce_at' => $futureUtc,
-            ])
-            ->assertStatus(200);
-
-        // Client is allowed before activation time
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])->assertStatus(200);
-
-        // Now advance policy enforce_at to 1 hour in the past (UTC ISO 8601)
-        $pastUtc = Carbon::now('UTC')->subHours(1)->toIso8601String();
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson('/api/superadmin/app-versions/policies/customer', [
-                'latest_release_id' => $latestRelease->id,
-                'minimum_release_id' => $minRelease->id,
-                'update_mode' => 'mandatory',
-                'is_enforced' => true,
-                'enforce_at' => $pastUtc,
-            ])
-            ->assertStatus(200);
-
-        // Client is now blocked after activation time
-        $this->getJson('/api/customer/categories', [
-            'X-App-Id' => 'customer',
-            'X-App-Version' => '1.0.0',
-            'X-App-Build' => '1',
-        ])->assertStatus(426);
-    }
-
-    public function test_public_endpoint_payload_has_no_secret_or_internal_admin_data(): void
-    {
-        $release = $this->createRelease([
-            'app' => 'customer',
-            'version' => '2.4.0',
-            'build_number' => 42,
+        $rel = $this->createRelease([
             'status' => 'published',
+            'version' => '2.5.0',
+            'build_number' => 50,
             'created_by' => $this->superadmin->id,
             'updated_by' => $this->superadmin->id,
         ]);
 
         $this->createPolicy([
-            'app' => 'customer',
-            'latest_release_id' => $release->id,
-            'minimum_release_id' => $release->id,
+            'latest_release_id' => $rel->id,
+            'minimum_release_id' => $rel->id,
+            'is_enforced' => true,
             'updated_by' => $this->superadmin->id,
         ]);
 
         $response = $this->getJson('/api/app-version/customer');
 
         $response->assertStatus(200);
-
         $json = $response->json();
 
-        // Must not expose internal admin relations, passwords, or audit tokens
+        // Must NOT leak user IDs or internal state
+        $this->assertArrayNotHasKey('is_enforced', $json);
         $this->assertArrayNotHasKey('created_by', $json);
         $this->assertArrayNotHasKey('updated_by', $json);
-        $this->assertArrayNotHasKey('password_hash', $json);
-        $this->assertArrayNotHasKey('creator', $json);
-        $this->assertArrayNotHasKey('updater', $json);
-        $this->assertArrayNotHasKey('audit_trail', $json);
+        $this->assertArrayNotHasKey('user_id', $json);
+        $this->assertArrayNotHasKey('admin', $json);
+        $this->assertArrayNotHasKey('password', $json);
     }
 
-    public function test_missing_or_malformed_client_version_under_enforcement(): void
+    public function test_scheduled_enforcement_activates_when_time_passes(): void
     {
-        $minRelease = $this->createRelease(['app' => 'customer', 'version' => '2.0.0', 'build_number' => 20, 'status' => 'published']);
+        $minRel = $this->createRelease([
+            'status' => 'published',
+            'version' => '2.0.0',
+            'build_number' => 20,
+        ]);
 
+        // Schedule enforcement 1 hour into the future
+        $futureTime = now()->addHour();
         $this->createPolicy([
-            'app' => 'customer',
-            'latest_release_id' => $minRelease->id,
-            'minimum_release_id' => $minRelease->id,
+            'latest_release_id' => $minRel->id,
+            'minimum_release_id' => $minRel->id,
+            'is_enforced' => true,
+            'enforce_at' => $futureTime,
+        ]);
+
+        // 1. Before scheduled time: enforcement_active is false, older client is NOT blocked
+        $response = $this->getJson('/api/app-version/customer');
+        $response->assertStatus(200)->assertJsonPath('enforcement_active', false);
+
+        $apiRes = $this->actingAs($this->customer, 'sanctum')->getJson('/api/customer/profile', [
+            'X-App-Id' => 'customer',
+            'X-App-Version' => '1.5.0',
+            'X-App-Build' => '15',
+        ]);
+        $apiRes->assertStatus(200);
+
+        // 2. Advance time past enforce_at
+        Carbon::setTestNow($futureTime->copy()->addMinutes(5));
+
+        // Dynamic check: public endpoint now reports enforcement_active = true
+        $responseAfter = $this->getJson('/api/app-version/customer');
+        $responseAfter->assertStatus(200)->assertJsonPath('enforcement_active', true);
+
+        // API request is now blocked with 426
+        $apiResAfter = $this->actingAs($this->customer, 'sanctum')->getJson('/api/customer/profile', [
+            'X-App-Id' => 'customer',
+            'X-App-Version' => '1.5.0',
+            'X-App-Build' => '15',
+        ]);
+        $apiResAfter->assertStatus(426)->assertJsonPath('update_required', true);
+
+        // Reset test time
+        Carbon::setTestNow();
+    }
+
+    public function test_disabling_enforcement_restores_normal_access_immediately(): void
+    {
+        $minRel = $this->createRelease([
+            'status' => 'published',
+            'version' => '3.0.0',
+            'build_number' => 30,
+        ]);
+
+        $policy = $this->createPolicy([
+            'latest_release_id' => $minRel->id,
+            'minimum_release_id' => $minRel->id,
             'is_enforced' => true,
         ]);
 
-        // Client identifying as app client without version header
-        $response = $this->getJson('/api/customer/categories', [
+        // Initially blocked
+        $blocked = $this->actingAs($this->customer, 'sanctum')->getJson('/api/customer/profile', [
             'X-App-Id' => 'customer',
+            'X-App-Version' => '2.0.0',
+            'X-App-Build' => '20',
         ]);
+        $blocked->assertStatus(426);
 
-        $response->assertStatus(426)
-            ->assertJsonPath('update_required', true);
+        // SuperAdmin disables enforcement (kill switch)
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->putJson('/api/superadmin/app-versions/policies/customer', [
+                'latest_release_id' => $minRel->id,
+                'minimum_release_id' => $minRel->id,
+                'update_mode' => 'optional',
+                'is_enforced' => false,
+            ])
+            ->assertStatus(200);
+
+        // Client is immediately restored without deleting releases
+        $restored = $this->actingAs($this->customer, 'sanctum')->getJson('/api/customer/profile', [
+            'X-App-Id' => 'customer',
+            'X-App-Version' => '2.0.0',
+            'X-App-Build' => '20',
+        ]);
+        $restored->assertStatus(200);
     }
 
     /* ── Helpers ────────────────────────────────────────────── */

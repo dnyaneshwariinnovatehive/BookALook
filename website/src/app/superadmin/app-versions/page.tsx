@@ -67,7 +67,8 @@ interface AuditItem {
 
 function parseSemVer(v: string): [number, number, number] {
   const clean = v.replace(/^v/i, '').trim();
-  const parts = clean.split('.').map((p) => parseInt(p, 10) || 0);
+  const core = clean.split(/[+-]/)[0] || '';
+  const parts = core.split('.').map((p) => parseInt(p, 10) || 0);
   return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
 }
 

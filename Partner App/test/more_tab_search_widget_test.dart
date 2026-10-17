@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/screens/dashboard/tabs/more_tab.dart';
+import 'package:partner_app/widgets/push_notification_toggle.dart';
 
 void main() {
   setUp(() {
@@ -50,7 +51,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Search settings and features'), findsOneWidget);
+      expect(find.text('Search "'), findsOneWidget);
       expect(find.text('More'), findsOneWidget);
     });
 
@@ -184,6 +185,19 @@ void main() {
 
       expect(find.text('Dark Mode'), findsOneWidget);
       expect(find.byType(Switch), findsOneWidget);
+    });
+
+    testWidgets('10. Searching "push notifications" renders the inline PushNotificationToggle', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), 'push');
+      await tester.pump();
+
+      expect(find.text('Push Notifications'), findsOneWidget);
+      expect(find.byType(PushNotificationToggle), findsOneWidget);
     });
   });
 }
