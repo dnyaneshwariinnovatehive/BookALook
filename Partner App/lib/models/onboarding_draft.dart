@@ -157,9 +157,26 @@ class OnboardingDraft {
       workingHours = week;
     }
 
-    services = (salon['services'] as List? ?? [])
-        .map((raw) => DraftService.fromJson(Map<String, dynamic>.from(raw as Map)))
-        .toList();
+    final rawServices = (salon['services'] as List? ?? []);
+    final seenTemplateIds = <String>{};
+    final seenCustomIdentities = <String>{};
+    final dedupedServices = <DraftService>[];
+
+    for (final raw in rawServices) {
+      final s = DraftService.fromJson(Map<String, dynamic>.from(raw as Map));
+      if (s.templateId != null && s.templateId!.isNotEmpty) {
+        if (seenTemplateIds.add(s.templateId!)) {
+          dedupedServices.add(s);
+        }
+      } else {
+        final identity = '${s.categoryName.trim().toLowerCase()}::${s.name.trim().toLowerCase()}';
+        if (seenCustomIdentities.add(identity)) {
+          dedupedServices.add(s);
+        }
+      }
+    }
+
+    services = dedupedServices;
 
     existingPhotoCount = (salon['photo_urls'] as List?)?.length ?? 0;
   }
@@ -290,7 +307,7 @@ class OnboardingDraft {
         if (description.trim().isNotEmpty) 'description': description.trim(),
         'address': address.trim(),
         'city_id': cityId ?? '',
-        if (subAreaId != null) 'sub_area_id': subAreaId!,
+        if (subAreaId case final String id) 'sub_area_id': id,
         if (pincode.trim().isNotEmpty) 'pincode': pincode.trim(),
         if (salonPhone.trim().isNotEmpty) 'salon_phone': salonPhone.trim(),
         'gender_focus': genderFocus,

@@ -14,7 +14,22 @@ import '../../theme/app_theme.dart';
 /// collaborator with no signal can still add custom services, which is the
 /// whole reason the custom path is not hidden behind an empty list.
 class ServicePickerSheet extends StatefulWidget {
-  const ServicePickerSheet({super.key});
+  final Set<String> existingTemplateIds;
+  final Set<String> existingCustomIdentities;
+  final List<dynamic>? initialCategories;
+
+  const ServicePickerSheet({
+    super.key,
+    this.existingTemplateIds = const {},
+    this.existingCustomIdentities = const {},
+    this.initialCategories,
+  });
+
+  static String normalizeCustomIdentity(String category, String name) {
+    final cat = category.trim().toLowerCase();
+    final n = name.trim().toLowerCase();
+    return '$cat::$n';
+  }
 
   @override
   State<ServicePickerSheet> createState() => _ServicePickerSheetState();
@@ -39,7 +54,12 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.initialCategories != null) {
+      _categories = widget.initialCategories!;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -101,12 +121,19 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
       if (name.isEmpty) return _say('Give the service a name.');
       if (duration < 15) return _say('A service needs to take at least 15 minutes.');
 
+      final category =
+          _customCategory.text.trim().isEmpty ? 'Other' : _customCategory.text.trim();
+      final customIdentity = ServicePickerSheet.normalizeCustomIdentity(category, name);
+
+      if (widget.existingCustomIdentities.contains(customIdentity)) {
+        return _say('This custom service has already been added in "$category".');
+      }
+
       Navigator.pop(
         context,
         DraftService(
           name: name,
-          categoryName:
-              _customCategory.text.trim().isEmpty ? 'Other' : _customCategory.text.trim(),
+          categoryName: category,
           durationMinutes: duration,
           price: price,
         ),
@@ -255,27 +282,56 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
       itemBuilder: (_, index) {
         final template = matches[index]['template'] as Map<String, dynamic>;
         final categoryName = matches[index]['category'] as String;
+        final templateId = template['id']?.toString() ?? '';
+        final isAdded = widget.existingTemplateIds.contains(templateId);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppTheme.lightBorder),
           ),
-          child: ListTile(
-            title: Text(template['name'].toString(),
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: Text(
-              '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min',
-              style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            child: ListTile(
+              title: Text(
+                template['name'].toString(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isAdded ? AppTheme.lightTextBody : AppTheme.lightTextHeading,
+                ),
+              ),
+              subtitle: Text(
+                '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min',
+                style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
+              ),
+              trailing: isAdded
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightAccentSoft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Added',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.accentColor,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.chevron_right, color: AppTheme.lightTextLight),
+              onTap: isAdded
+                  ? () => _say('This service is already in the draft.')
+                  : () => setState(() {
+                      _chosenTemplate = template;
+                      _chosenCategoryName = categoryName;
+                    }),
             ),
-            trailing: const Icon(Icons.chevron_right, color: AppTheme.lightTextLight),
-            onTap: () => setState(() {
-              _chosenTemplate = template;
-              _chosenCategoryName = categoryName;
-            }),
           ),
         );
       },

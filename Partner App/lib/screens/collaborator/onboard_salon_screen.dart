@@ -1108,17 +1108,52 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
       );
 
   Future<void> _addService() async {
+    final existingTemplateIds = <String>{};
+    final existingCustomIdentities = <String>{};
+
+    for (final s in _draft!.services) {
+      if (s.templateId != null && s.templateId!.isNotEmpty) {
+        existingTemplateIds.add(s.templateId!);
+      } else {
+        existingCustomIdentities.add(ServicePickerSheet.normalizeCustomIdentity(s.categoryName, s.name));
+      }
+    }
+
     final service = await showModalBottomSheet<DraftService>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const ServicePickerSheet(),
+      builder: (_) => ServicePickerSheet(
+        existingTemplateIds: existingTemplateIds,
+        existingCustomIdentities: existingCustomIdentities,
+      ),
     );
 
     if (service == null) return;
 
+    // Defensive duplicate guard: reject if duplicate slips through
+    if (_isDuplicateService(service)) {
+      _say('This service has already been added to the draft.');
+      return;
+    }
+
     setState(() => _draft!.services.add(service));
     await _persist();
+  }
+
+  bool _isDuplicateService(DraftService candidate) {
+    for (final s in _draft!.services) {
+      if (candidate.templateId != null && candidate.templateId!.isNotEmpty) {
+        if (s.templateId == candidate.templateId) return true;
+      } else {
+        if (s.templateId == null || s.templateId!.isEmpty) {
+          final id1 = ServicePickerSheet.normalizeCustomIdentity(s.categoryName, s.name);
+          final id2 = ServicePickerSheet.normalizeCustomIdentity(candidate.categoryName, candidate.name);
+          if (id1 == id2) return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// The last thing before submitting: what is about to be sent, and what is

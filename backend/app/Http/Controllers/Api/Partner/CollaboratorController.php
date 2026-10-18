@@ -643,7 +643,7 @@ class CollaboratorController extends Controller
             ], 403);
         }
 
-        $data = $this->validateSubmission($request);
+        $data = $this->validateSubmission($request, $enquiry);
 
         try {
             $result = $this->onboarding->onboard(
@@ -674,14 +674,20 @@ class CollaboratorController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function validateSubmission(Request $request): array
+    private function validateSubmission(Request $request, ?SalonEnquiry $enquiry = null): array
     {
-        $request->merge([
-            'working_hours' => $this->decodeList($request->input('working_hours')),
-            'services' => $this->decodeList($request->input('services')),
-        ]);
+        $toMerge = [];
+        if ($request->has('working_hours')) {
+            $toMerge['working_hours'] = $this->decodeList($request->input('working_hours'));
+        }
+        if ($request->has('services')) {
+            $toMerge['services'] = $this->decodeList($request->input('services'));
+        }
+        if (! empty($toMerge)) {
+            $request->merge($toMerge);
+        }
 
-        $data = $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             // Owner. Prefilled from the enquiry, but a collaborator standing in
             // front of them can correct it — and has to confirm it either way.
             'owner_name' => 'required|string|max:150',
@@ -738,67 +744,116 @@ class CollaboratorController extends Controller
             'cover_index' => 'nullable|integer|min:0',
         ]);
 
-        $existingSalon = $enquiry->salon;
-        $uploadedPhotos = $request->file('photos', []);
-        if (empty($uploadedPhotos)) {
-            if (! $existingSalon || empty($existingSalon->cover_photo_url)) {
-                throw ValidationException::withMessages([
-                    'cover_photo' => 'A main cover photo is mandatory for salon onboarding.',
-                ]);
+        $validator->after(function ($validator) use ($request, $enquiry) {
+            $existingSalon = $enquiry?->salon;
+            $uploadedPhotos = $request->file('photos', []);
+            if (empty($uploadedPhotos)) {
+                if (! $existingSalon || empty($existingSalon->cover_photo_url)) {
+                    $validator->errors()->add('cover_photo', 'A main cover photo is mandatory for salon onboarding.');
+                }
             }
-        }
 
-        $this->assertOpeningHoursMakeSense($data['working_hours'] ?? []);
-        $this->assertSalonEverOpens($data['working_hours'] ?? []);
+            $services = $request->input('services');
+            if (is_array($services)) {
+                $seenStandardTemplateIds = [];
+                $seenCustomIdentities = [];
 
-        return $data;
+                // Fetch templates for standard services to verify ownership and category matching
+                $templateIds = array_filter(array_column($services, 'template_id'));
+                $templates = ! empty($templateIds)
+                    ? \App\Models\ServiceTemplate::with('category')->whereIn('id', $templateIds)->get()->keyBy('id')
+                    : collect();
+
+                foreach ($services as $index => $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    $templateId = $item['template_id'] ?? null;
+                    if (! empty($templateId)) {
+                        // Standard template duplicate rejection
+                        if (isset($seenStandardTemplateIds[$templateId])) {
+                            $validator->errors()->add("services.{$index}.template_id", 'The service template has already been selected.');
+                        } else {
+                            $seenStandardTemplateIds[$templateId] = $index;
+                        }
+
+                        // Verify custom template authorization: collaborators cannot pick a custom template belonging to another salon
+                        $template = $templates->get($templateId);
+                        if ($template && $template->is_custom) {
+                            if (! $existingSalon || $template->created_by_salon_id !== $existingSalon->id) {
+                                $validator->errors()->add("services.{$index}.template_id", 'Unauthorized service template selection.');
+                            }
+                        }
+                    } else {
+                        // Custom service entry
+                        $name = trim($item['custom_template_name'] ?? '');
+                        if ($name !== '') {
+                            $normalizedName = mb_strtolower($name);
+                            $categoryId = $item['category_id'] ?? null;
+                            $customCategoryName = trim($item['custom_category_name'] ?? '');
+                            $normalizedCategoryName = mb_strtolower($customCategoryName !== '' ? $customCategoryName : 'other');
+
+                            // Determine canonical category key for identity check
+                            $categoryKey = ($categoryId && $categoryId !== 'new_custom')
+                                ? $categoryId
+                                : $normalizedCategoryName;
+
+                            $customIdentity = $categoryKey . '::' . $normalizedName;
+
+                            if (isset($seenCustomIdentities[$customIdentity])) {
+                                $validator->errors()->add("services.{$index}.custom_template_name", 'Duplicate custom service entry in the same category.');
+                            } else {
+                                $seenCustomIdentities[$customIdentity] = $index;
+                            }
+
+                            // Check if this custom service duplicates a selected standard template in the same payload
+                            foreach ($templates as $st) {
+                                if (mb_strtolower(trim($st->name)) === $normalizedName) {
+                                    $stCatId = $st->category_id;
+                                    $stCatName = mb_strtolower(trim($st->category?->name ?? ''));
+                                    if ($categoryId === $stCatId || $normalizedCategoryName === $stCatName) {
+                                        $validator->errors()->add("services.{$index}.custom_template_name", 'This custom service duplicates an existing standard service in the same category.');
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            $workingHours = $request->input('working_hours', []);
+            if (is_array($workingHours) && ! empty($workingHours)) {
+                $open = collect($workingHours)->reject(
+                    fn ($day) => filter_var($day['is_closed'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                );
+
+                if ($open->isEmpty()) {
+                    $validator->errors()->add('working_hours', 'The salon has to be open at least one day a week.');
+                }
+
+                foreach ($workingHours as $index => $day) {
+                    if (filter_var($day['is_closed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                        continue;
+                    }
+
+                    $openTime = $day['open_time'] ?? null;
+                    $closeTime = $day['close_time'] ?? null;
+
+                    if (! $openTime || ! $closeTime) {
+                        $validator->errors()->add("working_hours.{$index}", 'An open day needs both an opening and a closing time.');
+                    } elseif ($closeTime <= $openTime) {
+                        $validator->errors()->add("working_hours.{$index}", 'Closing time must be after opening time.');
+                    }
+                }
+            }
+        });
+
+        return $validator->validate();
     }
 
-    /**
-     * A salon closed all seven days cannot take a booking, so submitting one is
-     * always a mistake rather than a choice.
-     */
-    private function assertSalonEverOpens(array $days): void
-    {
-        $open = collect($days)->reject(
-            fn ($day) => filter_var($day['is_closed'] ?? false, FILTER_VALIDATE_BOOLEAN)
-        );
 
-        if ($open->isEmpty()) {
-            throw ValidationException::withMessages([
-                'working_hours' => 'The salon has to be open at least one day a week.',
-            ]);
-        }
-    }
-
-    /**
-     * A day that is open needs both ends of its window, and the close has to
-     * come after the open. Caught here rather than at booking time, when the
-     * collaborator is long gone.
-     */
-    private function assertOpeningHoursMakeSense(array $days): void
-    {
-        foreach ($days as $index => $day) {
-            if (filter_var($day['is_closed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-                continue;
-            }
-
-            $open = $day['open_time'] ?? null;
-            $close = $day['close_time'] ?? null;
-
-            if (! $open || ! $close) {
-                throw ValidationException::withMessages([
-                    "working_hours.{$index}" => 'An open day needs both an opening and a closing time.',
-                ]);
-            }
-
-            if ($close <= $open) {
-                throw ValidationException::withMessages([
-                    "working_hours.{$index}" => 'Closing time must be after opening time.',
-                ]);
-            }
-        }
-    }
 
     /** @return array<int, mixed> */
     private function decodeList(mixed $value): array

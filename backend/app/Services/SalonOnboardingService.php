@@ -84,7 +84,9 @@ class SalonOnboardingService
                 : $this->createSalon($enquiry, $collaborator, $owner, $payload);
 
             $this->writeWorkingHours($salon, $payload['working_hours'] ?? []);
-            $this->writeServices($salon, $payload['services'] ?? []);
+            if (array_key_exists('services', $payload)) {
+                $this->writeServices($salon, $payload['services'] ?? [], true);
+            }
             $this->storePhotos($salon, $collaborator, $photos, (int) ($payload['cover_index'] ?? 0));
 
             // The enquiry's job is done the moment the salon exists. Whether it
@@ -263,24 +265,63 @@ class SalonOnboardingService
      *
      * @param  array<int, array<string, mixed>>  $services
      */
-    private function writeServices(Salon $salon, array $services): void
+    private function writeServices(Salon $salon, array $services, bool $reconcile = true): void
     {
+        $activeTemplateIds = [];
+
         foreach ($services as $index => $line) {
             $templateId = $this->resolveTemplate($salon, $line);
+            $activeTemplateIds[] = $templateId;
 
-            // The salon/template pair is unique, so a resubmission updates the
-            // price rather than colliding with the row it wrote last time.
-            Service::updateOrCreate(
-                ['salon_id' => $salon->id, 'template_id' => $templateId],
-                [
-                    'price' => (float) $line['price'],
-                    'description' => $line['description'] ?? null,
-                    'advance_percentage' => $line['advance_percentage'] ?? null,
-                    'gender_focus' => $line['gender_focus'] ?? $salon->gender_focus,
-                    'is_active' => true,
-                    'display_order' => $index,
-                ]
-            );
+            $attributes = [
+                'price' => (float) $line['price'],
+                'description' => $line['description'] ?? null,
+                'advance_percentage' => $line['advance_percentage'] ?? null,
+                'gender_focus' => $line['gender_focus'] ?? $salon->gender_focus,
+                'is_active' => true,
+                'display_order' => $index,
+            ];
+
+            // Handle existing rows safely including soft-deleted ones
+            $existingService = Service::withTrashed()
+                ->where('salon_id', $salon->id)
+                ->where('template_id', $templateId)
+                ->first();
+
+            if ($existingService) {
+                if ($existingService->trashed()) {
+                    $existingService->restore();
+                }
+                $existingService->update($attributes);
+            } else {
+                try {
+                    Service::create(array_merge([
+                        'salon_id' => $salon->id,
+                        'template_id' => $templateId,
+                    ], $attributes));
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $winner = Service::withTrashed()
+                        ->where('salon_id', $salon->id)
+                        ->where('template_id', $templateId)
+                        ->first();
+                    if ($winner) {
+                        if ($winner->trashed()) {
+                            $winner->restore();
+                        }
+                        $winner->update($attributes);
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
+        }
+
+        // Reconcile omitted services during editable onboarding submission:
+        // Soft-delete any services for this salon that are active but not in the submitted list.
+        if ($reconcile) {
+            Service::where('salon_id', $salon->id)
+                ->whereNotIn('template_id', $activeTemplateIds)
+                ->delete();
         }
     }
 
@@ -295,23 +336,85 @@ class SalonOnboardingService
             return $line['template_id'];
         }
 
+        $name = trim($line['custom_template_name'] ?? '');
+        $duration = (int) ($line['estimated_duration_minutes'] ?? 30);
         $categoryId = $line['category_id'] ?? null;
 
+        // 1. Resolve Category
         if ($categoryId === 'new_custom' || empty($categoryId)) {
-            $categoryId = ServiceCategory::create([
-                'name' => $line['custom_category_name'] ?? 'Other',
-                'is_custom' => true,
-                'created_by_salon_id' => $salon->id,
-            ])->id;
+            $rawCatName = trim($line['custom_category_name'] ?? 'Other');
+            $catName = $rawCatName !== '' ? $rawCatName : 'Other';
+
+            // Look for existing category owned by this salon, or standard category with exact matching name
+            $existingCat = ServiceCategory::where('created_by_salon_id', $salon->id)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($catName)])
+                ->first();
+
+            if (! $existingCat) {
+                $existingCat = ServiceCategory::where('is_custom', false)
+                    ->whereRaw('LOWER(name) = ?', [mb_strtolower($catName)])
+                    ->first();
+            }
+
+            if ($existingCat) {
+                $categoryId = $existingCat->id;
+            } else {
+                try {
+                    $categoryId = ServiceCategory::create([
+                        'name' => $catName,
+                        'is_custom' => true,
+                        'created_by_salon_id' => $salon->id,
+                    ])->id;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $winnerCat = ServiceCategory::where('created_by_salon_id', $salon->id)
+                        ->whereRaw('LOWER(name) = ?', [mb_strtolower($catName)])
+                        ->first();
+                    if ($winnerCat) {
+                        $categoryId = $winnerCat->id;
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
         }
 
-        return ServiceTemplate::create([
-            'category_id' => $categoryId,
-            'name' => $line['custom_template_name'],
-            'estimated_duration_minutes' => (int) $line['estimated_duration_minutes'],
-            'is_custom' => true,
-            'created_by_salon_id' => $salon->id,
-        ])->id;
+        // 2. Resolve Custom Template: reuse existing custom template owned by this salon
+        // Match by created_by_salon_id = $salon->id, is_custom = true, category_id = $categoryId, and normalized name
+        $existingTemplate = ServiceTemplate::where('created_by_salon_id', $salon->id)
+            ->where('is_custom', true)
+            ->where('category_id', $categoryId)
+            ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if ($existingTemplate) {
+            $existingTemplate->update([
+                'estimated_duration_minutes' => $duration >= 15 ? $duration : $existingTemplate->estimated_duration_minutes,
+                'is_active' => true,
+            ]);
+
+            return $existingTemplate->id;
+        }
+
+        try {
+            return ServiceTemplate::create([
+                'category_id' => $categoryId,
+                'name' => $name,
+                'estimated_duration_minutes' => $duration >= 15 ? $duration : 30,
+                'is_custom' => true,
+                'created_by_salon_id' => $salon->id,
+                'is_active' => true,
+            ])->id;
+        } catch (\Illuminate\Database\QueryException $e) {
+            $winnerTemplate = ServiceTemplate::where('created_by_salon_id', $salon->id)
+                ->where('is_custom', true)
+                ->where('category_id', $categoryId)
+                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
+                ->first();
+            if ($winnerTemplate) {
+                return $winnerTemplate->id;
+            }
+            throw $e;
+        }
     }
 
     /**
