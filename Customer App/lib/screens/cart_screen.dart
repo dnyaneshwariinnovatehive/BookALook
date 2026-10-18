@@ -427,13 +427,12 @@ class _CartScreenState extends State<CartScreen> {
 
     final serviceId = item['service_id']?.toString();
     final comboId = item['combo_id']?.toString();
+    if (serviceId != null) return; // Individual services cannot be incremented
 
     setState(() => _isAdding = true);
     try {
       AppHaptics.lightImpact();
-      if (serviceId != null) {
-        await _cartService.addItem(salonId, serviceId, quantity: 1);
-      } else if (comboId != null) {
+      if (comboId != null) {
         await _cartService.addCombo(salonId, comboId, quantity: 1);
       }
       await _loadCart();
@@ -450,16 +449,21 @@ class _CartScreenState extends State<CartScreen> {
     final salonId = _cart?['salon_id']?.toString();
     if (salonId == null || _isAdding) return;
 
-    final qty = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
+    final qty =
+        int.tryParse('${item['quantity']}') ??
+        (item['quantity'] as num?)?.toInt() ??
+        1;
     final itemId = item['id'].toString();
-    final serviceId = item['service_id']?.toString() ?? item['service']?['id']?.toString();
-    final comboId = item['combo_id']?.toString() ?? item['combo']?['id']?.toString();
+    final serviceId =
+        item['service_id']?.toString() ?? item['service']?['id']?.toString();
+    final comboId =
+        item['combo_id']?.toString() ?? item['combo']?['id']?.toString();
     final isCombo = comboId != null;
     final title = isCombo
         ? (item['combo']?['name'] ?? 'Package')
         : (item['service']?['template']?['name'] ?? 'Service');
 
-    if (qty <= 1) {
+    if (!isCombo || qty <= 1) {
       await _removeItem(
         itemId,
         title: title,
@@ -502,7 +506,10 @@ class _CartScreenState extends State<CartScreen> {
     final subtitle = isCombo
         ? '${(combo['services'] as List?)?.length ?? 0} services in this package'
         : null;
-    final quantity = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
+    final quantity =
+        int.tryParse('${item['quantity']}') ??
+        (item['quantity'] as num?)?.toInt() ??
+        1;
     final singlePrice = _singleItemPrice(item);
     final totalPrice = _lineTotal(item);
 
@@ -567,7 +574,7 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ],
                     const SizedBox(height: 4),
-                    if (quantity > 1)
+                    if (isCombo && quantity > 1)
                       Text(
                         '₹${singlePrice.toStringAsFixed(0)} each',
                         style: GoogleFonts.outfit(
@@ -600,125 +607,165 @@ class _CartScreenState extends State<CartScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Builder(builder: (context) {
-                final summary = _cart?['summary'] as Map<String, dynamic>?;
-                final ftd = summary?['first_time_discount'] is Map<String, dynamic>
-                    ? summary!['first_time_discount'] as Map<String, dynamic>
-                    : (summary?['first_time_discount'] is Map
-                        ? Map<String, dynamic>.from(summary!['first_time_discount'] as Map)
-                        : null);
-                final serviceId = item['service_id']?.toString() ?? item['service']?['id']?.toString();
-                final lineFtd = (!isCombo && ftd != null && ftd['lines'] is Map && serviceId != null)
-                    ? (ftd['lines'] as Map)[serviceId] as Map<String, dynamic>?
-                    : null;
-                final lineDiscount = lineFtd != null ? (double.tryParse('${lineFtd['line_discount'] ?? 0}') ?? 0.0) : 0.0;
-                final finalLinePrice = lineFtd != null && lineFtd['final_line_price'] != null
-                    ? (double.tryParse('${lineFtd['final_line_price']}') ?? totalPrice)
-                    : (lineDiscount > 0 ? (totalPrice - lineDiscount) : totalPrice);
+              Builder(
+                builder: (context) {
+                  final summary = _cart?['summary'] as Map<String, dynamic>?;
+                  final ftd =
+                      summary?['first_time_discount'] is Map<String, dynamic>
+                      ? summary!['first_time_discount'] as Map<String, dynamic>
+                      : (summary?['first_time_discount'] is Map
+                            ? Map<String, dynamic>.from(
+                                summary!['first_time_discount'] as Map,
+                              )
+                            : null);
+                  final serviceId =
+                      item['service_id']?.toString() ??
+                      item['service']?['id']?.toString();
+                  final lineFtd =
+                      (!isCombo &&
+                          ftd != null &&
+                          ftd['lines'] is Map &&
+                          serviceId != null)
+                      ? (ftd['lines'] as Map)[serviceId]
+                            as Map<String, dynamic>?
+                      : null;
+                  final lineDiscount = lineFtd != null
+                      ? (double.tryParse('${lineFtd['line_discount'] ?? 0}') ??
+                            0.0)
+                      : 0.0;
+                  final finalLinePrice =
+                      lineFtd != null && lineFtd['final_line_price'] != null
+                      ? (double.tryParse('${lineFtd['final_line_price']}') ??
+                            totalPrice)
+                      : (lineDiscount > 0
+                            ? (totalPrice - lineDiscount)
+                            : totalPrice);
 
-                if (lineDiscount > 0) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  if (lineDiscount > 0) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '₹${finalLinePrice.toStringAsFixed(0)}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accentColor,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '₹${totalPrice.toStringAsFixed(0)}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                decoration: TextDecoration.lineThrough,
+                                color: context.colors.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'First visit: save ₹${lineDiscount.toStringAsFixed(0)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.success,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Text(
+                    '₹${totalPrice.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentColor,
+                    ),
+                  );
+                },
+              ),
+              if (isCombo)
+                Container(
+                  decoration: BoxDecoration(
+                    color: context.colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.colors.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '₹${finalLinePrice.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.accentColor,
-                            ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _isAdding ? null : () => _decrementItem(item),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '₹${totalPrice.toStringAsFixed(0)}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 13,
-                              decoration: TextDecoration.lineThrough,
-                              color: context.colors.textTertiary,
-                            ),
+                          child: Icon(
+                            quantity <= 1 ? Icons.delete_outline : Icons.remove,
+                            size: 18,
+                            color: quantity <= 1
+                                ? context.colors.danger
+                                : context.colors.textPrimary,
                           ),
-                        ],
+                        ),
                       ),
-                      Text(
-                        'First visit: save ₹${lineDiscount.toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.success,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '$quantity',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: context.colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _isAdding ? null : () => _incrementItem(item),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 18,
+                            color: AppTheme.accentColor,
+                          ),
                         ),
                       ),
                     ],
-                  );
-                }
-
-                return Text(
-                  '₹${totalPrice.toStringAsFixed(0)}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.accentColor,
                   ),
-                );
-              }),
-              Container(
-                decoration: BoxDecoration(
-                  color: context.colors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.colors.border),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.colors.border),
+                  ),
+                  child: Text(
+                    'Qty: 1',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _isAdding ? null : () => _decrementItem(item),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        child: Icon(
-                          quantity <= 1 ? Icons.delete_outline : Icons.remove,
-                          size: 18,
-                          color: quantity <= 1
-                              ? context.colors.danger
-                              : context.colors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        '$quantity',
-                        style: GoogleFonts.outfit(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: context.colors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: _isAdding ? null : () => _incrementItem(item),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        child: Icon(
-                          Icons.add,
-                          size: 18,
-                          color: AppTheme.accentColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ],
@@ -728,18 +775,23 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildBillBreakdownCard(Map<String, dynamic> summary) {
     final listTotal = double.tryParse('${summary['list_total'] ?? 0}') ?? 0.0;
-    final totalAmount = double.tryParse('${summary['total_amount'] ?? 0}') ?? 0.0;
+    final totalAmount =
+        double.tryParse('${summary['total_amount'] ?? 0}') ?? 0.0;
     final totalSaving = double.tryParse('${summary['saving'] ?? 0}') ?? 0.0;
 
     final ftd = summary['first_time_discount'] is Map<String, dynamic>
         ? summary['first_time_discount'] as Map<String, dynamic>
         : (summary['first_time_discount'] is Map
-            ? Map<String, dynamic>.from(summary['first_time_discount'] as Map)
-            : null);
+              ? Map<String, dynamic>.from(summary['first_time_discount'] as Map)
+              : null);
     final bool hasFtd = ftd != null && ftd['applied'] == true;
-    final double ftdAmount = hasFtd ? (double.tryParse('${ftd['total_discount'] ?? 0}') ?? 0.0) : 0.0;
+    final double ftdAmount = hasFtd
+        ? (double.tryParse('${ftd['total_discount'] ?? 0}') ?? 0.0)
+        : 0.0;
     final String? ftdOfferName = ftd?['offer_name']?.toString();
-    final double comboSavings = (totalSaving - ftdAmount) > 0 ? (totalSaving - ftdAmount) : 0.0;
+    final double comboSavings = (totalSaving - ftdAmount) > 0
+        ? (totalSaving - ftdAmount)
+        : 0.0;
 
     return Container(
       margin: const EdgeInsets.only(top: 8, bottom: 8),
@@ -754,7 +806,11 @@ class _CartScreenState extends State<CartScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.receipt_outlined, size: 18, color: AppTheme.accentColor),
+              Icon(
+                Icons.receipt_outlined,
+                size: 18,
+                color: AppTheme.accentColor,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Bill details',
@@ -821,7 +877,11 @@ class _CartScreenState extends State<CartScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.savings_outlined, size: 15, color: context.colors.success),
+                  Icon(
+                    Icons.savings_outlined,
+                    size: 15,
+                    color: context.colors.success,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -855,7 +915,11 @@ class _CartScreenState extends State<CartScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isBadge) ...[
-              const Icon(Icons.auto_awesome, size: 14, color: AppTheme.accentColor),
+              const Icon(
+                Icons.auto_awesome,
+                size: 14,
+                color: AppTheme.accentColor,
+              ),
               const SizedBox(width: 4),
             ],
             Text(
@@ -900,7 +964,10 @@ class _CartScreenState extends State<CartScreen> {
   /// Price of one cart line. A combo is priced from its own special prices,
   /// not from the services' list prices.
   double _lineTotal(dynamic item) {
-    final quantity = int.tryParse('${item['quantity']}') ?? (item['quantity'] as num?)?.toInt() ?? 1;
+    final quantity =
+        int.tryParse('${item['quantity']}') ??
+        (item['quantity'] as num?)?.toInt() ??
+        1;
 
     if (item['combo'] != null) {
       double comboPrice = 0.0;
@@ -913,7 +980,7 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     if (item['service'] != null) {
-      return (double.tryParse('${item['service']['price']}') ?? 0.0) * quantity;
+      return double.tryParse('${item['service']['price']}') ?? 0.0;
     }
 
     return 0.0;

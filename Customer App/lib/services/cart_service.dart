@@ -13,7 +13,8 @@ class CartConflictException implements Exception {
 
 class CartService {
   final String baseUrl =
-      dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+      (dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null) ??
+      'http://127.0.0.1:8000/api';
 
   static final ValueNotifier<Map<String, dynamic>?> globalCartNotifier =
       ValueNotifier(null);
@@ -74,11 +75,30 @@ class CartService {
     }
   }
 
+  /// Checks whether an individual service is already in the global active cart.
+  static bool isServiceInCart(String serviceId) {
+    final cart = globalCartNotifier.value;
+    if (cart == null) return false;
+    final items = (cart['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map) {
+        final sId = item['service_id'] ?? item['service']?['id'];
+        if (sId != null && sId.toString() == serviceId.toString()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Instance wrapper for [isServiceInCart].
+  bool isServiceInActiveCart(String serviceId) => isServiceInCart(serviceId);
+
   Future<Map<String, dynamic>?> addItem(
     String salonId,
     String serviceId, {
     int quantity = 1,
-  }) => _addToCart(salonId, {'service_id': serviceId, 'quantity': quantity});
+  }) => _addToCart(salonId, {'service_id': serviceId, 'quantity': 1});
 
   /// Adds a whole combo package. The backend explodes it into its constituent
   /// services when the appointment is booked.
@@ -156,6 +176,12 @@ class CartService {
       return getGlobalCart();
     }
 
+    if (serviceId != null && newQuantity > 1) {
+      throw Exception(
+        'Individual services cannot have a quantity greater than 1.',
+      );
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -193,7 +219,7 @@ class CartService {
     return _addToCart(salonId, {
       if (serviceId != null) 'service_id': serviceId,
       if (comboId != null) 'combo_id': comboId,
-      'quantity': newQuantity,
+      'quantity': serviceId != null ? 1 : newQuantity,
     });
   }
 }

@@ -201,7 +201,7 @@ void main() {
 
   group('Issue 2: Visual Highlighting of Selected Services', () {
     testWidgets(
-      'selected service displays purple border, lavender tint, badge, and quantity stepper',
+      'selected service displays purple border, lavender tint, badge, and added button without increment stepper',
       (tester) async {
         int serviceQty = 0;
 
@@ -241,11 +241,7 @@ void main() {
                                     Icons.check_circle_rounded,
                                     key: ValueKey('check_icon'),
                                   ),
-                                  Text(
-                                    serviceQty > 1
-                                        ? 'Selected ($serviceQty)'
-                                        : 'Selected',
-                                  ),
+                                  const Text('Selected'),
                                 ],
                               ),
                             ),
@@ -255,19 +251,47 @@ void main() {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  key: const ValueKey('stepper_decrement'),
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () => setState(() => serviceQty--),
+                                InkWell(
+                                  key: const ValueKey('added_button'),
+                                  onTap: () => setState(() => serviceQty = 0),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: context.colors.accentSoft,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppTheme.accentColor,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.check,
+                                          size: 14,
+                                          color: AppTheme.accentColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'ADDED',
+                                          style: TextStyle(
+                                            color: AppTheme.accentColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                Text(
-                                  '$serviceQty',
-                                  key: const ValueKey('stepper_qty'),
-                                ),
+                                const SizedBox(width: 4),
                                 IconButton(
-                                  key: const ValueKey('stepper_increment'),
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () => setState(() => serviceQty++),
+                                  key: const ValueKey('remove_service_btn'),
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () =>
+                                      setState(() => serviceQty = 0),
                                 ),
                               ],
                             )
@@ -290,60 +314,51 @@ void main() {
         // Unselected state:
         // 1. ADD button is present
         expect(find.byKey(const ValueKey('add_button')), findsOneWidget);
-        // 2. Selected badge is absent
+        // 2. Selected badge and added state are absent
         expect(find.byKey(const ValueKey('selected_badge')), findsNothing);
-        expect(find.byKey(const ValueKey('stepper_qty')), findsNothing);
+        expect(find.byKey(const ValueKey('added_button')), findsNothing);
+        expect(find.byKey(const ValueKey('stepper_increment')), findsNothing);
 
         // Select service:
         await tester.tap(find.byKey(const ValueKey('add_button')));
         await tester.pumpAndSettle();
 
-        // Selected state with quantity 1:
+        // Selected state:
         expect(find.byKey(const ValueKey('add_button')), findsNothing);
         expect(find.byKey(const ValueKey('selected_badge')), findsOneWidget);
         expect(find.text('Selected'), findsOneWidget);
         expect(find.byKey(const ValueKey('check_icon')), findsOneWidget);
-        expect(find.text('1'), findsOneWidget);
+        expect(find.byKey(const ValueKey('added_button')), findsOneWidget);
+        expect(find.text('ADDED'), findsOneWidget);
+        // No stepper or increment control for individual service
+        expect(find.byKey(const ValueKey('stepper_increment')), findsNothing);
+        expect(find.text('Selected (2)'), findsNothing);
 
-        // Increment to quantity 2:
-        await tester.tap(find.byKey(const ValueKey('stepper_increment')));
-        await tester.pumpAndSettle();
-
-        // Selected state with quantity 2:
-        expect(find.text('Selected (2)'), findsOneWidget);
-        expect(find.text('2'), findsOneWidget);
-
-        // Decrement back to quantity 1:
-        await tester.tap(find.byKey(const ValueKey('stepper_decrement')));
-        await tester.pumpAndSettle();
-        expect(find.text('Selected'), findsOneWidget);
-        expect(find.text('1'), findsOneWidget);
-
-        // Decrement to 0 (removal):
-        await tester.tap(find.byKey(const ValueKey('stepper_decrement')));
+        // Tap remove button to unselect:
+        await tester.tap(find.byKey(const ValueKey('added_button')));
         await tester.pumpAndSettle();
 
         // Unselected state restored:
         expect(find.byKey(const ValueKey('add_button')), findsOneWidget);
         expect(find.byKey(const ValueKey('selected_badge')), findsNothing);
-        expect(find.byKey(const ValueKey('stepper_qty')), findsNothing);
+        expect(find.byKey(const ValueKey('added_button')), findsNothing);
       },
     );
   });
 
-  group('Issue 3: Multiple Quantity Tracking and Pricing Integrity Tests', () {
+  group('Issue 3: Single Quantity Tracking and Pricing Integrity Tests', () {
     test(
-      'tracks repeated additions of the same service and aggregates quantity correctly',
+      'enforces single quantity on repeated additions of the same service (idempotency)',
       () {
         final List<Map<String, dynamic>> cartItems = [];
 
-        void addOrIncrement(String serviceId, String name, double price) {
+        void addService(String serviceId, String name, double price) {
           final existingIndex = cartItems.indexWhere(
             (i) => i['service_id'] == serviceId,
           );
           if (existingIndex >= 0) {
-            cartItems[existingIndex]['quantity'] =
-                (cartItems[existingIndex]['quantity'] as int) + 1;
+            // Idempotent: retain quantity 1, never increment or create duplicate
+            cartItems[existingIndex]['quantity'] = 1;
           } else {
             cartItems.add({
               'service_id': serviceId,
@@ -354,18 +369,8 @@ void main() {
           }
         }
 
-        void decrementOrRemove(String serviceId) {
-          final existingIndex = cartItems.indexWhere(
-            (i) => i['service_id'] == serviceId,
-          );
-          if (existingIndex >= 0) {
-            final currentQty = cartItems[existingIndex]['quantity'] as int;
-            if (currentQty <= 1) {
-              cartItems.removeAt(existingIndex);
-            } else {
-              cartItems[existingIndex]['quantity'] = currentQty - 1;
-            }
-          }
+        void removeService(String serviceId) {
+          cartItems.removeWhere((i) => i['service_id'] == serviceId);
         }
 
         int aggregateItemCount() {
@@ -384,45 +389,45 @@ void main() {
         }
 
         // Add Haircut once
-        addOrIncrement('srv-1', 'Haircut', 350.0);
+        addService('srv-1', 'Haircut', 350.0);
         expect(cartItems.length, 1);
         expect(cartItems[0]['quantity'], 1);
         expect(aggregateItemCount(), 1);
         expect(calculateTotal(), 350.0);
 
-        // Add Haircut second time
-        addOrIncrement('srv-1', 'Haircut', 350.0);
-        expect(cartItems.length, 1); // No untracked duplicate line
-        expect(cartItems[0]['quantity'], 2);
-        expect(aggregateItemCount(), 2);
-        expect(calculateTotal(), 700.0);
+        // Add Haircut second time - must stay at quantity 1
+        addService('srv-1', 'Haircut', 350.0);
+        expect(cartItems.length, 1); // No duplicate line
+        expect(cartItems[0]['quantity'], 1); // Idempotent quantity 1
+        expect(aggregateItemCount(), 1);
+        expect(calculateTotal(), 350.0);
 
-        // Add Haircut third time
-        addOrIncrement('srv-1', 'Haircut', 350.0);
-        expect(cartItems[0]['quantity'], 3);
-        expect(aggregateItemCount(), 3);
-        expect(calculateTotal(), 1050.0);
+        // Add Haircut third time - still 1
+        addService('srv-1', 'Haircut', 350.0);
+        expect(cartItems[0]['quantity'], 1);
+        expect(aggregateItemCount(), 1);
+        expect(calculateTotal(), 350.0);
 
         // Add independent service (Beard Trim)
-        addOrIncrement('srv-2', 'Beard Trim', 200.0);
+        addService('srv-2', 'Beard Trim', 200.0);
         expect(cartItems.length, 2);
-        expect(cartItems[0]['quantity'], 3);
+        expect(cartItems[0]['quantity'], 1);
         expect(cartItems[1]['quantity'], 1);
-        expect(aggregateItemCount(), 4); // 3 Haircut + 1 Beard Trim = 4 items
-        expect(calculateTotal(), 1250.0);
+        expect(aggregateItemCount(), 2); // 1 Haircut + 1 Beard Trim = 2 items
+        expect(calculateTotal(), 550.0);
 
-        // Decrement Haircut
-        decrementOrRemove('srv-1');
-        expect(cartItems[0]['quantity'], 2);
-        expect(aggregateItemCount(), 3);
-        expect(calculateTotal(), 900.0);
+        // Direct removal of Haircut
+        removeService('srv-1');
+        expect(cartItems.length, 1);
+        expect(cartItems.any((i) => i['service_id'] == 'srv-1'), isFalse);
+        expect(aggregateItemCount(), 1);
+        expect(calculateTotal(), 200.0);
 
         // Remove Beard Trim completely
-        decrementOrRemove('srv-2');
-        expect(cartItems.length, 1);
-        expect(cartItems.any((i) => i['service_id'] == 'srv-2'), isFalse);
-        expect(aggregateItemCount(), 2);
-        expect(calculateTotal(), 700.0);
+        removeService('srv-2');
+        expect(cartItems.length, 0);
+        expect(aggregateItemCount(), 0);
+        expect(calculateTotal(), 0.0);
       },
     );
 
@@ -435,7 +440,7 @@ void main() {
             {
               'id': 1,
               'service_id': '10',
-              'quantity': 2,
+              'quantity': 1,
               'service': {
                 'id': 10,
                 'name': 'Facial Glow',
@@ -471,10 +476,10 @@ void main() {
           calculatedDuration += duration * qty;
         }
 
-        expect(calculatedTotal, (800.0 * 2) + (1200.0 * 1)); // 2800.0
-        expect(calculatedDuration, (45 * 2) + (60 * 1)); // 150 mins
+        expect(calculatedTotal, (800.0 * 1) + (1200.0 * 1)); // 2000.0
+        expect(calculatedDuration, (45 * 1) + (60 * 1)); // 105 mins
         final advancePayable = calculatedTotal * 0.20; // 20% advance rule
-        expect(advancePayable, 560.0);
+        expect(advancePayable, 400.0);
       },
     );
 

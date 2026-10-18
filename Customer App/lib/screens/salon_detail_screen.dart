@@ -60,6 +60,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   String _error = '';
   bool _isFavourited = false;
   bool _isTogglingFavourite = false;
+  final Set<String> _inFlightServiceIds = {};
 
   /// null = the "All Services" tab.
   String? _selectedCategoryId;
@@ -369,8 +370,16 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     required String label,
     int quantity = 1,
   }) async {
+    if (serviceId != null) {
+      if (_inFlightServiceIds.contains(serviceId)) return;
+      setState(() => _inFlightServiceIds.add(serviceId));
+    }
+
     final token = await AuthService.getToken();
     if (token == null || token.isEmpty) {
+      if (serviceId != null && mounted) {
+        setState(() => _inFlightServiceIds.remove(serviceId));
+      }
       if (!mounted) return;
       final loggedIn = await Navigator.push<bool>(
         context,
@@ -379,15 +388,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         ),
       );
       if (loggedIn != true) return;
+      if (serviceId != null && mounted) {
+        setState(() => _inFlightServiceIds.add(serviceId));
+      }
     }
 
     try {
       final cart = serviceId != null
-          ? await _cartService.addItem(
-              widget.salonId,
-              serviceId,
-              quantity: quantity,
-            )
+          ? await _cartService.addItem(widget.salonId, serviceId, quantity: 1)
           : await _cartService.addCombo(
               widget.salonId,
               comboId!,
@@ -458,34 +466,37 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       _showError(
         describeError(e, fallback: 'Could not add that to your cart.'),
       );
+    } finally {
+      if (serviceId != null && mounted) {
+        setState(() => _inFlightServiceIds.remove(serviceId));
+      }
     }
   }
 
-  Future<void> _decrementService(String serviceId, String label) async {
+  Future<void> _removeService(String serviceId, String label) async {
     final cartItem = _getServiceCartItem(serviceId);
     if (cartItem == null) return;
+    if (_inFlightServiceIds.contains(serviceId)) return;
 
-    final currentQty = (cartItem['quantity'] as num?)?.toInt() ?? 1;
     final itemId = cartItem['id'].toString();
 
+    setState(() => _inFlightServiceIds.add(serviceId));
     try {
       AppHaptics.lightImpact();
-      final updatedCart = await _cartService.updateQuantity(
-        widget.salonId,
-        itemId,
-        serviceId: serviceId,
-        newQuantity: currentQty - 1,
-      );
-
+      await _cartService.removeItem(itemId);
       if (!mounted) return;
       setState(() {
-        _cart = updatedCart;
+        _cart = CartService.globalCartNotifier.value;
         _actionError = null;
       });
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      _showError(describeError(e, fallback: 'Could not update quantity.'));
+      _showError(describeError(e, fallback: 'Could not remove service.'));
+    } finally {
+      if (mounted) {
+        setState(() => _inFlightServiceIds.remove(serviceId));
+      }
     }
   }
 
@@ -1760,7 +1771,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              qty > 1 ? 'Selected ($qty)' : 'Selected',
+                              'Selected',
                               style: GoogleFonts.outfit(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -1904,32 +1915,18 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                           ),
                         ),
                       ),
-                    if (qty > 1)
-                      Text(
-                        'Total: ₹${(effectivePrice * qty).toStringAsFixed(0)}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.textSecondary,
-                        ),
-                      ),
                   ],
                 ),
                 if (isSelected)
-                  _quantityStepper(
-                    quantity: qty,
-                    onIncrement: () => _addToCart(
-                      serviceId: serviceId,
-                      label: service['name'] ?? 'Service',
-                    ),
-                    onDecrement: () => _decrementService(
-                      serviceId,
-                      service['name'] ?? 'Service',
-                    ),
+                  _addedButton(
+                    inFlight: _inFlightServiceIds.contains(serviceId),
+                    onRemove: () =>
+                        _removeService(serviceId, service['name'] ?? 'Service'),
                   )
                 else
                   _addButton(
-                    enabled: canAdd,
+                    enabled: canAdd && !_inFlightServiceIds.contains(serviceId),
+                    inFlight: _inFlightServiceIds.contains(serviceId),
                     onTap: () => _addToCart(
                       serviceId: serviceId,
                       label: service['name'] ?? 'Service',
@@ -2093,10 +2090,24 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     );
   }
 
-  Widget _addButton({required bool enabled, required VoidCallback onTap}) {
+  Widget _addButton({
+    required bool enabled,
+    bool inFlight = false,
+    required VoidCallback onTap,
+  }) {
     return ElevatedButton.icon(
-      onPressed: enabled ? onTap : null,
-      icon: Icon(Icons.add, size: 18),
+      key: const ValueKey('add_service_button'),
+      onPressed: enabled && !inFlight ? onTap : null,
+      icon: inFlight
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.add, size: 18),
       label: Text(
         'ADD',
         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
@@ -2107,8 +2118,84 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         disabledBackgroundColor: context.colors.border,
         disabledForegroundColor: context.colors.textTertiary,
         elevation: 0,
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
+  Widget _addedButton({
+    required bool inFlight,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      key: const ValueKey('added_service_container'),
+      decoration: BoxDecoration(
+        color: context.colors.accentSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppTheme.accentColor.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: inFlight ? null : onRemove,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (inFlight)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.accentColor,
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: AppTheme.accentColor,
+                    ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ADDED',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 18,
+            color: AppTheme.accentColor.withValues(alpha: 0.25),
+          ),
+          IconButton(
+            key: const ValueKey('remove_service_button'),
+            tooltip: 'Remove from cart',
+            icon: Icon(
+              Icons.close_rounded,
+              size: 16,
+              color: context.colors.textSecondary,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
+            onPressed: inFlight ? null : onRemove,
+          ),
+        ],
       ),
     );
   }

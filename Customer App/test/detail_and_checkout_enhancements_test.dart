@@ -123,7 +123,7 @@ void main() {
 
   group('Cart Extra Quantity Decrement Tests', () {
     testWidgets(
-      'allows decrementing quantity from 2 to 1 and prompts removal at 1',
+      'allows decrementing combo package quantity from 2 to 1 and prompts removal at 1',
       (tester) async {
         int itemQuantity = 2;
         bool removed = false;
@@ -178,6 +178,40 @@ void main() {
 
         // Tap again at 1 to remove
         await tester.tap(find.byKey(const ValueKey('decrement_btn')));
+        await tester.pump();
+
+        expect(removed, isTrue);
+      },
+    );
+
+    testWidgets(
+      'individual service cart lines show single-quantity presentation and remove directly without increment stepper',
+      (tester) async {
+        bool removed = false;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: Scaffold(
+              body: Row(
+                children: [
+                  const Text('Qty: 1', key: ValueKey('service_qty_badge')),
+                  IconButton(
+                    key: const ValueKey('service_remove_btn'),
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => removed = true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byKey(const ValueKey('service_qty_badge')), findsOneWidget);
+        expect(find.text('Qty: 1'), findsOneWidget);
+        expect(find.byIcon(Icons.add), findsNothing);
+
+        await tester.tap(find.byKey(const ValueKey('service_remove_btn')));
         await tester.pump();
 
         expect(removed, isTrue);

@@ -35,9 +35,23 @@ class CategoryServiceStrip extends StatefulWidget {
 class _CategoryServiceStripState extends State<CategoryServiceStrip> {
   final CartService _cartService = CartService();
 
-  /// service id -> quantity the customer has added from this strip.
-  final Map<String, int> _added = {};
   final Set<String> _adding = {};
+
+  @override
+  void initState() {
+    super.initState();
+    CartService.globalCartNotifier.addListener(_onCartChanged);
+  }
+
+  @override
+  void dispose() {
+    CartService.globalCartNotifier.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
 
   /// How many services to show before the "see all" affordance. Enough to fill
   /// the width of a card on the largest common phone, so the scroll gesture
@@ -54,6 +68,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
   Future<void> _addService(Map<String, dynamic> service) async {
     final serviceId = service['id'].toString();
     if (_adding.contains(serviceId)) return;
+    if (CartService.isServiceInCart(serviceId)) return;
 
     // Booking needs an account, so an anonymous customer is asked to sign in at
     // the moment they try to act, not before they have chosen anything.
@@ -73,9 +88,6 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
       await _cartService.addItem(widget.salonId, serviceId);
       if (!mounted) return;
       AppHaptics.lightImpact();
-      setState(() {
-        _added[serviceId] = (_added[serviceId] ?? 0) + 1;
-      });
       setState(() => _error = null);
     } on CartConflictException catch (e) {
       if (!mounted) return;
@@ -84,7 +96,12 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
     } catch (e) {
       if (!mounted) return;
       AppHaptics.error();
-      setState(() => _error = describeError(e, fallback: 'Could not add that to your cart.'));
+      setState(
+        () => _error = describeError(
+          e,
+          fallback: 'Could not add that to your cart.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _adding.remove(serviceId));
     }
@@ -125,7 +142,9 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
                 await _cartService.clearGlobalCart();
               } catch (_) {
                 if (!mounted) return;
-                setState(() => _error = 'Could not clear your cart. Please try again.');
+                setState(
+                  () => _error = 'Could not clear your cart. Please try again.',
+                );
                 return;
               }
               if (!mounted) return;
@@ -227,11 +246,12 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
   }) {
     final serviceId = service['id'].toString();
     final isAdding = _adding.contains(serviceId);
-    final quantity = _added[serviceId] ?? 0;
+    final isInCart = CartService.isServiceInCart(serviceId);
     final double rawPrice = (service['price'] as num?)?.toDouble() ?? 0;
     final double? origPrice = (service['original_price'] as num?)?.toDouble();
     final double? discPrice = (service['discounted_price'] as num?)?.toDouble();
-    final bool hasDiscount = service['first_time_discount'] != null &&
+    final bool hasDiscount =
+        service['first_time_discount'] != null &&
         origPrice != null &&
         discPrice != null &&
         origPrice > discPrice &&
@@ -272,7 +292,9 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
                 Row(
                   children: [
                     Text(
-                      isBookable ? '₹${displayPrice.toStringAsFixed(0)}' : 'Unavailable',
+                      isBookable
+                          ? '₹${displayPrice.toStringAsFixed(0)}'
+                          : 'Unavailable',
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -299,7 +321,7 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
           _buildButton(
             isBookable: isBookable,
             isAdding: isAdding,
-            quantity: quantity,
+            isInCart: isInCart,
             onPressed: () => _addService(service),
           ),
         ],
@@ -310,45 +332,45 @@ class _CategoryServiceStripState extends State<CategoryServiceStrip> {
   Widget _buildButton({
     required bool isBookable,
     required bool isAdding,
-    required int quantity,
+    required bool isInCart,
     required VoidCallback onPressed,
   }) {
-    // An added service turns into a counter rather than a button that can be
-    // pressed again: the cart already holds it, and the number is what tells
-    // the customer that.
-    final label = isAdding
-        ? ''
-        : quantity > 0
-        ? '$quantity'
-        : '+';
-
     return GestureDetector(
-      onTap: isBookable && !isAdding ? onPressed : null,
+      onTap: isBookable && !isAdding && !isInCart ? onPressed : null,
       child: Container(
         width: 30,
         height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isBookable ? AppTheme.accentColor : context.colors.iconIdle,
+          color: !isBookable
+              ? context.colors.iconIdle
+              : isInCart
+              ? context.colors.accentSoft
+              : AppTheme.accentColor,
           borderRadius: BorderRadius.circular(10),
+          border: isInCart
+              ? Border.all(color: AppTheme.accentColor, width: 1.5)
+              : null,
         ),
-            child: isAdding
-                ? SizedBox(
-                    width: 13,
-                    height: 13,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: context.colors.onAccent,
-                    ),
-                  )
-                : Text(
-                    label,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.onAccent,
-                    ),
-                  ),
+        child: isAdding
+            ? SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.colors.onAccent,
+                ),
+              )
+            : isInCart
+            ? Icon(Icons.check, size: 16, color: AppTheme.accentColor)
+            : Text(
+                '+',
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.onAccent,
+                ),
+              ),
       ),
     );
   }

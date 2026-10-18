@@ -151,6 +151,16 @@ class CartController extends Controller
             return response()->json(['message' => 'Either service_id or combo_id is required.'], 400);
         }
 
+        // For individual services, enforce quantity 1
+        if ($request->filled('service_id') && $request->has('quantity') && (int) $request->quantity > 1) {
+            return response()->json([
+                'message' => 'Individual services can only be added with quantity 1.',
+                'errors' => [
+                    'quantity' => ['The quantity for an individual service must always be 1.']
+                ]
+            ], 422);
+        }
+
         // Enforce single active cart rule
         $activeCart = Cart::with('salon')->where('customer_id', $request->user()->id)
             ->where('status', 'active')
@@ -168,26 +178,73 @@ class CartController extends Controller
             ['customer_id' => $request->user()->id, 'salon_id' => $salon_id, 'status' => 'active']
         );
 
-        // Check if item already exists
-        $existingItem = CartItem::where('cart_id', $cart->id)
-            ->where('service_id', $request->service_id)
-            ->where('combo_id', $request->combo_id)
-            ->first();
+        if ($request->service_id) {
+            $existingItem = CartItem::where('cart_id', $cart->id)
+                ->where('service_id', $request->service_id)
+                ->first();
 
-        if ($existingItem) {
-            $existingItem->quantity += $request->get('quantity', 1);
-            $existingItem->preferred_provider_id = $request->preferred_provider_id;
-            $existingItem->is_any_available = $request->get('is_any_available', false);
-            $existingItem->save();
+            if ($existingItem) {
+                // Idempotent: retain single line with quantity = 1, never increment
+                $existingItem->quantity = 1;
+                if ($request->has('preferred_provider_id')) {
+                    $existingItem->preferred_provider_id = $request->preferred_provider_id;
+                }
+                if ($request->has('is_any_available')) {
+                    $existingItem->is_any_available = $request->boolean('is_any_available');
+                }
+                $existingItem->save();
+            } else {
+                try {
+                    CartItem::create([
+                        'cart_id' => $cart->id,
+                        'service_id' => $request->service_id,
+                        'combo_id' => null,
+                        'preferred_provider_id' => $request->preferred_provider_id,
+                        'is_any_available' => $request->boolean('is_any_available', false),
+                        'quantity' => 1
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // In case of concurrent add requests, recover idempotently
+                    $existingItem = CartItem::where('cart_id', $cart->id)
+                        ->where('service_id', $request->service_id)
+                        ->first();
+
+                    if ($existingItem) {
+                        $existingItem->quantity = 1;
+                        if ($request->has('preferred_provider_id')) {
+                            $existingItem->preferred_provider_id = $request->preferred_provider_id;
+                        }
+                        if ($request->has('is_any_available')) {
+                            $existingItem->is_any_available = $request->boolean('is_any_available');
+                        }
+                        $existingItem->save();
+                    } else {
+                        throw $e;
+                    }
+                }
+            }
         } else {
-            CartItem::create([
-                'cart_id' => $cart->id,
-                'service_id' => $request->service_id,
-                'combo_id' => $request->combo_id,
-                'preferred_provider_id' => $request->preferred_provider_id,
-                'is_any_available' => $request->get('is_any_available', false),
-                'quantity' => $request->get('quantity', 1)
-            ]);
+            // Direct combo packages
+            $existingItem = CartItem::where('cart_id', $cart->id)
+                ->where('combo_id', $request->combo_id)
+                ->whereNull('service_id')
+                ->first();
+
+            if ($existingItem) {
+                $existingItem->quantity += $request->get('quantity', 1);
+                $existingItem->preferred_provider_id = $request->preferred_provider_id;
+                $existingItem->is_any_available = $request->boolean('is_any_available', false);
+                $existingItem->save();
+            } else {
+                CartItem::create([
+                    'cart_id' => $cart->id,
+                    'service_id' => null,
+                    'combo_id' => $request->combo_id,
+                    'preferred_provider_id' => $request->preferred_provider_id,
+                    'is_any_available' => $request->boolean('is_any_available', false),
+                    'quantity' => $request->get('quantity', 1)
+                ]);
+            }
         }
 
         // The enriched cart comes straight back so the app can show what this
@@ -220,6 +277,16 @@ class CartController extends Controller
 
         if (!$item) {
             return response()->json(['message' => 'Cart item not found.'], 404);
+        }
+
+        // For individual service items, reject quantity > 1
+        if ($item->service_id !== null && (int) $request->quantity > 1) {
+            return response()->json([
+                'message' => 'Individual services cannot have a quantity greater than 1.',
+                'errors' => [
+                    'quantity' => ['The quantity for an individual service must be 1.']
+                ]
+            ], 422);
         }
 
         $cart = $item->cart;
