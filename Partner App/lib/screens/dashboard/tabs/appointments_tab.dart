@@ -8,6 +8,8 @@ import '../../walk_in_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../widgets/wallet_coin_pill.dart';
+import '../../../../models/admin_provider_models.dart';
+import '../../../../services/admin_provider_api.dart';
 
 const String _kAllDates = 'All Dates';
 const String _kAllProviders = 'All Providers';
@@ -69,6 +71,9 @@ class AppointmentsTabState extends State<AppointmentsTab> {
   /// Set when the date filter is "Custom Date".
   DateTime? _customDate;
 
+  AdminProviderStatus? _adminStatus;
+  bool _isMyAppointmentsView = false;
+
   @override
   void initState() {
     super.initState();
@@ -78,17 +83,29 @@ class AppointmentsTabState extends State<AppointmentsTab> {
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
     try {
-      // Fetch real data from database
-      final data = await _service.getAppointments(widget.salonId);
+      final results = await Future.wait([
+        _service.getAppointments(widget.salonId),
+        AdminProviderApi.getStatus(widget.salonId).catchError((_) => AdminProviderStatus(
+          isProviderEnabled: false,
+          setupValidation: AdminProviderValidation(
+            salonHoursConfigured: false,
+            adminHoursConfigured: false,
+            servicesAssigned: false,
+            isReadyForBooking: false,
+          ),
+          upcomingAppointmentsCount: 0,
+        )),
+      ]);
       setState(() {
-        _appointments = data;
+        _appointments = results[0] as List<dynamic>;
+        _adminStatus = results[1] as AdminProviderStatus;
         _isLoading = false;
       });
     } catch (e, stack) {
       print('AppointmentsTab error: $e');
       print(stack);
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
     }
   }
 
@@ -174,19 +191,29 @@ class AppointmentsTabState extends State<AppointmentsTab> {
     return [_kAllServices, ...sorted];
   }
 
-  /// The 5 filters applied together.
+  /// The 5 filters applied together, plus personal provider scoping in "My Appointments" mode.
   List<dynamic> get _filteredAppointments {
     final date = _filterDate;
+    final adminProviderId = _adminStatus?.provider?.id;
 
     return _appointments.where((raw) {
       final apt = raw as Map<String, dynamic>;
+
+      if (_isMyAppointmentsView) {
+        if (adminProviderId == null) return false;
+        final appointedId = apt['appointed_provider_id']?.toString();
+        final servingId = apt['serving_provider_id']?.toString();
+        if (appointedId != adminProviderId && servingId != adminProviderId) {
+          return false;
+        }
+      }
 
       if (date != null) {
         final aptDate = DateTime.tryParse('${apt['appointment_date']}');
         if (aptDate == null || !DateUtils.isSameDay(aptDate, date)) return false;
       }
 
-      if (_selectedProvider != _kAllProviders && _providerName(apt) != _selectedProvider) {
+      if (!_isMyAppointmentsView && _selectedProvider != _kAllProviders && _providerName(apt) != _selectedProvider) {
         return false;
       }
 
@@ -211,7 +238,7 @@ class AppointmentsTabState extends State<AppointmentsTab> {
 
   bool get _hasActiveFilter =>
       _selectedDate != 'Today' ||
-      _selectedProvider != _kAllProviders ||
+      (!_isMyAppointmentsView && _selectedProvider != _kAllProviders) ||
       _selectedService != _kAllServices ||
       _selectedStatus != _kAllStatus ||
       _selectedSource != _kAllSources;
@@ -264,6 +291,8 @@ class AppointmentsTabState extends State<AppointmentsTab> {
         child: Column(
           children: [
             _buildHeader(isDark),
+            if (_adminStatus?.isProviderEnabled == true)
+              _buildViewSwitcher(isDark),
             _buildFilters(isDark),
             Expanded(
               child: _isLoading
@@ -310,7 +339,9 @@ class AppointmentsTabState extends State<AppointmentsTab> {
             Text(
               filtered
                   ? 'No appointments match these filters'
-                  : 'No appointments found',
+                  : (_isMyAppointmentsView
+                      ? 'No appointments assigned to you'
+                      : 'No appointments found'),
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
                 color: primaryColor,
@@ -448,6 +479,121 @@ class AppointmentsTabState extends State<AppointmentsTab> {
     );
   }
 
+  Widget _buildViewSwitcher(bool isDark) {
+    final activeBg = Theme.of(context).colorScheme.surface;
+    final activeText = Theme.of(context).textTheme.bodyLarge?.color;
+    final inactiveText = isDark ? Colors.white60 : Colors.black54;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_isMyAppointmentsView) {
+                  setState(() {
+                    _isMyAppointmentsView = false;
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(26),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: !_isMyAppointmentsView ? activeBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: !_isMyAppointmentsView
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.storefront_outlined,
+                      size: 16,
+                      color: !_isMyAppointmentsView ? AppTheme.accentColor : inactiveText,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Salon Schedule',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: !_isMyAppointmentsView ? activeText : inactiveText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (!_isMyAppointmentsView) {
+                  setState(() {
+                    _isMyAppointmentsView = true;
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(26),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _isMyAppointmentsView ? activeBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(26),
+                  boxShadow: _isMyAppointmentsView
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.badge_outlined,
+                      size: 16,
+                      color: _isMyAppointmentsView ? AppTheme.accentColor : inactiveText,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'My Appointments',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: _isMyAppointmentsView ? activeText : inactiveText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilters(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -465,13 +611,15 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                   ? DateFormat('d MMM').format(_customDate!)
                   : item,
             ),
-            const SizedBox(width: 8),
-            _buildDropdown(
-              _providerOptions,
-              _selectedProvider,
-              (v) => setState(() => _selectedProvider = v!),
-              isDark: isDark,
-            ),
+            if (!_isMyAppointmentsView) ...[
+              const SizedBox(width: 8),
+              _buildDropdown(
+                _providerOptions,
+                _selectedProvider,
+                (v) => setState(() => _selectedProvider = v!),
+                isDark: isDark,
+              ),
+            ],
             const SizedBox(width: 8),
             _buildDropdown(
               _serviceOptions,

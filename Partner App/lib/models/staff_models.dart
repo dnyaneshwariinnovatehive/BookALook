@@ -17,6 +17,9 @@ class StaffMember {
   /// Empty when the API did not send them.
   final List<StaffWorkingHour> workingHours;
 
+  /// Whether this profile belongs to the salon owner/admin
+  final bool isAdminProvider;
+
   StaffMember({
     required this.id,
     required this.userId,
@@ -26,6 +29,7 @@ class StaffMember {
     required this.commissionPercentage,
     required this.isActive,
     this.autoApproveLeave = false,
+    this.isAdminProvider = false,
     this.user,
     this.services,
     this.workingHours = const [],
@@ -47,6 +51,7 @@ class StaffMember {
       commissionPercentage: double.tryParse(json['commission_percentage'].toString()) ?? 0.0,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
       autoApproveLeave: json['auto_approve_leave'] == 1 || json['auto_approve_leave'] == true,
+      isAdminProvider: json['is_admin_provider'] == 1 || json['is_admin_provider'] == true,
       user: json['user'],
       services: json['services'],
       workingHours: hours,

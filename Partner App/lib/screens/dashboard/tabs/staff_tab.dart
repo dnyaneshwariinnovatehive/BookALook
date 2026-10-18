@@ -1,4 +1,3 @@
-import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/staff_models.dart';
@@ -6,6 +5,9 @@ import '../../../models/leave_models.dart';
 import '../../../services/staff_api.dart';
 import '../../../theme/app_theme.dart';
 import 'staff/add_staff_screen.dart';
+import 'staff/admin_provider_config_sheet.dart';
+import '../../../models/admin_provider_models.dart';
+import '../../../services/admin_provider_api.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 
 class StaffTab extends StatefulWidget {
@@ -29,6 +31,10 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
   List<ProviderLeave> _leaves = [];
   String? _leaveError;
 
+  AdminProviderStatus? _adminStatus;
+  bool _isLoadingAdminStatus = true;
+  bool _isTogglingAdmin = false;
+
   /// Which leave status is shown in the Leave Requests view. Defaults to the
   /// most actionable bucket — the ones still waiting for a decision.
   String _leaveFilter = 'pending';
@@ -40,6 +46,7 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
     loadFuture = Future.wait([
       _fetchStaff(),
       _fetchLeaves(),
+      _fetchAdminStatus(),
     ]);
   }
 
@@ -85,6 +92,352 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
         _isLoadingLeaves = false;
       });
     }
+  }
+
+  Future<void> _fetchAdminStatus() async {
+    setState(() => _isLoadingAdminStatus = true);
+    try {
+      final status = await AdminProviderApi.getStatus(widget.salonId);
+      if (mounted) {
+        setState(() {
+          _adminStatus = status;
+          _isLoadingAdminStatus = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAdminStatus = false);
+    }
+  }
+
+  Future<void> _handleAdminToggle(bool enable) async {
+    if (!enable) {
+      final upcomingCount = _adminStatus?.upcomingAppointmentsCount ?? 0;
+      if (upcomingCount > 0) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) {
+            final isDark = Theme.of(dialogCtx).brightness == Brightness.dark;
+            return AlertDialog(
+              backgroundColor: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Disable Service Provider Mode?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You have $upcomingCount upcoming appointment(s) assigned to you.',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'When disabled, customers will no longer be able to select you or book new appointments with you.\n\nYour existing appointments, service assignments, and working hours will be safely preserved for future reactivation.',
+                    style: TextStyle(fontSize: 13, color: isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody, height: 1.4),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx, false),
+                  child: const Text('Keep Active'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => Navigator.pop(dialogCtx, true),
+                  child: const Text('Disable'),
+                ),
+              ],
+            );
+          },
+        );
+        if (confirmed != true) return;
+      }
+    }
+
+    setState(() => _isTogglingAdmin = true);
+    try {
+      final newStatus = await AdminProviderApi.toggle(
+        salonId: widget.salonId,
+        enabled: enable,
+      );
+      if (mounted) {
+        setState(() {
+          _adminStatus = newStatus;
+          _isTogglingAdmin = false;
+        });
+        _refreshAll();
+
+        if (enable && !newStatus.setupValidation.isReadyForBooking) {
+          AdminProviderConfigSheet.show(
+            context,
+            salonId: widget.salonId,
+            initialStatus: newStatus,
+          ).then((updated) {
+            if (updated == true) _refreshAll();
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isTogglingAdmin = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text('Failed to update provider mode: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildAdminProviderCard() {
+    if (_isLoadingAdminStatus) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        height: 80,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+      );
+    }
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isEnabled = _adminStatus?.isProviderEnabled ?? false;
+    final validation = _adminStatus?.setupValidation;
+    final isReady = validation?.isReadyForBooking ?? false;
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final cardBg = theme.colorScheme.surface;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isEnabled
+              ? (isReady ? AppTheme.accentColor.withOpacity(0.4) : Colors.orange.withOpacity(0.4))
+              : theme.dividerColor,
+          width: isEnabled ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isEnabled
+                      ? AppTheme.accentColor.withOpacity(0.12)
+                      : theme.dividerColor.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.person_pin,
+                  color: isEnabled ? AppTheme.accentColor : theme.colorScheme.onSurface.withOpacity(0.5),
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Also work as a service provider',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: headingColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isEnabled
+                          ? 'You can receive customer bookings'
+                          : 'Accept personal client bookings as owner',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isTogglingAdmin)
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Switch(
+                  value: isEnabled,
+                  activeColor: AppTheme.accentColor,
+                  onChanged: _handleAdminToggle,
+                ),
+            ],
+          ),
+          if (isEnabled) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isReady
+                        ? (isDark ? AppTheme.darkSuccessBg : AppTheme.lightSuccessBg)
+                        : const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isReady ? Icons.check_circle : Icons.warning_amber_rounded,
+                        size: 14,
+                        color: isReady
+                            ? (isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess)
+                            : const Color(0xFFEA580C),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isReady ? 'Ready for Bookings' : 'Setup Incomplete',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isReady
+                              ? (isDark ? AppTheme.darkSuccess : AppTheme.lightSuccess)
+                              : const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_adminStatus?.provider?.specialization != null)
+                  Expanded(
+                    child: Text(
+                      _adminStatus!.provider!.specialization!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Assigned Services', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_adminStatus?.provider?.servicesCount ?? 0} Selected',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: (_adminStatus?.setupValidation.servicesAssigned ?? false)
+                                ? headingColor
+                                : Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Working Hours', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        const SizedBox(height: 2),
+                        Text(
+                          (_adminStatus?.setupValidation.adminHoursConfigured ?? false)
+                              ? 'Configured'
+                              : 'Missing',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: (_adminStatus?.setupValidation.adminHoursConfigured ?? false)
+                                ? headingColor
+                                : Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final updated = await AdminProviderConfigSheet.show(
+                    context,
+                    salonId: widget.salonId,
+                    initialStatus: _adminStatus,
+                  );
+                  if (updated == true) {
+                    _refreshAll();
+                  }
+                },
+                icon: const Icon(Icons.tune, size: 16),
+                label: const Text('Configure Services & Schedule'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.accentColor,
+                  side: const BorderSide(color: AppTheme.accentColor),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// Whoever asked. The two screens that render leaves read the name out of
@@ -238,6 +591,7 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
     await Future.wait([
       _fetchStaff(),
       _fetchLeaves(),
+      _fetchAdminStatus(),
     ]);
   }
 
@@ -361,13 +715,13 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
         final start = TimeOfDay(hour: int.parse(startParts[0]), minute: int.parse(startParts[1]));
         final end = TimeOfDay(hour: int.parse(endParts[0]), minute: int.parse(endParts[1]));
 
-        String _formatTOD(TimeOfDay t) {
+        String formatTOD(TimeOfDay t) {
           int h = t.hour > 12 ? t.hour - 12 : (t.hour == 0 ? 12 : t.hour);
           String period = t.hour >= 12 ? 'PM' : 'AM';
           return '${h.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} $period';
         }
 
-        return '$formattedDate • ${_formatTOD(start)} - ${_formatTOD(end)}';
+        return '$formattedDate • ${formatTOD(start)} - ${formatTOD(end)}';
       }
       return formattedDate;
     } catch (e) {
@@ -663,16 +1017,16 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
   }
 
   List<StaffMember> get _filteredStaff {
+    final nonAdmin = _staff.where((s) => !s.isAdminProvider).toList();
     if (_staffFilter == 'active') {
-      return _staff.where((s) => s.isActive).toList();
+      return nonAdmin.where((s) => s.isActive).toList();
     }
-    return _staff;
+    return nonAdmin;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -750,8 +1104,9 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              _buildAdminProviderCard(),
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                                 child: Row(
                                   children: [
                                     _buildStaffFilterChip('all', 'All Staff'),

@@ -9,6 +9,8 @@ import 'package:partner_app/services/api_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:partner_app/models/subscription_plan.dart';
 import 'package:partner_app/widgets/subscription/plan_feature_item.dart';
+import 'package:partner_app/widgets/subscription/subscription_bill_summary_sheet.dart';
+import 'package:partner_app/widgets/subscription/payment_proof_viewer.dart';
 import 'upgrade_plan_screen.dart';
 
 class SubscriptionBillingScreen extends StatefulWidget {
@@ -16,10 +18,12 @@ class SubscriptionBillingScreen extends StatefulWidget {
   const SubscriptionBillingScreen({super.key, required this.salonId});
 
   @override
-  State<SubscriptionBillingScreen> createState() => _SubscriptionBillingScreenState();
+  State<SubscriptionBillingScreen> createState() =>
+      _SubscriptionBillingScreenState();
 }
 
-class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
+class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _hasSubscription = false;
   bool _isPlanFeaturesExpanded = false;
@@ -51,7 +55,21 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchSubscription();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _fetchSubscription();
+    }
   }
 
   Future<void> _fetchSubscription() async {
@@ -104,7 +122,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   Future<void> _confirmRenewal() async {
     final planName = _subscription?['plan']?['name']?.toString() ?? 'your plan';
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final heading = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final heading = isDark
+        ? AppTheme.darkTextHeading
+        : AppTheme.lightTextHeading;
     final body = isDark ? AppTheme.darkTextBody : AppTheme.lightTextBody;
     final accent = AppTheme.accentColor;
     final softBg = isDark ? AppTheme.darkAccentSoft : AppTheme.lightAccentSoft;
@@ -115,8 +135,14 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Renew $planName?',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 19, color: heading)),
+        title: Text(
+          'Renew $planName?',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 19,
+            color: heading,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,17 +151,32 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Plan', style: TextStyle(fontSize: 14, color: body)),
-                Text('$planName Plan',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+                Text(
+                  '$planName Plan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: heading,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Runs out in', style: TextStyle(fontSize: 14, color: body)),
-                Text('$_daysRemaining days',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: heading)),
+                Text(
+                  'Runs out in',
+                  style: TextStyle(fontSize: 14, color: body),
+                ),
+                Text(
+                  '$_daysRemaining days',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: heading,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 14),
@@ -161,8 +202,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('Renew',
-                style: TextStyle(color: accent, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Renew',
+              style: TextStyle(color: accent, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -180,7 +223,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final token = prefs.getString('auth_token');
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/partner/salons/${widget.salonId}/subscription/renew'),
+        Uri.parse(
+          '$_baseUrl/partner/salons/${widget.salonId}/subscription/renew',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -190,12 +235,18 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'])),
+          SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(data['message']),
+          ),
         );
         _fetchSubscription();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'] ?? 'Renewal failed')),
+          SnackBar(
+            duration: const Duration(milliseconds: 2500),
+            content: Text(data['message'] ?? 'Renewal failed'),
+          ),
         );
         setState(() => _isLoading = false);
       }
@@ -256,7 +307,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(duration: const Duration(milliseconds: 2500), content: Text(data['message'] ?? 'Could not send the request.')),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(data['message'] ?? 'Could not send the request.'),
+        ),
       );
 
       if (data['success'] == true) _fetchSubscription();
@@ -270,9 +324,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final theme = Theme.of(context);
@@ -280,9 +332,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Billing'),
-      ),
+      appBar: AppBar(title: const Text('Billing')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -293,28 +343,45 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 margin: const EdgeInsets.only(bottom: 24),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? Theme.of(context).dividerColor : Theme.of(context).dividerColor,
-                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  color: isDark
+                      ? Theme.of(context).dividerColor
+                      : Theme.of(context).dividerColor,
+                  border: Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.5),
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.error_outline,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Your subscription plan has expired. Online booking is currently disabled for your salon.',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
 
+            _buildPendingApprovalBanner(colorScheme, theme, isDark),
+
             if (_hasSubscription && _subscription != null) ...[
               Text(
                 _onCommissionModel ? 'Your arrangement' : 'Current Plan',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
               Card(
@@ -330,21 +397,47 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                         children: [
                           Text(
                             _subscription!['plan']['name'] + ' Plan',
-                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
                           ),
                           Chip(
                             label: Text(
                               _subscription!['status'].toString().toUpperCase(),
-                              style: TextStyle(color: Theme.of(context).colorScheme.surface, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.surface,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                            backgroundColor: _subscription!['status'] == 'active' ? (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess) : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                          )
+                            backgroundColor:
+                                _subscription!['status'] == 'active'
+                                ? (Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.darkSuccess
+                                      : AppTheme.lightSuccess)
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.5),
+                          ),
                         ],
                       ),
                       Divider(height: 32),
-                      _buildDetailRow('Feature Level', _subscription!['plan']['has_priority_visibility'] == true ? 'PREMIUM' : 'STANDARD', colorScheme),
+                      _buildDetailRow(
+                        'Feature Level',
+                        _subscription!['plan']['has_priority_visibility'] ==
+                                true
+                            ? 'PREMIUM'
+                            : 'STANDARD',
+                        colorScheme,
+                      ),
                       const SizedBox(height: 12),
-                      _buildDetailRow('Billing Model', _billingLabel, colorScheme),
+                      _buildDetailRow(
+                        'Billing Model',
+                        _billingLabel,
+                        colorScheme,
+                      ),
                       if (_onCommissionModel) ...[
                         const SizedBox(height: 12),
                         _buildDetailRow(
@@ -364,7 +457,11 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      _buildDetailRow('Start Date', _formatDate(_subscription!['start_date']), colorScheme),
+                      _buildDetailRow(
+                        'Start Date',
+                        _formatDate(_subscription!['start_date']),
+                        colorScheme,
+                      ),
                       const SizedBox(height: 12),
                       _buildDetailRow(
                         _onCommissionModel ? 'Access until' : 'Expiry Date',
@@ -401,13 +498,20 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline, size: 20, color: colorScheme.onSurfaceVariant),
+                      Icon(
+                        Icons.info_outline,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'There is nothing to renew. Your access extends each time '
                           'BookALook settles your month\u2019s commission.',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, height: 1.4),
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ],
@@ -420,29 +524,44 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   label: const Text('Renew Subscription (Mock)'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               const SizedBox(height: 16),
 
               if (!_onCommissionModel && _pendingRequest == null) ...[
                 OutlinedButton.icon(
-                  onPressed: _isRequestingCommission ? null : _requestCommissionModel,
+                  onPressed: _isRequestingCommission
+                      ? null
+                      : _requestCommissionModel,
                   icon: const Icon(Icons.percent_rounded),
-                  label: Text(_isRequestingCommission
-                      ? 'Sending…'
-                      : 'Switch to the Commission Model'),
+                  label: Text(
+                    _isRequestingCommission
+                        ? 'Sending…'
+                        : 'Switch to the Commission Model',
+                  ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Pay nothing up front. Instead BookALook keeps an agreed percentage '
                   'of what you bill, settled monthly.',
-                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -450,7 +569,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 onPressed: () async {
                   final submitted = await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => UpgradePlanScreen(salonId: widget.salonId)),
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          UpgradePlanScreen(salonId: widget.salonId),
+                    ),
                   );
                   if (submitted == true && mounted) {
                     _fetchSubscription();
@@ -460,39 +582,24 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 label: const Text('Upgrade Plan & Redeem Coins'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ] else ...[
-              Icon(Icons.receipt_long, size: 80, color: colorScheme.onSurfaceVariant),
-              const SizedBox(height: 24),
-              if (_pendingRequest != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.hourglass_top, color: colorScheme.onSecondaryContainer, size: 40),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Payment Under Verification',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onSecondaryContainer),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Your payment screenshot is currently being reviewed by the SuperAdmin. Your subscription will be activated soon.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: colorScheme.onSecondaryContainer),
-                      )
-                    ]
-                  )
-                )
-              ] else ...[
-                Text(
+              if (_pendingRequest == null) ...[
+                Icon(
+                  Icons.receipt_long,
+                  size: 80,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 24),
+                const Text(
                   'No Active Subscription',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -508,7 +615,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   onPressed: () async {
                     final submitted = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => UpgradePlanScreen(salonId: widget.salonId)),
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            UpgradePlanScreen(salonId: widget.salonId),
+                      ),
                     );
                     if (submitted == true && mounted) {
                       _fetchSubscription();
@@ -518,11 +628,39 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   label: const Text('Purchase Subscription'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-              ]
+              ] else ...[
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final submitted = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            UpgradePlanScreen(salonId: widget.salonId),
+                      ),
+                    );
+                    if (submitted == true && mounted) {
+                      _fetchSubscription();
+                    }
+                  },
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  label: const Text('Replace or Re-submit Payment Proof'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ],
             if (_paymentRequests.isNotEmpty) ...[
               const SizedBox(height: 32),
@@ -535,11 +673,17 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
               const SizedBox(height: 6),
               Text(
                 'Every plan payment you have sent us, and what became of it.',
-                style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 16),
               ..._paymentRequests
-                  .map((item) => _buildPaymentRequestCard(item, colorScheme, theme))
+                  .map(
+                    (item) =>
+                        _buildPaymentRequestCard(item, colorScheme, theme),
+                  )
                   .toList(),
             ],
             if (_history.isNotEmpty) ...[
@@ -551,7 +695,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              ..._history.map((item) => _buildHistoryCard(item, colorScheme, theme)).toList(),
+              ..._history
+                  .map((item) => _buildHistoryCard(item, colorScheme, theme))
+                  .toList(),
             ],
           ],
         ),
@@ -581,7 +727,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
       final int diff = target.difference(today).inDays;
 
       if (diff == 1) {
-        return hasTime ? 'Tomorrow at ${DateFormat('HH:mm').format(dt)}' : 'Tomorrow';
+        return hasTime
+            ? 'Tomorrow at ${DateFormat('HH:mm').format(dt)}'
+            : 'Tomorrow';
       }
       if (diff == 0) {
         return hasTime ? 'Today at ${DateFormat('HH:mm').format(dt)}' : 'Today';
@@ -594,12 +742,258 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
     return DateFormat('dd/MM/yy').format(dt);
   }
 
+  Widget _buildPendingApprovalBanner(
+    ColorScheme colorScheme,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    if (_pendingRequest == null) return const SizedBox.shrink();
+
+    final String planName =
+        _pendingRequest!['plan_name']?.toString() ??
+        _pendingRequest!['plan']?['name']?.toString() ??
+        'Subscription Plan';
+    final int validityDays =
+        int.tryParse(
+          (_pendingRequest!['validity_days'] ??
+                  _pendingRequest!['plan']?['validity_days'] ??
+                  30)
+              .toString(),
+        ) ??
+        30;
+    final double payable =
+        double.tryParse(
+          (_pendingRequest!['amount_payable_inr'] ??
+                  _pendingRequest!['amount_submitted'] ??
+                  0)
+              .toString(),
+        ) ??
+        0.0;
+    final int coins =
+        int.tryParse((_pendingRequest!['coins_to_redeem'] ?? 0).toString()) ??
+        0;
+    final String? transactionId = _pendingRequest!['transaction_id']
+        ?.toString();
+    final String? screenshotUrl = _pendingRequest!['screenshot_url']
+        ?.toString();
+    final String? note = _pendingRequest!['note']?.toString();
+    final String? raisedAt =
+        _pendingRequest!['raised_at']?.toString() ??
+        _pendingRequest!['created_at']?.toString();
+
+    final Color warningColor = isDark
+        ? AppTheme.darkWarning
+        : AppTheme.lightWarning;
+    final Color warningBg = warningColor.withValues(
+      alpha: isDark ? 0.16 : 0.08,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: warningBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: warningColor.withValues(alpha: 0.4),
+          width: 1.2,
+        ),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: warningColor.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.pending_actions_rounded,
+                  color: warningColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Payment Received — Under Review',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.white
+                                  : Colors.grey.shade900,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: warningColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: warningColor.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            'PENDING REVIEW',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: warningColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _hasSubscription && _subscription != null
+                          ? 'Your subscription payment submission has been received and is awaiting SuperAdmin verification. Your current plan remains active while under review.'
+                          : 'Your subscription payment submission has been received and is awaiting SuperAdmin verification. Your subscription status will update once the review is complete.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: isDark
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: warningColor.withValues(alpha: 0.25)),
+          const SizedBox(height: 12),
+          _summaryRow('Plan', '$planName ($validityDays days)', colorScheme),
+          const SizedBox(height: 6),
+          _summaryRow(
+            'Amount submitted',
+            '₹${payable.toStringAsFixed(2)}${coins > 0 ? ' (+$coins coins applied)' : ''}',
+            colorScheme,
+          ),
+          const SizedBox(height: 6),
+          _summaryRow(
+            'Reference / UTR',
+            (transactionId != null && transactionId.isNotEmpty)
+                ? transactionId
+                : 'Not provided',
+            colorScheme,
+          ),
+          const SizedBox(height: 6),
+          _summaryRow('Submitted on', _formatDate(raisedAt), colorScheme),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  SubscriptionBillSummarySheet.show(
+                    context,
+                    Map<String, dynamic>.from(_pendingRequest!),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                label: const Text('View Bill Summary'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              if (screenshotUrl != null && screenshotUrl.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    PaymentProofViewer.show(
+                      context,
+                      imageUrl: screenshotUrl,
+                      title: 'Payment Proof',
+                      transactionId: transactionId,
+                      note: note,
+                    );
+                  },
+                  icon: const Icon(Icons.image_outlined, size: 16),
+                  label: const Text('View Payment Proof'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              IconButton(
+                onPressed: _fetchSubscription,
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'Check review status',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, ColorScheme colorScheme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDetailRow(String label, String value, ColorScheme colorScheme) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          label,
+          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+        ),
+        Text(
+          value,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
       ],
     );
   }
@@ -645,7 +1039,10 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                 },
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -692,8 +1089,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
           )
         else ...[
           // When collapsed show top 2 features, when expanded show all features
-          ...((_isPlanFeaturesExpanded ? included : included.take(2))
-              .map((f) => PlanFeatureItem(feature: f, isCompact: true))),
+          ...((_isPlanFeaturesExpanded ? included : included.take(2)).map(
+            (f) => PlanFeatureItem(feature: f, isCompact: true),
+          )),
         ],
         const SizedBox(height: 10),
         Container(
@@ -725,15 +1123,21 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   /// words about the transfer — if BookALook cannot find it, or the owner
   /// cannot remember what they wrote, the reference is the only thing either
   /// side can go on.
-  Widget _buildPaymentRequestCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildPaymentRequestCard(
+    dynamic item,
+    ColorScheme colorScheme,
+    ThemeData theme,
+  ) {
     final String status = (item['status'] ?? 'unknown').toString();
     final String? planName = item['plan_name']?.toString();
     final String? transactionId = item['transaction_id']?.toString();
     final String? note = item['note']?.toString();
     final String? screenshotUrl = item['screenshot_url']?.toString();
 
-    final double payable = double.tryParse((item['amount_payable_inr'] ?? 0).toString()) ?? 0;
-    final int coins = int.tryParse((item['coins_to_redeem'] ?? 0).toString()) ?? 0;
+    final double payable =
+        double.tryParse((item['amount_payable_inr'] ?? 0).toString()) ?? 0;
+    final int coins =
+        int.tryParse((item['coins_to_redeem'] ?? 0).toString()) ?? 0;
 
     Color statusColor;
     String statusLabel;
@@ -765,13 +1169,21 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    planName ?? item['billing_label']?.toString() ?? 'Plan payment',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    planName ??
+                        item['billing_label']?.toString() ??
+                        'Plan payment',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -779,38 +1191,86 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   ),
                   child: Text(
                     statusLabel,
-                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _paymentLine('Sent on', _formatDate(item['raised_at']), colorScheme),
-            _paymentLine('Amount paid', '₹${payable.toStringAsFixed(2)}', colorScheme),
+            _paymentLine(
+              'Sent on',
+              _formatDate(item['raised_at']),
+              colorScheme,
+            ),
+            _paymentLine(
+              'Amount paid',
+              '₹${payable.toStringAsFixed(2)}',
+              colorScheme,
+            ),
             if (coins > 0)
-              _paymentLine('Coins used', '$coins (₹ discount applied on approval)', colorScheme),
+              _paymentLine(
+                'Coins used',
+                '$coins (₹ discount applied on approval)',
+                colorScheme,
+              ),
             if (transactionId != null && transactionId.isNotEmpty)
               _paymentLine('Transaction ID', transactionId, colorScheme),
             if (note != null && note.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text('Note', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+              Text(
+                'Note',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 2),
               Text(note, style: TextStyle(fontSize: 14, height: 1.35)),
             ],
-            if (screenshotUrl != null && screenshotUrl.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _openExternal(screenshotUrl, 'Could not open the payment screenshot.'),
-                icon: const Icon(Icons.image_outlined, size: 18),
-                label: const Text('View screenshot'),
-              ),
-            ],
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    SubscriptionBillSummarySheet.show(
+                      context,
+                      Map<String, dynamic>.from(item),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                  label: const Text('View Bill Summary'),
+                ),
+                if (screenshotUrl != null && screenshotUrl.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      PaymentProofViewer.show(
+                        context,
+                        imageUrl: screenshotUrl,
+                        title: 'Payment Proof',
+                        transactionId: transactionId,
+                        note: note,
+                      );
+                    },
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text('View Payment Proof'),
+                  ),
+              ],
+            ),
             if (status == 'rejected')
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(
                   'Not accepted. This is usually because a newer payment replaced it.',
-                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
           ],
@@ -827,10 +1287,19 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
         children: [
           SizedBox(
             width: 120,
-            child: Text(label, style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),
@@ -845,18 +1314,31 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
   /// permissions.
   Future<void> _openExternal(String rawUrl, String failureMessage) async {
     final uri = Uri.tryParse(rawUrl.trim());
-    final allowed = uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
+    final allowed =
+        uri != null && (uri.scheme == 'https' || uri.scheme == 'http');
 
     // `allowed` being true is what proves uri is non-null, so no bang needed.
-    if (!allowed || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (!allowed ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(failureMessage)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text(failureMessage),
+        ),
+      );
     }
   }
 
-  Widget _buildHistoryCard(dynamic item, ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildHistoryCard(
+    dynamic item,
+    ColorScheme colorScheme,
+    ThemeData theme,
+  ) {
     final String status = item['status'] ?? 'unknown';
-    final String planName = item['plan'] != null ? item['plan']['name'] : 'Unknown';
+    final String planName = item['plan'] != null
+        ? item['plan']['name']
+        : 'Unknown';
     final String startDate = _formatDate(item['start_date']);
     final String endDate = _formatDate(item['end_date']);
 
@@ -886,10 +1368,16 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
               children: [
                 Text(
                   '$planName Plan',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -897,7 +1385,11 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
                   ),
                   child: Text(
                     status.toUpperCase(),
-                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -905,11 +1397,18 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 14, color: colorScheme.onSurfaceVariant),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   '$startDate to $endDate',
-                  style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

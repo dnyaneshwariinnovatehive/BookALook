@@ -16,11 +16,16 @@ class StaffManagementController extends Controller
 {
     public function index($salonId)
     {
-        // workingHours is loaded so the edit screen can show what is actually
-        // stored instead of falling back to defaults.
+        $salon = \App\Models\Salon::find($salonId);
+        $adminId = $salon?->admin_id;
+
         $staff = ServiceProvider::with(['user', 'services.template:id,name', 'workingHours'])
             ->where('salon_id', $salonId)
             ->get();
+
+        $staff->each(function ($provider) use ($adminId) {
+            $provider->is_admin_provider = ($adminId && $provider->user_id === $adminId);
+        });
 
         return response()->json(['staff' => $staff]);
     }
@@ -177,6 +182,14 @@ class StaffManagementController extends Controller
         try {
             DB::beginTransaction();
             $provider = ServiceProvider::where('salon_id', $salonId)->findOrFail($staffId);
+            $salon = \App\Models\Salon::find($salonId);
+
+            if ($salon && $provider->user_id === $salon->admin_id) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'The salon owner provider profile cannot be deleted as ordinary staff. Please use the "Also work as a service provider" toggle to deactivate it.',
+                ], 422);
+            }
             
             // Delete working hours
             ProviderWorkingHour::where('provider_id', $provider->id)->delete();

@@ -65,6 +65,7 @@ class PartnerSubscriptionController extends Controller
         $pendingRequest = SubscriptionPaymentRequest::with('plan')
             ->where('salon_id', $salonId)
             ->where('status', 'pending')
+            ->latest('created_at')
             ->first();
 
         // The requests this salon has made, newest first — including the ones
@@ -77,20 +78,12 @@ class PartnerSubscriptionController extends Controller
             ->orderByDesc('created_at')
             ->limit(50)
             ->get()
-            ->map(fn (SubscriptionPaymentRequest $pr) => [
-                'id' => $pr->id,
-                'plan_name' => $pr->plan?->name,
-                'billing_type' => BillingModel::normalise($pr->billing_type),
-                'billing_label' => BillingModel::label($pr->billing_type),
-                'status' => $pr->status,
-                'screenshot_url' => $pr->screenshot_url,
-                'transaction_id' => $pr->transaction_id,
-                'note' => $pr->note,
-                'coins_to_redeem' => (int) $pr->coins_to_redeem,
-                'coin_discount_inr' => (float) $pr->coin_discount_inr,
-                'amount_payable_inr' => (float) $pr->amount_payable_inr,
-                'raised_at' => $pr->created_at?->toIso8601String(),
-            ]);
+            ->map(fn (SubscriptionPaymentRequest $pr) => $this->formatPaymentRequest($pr));
+
+        $latestPaymentRequest = SubscriptionPaymentRequest::with('plan')
+            ->where('salon_id', $salonId)
+            ->latest('created_at')
+            ->first();
 
         $history = $salon->subscriptions()->with('plan')->orderBy('created_at', 'desc')->get();
 
@@ -111,7 +104,8 @@ class PartnerSubscriptionController extends Controller
                 : null,
             'days_remaining' => $daysRemaining,
             'warning_threshold_days' => $warningDays,
-            'pending_request' => $pendingRequest,
+            'pending_request' => $this->formatPaymentRequest($pendingRequest),
+            'latest_payment_request' => $this->formatPaymentRequest($latestPaymentRequest),
             'payment_requests' => $paymentRequests,
             'history' => $history
         ]);
@@ -356,13 +350,17 @@ class PartnerSubscriptionController extends Controller
             ? sprintf(' %d coins (₹%s) will come off when it is approved.', $coins, number_format($discount, 2))
             : '';
 
+        $paymentRequest->load('plan');
+        $formattedRequest = $this->formatPaymentRequest($paymentRequest);
+
         return response()->json([
             'success' => true,
             'message' => 'Payment screenshot uploaded successfully. Your subscription plan will be activated once verified by SuperAdmin.' . $note,
             'coins_to_redeem' => $coins,
             'coin_discount' => $discount,
             'amount_payable' => $payable,
-            'data' => $paymentRequest
+            'data' => $formattedRequest,
+            'payment_request' => $formattedRequest,
         ]);
     }
 
@@ -471,6 +469,53 @@ class PartnerSubscriptionController extends Controller
             'message' => 'Request sent. SuperAdmin will confirm your commission percentage and switch you over.',
             'data' => $commissionRequest,
         ]);
+    }
+
+    /**
+     * Format a SubscriptionPaymentRequest for API clients with full structured bill details.
+     */
+    private function formatPaymentRequest(?SubscriptionPaymentRequest $pr): ?array
+    {
+        if (! $pr) {
+            return null;
+        }
+
+        $planPrice = (float) ($pr->plan?->price ?? 0);
+        $amountPayable = (float) $pr->amount_payable_inr;
+        $coinDiscount = (float) $pr->coin_discount_inr;
+        // The historical price quoted at the time of the request is reconstructed from
+        // the sum of amount payable + coin discount, protecting against future plan price edits:
+        $historicalBasePrice = round($amountPayable + $coinDiscount, 2);
+        $basePrice = $historicalBasePrice > 0 ? $historicalBasePrice : $planPrice;
+
+        return [
+            'id' => $pr->id,
+            'salon_id' => $pr->salon_id,
+            'subscription_plan_id' => $pr->subscription_plan_id,
+            'plan_id' => $pr->subscription_plan_id,
+            'plan_name' => $pr->plan?->name,
+            'validity_days' => (int) ($pr->plan?->validity_days ?? 30),
+            'plan_price' => $basePrice,
+            'base_price' => $basePrice,
+            'billing_type' => BillingModel::normalise($pr->billing_type),
+            'billing_label' => BillingModel::label($pr->billing_type),
+            'status' => $pr->status,
+            'screenshot_url' => $pr->screenshot_url,
+            'transaction_id' => $pr->transaction_id,
+            'note' => $pr->note,
+            'coins_to_redeem' => (int) $pr->coins_to_redeem,
+            'coin_discount_inr' => $coinDiscount,
+            'amount_payable_inr' => $amountPayable,
+            'amount_submitted' => $amountPayable,
+            'created_at' => $pr->created_at?->toIso8601String(),
+            'raised_at' => $pr->created_at?->toIso8601String(),
+            'plan' => $pr->plan ? [
+                'id' => $pr->plan->id,
+                'name' => $pr->plan->name,
+                'price' => $basePrice,
+                'validity_days' => (int) $pr->plan->validity_days,
+            ] : null,
+        ];
     }
 
     /**

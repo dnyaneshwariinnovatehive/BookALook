@@ -52,6 +52,10 @@ class SalonAccess {
   final double walletValueInr;
   final DateTime? welcomeBonusGrantedAt;
 
+  final bool hasPendingRequest;
+  final Map<String, dynamic>? pendingRequest;
+  final Map<String, dynamic>? latestRejectedRequest;
+
   SalonAccess({
     required this.salonName,
     required this.isLocked,
@@ -65,6 +69,9 @@ class SalonAccess {
     this.walletCoins = 0,
     this.walletValueInr = 0,
     this.welcomeBonusGrantedAt,
+    this.hasPendingRequest = false,
+    this.pendingRequest,
+    this.latestRejectedRequest,
   });
 
   /// A plan that ran out, as opposed to a salon that was never approved.
@@ -75,6 +82,13 @@ class SalonAccess {
   /// it is standing at the start line, so the lock screen has to sell the
   /// first purchase rather than chase a renewal.
   bool get hasNeverSubscribed => reason == 'no_subscription';
+
+  /// A payment submission was received and is currently waiting on SuperAdmin review.
+  bool get isPendingApproval => hasPendingRequest && pendingRequest != null;
+
+  /// The most recent payment submission was rejected/not accepted.
+  bool get hasRejectedPayment =>
+      !hasPendingRequest && latestRejectedRequest != null;
 
   factory SalonAccess.fromJson(Map<String, dynamic> json) {
     final subscription = json['subscription'] as Map<String, dynamic>?;
@@ -92,9 +106,15 @@ class SalonAccess {
       adminPhone: admin?['phone'],
       walletCoins: (json['wallet_coins'] as num?)?.toInt() ?? 0,
       walletValueInr: (json['wallet_value_inr'] as num?)?.toDouble() ?? 0,
-      welcomeBonusGrantedAt: json['welcome_bonus_granted_at'] != null 
-          ? DateTime.tryParse(json['welcome_bonus_granted_at']) 
+      welcomeBonusGrantedAt: json['welcome_bonus_granted_at'] != null
+          ? DateTime.tryParse(json['welcome_bonus_granted_at'])
           : null,
+      hasPendingRequest:
+          json['has_pending_request'] == true ||
+          json['pending_request'] != null,
+      pendingRequest: json['pending_request'] as Map<String, dynamic>?,
+      latestRejectedRequest:
+          json['latest_rejected_request'] as Map<String, dynamic>?,
     );
   }
 

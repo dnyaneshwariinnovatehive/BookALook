@@ -52,7 +52,11 @@ class AppointmentController extends Controller
         }
 
         if ($request->has('provider_id') && !empty($request->provider_id) && $request->provider_id !== 'All') {
-            $query->where('appointed_provider_id', $request->provider_id);
+            $pId = $request->provider_id;
+            $query->where(function ($q) use ($pId) {
+                $q->where('appointed_provider_id', $pId)
+                  ->orWhere('serving_provider_id', $pId);
+            });
         }
 
         if ($request->has('status') && !empty($request->status) && $request->status !== 'All') {

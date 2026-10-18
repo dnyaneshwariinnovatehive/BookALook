@@ -18,6 +18,9 @@ import 'settings/salon_timings_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../services/salon_settings_api.dart';
 import '../../../services/insights_api.dart';
+import '../../../models/admin_provider_models.dart';
+import '../../../services/admin_provider_api.dart';
+import 'staff/admin_provider_config_sheet.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -55,6 +58,8 @@ class HomeTabState extends State<HomeTab> {
   Map<String, int> _providerLoads = {};
   bool _needsWorkingHours = false;
   SalonInsights? _insights;
+  AdminProviderStatus? _adminStatus;
+  int _myAppointmentsToday = 0;
 
   int _unreadNotifications = 0;
 
@@ -123,6 +128,11 @@ class HomeTabState extends State<HomeTab> {
         insights = await InsightsApi.fetch(widget.salonId);
       } catch (_) {}
 
+      AdminProviderStatus? adminStatus;
+      try {
+        adminStatus = await AdminProviderApi.getStatus(widget.salonId);
+      } catch (_) {}
+
       final appointments = responses[0] as List<dynamic>;
       final staff = responses[1] as List<StaffMember>;
       final leaves = responses[2] as List<ProviderLeave>;
@@ -132,6 +142,8 @@ class HomeTabState extends State<HomeTab> {
       if (!mounted) return;
 
       int apptsCount = 0;
+      int myApptsToday = 0;
+      final adminProviderId = adminStatus?.provider?.id;
       Map<String, int> providerLoads = {};
       
       // Calculate appointment stats
@@ -143,6 +155,9 @@ class HomeTabState extends State<HomeTab> {
           final pId = appt['appointed_provider_id']?.toString() ?? appt['serving_provider_id']?.toString();
           if (pId != null) {
             providerLoads[pId] = (providerLoads[pId] ?? 0) + 1;
+            if (adminStatus?.isProviderEnabled == true && pId == adminProviderId) {
+              myApptsToday++;
+            }
           }
         }
       }
@@ -193,6 +208,8 @@ class HomeTabState extends State<HomeTab> {
         _providerLoads = providerLoads;
         _needsWorkingHours = workingHoursResponse['is_default'] == true;
         _insights = insights;
+        _adminStatus = adminStatus;
+        _myAppointmentsToday = myApptsToday;
         _isLoading = false;
       });
 
@@ -414,10 +431,24 @@ class HomeTabState extends State<HomeTab> {
                          const SizedBox(height: 16),
                          _buildWorkingHoursPrompt(),
                        ],
+                       if (_adminStatus?.isProviderEnabled == true && !_needsWorkingHours) ...[
+                         if (!_adminStatus!.setupValidation.adminHoursConfigured) ...[
+                           const SizedBox(height: 16),
+                           _buildAdminHoursMissingPrompt(),
+                         ],
+                         if (!_adminStatus!.setupValidation.servicesAssigned) ...[
+                           const SizedBox(height: 16),
+                           _buildAdminServicesMissingPrompt(),
+                         ],
+                       ],
                        const SizedBox(height: 24),
                        _buildScanCard(),
                        const SizedBox(height: 24),
                        _buildTopStats(isDark),
+                       if (_adminStatus?.isProviderEnabled == true) ...[
+                         const SizedBox(height: 14),
+                         _buildMyAdminTodayCard(isDark),
+                       ],
                        if (_insights != null) ...[
                          const SizedBox(height: 24),
                          _buildBasicAnalytics(isDark),
@@ -628,6 +659,177 @@ class HomeTabState extends State<HomeTab> {
               child: const Text('Set Timings'),
             ),
           )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminHoursMissingPrompt() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED), // orange-50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFED7AA)), // orange-200
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.schedule, color: Color(0xFFEA580C)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Provider Working Hours Missing',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF9A3412)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Provider mode is enabled, but your personal working schedule is not configured. Customers cannot book you until your schedule is set.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF9A3412), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                AdminProviderConfigSheet.show(
+                  context,
+                  salonId: widget.salonId,
+                  initialStatus: _adminStatus,
+                ).then((_) => _fetchHomeData(silent: true));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('Configure Working Hours'),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminServicesMissingPrompt() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED), // orange-50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFED7AA)), // orange-200
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.design_services_outlined, color: Color(0xFFEA580C)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No Services Assigned',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF9A3412)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'You have not selected which salon services you personally perform. Assign services so clients can select you during checkout.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF9A3412), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                AdminProviderConfigSheet.show(
+                  context,
+                  salonId: widget.salonId,
+                  initialStatus: _adminStatus,
+                ).then((_) => _fetchHomeData(silent: true));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: const Text('Assign Services'),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMyAdminTodayCard(bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final headingColor = isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading;
+    final subColor = isDark ? AppTheme.darkTextBody : Colors.black54;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.accentColor.withOpacity(isDark ? 0.3 : 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.badge_outlined, color: AppTheme.accentColor, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'My Appointments Today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: headingColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Assigned to you personally as service provider',
+                  style: TextStyle(fontSize: 11, color: subColor),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$_myAppointmentsToday',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
         ],
       ),
     );

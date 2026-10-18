@@ -427,6 +427,8 @@ Route::prefix('partner')->group(function () {
         Route::delete('/salons/{salon_id}/closures/{closure_id}', [\App\Http\Controllers\Api\Partner\SalonClosureController::class, 'destroy']);
 
         // Staff Management
+        Route::get('/salons/{salon_id}/admin-provider', [\App\Http\Controllers\Api\Partner\AdminProviderController::class, 'status']);
+        Route::post('/salons/{salon_id}/admin-provider/toggle', [\App\Http\Controllers\Api\Partner\AdminProviderController::class, 'toggle']);
         Route::get('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'index']);
         Route::post('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'store']);
         Route::put('/salons/{salon_id}/staff/{staff_id}', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'update']);

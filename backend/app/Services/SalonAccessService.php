@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Salon;
 use App\Models\SalonSubscription;
+use App\Models\SubscriptionPaymentRequest;
 use App\Models\WalletTransaction;
 use App\Support\BillingModel;
 use Carbon\Carbon;
@@ -126,6 +127,54 @@ class SalonAccessService
             ->where('type', WalletTransaction::TYPE_WELCOME_BONUS)
             ->first();
 
+        $pendingRequest = SubscriptionPaymentRequest::with('plan')
+            ->where('salon_id', $salon->id)
+            ->where('status', 'pending')
+            ->latest('created_at')
+            ->first();
+
+        $latestRejected = null;
+        if (! $pendingRequest) {
+            $latestRejected = SubscriptionPaymentRequest::with('plan')
+                ->where('salon_id', $salon->id)
+                ->where('status', 'rejected')
+                ->latest('created_at')
+                ->first();
+        }
+
+        $formatRequestSummary = function (?SubscriptionPaymentRequest $pr) {
+            if (! $pr) {
+                return null;
+            }
+            $amount = (float) $pr->amount_payable_inr;
+            $discount = (float) $pr->coin_discount_inr;
+            $basePrice = round($amount + $discount, 2) ?: (float) ($pr->plan?->price ?? 0);
+
+            return [
+                'id' => $pr->id,
+                'status' => $pr->status,
+                'plan_name' => $pr->plan?->name,
+                'validity_days' => (int) ($pr->plan?->validity_days ?? 30),
+                'plan_price' => $basePrice,
+                'base_price' => $basePrice,
+                'coins_to_redeem' => (int) $pr->coins_to_redeem,
+                'coin_discount_inr' => $discount,
+                'amount_payable_inr' => $amount,
+                'amount_submitted' => $amount,
+                'transaction_id' => $pr->transaction_id,
+                'note' => $pr->note,
+                'screenshot_url' => $pr->screenshot_url,
+                'created_at' => $pr->created_at?->toIso8601String(),
+                'raised_at' => $pr->created_at?->toIso8601String(),
+                'plan' => $pr->plan ? [
+                    'id' => $pr->plan->id,
+                    'name' => $pr->plan->name,
+                    'price' => $basePrice,
+                    'validity_days' => (int) $pr->plan->validity_days,
+                ] : null,
+            ];
+        };
+
         return [
             'wallet_coins' => $coins,
             'wallet_value_inr' => round($coins * $wallet->coinValue(), 2),
@@ -133,6 +182,9 @@ class SalonAccessService
             'salon_id' => $salon->id,
             'salon_name' => $salon->name,
             'is_locked' => ! $status['is_active'],
+            'has_pending_request' => $pendingRequest !== null,
+            'pending_request' => $formatRequestSummary($pendingRequest),
+            'latest_rejected_request' => $formatRequestSummary($latestRejected),
             'reason' => $status['reason'],
             'expired_on' => $status['expired_on'],
             'days_remaining' => $status['days_remaining'],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
@@ -7,17 +8,19 @@ class PartnerAppointmentService {
   // Must match the rest of the app — see ApiConfig.
   String get baseUrl => ApiConfig.baseUrl;
 
-  Future<List<dynamic>> getAppointments(String salonId, {String? date}) async {
+  Future<List<dynamic>> getAppointments(String salonId, {String? date, String? providerId}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     
-    String url = '$baseUrl/partner/salons/$salonId/appointments';
-    if (date != null) {
-      url += '?date=$date';
-    }
+    final queryParams = <String, String>{};
+    if (date != null && date.isNotEmpty) queryParams['date'] = date;
+    if (providerId != null && providerId.isNotEmpty) queryParams['provider_id'] = providerId;
+
+    final uri = Uri.parse('$baseUrl/partner/salons/$salonId/appointments')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
     final response = await http.get(
-      Uri.parse(url),
+      uri,
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
@@ -30,7 +33,7 @@ class PartnerAppointmentService {
       prefs.remove('auth_token');
       throw Exception('Session expired. Please log in again.');
     } else {
-      print('Failed to load appointments: ${response.statusCode} - ${response.body}');
+      debugPrint('Failed to load appointments: ${response.statusCode} - ${response.body}');
       throw Exception('Failed to load appointments');
     }
   }

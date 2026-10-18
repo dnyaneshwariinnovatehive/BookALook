@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import 'dashboard/more/upgrade_plan_screen.dart';
 import 'phone_screen.dart';
 import '../services/push_notification_service.dart';
+import '../widgets/subscription/subscription_bill_summary_sheet.dart';
+import '../widgets/subscription/payment_proof_viewer.dart';
 
 /// Shown in place of the whole app when the salon has no usable plan.
 ///
@@ -37,7 +39,10 @@ class SubscriptionLockedScreen extends StatelessWidget {
 
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('No phone number on file for the salon owner.')),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text('No phone number on file for the salon owner.'),
+        ),
       );
       return;
     }
@@ -47,7 +52,10 @@ class SubscriptionLockedScreen extends StatelessWidget {
     if (!await launchUrl(uri)) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not start a call. The number is $phone.')),
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text('Could not start a call. The number is $phone.'),
+        ),
       );
     }
   }
@@ -88,7 +96,9 @@ class SubscriptionLockedScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _isWelcome ? Icons.celebration_outlined : Icons.lock_outline,
+                    _isWelcome
+                        ? Icons.celebration_outlined
+                        : Icons.lock_outline,
                     size: 44,
                     color: _accent,
                   ),
@@ -98,7 +108,10 @@ class SubscriptionLockedScreen extends StatelessWidget {
                 Text(
                   _title,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 10),
 
@@ -106,25 +119,43 @@ class SubscriptionLockedScreen extends StatelessWidget {
                   _message,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
-                      fontSize: 14.5, height: 1.5, color: Colors.grey.shade700),
+                    fontSize: 14.5,
+                    height: 1.5,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
 
-                if (access.canRenew && access.hasCoins) ...[
+                if (access.isPendingApproval &&
+                    access.pendingRequest != null) ...[
+                  const SizedBox(height: 20),
+                  _buildPendingCard(context),
+                ],
+
+                if (access.canRenew &&
+                    access.hasCoins &&
+                    !access.isPendingApproval) ...[
                   const SizedBox(height: 20),
                   _buildCoinsCard(),
                 ],
 
-                const SizedBox(height: 24),
-                _buildImpactCard(),
+                if (!access.isPendingApproval) ...[
+                  const SizedBox(height: 24),
+                  _buildImpactCard(),
+                ],
                 const SizedBox(height: 28),
 
-                if (access.canRenew) ..._ownerActions(context) else ..._staffActions(context),
+                if (access.canRenew)
+                  ..._ownerActions(context)
+                else
+                  ..._staffActions(context),
 
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () => _logout(context),
-                  child: Text('Log out',
-                      style: GoogleFonts.outfit(color: Colors.grey.shade600)),
+                  child: Text(
+                    'Log out',
+                    style: GoogleFonts.outfit(color: Colors.grey.shade600),
+                  ),
                 ),
               ],
             ),
@@ -136,12 +167,20 @@ class SubscriptionLockedScreen extends StatelessWidget {
 
   /// The salon has just been approved and is picking its very first plan, so
   /// the screen greets rather than warns.
-  bool get _isWelcome => access.hasNeverSubscribed;
+  bool get _isWelcome =>
+      access.hasNeverSubscribed &&
+      !access.isPendingApproval &&
+      !access.hasRejectedPayment;
 
-  Color get _accent =>
-      _isWelcome ? AppTheme.accentColor : AppTheme.lightWarning;
+  Color get _accent {
+    if (access.isPendingApproval) return AppTheme.lightWarning;
+    if (access.hasRejectedPayment) return Colors.red.shade600;
+    return _isWelcome ? AppTheme.accentColor : AppTheme.lightWarning;
+  }
 
   String get _title {
+    if (access.isPendingApproval) return 'Payment Received — Under Review';
+    if (access.hasRejectedPayment) return 'Payment Not Accepted';
     if (!access.canRenew) return 'This salon is offline';
 
     return _isWelcome ? 'Choose your plan' : 'Your plan has ended';
@@ -150,6 +189,16 @@ class SubscriptionLockedScreen extends StatelessWidget {
   String get _message => access.canRenew ? _ownerMessage() : _staffMessage();
 
   String _ownerMessage() {
+    if (access.isPendingApproval) {
+      final planName =
+          access.pendingRequest?['plan_name']?.toString() ?? 'your plan';
+      return 'We received your payment submission for $planName. SuperAdmin is reviewing your transfer proof. Your subscription will activate as soon as it is approved.';
+    }
+    if (access.hasRejectedPayment) {
+      final planName =
+          access.latestRejectedRequest?['plan_name']?.toString() ?? 'your plan';
+      return 'Your previous payment submission for $planName was not accepted. Please review and choose a plan to submit a new transfer.';
+    }
     if (_isWelcome) {
       return '${access.salonName} is approved and ready to go. Pick a plan to '
           'put it in front of customers, open bookings and unlock the app for '
@@ -164,6 +213,13 @@ class SubscriptionLockedScreen extends StatelessWidget {
   }
 
   String _staffMessage() {
+    if (access.isPendingApproval) {
+      return 'A subscription payment for ${access.salonName} is currently under SuperAdmin review. The app will unlock as soon as the review is complete.';
+    }
+    if (access.hasRejectedPayment) {
+      final owner = access.adminName ?? 'the salon owner';
+      return 'The subscription payment for ${access.salonName} was not accepted. Only $owner can resubmit a plan payment.';
+    }
     final owner = access.adminName ?? 'the salon owner';
 
     if (_isWelcome) {
@@ -181,115 +237,276 @@ class SubscriptionLockedScreen extends StatelessWidget {
   /// cold is being asked to start paying, while an owner who reads "you already
   /// have ₹2300 towards it" is being asked to finish something.
   Widget _buildCoinsCard() => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppTheme.lightSuccessBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.lightSuccess.withValues(alpha: 0.35)),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppTheme.lightSuccessBg,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppTheme.lightSuccess.withValues(alpha: 0.35)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppTheme.lightSuccess.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.savings_outlined,
+            size: 21,
+            color: AppTheme.lightSuccess,
+          ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.lightSuccess.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${access.walletCoins} coins ready to spend',
+                style: GoogleFonts.outfit(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.lightSuccess,
+                ),
               ),
-              child: const Icon(Icons.savings_outlined,
-                  size: 21, color: AppTheme.lightSuccess),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${access.walletCoins} coins ready to spend',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.lightSuccess),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _isWelcome
-                        ? 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your first plan.'
-                        : 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your renewal.',
-                    style: GoogleFonts.outfit(
-                        fontSize: 12.5, height: 1.35, color: AppTheme.lightTextBody),
-                  ),
-                ],
+              const SizedBox(height: 2),
+              Text(
+                _isWelcome
+                    ? 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your first plan.'
+                    : 'Worth ₹${access.walletValueInr.toStringAsFixed(0)} off your renewal.',
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppTheme.lightTextBody,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _buildImpactCard() => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          children: _isWelcome
-              ? [
-                  _impactRow(Icons.storefront_outlined,
-                      'The salon goes live for customers to find and book'),
-                  const SizedBox(height: 10),
-                  _impactRow(Icons.groups_outlined,
-                      'The whole team gets into the app'),
-                  const SizedBox(height: 10),
-                  _impactRow(Icons.point_of_sale_outlined,
-                      'Check-ins, walk-ins and billing all open up'),
-                ]
-              : [
-                  _impactRow(Icons.visibility_off_outlined,
-                      'Customers cannot find or book this salon'),
-                  const SizedBox(height: 10),
-                  _impactRow(
-                      Icons.block, 'Check-ins, walk-ins and billing are closed'),
-                  const SizedBox(height: 10),
-                  _impactRow(Icons.history_toggle_off,
-                      'Nothing is lost — your data is waiting when you renew'),
-                ],
-        ),
-      );
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      children: _isWelcome
+          ? [
+              _impactRow(
+                Icons.storefront_outlined,
+                'The salon goes live for customers to find and book',
+              ),
+              const SizedBox(height: 10),
+              _impactRow(
+                Icons.groups_outlined,
+                'The whole team gets into the app',
+              ),
+              const SizedBox(height: 10),
+              _impactRow(
+                Icons.point_of_sale_outlined,
+                'Check-ins, walk-ins and billing all open up',
+              ),
+            ]
+          : [
+              _impactRow(
+                Icons.visibility_off_outlined,
+                'Customers cannot find or book this salon',
+              ),
+              const SizedBox(height: 10),
+              _impactRow(
+                Icons.block,
+                'Check-ins, walk-ins and billing are closed',
+              ),
+              const SizedBox(height: 10),
+              _impactRow(
+                Icons.history_toggle_off,
+                'Nothing is lost — your data is waiting when you renew',
+              ),
+            ],
+    ),
+  );
 
   Widget _impactRow(IconData icon, String text) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 18, color: Colors.grey.shade500),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade700),
+        ),
+      ),
+    ],
+  );
+
+  Widget _buildPendingCard(BuildContext context) {
+    final req = access.pendingRequest!;
+    final planName = req['plan_name']?.toString() ?? 'Subscription Plan';
+    final payable =
+        double.tryParse(
+          (req['amount_payable_inr'] ?? req['amount_submitted'] ?? 0)
+              .toString(),
+        ) ??
+        0.0;
+    final transactionId = req['transaction_id']?.toString();
+    final screenshotUrl = req['screenshot_url']?.toString();
+    final note = req['note']?.toString();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.lightWarningBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.lightWarning.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: Colors.grey.shade500),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade700)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  planName,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.lightWarning.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'UNDER REVIEW',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.lightWarning,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Amount submitted',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              Text(
+                '₹${payable.toStringAsFixed(2)}',
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          if (transactionId != null && transactionId.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Reference / UTR',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                Text(
+                  transactionId,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    SubscriptionBillSummarySheet.show(context, req);
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                  label: const Text('Bill Summary'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              if (screenshotUrl != null && screenshotUrl.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      PaymentProofViewer.show(
+                        context,
+                        imageUrl: screenshotUrl,
+                        title: 'Payment Proof',
+                        transactionId: transactionId,
+                        note: note,
+                      );
+                    },
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text('Proof'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
-      );
+      ),
+    );
+  }
 
-  List<Widget> _ownerActions(BuildContext context) => [
+  List<Widget> _ownerActions(BuildContext context) {
+    if (access.isPendingApproval) {
+      return [
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () async {
-              // A renewal is the only thing that can unlock the app, so come
-              // straight back and re-check when they return.
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UpgradePlanScreen(
-                    salonId: _salonIdFrom(context),
-                    isFirstPlan: _isWelcome,
-                  ),
-                ),
-              );
-              await onRecheck();
-            },
-            icon: Icon(_isWelcome ? Icons.workspace_premium_outlined : Icons.autorenew),
-            label: Text(_isWelcome ? 'Choose a plan' : 'Renew now',
-                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
+            onPressed: onRecheck,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(
+              'Check Review Status',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor,
               foregroundColor: Colors.white,
@@ -301,47 +518,120 @@ class SubscriptionLockedScreen extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: onRecheck,
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-            child: Text(_isWelcome
-                ? 'I have paid — check again'
-                : 'I have renewed — check again'),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UpgradePlanScreen(
+                    salonId: _salonIdFrom(context),
+                    isFirstPlan: _isWelcome,
+                  ),
+                ),
+              );
+              await onRecheck();
+            },
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text('Re-submit or Change Plan'),
           ),
         ),
       ];
+    }
+
+    return [
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () async {
+            // A renewal is the only thing that can unlock the app, so come
+            // straight back and re-check when they return.
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UpgradePlanScreen(
+                  salonId: _salonIdFrom(context),
+                  isFirstPlan: _isWelcome,
+                ),
+              ),
+            );
+            await onRecheck();
+          },
+          icon: Icon(
+            _isWelcome ? Icons.workspace_premium_outlined : Icons.autorenew,
+          ),
+          label: Text(
+            access.hasRejectedPayment
+                ? 'Choose a plan & re-submit'
+                : (_isWelcome ? 'Choose a plan' : 'Renew now'),
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.accentColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: onRecheck,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          child: Text(
+            _isWelcome
+                ? 'I have paid — check again'
+                : 'I have renewed — check again',
+          ),
+        ),
+      ),
+    ];
+  }
 
   List<Widget> _staffActions(BuildContext context) => [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _callAdmin(context),
-            icon: const Icon(Icons.call),
-            label: Text(
-              access.adminName != null ? 'Call ${access.adminName}' : 'Call the owner',
-              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
+    SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => _callAdmin(context),
+        icon: const Icon(Icons.call),
+        label: Text(
+          access.adminName != null
+              ? 'Call ${access.adminName}'
+              : 'Call the owner',
+          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
         ),
-        if (access.adminPhone != null) ...[
-          const SizedBox(height: 8),
-          Text(access.adminPhone!,
-              style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade600)),
-        ],
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: onRecheck,
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-            child: const Text('Check again'),
-          ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green.shade700,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
-      ];
+      ),
+    ),
+    if (access.adminPhone != null) ...[
+      const SizedBox(height: 8),
+      Text(
+        access.adminPhone!,
+        style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey.shade600),
+      ),
+    ],
+    const SizedBox(height: 10),
+    SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onRecheck,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        child: const Text('Check again'),
+      ),
+    ),
+  ];
 
   /// The screen is only ever built with a salon in scope; the id travels on the
   /// inherited widget below so both dashboards can reuse this screen.
@@ -364,5 +654,6 @@ class LockedSalonScope extends InheritedWidget {
       context.dependOnInheritedWidgetOfExactType<LockedSalonScope>();
 
   @override
-  bool updateShouldNotify(LockedSalonScope oldWidget) => oldWidget.salonId != salonId;
+  bool updateShouldNotify(LockedSalonScope oldWidget) =>
+      oldWidget.salonId != salonId;
 }
