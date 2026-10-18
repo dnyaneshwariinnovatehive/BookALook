@@ -8,14 +8,14 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_skeleton.dart';
+import '../../collaborator/onboard_salon_screen.dart';
 
 /// Where a collaborator starts their day.
 ///
 /// Answers one question in the first screenful: what needs doing. Assignments
 /// waiting, drafts half typed, salons about to go dark — each with a tap that
-/// leads straight to it. "Onboard New Salon" does not open a blank form: a
-/// collaborator can only build a salon someone enquired about and SuperAdmin
-/// then assigned to them, so the button leads to the worklist.
+/// leads straight to it. Collaborators can onboard salons directly or complete
+/// assignments handed to them by SuperAdmin.
 class CollaboratorHomeTab extends StatefulWidget {
   /// Takes the collaborator to the Assigned tab, the only entry into onboarding.
   final VoidCallback onGoToAssigned;
@@ -113,6 +113,23 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     }
   }
 
+  /// Replaces the state with test values, for widget tests.
+  @visibleForTesting
+  void seedForTest({
+    Map<String, dynamic>? profile,
+    List<dynamic> alerts = const [],
+    int assignedCount = 0,
+  }) {
+    setState(() {
+      _profile = profile;
+      _alerts = alerts;
+      _assignedCount = assignedCount;
+      _loading = false;
+      _firstLoad = false;
+      _fetchedAt = DateTime.now();
+    });
+  }
+
   Map<String, dynamic> get _stats =>
       Map<String, dynamic>.from(_profile?['stats'] as Map? ?? {});
 
@@ -172,8 +189,7 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
           _buildPrimaryAction(),
           const SizedBox(height: 10),
           const Text(
-            'Salons reach you through the website enquiry form. SuperAdmin assigns '
-            'one to you and it appears under Assigned.',
+            'Onboard new salons directly on site and submit for SuperAdmin approval, or complete assignments from Assigned.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, height: 1.45),
           ),
@@ -524,45 +540,113 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
 
   Widget _buildWorkGrid() {
     if (_loading) {
-      return SkeletonRow(
-        children: const [
-          SkeletonBox(height: 92, radius: 14),
-          SkeletonBox(height: 92, radius: 14),
-          SkeletonBox(height: 92, radius: 14),
+      return const Column(
+        children: [
+          SkeletonRow(
+            children: [
+              SkeletonBox(height: 92, radius: 14),
+              SkeletonBox(height: 92, radius: 14),
+              SkeletonBox(height: 92, radius: 14),
+            ],
+          ),
+          SizedBox(height: 12),
+          SkeletonRow(
+            children: [
+              SkeletonBox(height: 92, radius: 14),
+              SkeletonBox(height: 92, radius: 14),
+            ],
+          ),
         ],
       );
     }
 
-    return Row(
+    final palette = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _tile(
-            value: '$_assignedCount',
-            label: 'To onboard',
-            icon: Icons.assignment_outlined,
-            colour: AppTheme.accentColor,
-            onTap: widget.onGoToAssigned,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'My Onboarded Salons',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: widget.onGoToMySalons,
+              child: const Text(
+                'View all',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.accentColor,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _tile(
-            value: '${_store.pendingCount}',
-            label: 'Drafts on this phone',
-            icon: Icons.edit_note_outlined,
-            colour: context.colors.info,
-            onTap: widget.onGoToAssigned,
-          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _tile(
+                value: '${_stats['pending'] ?? 0}',
+                label: 'Pending',
+                icon: Icons.hourglass_top_rounded,
+                colour: palette.warning,
+                onTap: widget.onGoToMySalons,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _tile(
+                value: '${_stats['approved'] ?? 0}',
+                label: 'Approved',
+                icon: Icons.verified_outlined,
+                colour: palette.success,
+                onTap: widget.onGoToMySalons,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _tile(
+                value: '${_stats['rejected'] ?? 0}',
+                label: 'Rejected',
+                icon: Icons.highlight_off_rounded,
+                colour: palette.danger,
+                onTap: widget.onGoToMySalons,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _tile(
-            value: '${_stats['approved'] ?? 0}',
-            label: 'Live salons',
-            icon: Icons.verified_outlined,
-            colour: context.colors.success,
-            onTap: widget.onGoToMySalons,
-          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _tile(
+                value: '$_assignedCount',
+                label: 'Assigned to onboard',
+                icon: Icons.assignment_outlined,
+                colour: AppTheme.accentColor,
+                onTap: widget.onGoToAssigned,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _tile(
+                value: '${_store.pendingCount}',
+                label: 'Drafts on device',
+                icon: Icons.edit_note_outlined,
+                colour: palette.info,
+                onTap: widget.onGoToAssigned,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -660,10 +744,23 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
     );
   }
 
+  Future<void> _onboardNewSalon() async {
+    final submitted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const OnboardSalonScreen(),
+      ),
+    );
+    await reload();
+    if (submitted == true && mounted) {
+      widget.onGoToMySalons();
+    }
+  }
+
   Widget _buildPrimaryAction() => SizedBox(
     width: double.infinity,
     child: ElevatedButton.icon(
-      onPressed: widget.onGoToAssigned,
+      onPressed: _onboardNewSalon,
       icon: const Icon(Icons.add_business),
       label: const Text(
         'Onboard New Salon',
@@ -686,21 +783,21 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
   /// single tappable row and opens on demand.
   Widget _buildHowItWorks() {
     const steps = <(String, String)>[
-      ('1', 'SuperAdmin assigns you a salon that filled in the enquiry form.'),
+      (
+        '1',
+        'Onboard a salon directly on site, or pick up an enquiry SuperAdmin assigned to you.',
+      ),
       (
         '2',
-        'You visit it and build the profile — photos, hours, and services '
-            'if the owner wants them priced now.',
+        'Build the profile — cover photo, address, hours, and optional services.',
       ),
       (
         '3',
-        'Submit for approval. No signal needed: it sends itself when you '
-            'have one.',
+        'Submit for approval. Works offline: it submits when you are back online.',
       ),
       (
         '4',
-        'You can keep editing until SuperAdmin approves it. After that the '
-            "salon is the owner's.",
+        'SuperAdmin reviews your submission. Once approved, the salon becomes live.',
       ),
     ];
 

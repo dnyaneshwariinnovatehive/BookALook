@@ -102,6 +102,45 @@ class SalonOnboardingService
     }
 
     /**
+     * Submit a salon onboarded directly by a collaborator without an enquiry.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  UploadedFile[]  $photos
+     * @return array{salon: Salon, created: bool, resubmitted: bool}
+     */
+    public function onboardDirect(User $collaborator, array $payload, array $photos = [], ?Salon $existingSalon = null): array
+    {
+        return DB::transaction(function () use ($collaborator, $payload, $photos, $existingSalon) {
+            $existing = null;
+            if ($existingSalon) {
+                $existing = Salon::lockForUpdate()->findOrFail($existingSalon->id);
+
+                if (! in_array($existing->status, self::EDITABLE_STATUSES, true)) {
+                    return ['salon' => $existing->load('city:id,name,state'), 'created' => false, 'resubmitted' => false];
+                }
+            }
+
+            $owner = $this->resolveOwner(null, $payload);
+
+            $salon = $existing
+                ? $this->reviseSalon($existing, $owner, $payload)
+                : $this->createSalonDirect($collaborator, $owner, $payload);
+
+            $this->writeWorkingHours($salon, $payload['working_hours'] ?? []);
+            if (array_key_exists('services', $payload)) {
+                $this->writeServices($salon, $payload['services'] ?? [], true);
+            }
+            $this->storePhotos($salon, $collaborator, $photos, (int) ($payload['cover_index'] ?? 0));
+
+            return [
+                'salon' => $salon->fresh()->load('city:id,name,state'),
+                'created' => ! $existing,
+                'resubmitted' => (bool) $existing,
+            ];
+        });
+    }
+
+    /**
      * The owner's account.
      *
      * Partner sign-in is a phone and an OTP, so the phone is the identity and
@@ -109,9 +148,9 @@ class SalonOnboardingService
      * — a collaborator onboarding their second salon must not be handed a
      * duplicate user.
      */
-    private function resolveOwner(SalonEnquiry $enquiry, array $payload): User
+    private function resolveOwner(?SalonEnquiry $enquiry, array $payload): User
     {
-        $phone = $payload['owner_phone'] ?? $enquiry->phone;
+        $phone = $payload['owner_phone'] ?? $enquiry?->phone;
         $existing = User::where('phone', $phone)->first();
 
         if ($existing) {
@@ -126,7 +165,7 @@ class SalonOnboardingService
 
         return User::create([
             'role' => 'admin',
-            'name' => $payload['owner_name'] ?? $enquiry->owner_name,
+            'name' => $payload['owner_name'] ?? $enquiry?->owner_name,
             'phone' => $phone,
             'email' => $payload['owner_email'] ?? null,
             // Never used to sign in; present because the column demands it.
@@ -140,6 +179,21 @@ class SalonOnboardingService
             'admin_id' => $owner->id,
             'slug' => $this->uniqueSlug($payload['salon_name']),
             'enquiry_id' => $enquiry->id,
+            'submitted_by' => $collaborator->id,
+            'assigned_collaborator_id' => $collaborator->id,
+            'status' => 'pending_approval',
+            'advance_required' => true,
+            'advance_refundable' => false,
+            'advance_percentage_default' => 25.00,
+        ]);
+    }
+
+    private function createSalonDirect(User $collaborator, User $owner, array $payload): Salon
+    {
+        return Salon::create($this->salonAttributes($payload) + [
+            'admin_id' => $owner->id,
+            'slug' => $this->uniqueSlug($payload['salon_name']),
+            'enquiry_id' => null,
             'submitted_by' => $collaborator->id,
             'assigned_collaborator_id' => $collaborator->id,
             'status' => 'pending_approval',

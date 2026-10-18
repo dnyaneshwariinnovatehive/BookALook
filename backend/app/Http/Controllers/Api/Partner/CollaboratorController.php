@@ -100,6 +100,10 @@ class CollaboratorController extends Controller
             ->where('assigned_collaborator_id', $user->id)
             // Salons this collaborator onboarded themselves live under My
             // Salons; this list is only the ones handed over ready-made.
+            ->where(function ($q) use ($user) {
+                $q->whereNull('submitted_by')
+                  ->orWhere('submitted_by', '!=', $user->id);
+            })
             ->whereNull('enquiry_id')
             ->whereIn('status', ['active', 'pending_approval', 'suspended'])
             ->orderByDesc('updated_at')
@@ -162,8 +166,13 @@ class CollaboratorController extends Controller
             'latestSubscription.plan:id,name',
         ])
             ->withCount('services')
-            ->where('assigned_collaborator_id', $user->id)
-            ->whereNotNull('enquiry_id')
+            ->where(function ($q) use ($user) {
+                $q->where('submitted_by', $user->id)
+                  ->orWhere(function ($q2) use ($user) {
+                      $q2->where('assigned_collaborator_id', $user->id)
+                         ->whereNotNull('enquiry_id');
+                  });
+            })
             ->orderByDesc('created_at')
             ->get()
             ->map(function (Salon $salon) {
@@ -230,8 +239,13 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $byStatus = Salon::where('assigned_collaborator_id', $user->id)
-            ->whereNotNull('enquiry_id')
+        $byStatus = Salon::where(function ($q) use ($user) {
+            $q->where('submitted_by', $user->id)
+              ->orWhere(function ($q2) use ($user) {
+                  $q2->where('assigned_collaborator_id', $user->id)
+                     ->whereNotNull('enquiry_id');
+              });
+        })
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -318,7 +332,10 @@ class CollaboratorController extends Controller
         // Every salon in this collaborator's care, however it got there — one
         // they onboarded, or one SuperAdmin handed them from the directory.
         $salons = Salon::with(['admin:id,name,phone', 'city:id,name'])
-            ->where('assigned_collaborator_id', $user->id)
+            ->where(function ($q) use ($user) {
+                $q->where('submitted_by', $user->id)
+                  ->orWhere('assigned_collaborator_id', $user->id);
+            })
             ->where('status', 'active')
             ->get();
 
@@ -401,7 +418,10 @@ class CollaboratorController extends Controller
         }
 
         $salon = Salon::with(['admin:id,name,phone,email', 'workingHours', 'media', 'services.template.category'])
-            ->where('assigned_collaborator_id', $user->id)
+            ->where(function ($q) use ($user) {
+                $q->where('submitted_by', $user->id)
+                  ->orWhere('assigned_collaborator_id', $user->id);
+            })
             ->find($salonId);
 
         if (! $salon) {
@@ -489,7 +509,10 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+        $salonIds = Salon::where(function ($q) use ($user) {
+            $q->where('submitted_by', $user->id)
+              ->orWhere('assigned_collaborator_id', $user->id);
+        })->pluck('id');
 
         $notifications = Notification::with('salon:id,name')
             ->where('user_id', $user->id)
@@ -523,7 +546,10 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+        $salonIds = Salon::where(function ($q) use ($user) {
+            $q->where('submitted_by', $user->id)
+              ->orWhere('assigned_collaborator_id', $user->id);
+        })->pluck('id');
 
         Notification::where('user_id', $user->id)
             ->whereIn('related_salon_id', $salonIds)
@@ -543,7 +569,10 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $salonIds = Salon::where('assigned_collaborator_id', $user->id)->pluck('id');
+        $salonIds = Salon::where(function ($q) use ($user) {
+            $q->where('submitted_by', $user->id)
+              ->orWhere('assigned_collaborator_id', $user->id);
+        })->pluck('id');
 
         $updated = Notification::where('user_id', $user->id)
             ->whereIn('related_salon_id', $salonIds)
@@ -669,12 +698,75 @@ class CollaboratorController extends Controller
     }
 
     /**
+     * Submit a directly onboarded salon for SuperAdmin approval.
+     */
+    public function onboardDirect(Request $request)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $existingSalon = null;
+        if ($request->filled('salon_id')) {
+            $existingSalon = Salon::where(function ($q) use ($user) {
+                $q->where('submitted_by', $user->id)
+                  ->orWhere('assigned_collaborator_id', $user->id);
+            })->find($request->input('salon_id'));
+
+            if (! $existingSalon) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You did not onboard this salon.',
+                ], 403);
+            }
+
+            if (! in_array($existingSalon->status, ['pending_approval', 'rejected', 'needs_correction'], true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This salon is already approved and can no longer be edited.',
+                ], 403);
+            }
+        }
+
+        $data = $this->validateSubmission($request, null, $existingSalon);
+
+        try {
+            $result = $this->onboarding->onboardDirect(
+                $user,
+                $data,
+                $request->file('photos') ?? [],
+                $existingSalon
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        if (! $result['created'] && ! $result['resubmitted']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This salon is already approved and can no longer be edited.',
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['created']
+                ? 'Salon submitted for SuperAdmin approval.'
+                : 'Changes saved. The salon is with SuperAdmin for approval.',
+            'already_submitted' => false,
+            'data' => $result['salon'],
+        ], $result['created'] ? 201 : 200);
+    }
+
+    /**
      * The profile is compulsory; the menu is not. Hours and services arrive as
      * JSON strings because the request is multipart — it is carrying photos.
      *
      * @return array<string, mixed>
      */
-    private function validateSubmission(Request $request, ?SalonEnquiry $enquiry = null): array
+    private function validateSubmission(Request $request, ?SalonEnquiry $enquiry = null, ?Salon $existingSalon = null): array
     {
         $toMerge = [];
         if ($request->has('working_hours')) {
@@ -744,11 +836,11 @@ class CollaboratorController extends Controller
             'cover_index' => 'nullable|integer|min:0',
         ]);
 
-        $validator->after(function ($validator) use ($request, $enquiry) {
-            $existingSalon = $enquiry?->salon;
+        $validator->after(function ($validator) use ($request, $enquiry, $existingSalon) {
+            $existing = $existingSalon ?? $enquiry?->salon;
             $uploadedPhotos = $request->file('photos', []);
             if (empty($uploadedPhotos)) {
-                if (! $existingSalon || empty($existingSalon->cover_photo_url)) {
+                if (! $existing || empty($existing->cover_photo_url)) {
                     $validator->errors()->add('cover_photo', 'A main cover photo is mandatory for salon onboarding.');
                 }
             }
@@ -781,7 +873,7 @@ class CollaboratorController extends Controller
                         // Verify custom template authorization: collaborators cannot pick a custom template belonging to another salon
                         $template = $templates->get($templateId);
                         if ($template && $template->is_custom) {
-                            if (! $existingSalon || $template->created_by_salon_id !== $existingSalon->id) {
+                            if (! $existing || $template->created_by_salon_id !== $existing->id) {
                                 $validator->errors()->add("services.{$index}.template_id", 'Unauthorized service template selection.');
                             }
                         }

@@ -22,16 +22,16 @@ import 'service_picker_sheet.dart';
 /// a connection, and even that one degrades: a finished draft that cannot be
 /// sent is queued and goes on its own once the phone finds a network.
 class OnboardSalonScreen extends StatefulWidget {
-  /// The assignment. A collaborator cannot onboard a salon nobody enquired
-  /// about, so this is always present.
-  final Map<String, dynamic> enquiry;
+  /// The assignment. When onboarding an enquiry, this holds the enquiry details.
+  /// When onboarding a new salon directly, this is null.
+  final Map<String, dynamic>? enquiry;
 
   /// Set when reopening a salon that has already been submitted — a correction
   /// SuperAdmin asked for, or a tidy-up while it waits in the queue. The form
   /// fills itself from the salon rather than from the enquiry.
   final String? editingSalonId;
 
-  const OnboardSalonScreen({super.key, required this.enquiry, this.editingSalonId});
+  const OnboardSalonScreen({super.key, this.enquiry, this.editingSalonId});
 
   @override
   State<OnboardSalonScreen> createState() => _OnboardSalonScreenState();

@@ -82,6 +82,7 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Start a draft for an assignment, or reopen the one already on the device.
+  /// Start a draft for an assignment, or reopen the one already on the device.
   ///
   /// A correction is the interesting case: the device threw its draft away when
   /// the submission succeeded, so the salon on the server is the only copy of
@@ -89,11 +90,15 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
   /// collaborator edits rather than retypes. If that fetch fails they still get
   /// a usable form seeded from the enquiry.
   Future<OnboardingDraft> open(
-    Map<String, dynamic> enquiry, {
+    Map<String, dynamic>? enquiry, {
     /// Pull the salon back down and edit that instead of starting fresh. Used
     /// for a correction and for editing a salon still queued for approval.
     String? prefillSalonId,
   }) async {
+    if (enquiry == null || enquiry['id'] == null) {
+      return openDirect(prefillSalonId: prefillSalonId ?? enquiry?['salon_id']?.toString());
+    }
+
     await load();
 
     final id = enquiry['id'].toString();
@@ -112,6 +117,41 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
     _drafts[id] = draft;
     await save(draft);
 
+    return draft;
+  }
+
+  /// Start a direct draft without an enquiry assignment, or reopen an unsubmitted direct draft.
+  Future<OnboardingDraft> openDirect({String? prefillSalonId}) async {
+    await load();
+
+    if (prefillSalonId != null && prefillSalonId.isNotEmpty) {
+      final directKey = 'direct_$prefillSalonId';
+      final existing = _drafts[directKey] ??
+          _drafts.values.cast<OnboardingDraft?>().firstWhere(
+                (d) => d?.editingSalonId == prefillSalonId && !d!.submitted,
+                orElse: () => null,
+              );
+      if (existing != null && !existing.submitted) return existing;
+
+      final draft = OnboardingDraft.direct(salonId: prefillSalonId);
+      final submitted = await CollaboratorApi.submittedSalon(prefillSalonId);
+      if (submitted != null) draft.restoreFrom(submitted);
+
+      _drafts[draft.enquiryId] = draft;
+      await save(draft);
+      return draft;
+    }
+
+    // Fresh direct onboarding: resume any in-progress unsubmitted direct draft
+    final unsubmittedDirect = _drafts.values.cast<OnboardingDraft?>().firstWhere(
+          (d) => d != null && d.isDirect && d.editingSalonId == null && !d.submitted,
+          orElse: () => null,
+        );
+    if (unsubmittedDirect != null) return unsubmittedDirect;
+
+    final draft = OnboardingDraft.direct();
+    _drafts[draft.enquiryId] = draft;
+    await save(draft);
     return draft;
   }
 

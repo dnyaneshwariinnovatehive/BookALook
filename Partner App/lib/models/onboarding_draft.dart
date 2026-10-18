@@ -9,9 +9,14 @@
 /// than the camera's temp folder, because a temp file is gone by the time the
 /// signal comes back.
 class OnboardingDraft {
-  /// The assignment this draft belongs to. A collaborator may only onboard a
-  /// salon SuperAdmin assigned them, so a draft without one cannot exist.
+  /// The assignment this draft belongs to. If this is a direct onboarding without
+  /// an enquiry, this contains a direct identifier e.g. `direct_<timestamp>` or `direct_<salonId>`.
   final String enquiryId;
+
+  /// Optional: set if editing an existing submitted salon.
+  String? editingSalonId;
+
+  bool get isDirect => enquiryId.startsWith('direct') || enquiryId.isEmpty;
 
   // Owner — prefilled from the enquiry, correctable on site.
   String ownerName;
@@ -71,6 +76,7 @@ class OnboardingDraft {
 
   OnboardingDraft({
     required this.enquiryId,
+    this.editingSalonId,
     this.ownerName = '',
     this.ownerPhone = '',
     this.ownerEmail = '',
@@ -107,10 +113,22 @@ class OnboardingDraft {
   factory OnboardingDraft.fromEnquiry(Map<String, dynamic> enquiry) {
     return OnboardingDraft(
       enquiryId: enquiry['id'].toString(),
+      editingSalonId: enquiry['salon_id']?.toString(),
       ownerName: enquiry['owner_name']?.toString() ?? '',
       ownerPhone: enquiry['phone']?.toString() ?? '',
       salonName: enquiry['salon_name']?.toString() ?? '',
       cityLabel: enquiry['city']?.toString() ?? '',
+    );
+  }
+
+  /// A fresh direct onboarding draft without an enquiry.
+  factory OnboardingDraft.direct({String? salonId}) {
+    final id = salonId != null && salonId.isNotEmpty
+        ? 'direct_$salonId'
+        : 'direct_${DateTime.now().millisecondsSinceEpoch}';
+    return OnboardingDraft(
+      enquiryId: id,
+      editingSalonId: salonId,
     );
   }
 
@@ -138,6 +156,9 @@ class OnboardingDraft {
     preferredPlanId = salon['preferred_plan_id']?.toString() ?? preferredPlanId;
     preferredCommercialModel = salon['preferred_commercial_model']?.toString() ?? preferredCommercialModel;
     requestedCommissionPercentage = (salon['requested_commission_percentage'] as num?)?.toDouble() ?? requestedCommissionPercentage;
+    if (salon['id'] != null) {
+      editingSalonId = salon['id']?.toString();
+    }
 
     final hours = salon['working_hours'] as List?;
     if (hours != null && hours.isNotEmpty) {
@@ -235,6 +256,7 @@ class OnboardingDraft {
 
   Map<String, dynamic> toJson() => {
         'enquiry_id': enquiryId,
+        'editing_salon_id': editingSalonId,
         'owner_name': ownerName,
         'owner_phone': ownerPhone,
         'owner_email': ownerEmail,
@@ -265,6 +287,7 @@ class OnboardingDraft {
 
   factory OnboardingDraft.fromJson(Map<String, dynamic> json) => OnboardingDraft(
         enquiryId: json['enquiry_id'].toString(),
+        editingSalonId: json['editing_salon_id']?.toString(),
         ownerName: json['owner_name'] ?? '',
         ownerPhone: json['owner_phone'] ?? '',
         ownerEmail: json['owner_email'] ?? '',
@@ -300,6 +323,7 @@ class OnboardingDraft {
   /// The fields the submit endpoint expects, photos excluded — those travel as
   /// files alongside.
   Map<String, String> toFormFields() => {
+        if (editingSalonId != null && editingSalonId!.isNotEmpty) 'salon_id': editingSalonId!,
         if (ownerName.trim().isNotEmpty) 'owner_name': ownerName.trim(),
         if (ownerPhone.trim().isNotEmpty) 'owner_phone': ownerPhone.trim(),
         if (ownerEmail.trim().isNotEmpty) 'owner_email': ownerEmail.trim(),

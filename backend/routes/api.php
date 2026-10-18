@@ -382,7 +382,9 @@ Route::prefix('partner')->group(function () {
         // What a rejected salon already holds, so a correction is an edit and
         // not a retype.
         Route::get('/collaborator/salons/{salonId}/submission', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'submittedSalon']);
-        // The assignment is the only way to onboard a salon, so the enquiry id
+        // Direct salon onboarding by collaborator (without enquiry)
+        Route::post('/collaborator/onboard', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'onboardDirect']);
+        // The assignment is the enquiry way to onboard a salon, where the enquiry id
         // is part of the address rather than something the body claims.
         Route::post('/collaborator/enquiries/{enquiryId}/onboard', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'onboard']);
     });

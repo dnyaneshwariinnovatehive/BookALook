@@ -142,19 +142,21 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
       : _salons.where((s) => (s as Map)['status'] == status).length;
 
   Future<void> _edit(Map<String, dynamic> salon) async {
-    // The onboarding form is built around an assignment, so it is handed the
-    // enquiry this salon came from plus the salon to fill itself from.
+    // The onboarding form can be for an assigned enquiry or direct onboarding.
+    // If direct (enquiry_id is null), pass enquiry: null and editingSalonId.
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => OnboardSalonScreen(
-          enquiry: {
-            'id': salon['enquiry_id'],
-            'salon_name': salon['name'],
-            'owner_name': salon['owner_name'],
-            'phone': salon['owner_phone'],
-            'city': salon['city'],
-          },
+          enquiry: salon['enquiry_id'] != null
+              ? {
+                  'id': salon['enquiry_id'],
+                  'salon_name': salon['name'],
+                  'owner_name': salon['owner_name'],
+                  'phone': salon['owner_phone'],
+                  'city': salon['city'],
+                }
+              : null,
           editingSalonId: salon['id']?.toString(),
         ),
       ),
@@ -676,8 +678,16 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
       body:
           'Salons you onboard show up here with their approval status, so you '
           'always know which ones went live.',
-      actionLabel: 'Check again',
-      onAction: _fetch,
+      actionLabel: 'Onboard New Salon',
+      onAction: () async {
+        final saved = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const OnboardSalonScreen(),
+          ),
+        );
+        if (saved == true) await _fetch();
+      },
       secondaryLabel: assignedHint ? 'Go to Assigned' : null,
       onSecondary: widget.onGoToAssigned,
     );

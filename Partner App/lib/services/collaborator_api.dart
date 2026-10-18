@@ -165,9 +165,12 @@ class CollaboratorApi {
   /// (no signal, server down) throws normally and the caller keeps the draft
   /// queued.
   static Future<Map<String, dynamic>> submit(OnboardingDraft draft) async {
+    final endpoint = draft.isDirect
+        ? '$_baseUrl/onboard'
+        : '$_baseUrl/enquiries/${draft.enquiryId}/onboard';
     final request = http.MultipartRequest(
       'POST',
-      Uri.parse('$_baseUrl/enquiries/${draft.enquiryId}/onboard'),
+      Uri.parse(endpoint),
     )..headers.addAll(await _headers());
 
     request.fields.addAll(draft.toFormFields());
