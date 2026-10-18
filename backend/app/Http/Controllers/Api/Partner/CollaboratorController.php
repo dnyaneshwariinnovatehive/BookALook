@@ -51,16 +51,16 @@ class CollaboratorController extends Controller
             ->orderBy('assigned_at', 'desc')
             ->get()
             ->map(function (SalonEnquiry $enquiry) {
-                // A rejected salon puts its enquiry back on this list. The app
-                // needs to tell that apart from a fresh assignment, or the
-                // collaborator would retype a profile that already exists.
-                $rejected = $enquiry->salon && $enquiry->salon->status === 'rejected';
+                // A rejected or correction-requested salon puts its enquiry back on this list.
+                // The app needs to tell that apart from a fresh assignment.
+                $needsCorrection = $enquiry->salon && in_array($enquiry->salon->status, ['rejected', 'needs_correction'], true);
+                $reason = $needsCorrection ? ($enquiry->salon->correction_notes ?: $enquiry->salon->rejection_reason) : null;
 
                 return $enquiry->only([
                     'id', 'salon_name', 'owner_name', 'phone', 'city', 'message', 'assigned_at',
                 ]) + [
-                    'needs_correction' => $rejected,
-                    'rejection_reason' => $rejected ? $enquiry->salon->rejection_reason : null,
+                    'needs_correction' => $needsCorrection,
+                    'rejection_reason' => $reason,
                     'salon_id' => $enquiry->salon?->id,
                 ];
             });
@@ -181,7 +181,8 @@ class CollaboratorController extends Controller
                     'id' => $salon->id,
                     'name' => $salon->name,
                     'status' => $salon->status,
-                    'rejection_reason' => $salon->rejection_reason,
+                    'rejection_reason' => $salon->correction_notes ?: $salon->rejection_reason,
+                    'correction_notes' => $salon->correction_notes,
                     'cover_photo_url' => $salon->cover_photo_url,
                     'address' => $salon->address,
                     'city' => $salon->city?->name,
@@ -204,7 +205,7 @@ class CollaboratorController extends Controller
                     'needs_plan' => $subscription === null && ! $lapsed,
                     // Editable right up to approval, and never again after it. Once
                     // a salon is live it belongs to its owner.
-                    'can_edit' => in_array($salon->status, ['pending_approval', 'rejected'], true),
+                    'can_edit' => in_array($salon->status, ['pending_approval', 'rejected', 'needs_correction'], true),
                 ];
             });
 
@@ -426,6 +427,13 @@ class CollaboratorController extends Controller
                 'owner_name' => $salon->admin?->name,
                 'owner_phone' => $salon->admin?->phone,
                 'owner_email' => $salon->admin?->email,
+                'preferred_plan_id' => $salon->preferred_plan_id,
+                'preferred_commercial_model' => $salon->preferred_commercial_model ?? 'subscription',
+                'requested_commission_percentage' => $salon->requested_commission_percentage === null ? null : (float) $salon->requested_commission_percentage,
+                'cover_photo_url' => $salon->cover_photo_url,
+                'status' => $salon->status,
+                'rejection_reason' => $salon->rejection_reason,
+                'correction_notes' => $salon->correction_notes,
                 'working_hours' => $salon->workingHours->map(fn ($hour) => [
                     'day_of_week' => (int) $hour->day_of_week,
                     'is_closed' => (bool) $hour->is_closed,
@@ -720,10 +728,25 @@ class CollaboratorController extends Controller
             'services.*.custom_template_name' => 'required_without:services.*.template_id|nullable|string|max:150',
             'services.*.estimated_duration_minutes' => 'required_without:services.*.template_id|nullable|integer|min:15',
 
+            // Commercial Model & Plan Preferences
+            'preferred_plan_id' => 'nullable|uuid|exists:subscription_plans,id',
+            'preferred_commercial_model' => 'nullable|in:subscription,commission',
+            'requested_commission_percentage' => 'nullable|required_if:preferred_commercial_model,commission|numeric|min:0|max:100',
+
             'photos' => 'array|max:10',
             'photos.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
             'cover_index' => 'nullable|integer|min:0',
         ]);
+
+        $existingSalon = $enquiry->salon;
+        $uploadedPhotos = $request->file('photos', []);
+        if (empty($uploadedPhotos)) {
+            if (! $existingSalon || empty($existingSalon->cover_photo_url)) {
+                throw ValidationException::withMessages([
+                    'cover_photo' => 'A main cover photo is mandatory for salon onboarding.',
+                ]);
+            }
+        }
 
         $this->assertOpeningHoursMakeSense($data['working_hours'] ?? []);
         $this->assertSalonEverOpens($data['working_hours'] ?? []);

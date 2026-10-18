@@ -26,6 +26,14 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
   // Form Data
   final Map<String, dynamic> _formData = {};
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialData != null) {
+      _formData.addAll(widget.initialData!);
+    }
+  }
+
   void _nextStep(Map<String, dynamic> stepData) {
     _formData.addAll(stepData);
     if (_currentStep < 2) {

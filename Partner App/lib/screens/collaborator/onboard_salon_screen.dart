@@ -60,6 +60,8 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
   final _salonPhone = TextEditingController();
   final _address = TextEditingController();
   final _pincode = TextEditingController();
+  final _commissionController = TextEditingController();
+  List<dynamic> _subscriptionPlans = [];
 
   Timer? _autosave;
 
@@ -82,14 +84,25 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     _salonPhone.text = draft.salonPhone;
     _address.text = draft.address;
     _pincode.text = draft.pincode;
+    if (draft.requestedCommissionPercentage != null) {
+      _commissionController.text = draft.requestedCommissionPercentage.toString();
+    }
 
     if (mounted) setState(() => _draft = draft);
 
-    final cities = await ApiService.fetchCities();
+    final results = await Future.wait([
+      ApiService.fetchCities(),
+      ApiService.getSubscriptionPlans(),
+    ]);
+
     if (!mounted) return;
+
+    final cities = results[0];
+    final plans = results[1];
 
     setState(() {
       _cities = cities;
+      _subscriptionPlans = plans;
       _states = cities
           .map((c) => c['state']?.toString().trim() ?? '')
           .where((s) => s.isNotEmpty)
@@ -146,6 +159,9 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
       ..address = _address.text
       ..pincode = _pincode.text;
 
+    final parsedCommission = double.tryParse(_commissionController.text.trim());
+    draft.requestedCommissionPercentage = parsedCommission;
+
     await _store.save(draft);
     if (mounted) setState(() {});
   }
@@ -156,7 +172,17 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     // Whatever is on screen when they walk away is what they come back to.
     unawaited(_persist());
     _pageController.dispose();
-    for (final c in [_ownerName, _ownerPhone, _ownerEmail, _salonName, _description, _salonPhone, _address, _pincode]) {
+    for (final c in [
+      _ownerName,
+      _ownerPhone,
+      _ownerEmail,
+      _salonName,
+      _description,
+      _salonPhone,
+      _address,
+      _pincode,
+      _commissionController
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -466,6 +492,57 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
           _label('Owner email', optional: true),
           _field(_ownerEmail, 'Leave blank if they do not have one', Icons.alternate_email,
               keyboard: TextInputType.emailAddress),
+
+          const SizedBox(height: 28),
+          _sectionTitle('Commercial preferences'),
+          const Text(
+            'Select the preferred commercial model. SuperAdmin sets the authoritative commission rate during review.',
+            style: TextStyle(fontSize: 12, height: 1.4, color: AppTheme.lightTextBody),
+          ),
+          const SizedBox(height: 14),
+          _label('Commercial model', required: true),
+          Row(
+            children: [
+              Expanded(child: _commercialModelToggle('subscription', 'Subscription Plan')),
+              const SizedBox(width: 8),
+              Expanded(child: _commercialModelToggle('commission', 'Commission Model')),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _label('Preferred subscription plan', optional: true),
+          _dropdown<String>(
+            value: _draft!.preferredPlanId,
+            hint: 'Not sure yet',
+            icon: Icons.card_membership_outlined,
+            items: [
+              const DropdownMenuItem<String>(value: null, child: Text('Not sure yet')),
+              ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
+                    value: p['id'].toString(),
+                    child: Text('${p['name']} (₹${p['price']} / ${p['duration_days']}d)'),
+                  )),
+            ],
+            onChanged: (val) {
+              setState(() => _draft!.preferredPlanId = val);
+              _persist();
+            },
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Registration preference only. The salon confirms and purchases their actual plan after approval.',
+            style: TextStyle(fontSize: 11.5, height: 1.35, color: AppTheme.lightTextBody),
+          ),
+          if (_draft!.preferredCommercialModel == 'commission') ...[
+            const SizedBox(height: 14),
+            _label('Requested commission rate (%)', required: true),
+            _field(_commissionController, 'e.g. 15.0', Icons.percent,
+                keyboard: const TextInputType.numberWithOptions(decimal: true),
+                requiredAs: 'Requested commission rate (0-100%)'),
+            const SizedBox(height: 6),
+            const Text(
+              'Requested percentage. SuperAdmin reviews and finalizes the approved commission rate.',
+              style: TextStyle(fontSize: 11.5, height: 1.35, color: AppTheme.lightTextBody),
+            ),
+          ],
           const SizedBox(height: 20),
         ],
       );
@@ -1074,7 +1151,11 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
           _reviewRow(Icons.spa_outlined,
               '${draft.services.length} ${draft.services.length == 1 ? 'service' : 'services'}'),
           _reviewRow(Icons.photo_library_outlined,
-              '${draft.photoPaths.length} ${draft.photoPaths.length == 1 ? 'photo' : 'photos'}'),
+              '${draft.photoPaths.length} ${draft.photoPaths.length == 1 ? 'photo' : 'photos'} (Cover set)'),
+          _reviewRow(Icons.account_balance_wallet_outlined,
+              draft.preferredCommercialModel == 'commission'
+                  ? 'Commercial: Commission Model (${draft.requestedCommissionPercentage ?? 0}%)'
+                  : 'Commercial: Subscription Plan'),
           if (missing.isNotEmpty) ...[
             const SizedBox(height: 10),
             Row(
@@ -1256,6 +1337,34 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
               fontWeight: selected ? FontWeight.bold : FontWeight.normal,
               color: selected ? AppTheme.accentColor : AppTheme.lightTextBody,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _commercialModelToggle(String value, String label) {
+    final selected = _draft!.preferredCommercialModel == value;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _draft!.preferredCommercialModel = value);
+        _persist();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.lightAccentSoft : Colors.white,
+          border: Border.all(color: selected ? AppTheme.accentColor : AppTheme.lightBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            color: selected ? AppTheme.accentColor : AppTheme.lightTextBody,
           ),
         ),
       ),

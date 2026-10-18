@@ -26,8 +26,13 @@ class SalonApprovalController extends Controller
             'direction' => 'nullable|in:asc,desc',
         ]);
 
-        $query = Salon::with(['admin', 'city'])
-            ->where('status', 'pending_approval');
+        $status = $request->input('status');
+        $query = Salon::with(['admin', 'city', 'preferredPlan']);
+        if ($status) {
+            $query->where('status', $status);
+        } else {
+            $query->whereIn('status', ['pending_approval', 'needs_correction']);
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -74,7 +79,16 @@ class SalonApprovalController extends Controller
      */
     public function show($id)
     {
-        $salon = Salon::with(['admin', 'city'])->findOrFail($id);
+        $salon = Salon::with([
+            'admin',
+            'city',
+            'subArea',
+            'media',
+            'workingHours',
+            'services.template.category',
+            'assignedCollaborator',
+            'preferredPlan',
+        ])->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -85,18 +99,41 @@ class SalonApprovalController extends Controller
     /**
      * Approve the salon.
      */
-    public function approve($id, WalletService $wallet)
+    public function approve(Request $request, $id, WalletService $wallet)
     {
         $salon = Salon::findOrFail($id);
         $previousStatus = $salon->status;
 
+        $targetModel = $request->input('commercial_model', $salon->preferred_commercial_model ?? 'subscription');
+        $isCommission = ($targetModel === 'commission');
+
+        if ($isCommission) {
+            $request->validate([
+                'commission_percentage' => 'required|numeric|min:0|max:100',
+            ]);
+        }
+
         // Generate a dummy QR code URL for now (e.g. using qrserver API)
         $dummyQrCodeUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=salon_' . $salon->id;
 
-        $salon->update([
+        $updateData = [
             'status' => 'active',
             'qr_code_url' => $dummyQrCodeUrl,
-        ]);
+            'approved_at' => now(),
+            'approved_by' => $request->user()?->id,
+            'rejection_reason' => null,
+            'correction_notes' => null,
+        ];
+
+        if ($isCommission) {
+            $updateData['commission_opt_in'] = true;
+            $updateData['commission_percentage'] = $request->input('commission_percentage');
+            $updateData['commission_rate_effective_from'] = now()->toDateString();
+        } else {
+            $updateData['commission_opt_in'] = false;
+        }
+
+        $salon->update($updateData);
 
         // The owner's next screen asks them to buy a plan, so the coins that
         // help pay for it have to be in the wallet before they get there.
@@ -109,7 +146,11 @@ class SalonApprovalController extends Controller
             label: $salon->name,
             before: ['status' => $previousStatus],
             after: ['status' => 'active'],
-            metadata: $bonus['granted'] > 0 ? ['welcome_coins_granted' => $bonus['granted']] : [],
+            metadata: array_filter([
+                'welcome_coins_granted' => $bonus['granted'] > 0 ? $bonus['granted'] : null,
+                'commission_percentage' => $isCommission ? $request->input('commission_percentage') : null,
+                'commercial_model' => $targetModel,
+            ]),
         );
 
         $message = 'Salon approved successfully. QR Code generated.';
@@ -123,7 +164,48 @@ class SalonApprovalController extends Controller
             'message' => $message,
             'welcome_bonus_coins' => $bonus['granted'],
             'wallet_balance' => $bonus['balance'],
-            'data' => $salon
+            'data' => $salon->fresh()->load([
+                'admin', 'city', 'subArea', 'media', 'workingHours', 'services.template.category', 'assignedCollaborator', 'preferredPlan',
+            ]),
+        ]);
+    }
+
+    /**
+     * Request corrections on a salon registration.
+     */
+    public function requestCorrections(Request $request, $id)
+    {
+        $request->validate([
+            'correction_notes' => 'required|string|max:1000',
+        ]);
+
+        $salon = Salon::findOrFail($id);
+        $previousStatus = $salon->status;
+
+        $salon->update([
+            'status' => 'needs_correction',
+            'correction_notes' => $request->correction_notes,
+            'rejection_reason' => $request->correction_notes,
+            'correction_requested_at' => now(),
+        ]);
+
+        AuditLogger::record(
+            action: 'salon.correction_requested',
+            entity: $salon,
+            label: $salon->name,
+            before: ['status' => $previousStatus],
+            after: ['status' => 'needs_correction'],
+            metadata: ['notes' => $request->correction_notes],
+        );
+
+        if ($salon->enquiry_id) {
+            $salon->enquiry()->update(['status' => 'assigned']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Salon returned for corrections.',
+            'data' => $salon,
         ]);
     }
 
@@ -141,7 +223,8 @@ class SalonApprovalController extends Controller
 
         $salon->update([
             'status' => 'rejected',
-            'rejection_reason' => $request->rejection_reason
+            'rejection_reason' => $request->rejection_reason,
+            'correction_notes' => null,
         ]);
 
         AuditLogger::record(

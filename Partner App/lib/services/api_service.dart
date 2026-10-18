@@ -33,6 +33,21 @@ class ApiService {
     return response;
   }
 
+  static Future<List<dynamic>> getSubscriptionPlans() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/public/subscription-plans'));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) return decoded;
+        if (decoded is Map && decoded['data'] is List) return decoded['data'];
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching subscription plans: $e');
+      return [];
+    }
+  }
+
   static Future<Map<String, dynamic>> registerSalon(Map<String, dynamic> data) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -67,10 +82,10 @@ class ApiService {
         final response = await http.Response.fromStream(streamedResponse);
         final decoded = jsonDecode(response.body);
 
-        if (response.statusCode == 201) {
+        if (response.statusCode == 201 || response.statusCode == 200) {
           return {'success': true, 'message': decoded['message'], 'data': decoded};
         } else {
-          return {'success': false, 'message': decoded['message'] ?? 'Unknown error occurred'};
+          return {'success': false, 'message': decoded['message'] ?? 'Registration failed', 'errors': decoded['errors']};
         }
       } else {
         final headers = {
@@ -90,10 +105,10 @@ class ApiService {
 
         final decoded = jsonDecode(response.body);
 
-        if (response.statusCode == 201) {
+        if (response.statusCode == 201 || response.statusCode == 200) {
           return {'success': true, 'message': decoded['message'], 'data': decoded};
         } else {
-          return {'success': false, 'message': decoded['message'] ?? 'Unknown error occurred'};
+          return {'success': false, 'message': decoded['message'] ?? 'Registration failed', 'errors': decoded['errors']};
         }
       }
     } catch (e) {

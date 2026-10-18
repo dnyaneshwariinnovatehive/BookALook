@@ -8,7 +8,9 @@ import styles from './page.module.css';
 interface Salon {
   id: string;
   name: string;
+  status?: string;
   created_at: string;
+  resubmitted_at?: string;
   city?: { name: string };
   admin?: { name: string };
 }
@@ -531,7 +533,14 @@ export default function SalonApprovalQueue() {
               ) : (
                 salons.map((salon) => (
                   <tr key={salon.id} className={styles.tr}>
-                    <td className={`${styles.td} ${styles.salonName}`}>{salon.name}</td>
+                    <td className={`${styles.td} ${styles.salonName}`}>
+                      {salon.name}
+                      {salon.status === 'needs_correction' && (
+                        <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', borderRadius: 9999, background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', fontWeight: 600 }}>
+                          Needs Correction
+                        </span>
+                      )}
+                    </td>
                     <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
                     <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
                     <td className={styles.td}>{formatDateTime(salon.created_at)}</td>

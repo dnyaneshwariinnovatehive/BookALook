@@ -41,7 +41,7 @@ class SalonOnboardingService
      * and a collaborator editing a live salon's prices from the field is not
      * something the platform should allow.
      */
-    private const EDITABLE_STATUSES = ['pending_approval', 'rejected'];
+    private const EDITABLE_STATUSES = ['pending_approval', 'rejected', 'needs_correction'];
 
     /**
      * @param  array<string, mixed>  $payload
@@ -161,6 +161,8 @@ class SalonOnboardingService
             'admin_id' => $owner->id,
             'status' => 'pending_approval',
             'rejection_reason' => null,
+            'correction_notes' => null,
+            'resubmitted_at' => now(),
         ]);
 
         return $salon;
@@ -170,6 +172,10 @@ class SalonOnboardingService
     private function salonAttributes(array $payload): array
     {
         $hasPin = isset($payload['latitude'], $payload['longitude']);
+        $preferredModel = $payload['preferred_commercial_model'] ?? 'subscription';
+        $requestedComm = ($preferredModel === 'commission' && isset($payload['requested_commission_percentage']))
+            ? $payload['requested_commission_percentage']
+            : null;
 
         return [
             'name' => $payload['salon_name'],
@@ -187,6 +193,9 @@ class SalonOnboardingService
             // A collaborator pins the salon from inside it, which is the same
             // quality of answer as the owner doing it.
             'location_source' => $hasPin ? 'owner' : null,
+            'preferred_plan_id' => $payload['preferred_plan_id'] ?? null,
+            'preferred_commercial_model' => $preferredModel,
+            'requested_commission_percentage' => $requestedComm,
         ];
     }
 

@@ -19,6 +19,9 @@ class SalonRegistrationController extends Controller
         $isExistingAdmin = auth('sanctum')->check();
         
         $request->validate([
+            // Editing existing salon application
+            'salon_id' => 'nullable|uuid|exists:salons,id',
+
             // Owner Account Details
             'full_name' => $isExistingAdmin ? 'nullable' : 'required|string|max:150',
             'email' => $isExistingAdmin ? 'nullable' : 'required|email|max:150',
@@ -45,11 +48,17 @@ class SalonRegistrationController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'gender_focus' => 'nullable|string', // Appended to description
 
-            // Photos (Optional during self-registration)
+            // Commercial Model & Plan Preferences
+            'preferred_plan_id' => 'nullable|uuid|exists:subscription_plans,id',
+            'preferred_commercial_model' => 'nullable|in:subscription,commission',
+            'requested_commission_percentage' => 'nullable|required_if:preferred_commercial_model,commission|numeric|min:0|max:100',
+
+            // Photos (Mandatory main cover photo required)
             'photos' => 'nullable|array|max:10',
             'photos.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'cover_index' => 'nullable|integer|min:0',
+            'cover_photo_index' => 'nullable|integer|min:0',
         ]);
 
         try {
@@ -89,37 +98,7 @@ class SalonRegistrationController extends Controller
             $fullAddress = $request->street_address;
             $fullDescription = $request->description ?? '';
 
-            // 3. Generate unique slug for Salon
-            $slug = Str::slug($request->salon_name);
-            if (Salon::where('slug', $slug)->exists()) {
-                $slug = $slug . '-' . uniqid();
-            }
-
-            // 4. Create the Salon
-            $salon = Salon::create([
-                'admin_id' => $adminUser->id,
-                'name' => $request->salon_name,
-                'slug' => $slug,
-                'description' => trim($fullDescription),
-                'city_id' => $request->city_id,
-                'sub_area_id' => $request->sub_area_id,
-                'address' => $fullAddress,
-                'pincode' => $request->pincode,
-                'latitude' => $request->latitude,
-                'longitude' => $request->longitude,
-                // Only the owner standing in their own salon can claim 'owner'.
-                'location_source' => $request->filled(['latitude', 'longitude'])
-                    ? 'owner'
-                    : null,
-                'status' => 'pending_approval',
-                'submitted_by' => $adminUser->id,
-                'advance_required' => true,
-                'advance_refundable' => false,
-                'advance_percentage_default' => 25.00,
-                'gender_focus' => $request->gender_focus ?? 'Unisex',
-            ]);
-
-            // 5. Store Photos if provided
+            // 3. Resolve Photos & Mandatory Cover Photo
             $uploadedPhotos = [];
             if ($request->hasFile('photos')) {
                 $uploadedPhotos = $request->file('photos');
@@ -127,10 +106,92 @@ class SalonRegistrationController extends Controller
                 $uploadedPhotos = [$request->file('cover_image')];
             }
 
-            $coverIndex = (int) ($request->input('cover_index') ?? 0);
-            $coverUrl = null;
+            $coverIndex = (int) ($request->input('cover_index') ?? $request->input('cover_photo_index') ?? 0);
+            if (!empty($uploadedPhotos) && $coverIndex >= count($uploadedPhotos)) {
+                $coverIndex = 0;
+            }
 
+            // 4. Create or Revise Salon
+            $preferredModel = $request->input('preferred_commercial_model', 'subscription');
+            $requestedComm = ($preferredModel === 'commission') ? $request->input('requested_commission_percentage') : null;
+
+            if ($request->filled('salon_id')) {
+                $salon = Salon::where('id', $request->salon_id)
+                    ->where('admin_id', $adminUser->id)
+                    ->first();
+
+                if (! $salon) {
+                    throw ValidationException::withMessages(['salon_id' => 'Salon not found or does not belong to you.']);
+                }
+
+                if (! in_array($salon->status, ['pending_approval', 'rejected', 'needs_correction'], true)) {
+                    throw ValidationException::withMessages(['salon_id' => 'Approved salons cannot be edited through registration.']);
+                }
+
+                // If no new photos uploaded, verify existing salon has a cover photo
+                if (empty($uploadedPhotos) && empty($salon->cover_photo_url)) {
+                    throw ValidationException::withMessages(['cover_photo' => 'A main cover photo is mandatory for salon registration.']);
+                }
+
+                $salon->update([
+                    'name' => $request->salon_name,
+                    'description' => trim($fullDescription),
+                    'city_id' => $request->city_id,
+                    'sub_area_id' => $request->sub_area_id,
+                    'address' => $fullAddress,
+                    'pincode' => $request->pincode,
+                    'latitude' => $request->latitude,
+                    'longitude' => $request->longitude,
+                    'location_source' => $request->filled(['latitude', 'longitude']) ? 'owner' : $salon->location_source,
+                    'gender_focus' => $request->gender_focus ?? 'Unisex',
+                    'preferred_plan_id' => $request->preferred_plan_id,
+                    'preferred_commercial_model' => $preferredModel,
+                    'requested_commission_percentage' => $requestedComm,
+                    'status' => 'pending_approval',
+                    'rejection_reason' => null,
+                    'correction_notes' => null,
+                    'resubmitted_at' => now(),
+                ]);
+            } else {
+                if (empty($uploadedPhotos)) {
+                    throw ValidationException::withMessages(['cover_photo' => 'A main cover photo is mandatory for salon registration.']);
+                }
+
+                $slug = Str::slug($request->salon_name);
+                if (Salon::where('slug', $slug)->exists()) {
+                    $slug = $slug . '-' . uniqid();
+                }
+
+                $salon = Salon::create([
+                    'admin_id' => $adminUser->id,
+                    'name' => $request->salon_name,
+                    'slug' => $slug,
+                    'description' => trim($fullDescription),
+                    'city_id' => $request->city_id,
+                    'sub_area_id' => $request->sub_area_id,
+                    'address' => $fullAddress,
+                    'pincode' => $request->pincode,
+                    'latitude' => $request->latitude,
+                    'longitude' => $request->longitude,
+                    'location_source' => $request->filled(['latitude', 'longitude']) ? 'owner' : null,
+                    'status' => 'pending_approval',
+                    'submitted_by' => $adminUser->id,
+                    'advance_required' => true,
+                    'advance_refundable' => false,
+                    'advance_percentage_default' => 25.00,
+                    'gender_focus' => $request->gender_focus ?? 'Unisex',
+                    'preferred_plan_id' => $request->preferred_plan_id,
+                    'preferred_commercial_model' => $preferredModel,
+                    'requested_commission_percentage' => $requestedComm,
+                ]);
+            }
+
+            // 5. Store Photos if provided
             if (!empty($uploadedPhotos)) {
+                // If replacing photos on revision, clean up old records
+                SalonMedia::where('salon_id', $salon->id)->delete();
+
+                $coverUrl = null;
                 foreach (array_values($uploadedPhotos) as $index => $photo) {
                     $path = $photo->storeAs(
                         'salons',
@@ -162,11 +223,16 @@ class SalonRegistrationController extends Controller
 
             DB::commit();
 
+            $statusCode = $request->filled('salon_id') ? 200 : 201;
+            $message = $request->filled('salon_id')
+                ? 'Salon application resubmitted successfully. Pending SuperAdmin approval.'
+                : 'Salon registered successfully. Pending SuperAdmin approval.';
+
             return response()->json([
-                'message' => 'Salon registered successfully. Pending SuperAdmin approval.',
+                'message' => $message,
                 'user' => $adminUser,
                 'salon' => $salon->fresh()->load('media')
-            ], 201);
+            ], $statusCode);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             DB::rollBack();

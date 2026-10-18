@@ -36,6 +36,11 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
 
   final List<String> _photoPaths = [];
   int _coverIndex = 0;
+
+  String _commercialModel = 'subscription';
+  String? _selectedPlanId;
+  final _commissionController = TextEditingController();
+  List<dynamic> _subscriptionPlans = [];
   
   List<dynamic> _cities = [];
   List<String> _states = [];
@@ -53,17 +58,50 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
     super.initState();
     if (widget.initialData != null) {
       _salonNameController.text = widget.initialData!['salon_name'] ?? '';
-      _addressController.text = widget.initialData!['street_address'] ?? '';
+      _descriptionController.text = widget.initialData!['description'] ?? '';
+      _addressController.text = widget.initialData!['street_address'] ?? widget.initialData!['address'] ?? '';
       _pincodeController.text = widget.initialData!['pincode'] ?? '';
+      if (widget.initialData!['gender_focus'] != null) {
+        _genderFocus = widget.initialData!['gender_focus'];
+      }
+      if (widget.initialData!['preferred_commercial_model'] != null) {
+        _commercialModel = widget.initialData!['preferred_commercial_model'];
+      }
+      if (widget.initialData!['preferred_plan_id'] != null) {
+        _selectedPlanId = widget.initialData!['preferred_plan_id']?.toString();
+      }
+      if (widget.initialData!['requested_commission_percentage'] != null) {
+        _commissionController.text = widget.initialData!['requested_commission_percentage'].toString();
+      }
     }
-    _loadCities();
+    _loadCitiesAndPlans();
   }
 
-  Future<void> _loadCities() async {
-    final cities = await ApiService.fetchCities();
+  @override
+  void dispose() {
+    _commissionController.dispose();
+    _salonNameController.dispose();
+    _descriptionController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCitiesAndPlans() async {
+    final results = await Future.wait([
+      ApiService.fetchCities(),
+      ApiService.getSubscriptionPlans(),
+    ]);
+
     if (mounted) {
+      final cities = results[0];
+      final plans = results[1];
+
       setState(() {
         _cities = cities;
+        _subscriptionPlans = plans;
         if (_cities.isNotEmpty) {
           final statesSet = <String>{};
           for (var city in _cities) {
@@ -74,13 +112,13 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
           _states = statesSet.toList()..sort();
 
           if (widget.initialData != null && widget.initialData!['city_id'] != null) {
-            _selectedCityId = widget.initialData!['city_id'];
+            _selectedCityId = widget.initialData!['city_id']?.toString();
             final city = _cities.firstWhere((c) => c['id'].toString() == _selectedCityId, orElse: () => null);
             if (city != null && city['state'] != null) {
               _selectedState = city['state']?.toString().trim();
               _filteredCities = _cities.where((c) => c['state']?.toString().trim() == _selectedState).toList();
             }
-            _selectedSubAreaId = widget.initialData!['sub_area_id'];
+            _selectedSubAreaId = widget.initialData!['sub_area_id']?.toString();
           }
         }
         _isLoadingCities = false;
@@ -128,6 +166,34 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
+      // Mandatory photo & cover photo check
+      final hasExistingCover = widget.initialData?['cover_photo_url'] != null;
+      if (_photoPaths.isEmpty && !hasExistingCover) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(milliseconds: 2500),
+            content: Text('Please upload at least one salon photo and select a main cover photo.'),
+          ),
+        );
+        return;
+      }
+
+      // Commission model validation
+      double? reqRate;
+      if (_commercialModel == 'commission') {
+        final rawRate = _commissionController.text.trim();
+        reqRate = double.tryParse(rawRate);
+        if (reqRate == null || reqRate < 0 || reqRate > 100) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(milliseconds: 2500),
+              content: Text('Please enter a valid requested commission rate between 0% and 100%.'),
+            ),
+          );
+          return;
+        }
+      }
+
       // Append state to address to respect the schema
       String stateVal = _useDropdowns ? (_selectedState ?? '') : _stateController.text.trim();
       String fullStreet = _addressController.text.trim();
@@ -143,21 +209,20 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
       }
 
       widget.onNext({
+        if (widget.initialData?['salon_id'] != null) 'salon_id': widget.initialData!['salon_id'],
         'salon_name': _salonNameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'street_address': fullStreet,
         'city_id': _useDropdowns ? _selectedCityId : null,
-        // Customers browse by area and collaborators are matched on it, so a
-        // salon without one is invisible to both.
         'sub_area_id': _selectedSubAreaId,
         if (!_useDropdowns) 'city_name': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'gender_focus': _genderFocus,
-        // Optional. Customers browse nearest-first, so a salon that pins itself
-        // at sign-up is placed correctly from its first day. Skipping it is
-        // fine — the owner can pin later from More > Salon Location.
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
+        'preferred_plan_id': _selectedPlanId,
+        'preferred_commercial_model': _commercialModel,
+        if (_commercialModel == 'commission' && reqRate != null) 'requested_commission_percentage': reqRate,
         'photo_paths': _photoPaths,
         'cover_index': _coverIndex,
       });
@@ -350,6 +415,9 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
             const SizedBox(height: 20),
 
             _buildPhotoSection(),
+            const SizedBox(height: 24),
+
+            _buildCommercialSection(),
             const SizedBox(height: 32),
 
             Row(
@@ -570,7 +638,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildLabel('Salon Photos (Optional)'),
+            _buildLabel('Salon Photos & Main Cover Photo *'),
             if (_photoPaths.isNotEmpty)
               Text(
                 '${_photoPaths.length} photo${_photoPaths.length == 1 ? '' : 's'} added',
@@ -580,7 +648,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Add photos of your storefront or interior. Tap a photo to select it as your cover picture.',
+          'Upload photos of your storefront or interior. Tap any photo to select it as the Main Cover Photo.',
           style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
         ),
         const SizedBox(height: 12),
@@ -631,7 +699,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
-                  'Cover',
+                  '★ Cover',
                   style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -673,4 +741,121 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
           ),
         ),
       );
+
+  Widget _buildCommercialSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Commercial Model *'),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _commercialModel = 'subscription'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _commercialModel == 'subscription' ? AppTheme.accentColor.withOpacity(0.1) : Colors.white,
+                    border: Border.all(color: _commercialModel == 'subscription' ? AppTheme.accentColor : AppTheme.lightBorder),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Subscription Plan',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: _commercialModel == 'subscription' ? FontWeight.bold : FontWeight.normal,
+                      color: _commercialModel == 'subscription' ? AppTheme.accentColor : AppTheme.lightTextBody,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _commercialModel = 'commission'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _commercialModel == 'commission' ? AppTheme.accentColor.withOpacity(0.1) : Colors.white,
+                    border: Border.all(color: _commercialModel == 'commission' ? AppTheme.accentColor : AppTheme.lightBorder),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Commission Model',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: _commercialModel == 'commission' ? FontWeight.bold : FontWeight.normal,
+                      color: _commercialModel == 'commission' ? AppTheme.accentColor : AppTheme.lightTextBody,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        _buildLabel('Preferred Subscription Plan (Optional)'),
+        DropdownButtonFormField<String>(
+          value: _selectedPlanId,
+          isExpanded: true,
+          decoration: InputDecoration(
+            hintText: 'Select preferred plan',
+            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+            prefixIcon: Icon(Icons.card_membership_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surface,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
+          ),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('Not sure yet (Choose after approval)'),
+            ),
+            ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
+                  value: p['id'].toString(),
+                  child: Text('${p['name']} (₹${p['price']} / ${p['duration_days']} days)'),
+                )),
+          ],
+          onChanged: (val) => setState(() => _selectedPlanId = val),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Preference only — your actual subscription purchase happens after SuperAdmin approval.',
+          style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody),
+        ),
+        const SizedBox(height: 16),
+
+        if (_commercialModel == 'commission') ...[
+          _buildLabel('Requested Commission Rate (%) *'),
+          _buildTextField(
+            controller: _commissionController,
+            hint: 'e.g. 15.0',
+            icon: Icons.percent,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (_commercialModel == 'commission') {
+                if (v == null || v.trim().isEmpty) return 'Required for commission model';
+                final n = double.tryParse(v.trim());
+                if (n == null || n < 0 || n > 100) return 'Must be between 0 and 100';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Informational request. SuperAdmin will finalize your approved commission rate upon registration review.',
+            style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
 }

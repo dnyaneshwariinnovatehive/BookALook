@@ -16,7 +16,15 @@ class Salon extends Model
         'commission_opt_in' => 'boolean',
         'commission_percentage' => 'decimal:2',
         'commission_rate_effective_from' => 'date',
+        'requested_commission_percentage' => 'decimal:2',
+        'correction_requested_at' => 'datetime',
+        'resubmitted_at' => 'datetime',
     ];
+
+    public function preferredPlan()
+    {
+        return $this->belongsTo(SubscriptionPlan::class, 'preferred_plan_id');
+    }
 
     public function city()
     {

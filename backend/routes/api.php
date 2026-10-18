@@ -137,6 +137,9 @@ Route::get('/public/app-links', [\App\Http\Controllers\Api\PublicSalonController
 // App version & update policy (public unauthenticated endpoint for Customer & Partner apps)
 Route::get('/app-version/{app}', [\App\Http\Controllers\Api\AppVersionController::class, 'show']);
 
+// Subscription plans catalogue for registration preferences & onboarding (public)
+Route::get('/public/subscription-plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
+
 Route::prefix('superadmin')->group(function () {
     Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
 
@@ -145,6 +148,7 @@ Route::prefix('superadmin')->group(function () {
     Route::get('/salons/pending/{id}', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'show']);
     Route::post('/salons/{id}/approve', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'approve']);
     Route::post('/salons/{id}/reject', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'reject']);
+    Route::post('/salons/{id}/request-corrections', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'requestCorrections']);
 
     // Salon Directory API (Unprotected for now)
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);

@@ -46,6 +46,11 @@ class OnboardingDraft {
   List<String> photoPaths;
   int coverIndex;
 
+  /// Registration preferences (commercial model & plan preference)
+  String? preferredPlanId;
+  String preferredCommercialModel;
+  double? requestedCommissionPercentage;
+
   /// How many photos the salon already has on the server.
   ///
   /// Only ever non-zero on an edit. The device does not hold those files and the
@@ -85,6 +90,9 @@ class OnboardingDraft {
     List<DraftService>? services,
     List<String>? photoPaths,
     this.coverIndex = 0,
+    this.preferredPlanId,
+    this.preferredCommercialModel = 'subscription',
+    this.requestedCommissionPercentage,
     this.existingPhotoCount = 0,
     this.submitted = false,
     this.lastError,
@@ -126,6 +134,10 @@ class OnboardingDraft {
     genderFocus = salon['gender_focus']?.toString() ?? 'Unisex';
     latitude = (salon['latitude'] as num?)?.toDouble();
     longitude = (salon['longitude'] as num?)?.toDouble();
+
+    preferredPlanId = salon['preferred_plan_id']?.toString() ?? preferredPlanId;
+    preferredCommercialModel = salon['preferred_commercial_model']?.toString() ?? preferredCommercialModel;
+    requestedCommissionPercentage = (salon['requested_commission_percentage'] as num?)?.toDouble() ?? requestedCommissionPercentage;
 
     final hours = salon['working_hours'] as List?;
     if (hours != null && hours.isNotEmpty) {
@@ -178,13 +190,18 @@ class OnboardingDraft {
             if (salonPhone.trim().isEmpty) 'Salon phone',
             if (ownerName.trim().isEmpty) 'Owner name',
             if (!_isPhone(ownerPhone)) 'Owner phone (10 digits)',
+            if (preferredCommercialModel == 'commission' &&
+                (requestedCommissionPercentage == null ||
+                    requestedCommissionPercentage! < 0 ||
+                    requestedCommissionPercentage! > 100))
+              'Requested commission rate (0-100%)',
           ],
         1 => [
             if (address.trim().isEmpty) 'Street address',
             if (cityId == null) 'City',
             if (subAreaId == null) 'Area',
             if (!_isPincode(pincode)) 'Pincode (6 digits)',
-            if (photoPaths.isEmpty && existingPhotoCount == 0) 'At least one photo',
+            if (photoPaths.isEmpty && existingPhotoCount == 0) 'At least one photo (with main cover selected)',
           ],
         2 => [
             if (workingHours.every((day) => day.isClosed)) 'At least one open day',
@@ -220,6 +237,9 @@ class OnboardingDraft {
         'services': services.map((s) => s.toJson()).toList(),
         'photo_paths': photoPaths,
         'cover_index': coverIndex,
+        'preferred_plan_id': preferredPlanId,
+        'preferred_commercial_model': preferredCommercialModel,
+        'requested_commission_percentage': requestedCommissionPercentage,
         'existing_photo_count': existingPhotoCount,
         'submitted': submitted,
         'last_error': lastError,
@@ -251,6 +271,9 @@ class OnboardingDraft {
             .toList(),
         photoPaths: (json['photo_paths'] as List?)?.map((p) => p.toString()).toList(),
         coverIndex: json['cover_index'] ?? 0,
+        preferredPlanId: json['preferred_plan_id']?.toString(),
+        preferredCommercialModel: json['preferred_commercial_model']?.toString() ?? 'subscription',
+        requestedCommissionPercentage: (json['requested_commission_percentage'] as num?)?.toDouble(),
         existingPhotoCount: json['existing_photo_count'] ?? 0,
         submitted: json['submitted'] == true,
         lastError: json['last_error'],
@@ -274,6 +297,10 @@ class OnboardingDraft {
         if (latitude != null) 'latitude': latitude.toString(),
         if (longitude != null) 'longitude': longitude.toString(),
         'cover_index': coverIndex.toString(),
+        if (preferredPlanId != null && preferredPlanId!.isNotEmpty) 'preferred_plan_id': preferredPlanId!,
+        'preferred_commercial_model': preferredCommercialModel,
+        if (preferredCommercialModel == 'commission' && requestedCommissionPercentage != null)
+          'requested_commission_percentage': requestedCommissionPercentage!.toString(),
       };
 }
 
