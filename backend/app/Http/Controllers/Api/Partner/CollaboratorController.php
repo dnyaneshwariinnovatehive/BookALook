@@ -168,10 +168,7 @@ class CollaboratorController extends Controller
             ->withCount('services')
             ->where(function ($q) use ($user) {
                 $q->where('submitted_by', $user->id)
-                  ->orWhere(function ($q2) use ($user) {
-                      $q2->where('assigned_collaborator_id', $user->id)
-                         ->whereNotNull('enquiry_id');
-                  });
+                  ->orWhere('assigned_collaborator_id', $user->id);
             })
             ->orderByDesc('created_at')
             ->get()
@@ -241,10 +238,7 @@ class CollaboratorController extends Controller
 
         $byStatus = Salon::where(function ($q) use ($user) {
             $q->where('submitted_by', $user->id)
-              ->orWhere(function ($q2) use ($user) {
-                  $q2->where('assigned_collaborator_id', $user->id)
-                     ->whereNotNull('enquiry_id');
-              });
+              ->orWhere('assigned_collaborator_id', $user->id);
         })
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
@@ -801,7 +795,7 @@ class CollaboratorController extends Controller
                 ),
             ],
             'pincode' => 'required|string|max:10',
-            'salon_phone' => 'required|string|max:20',
+            'salon_phone' => 'nullable|string|max:20',
             'gender_focus' => 'required|in:Unisex,Men Only,Women Only',
             // Optional: GPS can simply fail indoors, and a missing pin falls
             // back to the city centre rather than blocking the visit.

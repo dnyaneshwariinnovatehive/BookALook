@@ -238,4 +238,20 @@ class CollaboratorDirectOnboardingTest extends TestCase
         $hackRes->assertStatus(403);
         $hackRes->assertJsonPath('success', false);
     }
+
+    public function test_collaborator_can_onboard_salon_without_reception_phone_number(): void
+    {
+        Sanctum::actingAs($this->collaborator);
+        $payload = $this->validPayload([
+            'salon_name' => 'Receptionless Salon',
+            'salon_phone' => null,
+        ]);
+        unset($payload['salon_phone']);
+
+        $res = $this->post('/api/partner/collaborator/onboard', $payload);
+        $res->assertStatus(201);
+
+        $salon = Salon::where('name', 'Receptionless Salon')->firstOrFail();
+        $this->assertNull($salon->phone_num);
+    }
 }

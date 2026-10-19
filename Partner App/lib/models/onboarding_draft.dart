@@ -225,7 +225,6 @@ class OnboardingDraft {
         0 => [
             if (salonName.trim().isEmpty) 'Salon name',
             if (description.trim().isEmpty) 'Description',
-            if (salonPhone.trim().isEmpty) 'Salon phone',
             if (ownerName.trim().isEmpty) 'Owner name',
             if (!_isPhone(ownerPhone)) 'Owner phone (10 digits)',
             if (preferredCommercialModel == 'commission' &&

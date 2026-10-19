@@ -820,7 +820,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
             ),
             ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
                   value: p['id'].toString(),
-                  child: Text('${p['name']} (₹${p['price']} / ${p['duration_days']} days)'),
+                  child: Text('${p['name']} (₹${p['price']} / ${p['validity_days'] ?? p['duration_days'] ?? 30} days)'),
                 )),
           ],
           onChanged: (val) => setState(() => _selectedPlanId = val),

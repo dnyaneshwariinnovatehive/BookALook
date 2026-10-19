@@ -36,6 +36,14 @@ class CollaboratorSubscriptionNoticeTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (\App\Models\NotificationTemplate::where('key', 'assigned_salon_expiring_partner')->doesntExist()) {
+            $this->seed(\Database\Seeders\NotificationTemplateSeeder::class);
+        }
+    }
+
     // ------------------------------------------------------- the warning ladder
 
     public function test_the_collaborator_is_warned_a_week_out_and_again_at_three_days(): void

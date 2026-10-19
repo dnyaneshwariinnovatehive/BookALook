@@ -34,14 +34,15 @@ class OnboardSalonScreen extends StatefulWidget {
   const OnboardSalonScreen({super.key, this.enquiry, this.editingSalonId});
 
   @override
-  State<OnboardSalonScreen> createState() => _OnboardSalonScreenState();
+  State<OnboardSalonScreen> createState() => OnboardSalonScreenState();
 }
 
-class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
+class OnboardSalonScreenState extends State<OnboardSalonScreen> {
   final _store = OnboardingDraftStore.instance;
   final _pageController = PageController();
 
   OnboardingDraft? _draft;
+  OnboardingDraft? get draft => _draft;
   int _step = 0;
   bool _submitting = false;
   bool _locating = false;
@@ -125,6 +126,29 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
         await _store.save(draft);
       }
     }
+  }
+
+  @visibleForTesting
+  void seedForTest({
+    required OnboardingDraft draft,
+    List<dynamic>? subscriptionPlans,
+  }) {
+    _draft = draft;
+    _ownerName.text = draft.ownerName;
+    _ownerPhone.text = draft.ownerPhone;
+    _ownerEmail.text = draft.ownerEmail;
+    _salonName.text = draft.salonName;
+    _description.text = draft.description;
+    _salonPhone.text = draft.salonPhone;
+    _address.text = draft.address;
+    _pincode.text = draft.pincode;
+    if (draft.requestedCommissionPercentage != null) {
+      _commissionController.text = draft.requestedCommissionPercentage.toString();
+    }
+    if (subscriptionPlans != null) {
+      _subscriptionPlans = subscriptionPlans;
+    }
+    setState(() {});
   }
 
   String? _stateOfSelectedCity(String? cityId) {
@@ -471,9 +495,9 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          _label('Salon phone', required: true),
-          _field(_salonPhone, 'Reception line', Icons.call_outlined,
-              keyboard: TextInputType.phone, requiredAs: 'Salon phone'),
+          _label('Reception number', optional: true),
+          _field(_salonPhone, 'Reception line (optional)', Icons.call_outlined,
+              keyboard: TextInputType.phone),
 
           const SizedBox(height: 28),
           _sectionTitle('The owner'),
@@ -508,29 +532,41 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
               Expanded(child: _commercialModelToggle('commission', 'Commission Model')),
             ],
           ),
-          const SizedBox(height: 14),
-          _label('Preferred subscription plan', optional: true),
-          _dropdown<String>(
-            value: _draft!.preferredPlanId,
-            hint: 'Not sure yet',
-            icon: Icons.card_membership_outlined,
-            items: [
-              const DropdownMenuItem<String>(value: null, child: Text('Not sure yet')),
-              ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
-                    value: p['id'].toString(),
-                    child: Text('${p['name']} (₹${p['price']} / ${p['duration_days']}d)'),
-                  )),
-            ],
-            onChanged: (val) {
-              setState(() => _draft!.preferredPlanId = val);
-              _persist();
-            },
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Registration preference only. The salon confirms and purchases their actual plan after approval.',
-            style: TextStyle(fontSize: 11.5, height: 1.35, color: AppTheme.lightTextBody),
-          ),
+          if ((_draft!.preferredCommercialModel) == 'subscription') ...[
+            const SizedBox(height: 14),
+            _label('Preferred subscription plan', optional: true),
+            _dropdown<String>(
+              value: _draft!.preferredPlanId,
+              hint: 'Not sure yet (Choose after approval)',
+              icon: Icons.card_membership_outlined,
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('Not sure yet (Choose after approval)'),
+                ),
+                ..._subscriptionPlans.map((p) {
+                  final map = p is Map ? Map<String, dynamic>.from(p) : <String, dynamic>{};
+                  final id = map['id']?.toString() ?? '';
+                  return DropdownMenuItem<String>(
+                    value: id,
+                    child: Text(
+                      _formatPlanDetails(map),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }),
+              ],
+              onChanged: (val) {
+                setState(() => _draft!.preferredPlanId = val);
+                _persist();
+              },
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Registration preference only. The salon confirms and purchases their actual plan after approval.',
+              style: TextStyle(fontSize: 11.5, height: 1.35, color: AppTheme.lightTextBody),
+            ),
+          ],
           if (_draft!.preferredCommercialModel == 'commission') ...[
             const SizedBox(height: 14),
             _label('Requested commission rate (%)', required: true),
@@ -1319,29 +1355,60 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     );
   }
 
+  String _formatPlanDetails(Map<String, dynamic> p) {
+    final name = (p['name'] ?? 'Plan').toString();
+    final rawPrice = p['price'];
+    final numPrice = rawPrice != null ? double.tryParse(rawPrice.toString()) : null;
+    final priceStr = numPrice != null
+        ? '₹${numPrice.toStringAsFixed(numPrice.truncateToDouble() == numPrice ? 0 : 2)}'
+        : (rawPrice != null ? '₹$rawPrice' : '');
+
+    final days = p['validity_days'] ?? p['duration_days'] ?? 30;
+
+    final details = <String>[];
+    if (priceStr.isNotEmpty) details.add(priceStr);
+    details.add('$days days');
+
+    final campaigns = p['whatsapp_campaign_limit'];
+    final parsedCampaigns = campaigns != null ? int.tryParse(campaigns.toString()) : null;
+    if (parsedCampaigns != null && parsedCampaigns > 0) {
+      details.add('$parsedCampaigns WA campaigns');
+    }
+
+    if (p['has_priority_visibility'] == true ||
+        p['has_priority_visibility'] == 1 ||
+        p['has_priority_visibility'] == '1') {
+      details.add('Priority visibility');
+    }
+
+    return '$name (${details.join(' · ')})';
+  }
+
   Widget _dropdown<T>({
     required T? value,
     required String hint,
     required IconData icon,
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
-  }) =>
-      DropdownButtonFormField<T>(
-        initialValue: value,
-        isExpanded: true,
-        hint: Text(hint, style: const TextStyle(color: AppTheme.lightTextLight, fontSize: 13.5)),
-        items: items,
-        onChanged: items.isEmpty ? null : onChanged,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, size: 19, color: AppTheme.lightTextLight),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-          border: _border(AppTheme.lightBorder),
-          enabledBorder: _border(AppTheme.lightBorder),
-          focusedBorder: _border(AppTheme.accentColor),
-        ),
-      );
+  }) {
+    final effectiveValue = items.any((i) => i.value == value) ? value : null;
+    return DropdownButtonFormField<T>(
+      value: effectiveValue,
+      isExpanded: true,
+      hint: Text(hint, style: const TextStyle(color: AppTheme.lightTextLight, fontSize: 13.5)),
+      items: items,
+      onChanged: items.isEmpty ? null : onChanged,
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, size: 19, color: AppTheme.lightTextLight),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        border: _border(AppTheme.lightBorder),
+        enabledBorder: _border(AppTheme.lightBorder),
+        focusedBorder: _border(AppTheme.accentColor),
+      ),
+    );
+  }
 
   OutlineInputBorder _border(Color color) => OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -1383,7 +1450,12 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
 
     return GestureDetector(
       onTap: () {
-        setState(() => _draft!.preferredCommercialModel = value);
+        setState(() {
+          _draft!.preferredCommercialModel = value;
+          if (value == 'commission') {
+            _draft!.preferredPlanId = null;
+          }
+        });
         _persist();
       },
       child: Container(
