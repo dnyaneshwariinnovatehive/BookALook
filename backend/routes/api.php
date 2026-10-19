@@ -77,6 +77,7 @@ Route::prefix('customer')->group(function () {
         // on opening — anything it returns becomes the rating prompt.
         Route::get('/reviews/pending', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'pending']);
         Route::post('/appointments/{id}/review', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'store']);
+        Route::post('/appointments/{id}/complaint', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'storeComplaint']);
 
         // In-app notification inbox
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);

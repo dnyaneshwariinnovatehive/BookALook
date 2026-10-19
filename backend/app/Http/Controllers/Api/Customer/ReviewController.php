@@ -119,6 +119,44 @@ class ReviewController extends Controller
     }
 
     /**
+     * File a complaint for an appointment directly from the appointments tab.
+     */
+    public function storeComplaint(Request $request, string $appointmentId)
+    {
+        $data = $request->validate([
+            'complaint_subject' => 'required|string|max:150',
+            'complaint_description' => 'required|string|max:2000',
+        ]);
+
+        $appointment = Appointment::where('customer_id', $request->user()->id)
+            ->find($appointmentId);
+
+        if (! $appointment) {
+            return response()->json(['success' => false, 'message' => 'Booking not found.'], 404);
+        }
+
+        $existing = Complaint::where('related_appointment_id', $appointment->id)
+            ->where('customer_id', $request->user()->id)
+            ->whereIn('status', [Complaint::STATUS_OPEN, Complaint::STATUS_UNDER_REVIEW])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You already have an active complaint submitted for this appointment.',
+            ], 422);
+        }
+
+        $complaint = $this->raiseComplaint($appointment, $data, $request);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Thanks — your report has been submitted to the BookALook team.',
+            'complaint_id' => $complaint->id,
+        ], 201);
+    }
+
+    /**
      * Send a report to SuperAdmin and make sure somebody is actually told.
      *
      * A complaint that only lands in a table is a complaint nobody reads, so

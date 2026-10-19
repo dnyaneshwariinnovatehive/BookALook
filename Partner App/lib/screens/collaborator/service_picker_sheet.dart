@@ -43,6 +43,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   /// only thing left is the price.
   Map<String, dynamic>? _chosenTemplate;
   String _chosenCategoryName = '';
+  String? _selectedCategoryName;
 
   bool _custom = false;
   final _search = TextEditingController();
@@ -88,23 +89,68 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
     super.dispose();
   }
 
-  /// Every template across every category, flattened, with its category name
-  /// carried along so the result can be labelled without a second lookup.
-  List<Map<String, dynamic>> get _matches {
+  /// All valid categories loaded from the catalog.
+  List<Map<String, dynamic>> get _availableCategories {
+    return _categories
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  /// Total count of service templates across all categories.
+  int get _totalServicesCount {
+    var count = 0;
+    for (final cat in _availableCategories) {
+      final templates = cat['templates'] as List? ?? [];
+      count += templates.length;
+    }
+    return count;
+  }
+
+  /// Matching categories and their templates, grouped by category and
+  /// filtered by search keyword and the selected category dropdown.
+  List<Map<String, dynamic>> get _groupedMatches {
     final term = _search.text.trim().toLowerCase();
     final results = <Map<String, dynamic>>[];
 
-    for (final category in _categories) {
-      for (final template in (category['templates'] as List? ?? [])) {
+    for (final rawCategory in _categories) {
+      if (rawCategory is! Map) continue;
+      final category = Map<String, dynamic>.from(rawCategory);
+      final categoryName = category['name']?.toString() ?? '';
+
+      // If category dropdown has a selection, filter to only that category
+      if (_selectedCategoryName != null &&
+          _selectedCategoryName!.isNotEmpty &&
+          _selectedCategoryName != categoryName) {
+        continue;
+      }
+
+      final templates = (category['templates'] as List? ?? []);
+      final matchingTemplates = <Map<String, dynamic>>[];
+
+      for (final rawTemplate in templates) {
+        if (rawTemplate is! Map) continue;
+        final template = Map<String, dynamic>.from(rawTemplate);
         final name = template['name']?.toString() ?? '';
-        if (term.isEmpty || name.toLowerCase().contains(term)) {
-          results.add({'template': template, 'category': category['name']?.toString() ?? ''});
+
+        if (term.isEmpty ||
+            name.toLowerCase().contains(term) ||
+            categoryName.toLowerCase().contains(term)) {
+          matchingTemplates.add(template);
         }
+      }
+
+      if (matchingTemplates.isNotEmpty) {
+        results.add({
+          'id': category['id']?.toString() ?? categoryName,
+          'name': categoryName,
+          'templates': matchingTemplates,
+        });
       }
     }
 
     return results;
   }
+
 
   void _submit() {
     final price = double.tryParse(_price.text.trim());
@@ -161,7 +207,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.85,
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
@@ -196,7 +242,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   Widget _buildCatalogStep() => Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: Row(
               children: [
                 const Expanded(
@@ -234,17 +280,106 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
               ),
             ),
           ),
+          if (!_loading && _availableCategories.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _buildCategoryDropdown(),
+            ),
+          ],
           const SizedBox(height: 12),
           Expanded(child: _buildCatalogList()),
         ],
       );
 
+  Widget _buildCategoryDropdown() {
+    final categories = _availableCategories;
+    final totalCount = _totalServicesCount;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.lightBorder),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: _selectedCategoryName,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.accentColor),
+          hint: Row(
+            children: [
+              const Icon(Icons.category_outlined, size: 18, color: AppTheme.accentColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Category: All Categories ($totalCount)',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.lightTextHeading,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          items: [
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Row(
+                children: [
+                  const Icon(Icons.category_outlined, size: 18, color: AppTheme.accentColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'All Categories ($totalCount services)',
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...categories.map((c) {
+              final name = c['name']?.toString() ?? '';
+              final count = (c['templates'] as List? ?? []).length;
+              return DropdownMenuItem<String?>(
+                value: name,
+                child: Row(
+                  children: [
+                    const Icon(Icons.folder_outlined, size: 18, color: AppTheme.lightTextBody),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$name ($count)',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          onChanged: (val) {
+            setState(() {
+              _selectedCategoryName = val;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildCatalogList() {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
-    final matches = _matches;
+    final grouped = _groupedMatches;
 
-    if (matches.isEmpty) {
+    if (grouped.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -260,6 +395,14 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13, height: 1.4, color: AppTheme.lightTextBody),
               ),
+              if (_selectedCategoryName != null) ...[
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => setState(() => _selectedCategoryName = null),
+                  child: const Text('Show all categories',
+                      style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.w600)),
+                ),
+              ],
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () => setState(() => _custom = true),
@@ -278,15 +421,20 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      itemCount: matches.length,
+      itemCount: grouped.length,
       itemBuilder: (_, index) {
-        final template = matches[index]['template'] as Map<String, dynamic>;
-        final categoryName = matches[index]['category'] as String;
-        final templateId = template['id']?.toString() ?? '';
-        final isAdded = widget.existingTemplateIds.contains(templateId);
+        final group = grouped[index];
+        final categoryName = group['name'] as String;
+        final templates = group['templates'] as List<Map<String, dynamic>>;
+
+        // Count how many templates in this category have already been added to the draft
+        final addedCount = templates.where((t) {
+          final id = t['id']?.toString() ?? '';
+          return widget.existingTemplateIds.contains(id);
+        }).length;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: 12),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
@@ -295,46 +443,121 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
           child: Material(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            child: ListTile(
-              title: Text(
-                template['name'].toString(),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isAdded ? AppTheme.lightTextBody : AppTheme.lightTextHeading,
-                ),
-              ),
-              subtitle: Text(
-                '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min',
-                style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
-              ),
-              trailing: isAdded
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                key: PageStorageKey('cat_${group['id']}_${_search.text}_$_selectedCategoryName'),
+                initiallyExpanded: true,
+                tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        categoryName,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.lightTextHeading,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.lightAccentSoft,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Text(
-                        'Added',
-                        style: TextStyle(
-                          fontSize: 12,
+                      child: Text(
+                        '${templates.length}',
+                        style: const TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.accentColor,
                         ),
                       ),
-                    )
-                  : const Icon(Icons.chevron_right, color: AppTheme.lightTextLight),
-              onTap: isAdded
-                  ? () => _say('This service is already in the draft.')
-                  : () => setState(() {
-                      _chosenTemplate = template;
-                      _chosenCategoryName = categoryName;
-                    }),
+                    ),
+                    if (addedCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$addedCount added',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                children: [
+                  const Divider(height: 1, color: AppTheme.lightBorder),
+                  for (var i = 0; i < templates.length; i++)
+                    _buildTemplateItem(templates[i], categoryName, isLast: i == templates.length - 1),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTemplateItem(Map<String, dynamic> template, String categoryName, {bool isLast = false}) {
+    final templateId = template['id']?.toString() ?? '';
+    final isAdded = widget.existingTemplateIds.contains(templateId);
+
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            title: Text(
+              template['name'].toString(),
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: isAdded ? AppTheme.lightTextBody : AppTheme.lightTextHeading,
+              ),
+            ),
+            subtitle: Text(
+              '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min',
+              style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
+            ),
+            trailing: isAdded
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightAccentSoft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Added',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accentColor,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.chevron_right, color: AppTheme.lightTextLight, size: 20),
+            onTap: isAdded
+                ? () => _say('This service is already in the draft.')
+                : () => setState(() {
+                    _chosenTemplate = template;
+                    _chosenCategoryName = categoryName;
+                  }),
+          ),
+          if (!isLast) const Divider(height: 1, color: Color(0xFFF3F4F6)),
+        ],
+      ),
     );
   }
 

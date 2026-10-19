@@ -63,6 +63,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
   final _pincode = TextEditingController();
   final _commissionController = TextEditingController();
   List<dynamic> _subscriptionPlans = [];
+  List<dynamic>? _masterCatalogCategories;
 
   Timer? _autosave;
 
@@ -94,16 +95,19 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
     final results = await Future.wait([
       ApiService.fetchCities(),
       ApiService.getSubscriptionPlans(),
+      CollaboratorApi.masterCatalog().catchError((_) => <dynamic>[]),
     ]);
 
     if (!mounted) return;
 
     final cities = results[0];
     final plans = results[1];
+    final masterCatalog = results.length > 2 ? results[2] : null;
 
     setState(() {
       _cities = cities;
       _subscriptionPlans = plans;
+      _masterCatalogCategories = masterCatalog;
       _states = cities
           .map((c) => c['state']?.toString().trim() ?? '')
           .where((s) => s.isNotEmpty)
@@ -1160,6 +1164,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ServicePickerSheet(
+        initialCategories: _masterCatalogCategories,
         existingTemplateIds: existingTemplateIds,
         existingCustomIdentities: existingCustomIdentities,
       ),

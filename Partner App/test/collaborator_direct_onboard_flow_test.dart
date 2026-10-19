@@ -144,8 +144,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Verify OnboardSalonScreen was opened, NOT redirected to Assigned
+      // Verify OnboardSalonScreen was opened, NOT redirected to Assigned or My Salons
       expect(assignedCalled, isFalse);
+      expect(mySalonsCalled, isFalse);
       expect(find.byType(OnboardSalonScreen), findsOneWidget);
     });
   });

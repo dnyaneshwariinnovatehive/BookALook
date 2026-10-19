@@ -202,4 +202,48 @@ void main() {
         .toList();
     expect(customIdentities, ['grooming::royal shave', 'facials::royal shave']);
   });
+
+  testWidgets('services are listed organized by category with Category Dropdown filter', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildSheet());
+    await tester.pumpAndSettle();
+
+    // Verify both category expansion headers are visible
+    expect(find.text('Hair Styling'), findsOneWidget);
+    expect(find.text('Facials'), findsOneWidget);
+
+    // Verify services are displayed under their categories
+    expect(find.text('Classic Haircut'), findsOneWidget);
+    expect(find.text('Beard Grooming'), findsOneWidget);
+    expect(find.text('Gold Facial'), findsOneWidget);
+
+    // Verify Category Dropdown is present
+    expect(find.byType(DropdownButton<String?>), findsOneWidget);
+
+    // Tap dropdown to open category selector
+    await tester.tap(find.byType(DropdownButton<String?>));
+    await tester.pumpAndSettle();
+
+    // Select "Facials (1)"
+    await tester.tap(find.text('Facials (1)').last);
+    await tester.pumpAndSettle();
+
+    // Now only Facials should be displayed; Hair Styling should be filtered out
+    expect(find.text('Gold Facial'), findsOneWidget);
+    expect(find.text('Classic Haircut'), findsNothing);
+    expect(find.text('Beard Grooming'), findsNothing);
+
+    // Switch back to "All Categories (3 services)"
+    await tester.tap(find.byType(DropdownButton<String?>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Categories (3 services)').last);
+    await tester.pumpAndSettle();
+
+    // All services should be visible again
+    expect(find.text('Classic Haircut'), findsOneWidget);
+    expect(find.text('Beard Grooming'), findsOneWidget);
+    expect(find.text('Gold Facial'), findsOneWidget);
+  });
 }
+

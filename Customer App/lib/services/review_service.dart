@@ -69,6 +69,28 @@ class ReviewService {
     throw ReviewRefused(_messageFrom(body, response.statusCode));
   }
 
+  /// Submit a complaint directly for an appointment.
+  static Future<Map<String, dynamic>> submitComplaint({
+    required String appointmentId,
+    required String subject,
+    required String description,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/customer/appointments/$appointmentId/complaint'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'complaint_subject': subject.trim(),
+        'complaint_description': description.trim(),
+      }),
+    );
+
+    final body = _decode(response.body);
+
+    if (response.statusCode == 200 || response.statusCode == 201) return body;
+
+    throw ReviewRefused(_messageFrom(body, response.statusCode));
+  }
+
   /// A salon's reviews, page by page. Open to signed-out readers too.
   static Future<Map<String, dynamic>?> forSalon(
     String salonId, {

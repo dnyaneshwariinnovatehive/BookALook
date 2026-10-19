@@ -92,6 +92,19 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
   @visibleForTesting
   bool get isPolling => _poll != null;
 
+  @visibleForTesting
+  void seedForTest({
+    List<dynamic>? enquiries,
+    List<dynamic>? alerts,
+    List<dynamic>? assignedSalons,
+  }) {
+    if (enquiries != null) _enquiries = enquiries;
+    if (alerts != null) _alerts = alerts;
+    if (assignedSalons != null) _assignedSalons = assignedSalons;
+    _isLoading = false;
+    _firstLoad = false;
+  }
+
   /// Called by the shell whenever this tab gains or loses visibility.
   void setActive(bool active) {
     if (_isActive == active) return;
@@ -684,41 +697,11 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
           Divider(height: 1, color: palette.border),
           const SizedBox(height: 12),
 
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  draft != null
-                      ? 'Draft saved ${_ago(draft.updatedAt)}'
-                      : 'Assigned ${_assignedOn(enquiry['assigned_at'])}',
-                  style: TextStyle(fontSize: 11.5, color: palette.textTertiary),
-                ),
-              ),
-              if (draft != null)
-                // Discarding deletes the photos too, so it is styled as the
-                // destructive action it is rather than the quiet grey link it
-                // used to be, sitting right next to the primary button.
-                OutlinedButton.icon(
-                  onPressed: () => _confirmDiscard(id),
-                  icon: const Icon(Icons.delete_outline, size: 15),
-                  label: const Text(
-                    'Discard',
-                    style: TextStyle(fontSize: 12.5),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: palette.danger,
-                    backgroundColor: palette.dangerBg,
-                    side: BorderSide(
-                      color: palette.danger.withValues(alpha: 0.35),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                  ),
-                ),
-            ],
+          Text(
+            draft != null
+                ? 'Draft saved ${_ago(draft.updatedAt)}'
+                : 'Assigned ${_assignedOn(enquiry['assigned_at'])}',
+            style: TextStyle(fontSize: 11.5, color: palette.textTertiary),
           ),
 
           const SizedBox(height: 8),
@@ -773,44 +756,6 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     return CollaboratorChip(label: label, colour: colour);
   }
 
-  Future<void> _confirmDiscard(String enquiryId) async {
-    final palette = context.colors;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Discard this draft?'),
-        content: const Text(
-          'Everything typed in for this salon, including its photos, will be deleted '
-          'from this device. The assignment stays on your list.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
-          ),
-          // A filled danger button, not a flat link. The dialog it opens is the
-          // only thing standing between a collaborator and a lost afternoon of
-          // photos, and it should not look like a menu item.
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.danger,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) await _store.discard(enquiryId);
-  }
 
   Widget _detail(IconData icon, String text) {
     final palette = context.colors;
