@@ -204,6 +204,7 @@ Route::prefix('superadmin')->group(function () {
         // between the old rate and the new one stays honest.
         Route::put('/salons/{id}/commission-rate', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'setCommissionRate']);
         Route::get('/salons/{id}/commission-history', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'commissionHistory']);
+        Route::get('/salons/{id}/subscription-history', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'subscriptionHistory']);
         Route::get('/subscription-requests', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'getSubscriptionRequests']);
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);

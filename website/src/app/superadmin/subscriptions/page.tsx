@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Icon from '@/components/admin/Icon';
 import {
   Alert, Badge, Button, Card, DescriptionList, EmptyState, Field, IconButton, Modal, PageHeader,
-  Person, SearchInput, Segmented, Skeleton, StatCard, cx, formatINR, localISODate, ui, useConfirm,
+  Person, SearchInput, Segmented, Skeleton, StatCard, Tabs, cx, formatINR, localISODate, ui, useConfirm,
 } from '@/components/admin/ui';
 import styles from './page.module.css';
 
@@ -72,6 +72,19 @@ const fmtDay = (ymd?: string | null) => {
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const fmtDateStr = (str?: string | null) => {
+  if (!str) return '—';
+  try {
+    const clean = str.includes('T') ? str : str.replace(' ', 'T');
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) return str;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return str;
+  }
+};
+
+
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [salons, setSalons] = useState<any[]>([]);
@@ -111,12 +124,17 @@ export default function SubscriptionsPage() {
   const [blockingPayouts, setBlockingPayouts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Salon detail popup — runs off the full salon endpoint.
+  // Salon detail popup — runs off the full salon endpoint & subscription history.
   const [infoSalon, setInfoSalon] = useState<any>(null);
   const [infoLoading, setInfoLoading] = useState(false);
+  const [infoSalonTab, setInfoSalonTab] = useState<'overview' | 'subscription'>('overview');
+  const [infoSubscriptionData, setInfoSubscriptionData] = useState<any>(null);
+  const [infoSubscriptionLoading, setInfoSubscriptionLoading] = useState(false);
+  const [infoSubscriptionError, setInfoSubscriptionError] = useState('');
   const [salonSearch, setSalonSearch] = useState('');
   const [salonFilterModel, setSalonFilterModel] = useState('');
   const [salonSort, setSalonSort] = useState('name_asc');
+
 
   // Success notes fade on their own; errors stay until dismissed.
   useEffect(() => {
@@ -170,24 +188,53 @@ export default function SubscriptionsPage() {
   }, []);
 
   // The list row only carries subscription-scoped fields, so we go back to the
-  // salon endpoint for address, contact, city, staff and service counts.
-  const openSalonInfo = async (salon: any) => {
+  // salon endpoint for address, contact, city, staff and service counts, and to
+  // the subscription-history endpoint for current & past subscription records.
+  const openSalonInfo = (salon: any, initialTab: 'overview' | 'subscription' = 'overview') => {
+    if (!salon?.id) return;
+    setInfoSalonTab(initialTab);
     setInfoSalon({ ...salon, detail: null });
     setInfoLoading(true);
-    try {
-      const res = await fetch(`/api/proxy/superadmin/salons/${salon.id}`, {
-        headers: authHeaders(),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setInfoSalon((prev: any) => (prev ? { ...prev, detail: data.data } : prev));
-      }
-    } catch (e) {
-      console.error('Failed to load salon details:', e);
-    } finally {
-      setInfoLoading(false);
-    }
+    setInfoSubscriptionData(null);
+    setInfoSubscriptionLoading(true);
+    setInfoSubscriptionError('');
+
+    fetch(`/api/proxy/superadmin/salons/${salon.id}`, {
+      headers: authHeaders(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setInfoSalon((prev: any) => (prev ? { ...prev, detail: data.data } : prev));
+        }
+      })
+      .catch((e) => console.error('Failed to load salon details:', e))
+      .finally(() => setInfoLoading(false));
+
+    fetch(`/api/proxy/superadmin/salons/${salon.id}/subscription-history`, {
+      headers: authHeaders(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setInfoSubscriptionData(data);
+        } else {
+          setInfoSubscriptionError(data.message || 'Could not load subscription history.');
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to load subscription history:', e);
+        setInfoSubscriptionError('Could not reach the server.');
+      })
+      .finally(() => setInfoSubscriptionLoading(false));
   };
+
+  const openSalonPlanHistory = (salonId?: number | string | null, salonName?: string) => {
+    if (!salonId) return;
+    const existing = salons.find((s) => String(s.id) === String(salonId));
+    openSalonInfo(existing || { id: salonId, name: salonName || 'Salon' }, 'subscription');
+  };
+
 
   const openCreateModal = () => {
     setEditingPlanId(null);
@@ -516,7 +563,16 @@ export default function SubscriptionsPage() {
                   const isCommission = req.billing_type === COMMISSION;
                   return (
                     <tr key={req.id}>
-                      <td><Person name={req.salon?.name ?? 'Unknown salon'} size={32} /></td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.salonBtn}
+                          onClick={() => openSalonInfo(req.salon || { id: req.salon_id, name: req.salon?.name })}
+                          title="View salon details"
+                        >
+                          <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
+                        </button>
+                      </td>
                       <td>
                         <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
                       </td>
@@ -605,13 +661,23 @@ export default function SubscriptionsPage() {
                   <th>Transaction reference</th>
                   <th>Sent</th>
                   <th>Decision</th>
+                  <th>Plan history</th>
                   <th className={ui.alignRight}>Receipt</th>
                 </tr>
               </thead>
               <tbody>
                 {decidedRequests.map((req) => (
                   <tr key={req.id}>
-                    <td><Person name={req.salon?.name ?? 'Unknown salon'} size={32} /></td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.salonBtn}
+                        onClick={() => openSalonInfo(req.salon || { id: req.salon_id, name: req.salon?.name })}
+                        title="View salon details"
+                      >
+                        <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
+                      </button>
+                    </td>
                     <td><Badge tone={req.billing_type === COMMISSION ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge></td>
                     <td>{req.plan?.name || '—'}</td>
                     <td className={ui.alignRight}>
@@ -628,6 +694,16 @@ export default function SubscriptionsPage() {
                       <Badge tone={statusTone(req.status)} dot={false}>
                         {req.status === 'approved' ? 'Approved' : 'Rejected'}
                       </Badge>
+                    </td>
+                    <td>
+                      <Button
+                        size="sm"
+                        variant="soft"
+                        icon="history"
+                        onClick={() => openSalonPlanHistory(req.salon_id ?? req.salon?.id, req.salon?.name)}
+                      >
+                        Plan history
+                      </Button>
                     </td>
                     <td className={ui.alignRight}>
                       {req.screenshot_url ? (
@@ -1164,58 +1240,300 @@ export default function SubscriptionsPage() {
       <Modal
         open={!!infoSalon}
         onClose={() => setInfoSalon(null)}
-        size="md"
+        size="lg"
         title={infoSalon?.name ?? 'Salon'}
         header={infoSalon && <Person name={infoSalon.name} sub={infoSalon.owner} size={44} />}
         footer={<Button variant="primary" onClick={() => setInfoSalon(null)}>Close</Button>}
       >
-        {infoSalon && (infoLoading && infoSalon.detail == null ? (
-          <div className={styles.form}>
-            <Skeleton height={140} radius={14} />
-            <Skeleton height={100} radius={14} />
-          </div>
-        ) : infoSalon.detail ? (
-          <>
-            <div className={styles.infoStats}>
-              <div className={styles.fact}><span>Staff</span><b>{infoSalon.detail.providers?.length ?? '—'}</b></div>
-              <div className={styles.fact}><span>Services</span><b>{infoSalon.detail.services?.length ?? '—'}</b></div>
-              <div className={styles.fact}><span>Combos</span><b>{infoSalon.detail.combos?.length ?? '—'}</b></div>
+        {infoSalon && (
+          <div>
+            <div className={styles.modalTabsWrap}>
+              <Tabs<'overview' | 'subscription'>
+                value={infoSalonTab}
+                onChange={setInfoSalonTab}
+                tabs={[
+                  { value: 'overview', label: 'Salon Overview' },
+                  {
+                    value: 'subscription',
+                    label: (
+                      <span>
+                        Subscription History
+                        {infoSubscriptionData?.subscriptions?.length ? (
+                          <span className={styles.tabBadge}>{infoSubscriptionData.subscriptions.length}</span>
+                        ) : null}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
             </div>
-            <h4 className={ui.sectionLabel}>Salon</h4>
-            <DescriptionList
-              items={[
-                ['Status', infoSalon.detail.status],
-                ['City', infoSalon.detail.city?.name],
-                ['Address', infoSalon.detail.address],
-                ['Pincode', infoSalon.detail.pincode],
-                ['Gender focus', infoSalon.detail.gender_focus],
-                ['Description', infoSalon.detail.description],
-              ]}
-            />
-            <h4 className={ui.sectionLabel}>Owner</h4>
-            <DescriptionList
-              items={[
-                ['Name', infoSalon.detail.admin?.name],
-                ['Phone', infoSalon.detail.admin?.phone],
-                ['Email', infoSalon.detail.admin?.email],
-              ]}
-            />
-            <h4 className={ui.sectionLabel}>Billing</h4>
-            <DescriptionList
-              items={[
-                ['Model', infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)],
-                ['Plan', infoSalon.current_plan],
-                ...(infoSalon.billing_model === COMMISSION
-                  ? ([['Commission', pct(infoSalon.commission_percentage)]] as [string, string][])
-                  : []),
-                ['Access until', infoSalon.expiry ? fmtDay(infoSalon.expiry) : 'N/A'],
-                ['Registered', infoSalon.detail.created_at ? new Date(infoSalon.detail.created_at).toLocaleDateString('en-IN') : '—'],
-              ]}
-            />
-          </>
-        ) : (
-          <EmptyState icon="alert" title="Could not load salon details" />
-        ))}
+
+            {infoSalonTab === 'overview' && (
+              infoLoading && infoSalon.detail == null ? (
+                <div className={styles.form}>
+                  <Skeleton height={140} radius={14} />
+                  <Skeleton height={100} radius={14} />
+                </div>
+              ) : infoSalon.detail ? (
+                <>
+                  <div className={styles.infoStats}>
+                    <div className={styles.fact}><span>Staff</span><b>{infoSalon.detail.providers?.length ?? '—'}</b></div>
+                    <div className={styles.fact}><span>Services</span><b>{infoSalon.detail.services?.length ?? '—'}</b></div>
+                    <div className={styles.fact}><span>Combos</span><b>{infoSalon.detail.combos?.length ?? '—'}</b></div>
+                  </div>
+                  <h4 className={ui.sectionLabel}>Salon</h4>
+                  <DescriptionList
+                    items={[
+                      ['Status', infoSalon.detail.status],
+                      ['City', infoSalon.detail.city?.name],
+                      ['Address', infoSalon.detail.address],
+                      ['Pincode', infoSalon.detail.pincode],
+                      ['Gender focus', infoSalon.detail.gender_focus],
+                      ['Description', infoSalon.detail.description],
+                    ]}
+                  />
+                  <h4 className={ui.sectionLabel}>Owner</h4>
+                  <DescriptionList
+                    items={[
+                      ['Name', infoSalon.detail.admin?.name],
+                      ['Phone', infoSalon.detail.admin?.phone],
+                      ['Email', infoSalon.detail.admin?.email],
+                    ]}
+                  />
+                  <h4 className={ui.sectionLabel}>Billing</h4>
+                  <DescriptionList
+                    items={[
+                      ['Model', infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)],
+                      ['Plan', infoSalon.current_plan],
+                      ...(infoSalon.billing_model === COMMISSION
+                        ? ([['Commission', pct(infoSalon.commission_percentage)]] as [string, string][])
+                        : []),
+                      ['Access until', infoSalon.expiry ? fmtDay(infoSalon.expiry) : 'N/A'],
+                      ['Registered', infoSalon.detail.created_at ? new Date(infoSalon.detail.created_at).toLocaleDateString('en-IN') : '—'],
+                    ]}
+                  />
+                </>
+              ) : (
+                <EmptyState icon="alert" title="Could not load salon details" />
+              )
+            )}
+
+            {infoSalonTab === 'subscription' && (
+              infoSubscriptionLoading ? (
+                <div className={styles.historyLoadingWrap}>
+                  <Skeleton height={110} radius={14} />
+                  <Skeleton height={200} radius={14} />
+                </div>
+              ) : infoSubscriptionError ? (
+                <Alert tone="error">{infoSubscriptionError}</Alert>
+              ) : (
+                <div>
+                  {/* Current Active Plan Details on top */}
+                  {(() => {
+                    const currentSub = infoSubscriptionData?.current_subscription;
+                    const salonMeta = infoSubscriptionData?.salon;
+                    const isCommission = (salonMeta?.billing_model ?? infoSalon.billing_model) === COMMISSION;
+                    const planName = currentSub?.plan_name ?? (infoSalon.current_plan && infoSalon.current_plan !== 'None' ? infoSalon.current_plan : 'No active plan');
+                    const hasActive = currentSub?.status === 'active' || (isCommission && infoSalon.current_plan !== 'None');
+                    const activeDaysRemaining = daysUntil(currentSub?.expires_at?.split(' ')[0] ?? infoSalon.expiry);
+
+                    // Find matching plan in subscriptions to extract price & validity if available
+                    const matchedPlan = infoSubscriptionData?.subscriptions?.find(
+                      (s: any) => s.id === currentSub?.id || (s.plan_name === planName && s.status === 'active')
+                    );
+                    const price = matchedPlan?.price;
+                    const validityDays = matchedPlan?.validity_days;
+
+                    return (
+                      <div className={styles.activePlanCard}>
+                        <div className={styles.activePlanHead}>
+                          <div className={styles.activePlanIcon}>
+                            <Icon name={isCommission ? 'percent' : 'crown'} size={24} />
+                          </div>
+                          <div className={styles.activePlanInfo}>
+                            <div className={styles.activePlanTitleRow}>
+                              <span className={styles.activePlanLabel}>Current Active Plan</span>
+                              <Badge tone={hasActive ? 'success' : 'neutral'} dot={hasActive}>
+                                {hasActive ? 'Active' : 'No active plan'}
+                              </Badge>
+                              {activeDaysRemaining !== null && hasActive && !isCommission && (
+                                <Badge tone={activeDaysRemaining <= 7 ? (activeDaysRemaining < 0 ? 'danger' : 'warning') : 'info'}>
+                                  {activeDaysRemaining < 0 ? 'Expired' : activeDaysRemaining === 0 ? 'Expires today' : `${activeDaysRemaining}d remaining`}
+                                </Badge>
+                              )}
+                            </div>
+                            <h3 className={styles.activePlanName}>{planName}</h3>
+                          </div>
+                        </div>
+
+                        <div className={styles.activePlanGrid}>
+                          <div className={styles.activePlanFact}>
+                            <span>Arrangement</span>
+                            <b>{modelLabel(salonMeta?.billing_model ?? infoSalon.billing_model)}</b>
+                          </div>
+                          {isCommission ? (
+                            <div className={styles.activePlanFact}>
+                              <span>Commission rate</span>
+                              <b>{pct(salonMeta?.commission_percentage ?? infoSalon.commission_percentage)}</b>
+                            </div>
+                          ) : (
+                            <div className={styles.activePlanFact}>
+                              <span>Price / Validity</span>
+                              <b>
+                                {price != null ? formatINR(price) : '—'}
+                                {validityDays ? ` (${validityDays} days)` : ''}
+                              </b>
+                            </div>
+                          )}
+                          <div className={styles.activePlanFact}>
+                            <span>Valid from</span>
+                            <b>{fmtDateStr(currentSub?.starts_at)}</b>
+                          </div>
+                          <div className={styles.activePlanFact}>
+                            <span>Valid until</span>
+                            <b>
+                              {currentSub?.expires_at
+                                ? fmtDateStr(currentSub.expires_at)
+                                : isCommission
+                                ? 'Ongoing'
+                                : infoSalon.expiry
+                                ? fmtDay(infoSalon.expiry)
+                                : 'No expiry date'}
+                            </b>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* All Subscription Plans History Table */}
+                  <div className={styles.historySection}>
+                    <h4 className={ui.sectionLabel}>
+                      Subscription plans ({infoSubscriptionData?.subscriptions?.length ?? 0})
+                    </h4>
+                    {(!infoSubscriptionData?.subscriptions || infoSubscriptionData.subscriptions.length === 0) ? (
+                      <EmptyState
+                        icon="crown"
+                        title="No subscription history"
+                        hint="This salon has not had any subscription plans assigned yet."
+                      />
+                    ) : (
+                      <div className={ui.tableWrap}>
+                        <table className={ui.table}>
+                          <thead>
+                            <tr>
+                              <th>Plan</th>
+                              <th>Arrangement</th>
+                              <th>Price</th>
+                              <th>Validity</th>
+                              <th>Valid from</th>
+                              <th>Expires on</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {infoSubscriptionData.subscriptions.map((sub: any) => {
+                              const isComm = sub.billing_model === COMMISSION;
+                              return (
+                                <tr key={sub.id}>
+                                  <td>
+                                    <div className={styles.planCell}>
+                                      <span>{sub.plan_name}</span>
+                                      {sub.is_custom && <Badge tone="accent">Custom</Badge>}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <Badge tone={isComm ? 'accent' : 'info'}>
+                                      {modelLabel(sub.billing_model)}
+                                    </Badge>
+                                  </td>
+                                  <td>{sub.price != null ? formatINR(sub.price) : '—'}</td>
+                                  <td className={ui.num}>{sub.validity_days ? `${sub.validity_days} days` : '—'}</td>
+                                  <td className={ui.num}>{fmtDateStr(sub.starts_at)}</td>
+                                  <td className={ui.num}>{fmtDateStr(sub.expires_at)}</td>
+                                  <td>
+                                    <Badge
+                                      tone={
+                                        sub.status === 'active'
+                                          ? 'success'
+                                          : sub.status === 'expired'
+                                          ? 'neutral'
+                                          : sub.status === 'cancelled'
+                                          ? 'danger'
+                                          : 'warning'
+                                      }
+                                      dot={false}
+                                    >
+                                      {sub.status ? sub.status.charAt(0).toUpperCase() + sub.status.slice(1) : '—'}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payment Submissions Table if any */}
+                  {infoSubscriptionData?.payment_requests && infoSubscriptionData.payment_requests.length > 0 && (
+                    <div className={styles.historySection}>
+                      <h4 className={cx(ui.sectionLabel, styles.historySectionGap)}>
+                        Payment submissions ({infoSubscriptionData.payment_requests.length})
+                      </h4>
+                      <div className={ui.tableWrap}>
+                        <table className={ui.table}>
+                          <thead>
+                            <tr>
+                              <th>Plan</th>
+                              <th>Arrangement</th>
+                              <th className={ui.alignRight}>Amount</th>
+                              <th>Transaction reference</th>
+                              <th>Submitted</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {infoSubscriptionData.payment_requests.map((pr: any) => (
+                              <tr key={pr.id}>
+                                <td>{pr.plan_name}</td>
+                                <td>
+                                  <Badge tone={pr.billing_type === COMMISSION ? 'accent' : 'info'}>
+                                    {modelLabel(pr.billing_type)}
+                                  </Badge>
+                                </td>
+                                <td className={ui.alignRight}>
+                                  {pr.amount_payable_inr != null ? formatINR(pr.amount_payable_inr, 2) : '—'}
+                                  {Number(pr.coins_to_redeem) > 0 && (
+                                    <div className={styles.refNote}>+{pr.coins_to_redeem} coins</div>
+                                  )}
+                                </td>
+                                <td>
+                                  {pr.transaction_id ? (
+                                    <b className={styles.refId}>{pr.transaction_id}</b>
+                                  ) : (
+                                    <span className={styles.mutedNote}>—</span>
+                                  )}
+                                </td>
+                                <td className={ui.num}>{fmtDateStr(pr.created_at)}</td>
+                                <td>
+                                  <Badge tone={statusTone(pr.status)} dot={false}>
+                                    {pr.status ? pr.status.charAt(0).toUpperCase() + pr.status.slice(1) : '—'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        )}
       </Modal>
 
       {confirmDialog}

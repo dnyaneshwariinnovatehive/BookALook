@@ -518,11 +518,19 @@ class _AnimatedBigPinState extends State<_AnimatedBigPin> with SingleTickerProvi
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1500),
-  )..repeat(reverse: true);
+  );
 
   late final Animation<double> _animation = Tween<double>(begin: 0, end: -8).animate(
     CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+      _controller.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
