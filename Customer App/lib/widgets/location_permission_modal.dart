@@ -280,36 +280,36 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
           child: Material(
             color: Colors.transparent,
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 380),
+              constraints: const BoxConstraints(maxWidth: 360),
               decoration: BoxDecoration(
                 color: context.colors.surface,
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isDark
                       ? context.colors.border
-                      : AppTheme.accentColor.withValues(alpha: 0.12),
+                      : AppTheme.accentColor.withValues(alpha: 0.10),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: AppTheme.accentColor.withValues(
-                      alpha: isDark ? 0.25 : 0.14,
+                      alpha: isDark ? 0.22 : 0.12,
                     ),
-                    blurRadius: 36,
+                    blurRadius: 32,
                     spreadRadius: 0,
-                    offset: const Offset(0, 12),
+                    offset: const Offset(0, 10),
                   ),
                   BoxShadow(
                     color: Colors.black.withValues(
-                      alpha: isDark ? 0.5 : 0.10,
+                      alpha: isDark ? 0.45 : 0.08,
                     ),
-                    blurRadius: 20,
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -317,37 +317,10 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                     // Top Illustration Header with Close Button
                     Stack(
                       children: [
-                        SizedBox(
-                          height: 110,
+                        const SizedBox(
+                          height: 115,
                           width: double.infinity,
-                          child: FittedBox(
-                            fit: BoxFit.cover,
-                            alignment: const Alignment(0, 0.15),
-                            child: const SizedBox(
-                              width: 380,
-                              height: 220,
-                              child: SalonIllustration(),
-                            ),
-                          ),
-                        ),
-                        // Soft bottom gradient blend
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: 28,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  context.colors.surface.withValues(alpha: 0.0),
-                                  context.colors.surface,
-                                ],
-                              ),
-                            ),
-                          ),
+                          child: SalonIllustration(),
                         ),
                         // Close Button (X)
                         Positioned(
@@ -367,19 +340,24 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                 decoration: BoxDecoration(
                                   color: context.colors.surface.withValues(alpha: 0.90),
                                   shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isDark
+                                        ? context.colors.border
+                                        : Colors.black.withValues(alpha: 0.06),
+                                    width: 1,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.12),
+                                      color: Colors.black.withValues(alpha: 0.08),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close_rounded,
                                   size: 18,
-                                  color: Color(0xFF4B5563),
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             ),
@@ -390,7 +368,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
 
                     // Main Content Section
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -399,13 +377,13 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                             'Turn on your location',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.outfit(
-                              fontSize: 18,
+                              fontSize: 18.5,
                               fontWeight: FontWeight.w700,
                               color: context.colors.textPrimary,
                               letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
 
                           // Supporting Text
                           Text(
@@ -424,7 +402,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                           _buildBenefitRow(
                             icon: Icons.location_on_rounded,
                             iconColor: AppTheme.accentColor,
-                            iconBg: context.colors.accentSoft,
+                            iconBg: const Color(0xFFEDE9FE),
                             title: 'Discover salons near you',
                             description:
                                 'Explore salons and available services around your area.',
@@ -434,8 +412,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                           // Benefit 2: Plan your visit easily
                           _buildBenefitRow(
                             icon: Icons.calendar_today_rounded,
-                            iconColor: const Color(0xFF3B82F6),
-                            iconBg: const Color(0xFFDBEAFE),
+                            iconColor: const Color(0xFF0284C7),
+                            iconBg: const Color(0xFFE0F2FE),
                             title: 'Plan your visit easily',
                             description:
                                 'Get accurate distance, availability and instant booking.',
@@ -767,8 +745,8 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                                 const SizedBox(width: 6),
                                                 Text(
                                                   'Enable location',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 14.5,
                                                     fontWeight: FontWeight.w700,
                                                     color:
                                                         context.colors.onAccent,
@@ -804,15 +782,22 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                   style: TextButton.styleFrom(
                                     backgroundColor: isDark
                                         ? context.colors.surfaceMuted
-                                        : context.colors.accentSoft,
+                                        : const Color(0xFFF4EFFF),
                                     foregroundColor: AppTheme.accentColor,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(
+                                        color: isDark
+                                            ? context.colors.border
+                                            : AppTheme.accentColor
+                                                .withValues(alpha: 0.18),
+                                        width: 1,
+                                      ),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'Select location manually',
-                                    style: TextStyle(
+                                    style: GoogleFonts.outfit(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.accentColor,
@@ -859,27 +844,27 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: isDark ? context.colors.surfaceMuted : const Color(0xFFF7F6FC),
-        borderRadius: BorderRadius.circular(12),
+        color: isDark ? context.colors.surfaceMuted : const Color(0xFFF9F8FD),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: isDark
               ? context.colors.border
-              : AppTheme.accentColor.withValues(alpha: 0.07),
-          width: 0.8,
+              : AppTheme.accentColor.withValues(alpha: 0.08),
+          width: 0.9,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 30,
-            height: 30,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: iconBg,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 16, color: iconColor),
+            child: Icon(icon, size: 17, color: iconColor),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -888,7 +873,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: GoogleFonts.outfit(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: context.colors.textPrimary,

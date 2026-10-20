@@ -96,17 +96,21 @@ class DiscoverySalonCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IntrinsicHeight(
+              SizedBox(
+                height: 125,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
                       width: 125,
+                      height: 125,
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
                           Image.network(
                             salon['cover_photo_url'] ?? '',
+                            width: 125,
+                            height: 125,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Container(
                               color: context.colors.imagePlaceholder,
@@ -163,9 +167,10 @@ class DiscoverySalonCard extends StatelessWidget {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
