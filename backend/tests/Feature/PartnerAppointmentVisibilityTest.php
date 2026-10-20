@@ -105,7 +105,36 @@ class PartnerAppointmentVisibilityTest extends TestCase
     public function test_provider_from_another_salon_is_forbidden(): void
     {
         [$salonA, , , $providerA] = $this->fixture();
-        [$salonB] = $this->fixture();
+
+        $otherAdmin = User::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Other Admin',
+            'phone' => '94' . rand(10000000, 99999999),
+            'password_hash' => bcrypt('password'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $salonB = Salon::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'admin_id' => $otherAdmin->id,
+            'name' => 'Other Salon',
+            'slug' => 'other-salon-' . \Illuminate\Support\Str::random(5),
+            'address' => '456 Other St',
+            'status' => 'active',
+            'submitted_by' => $otherAdmin->id,
+        ]);
+
+        $plan = SubscriptionPlan::first();
+        SalonSubscription::create([
+            'salon_id' => $salonB->id,
+            'plan_id' => $plan->id,
+            'billing_type' => \App\Support\BillingModel::SUBSCRIPTION,
+            'plan_price_snapshot' => $plan->price,
+            'start_date' => Carbon::today()->subDay(),
+            'end_date' => Carbon::today()->addDays(30),
+            'status' => 'active',
+        ]);
 
         // Provider A tries to access salon B's appointment endpoint
         $this->actingAs($providerA->user, 'sanctum')
