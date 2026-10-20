@@ -154,6 +154,7 @@ Route::prefix('superadmin')->group(function () {
     // Salon Directory API (Unprotected for now)
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+    Route::get('/salons/{id}/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'forSalon']);
     Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
     // The directory is the only surface that holds partner-app salons, which
     // never passed through an enquiry to be assigned a collaborator.

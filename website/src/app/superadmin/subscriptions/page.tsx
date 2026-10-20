@@ -124,17 +124,27 @@ export default function SubscriptionsPage() {
   const [blockingPayouts, setBlockingPayouts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Salon detail popup — runs off the full salon endpoint & subscription history.
+  // Salon detail popup — runs off full salon endpoint, subscription history, appointments & payouts.
+  type SalonInfoTab = 'salon_info' | 'owner_details' | 'appointments' | 'finance' | 'payouts' | 'plan_history';
   const [infoSalon, setInfoSalon] = useState<any>(null);
   const [infoLoading, setInfoLoading] = useState(false);
-  const [infoSalonTab, setInfoSalonTab] = useState<'overview' | 'subscription'>('overview');
+  const [infoSalonTab, setInfoSalonTab] = useState<SalonInfoTab>('salon_info');
   const [infoSubscriptionData, setInfoSubscriptionData] = useState<any>(null);
   const [infoSubscriptionLoading, setInfoSubscriptionLoading] = useState(false);
   const [infoSubscriptionError, setInfoSubscriptionError] = useState('');
+
+  // Appointments & Finance for the salon
+  const [infoAppointments, setInfoAppointments] = useState<any[]>([]);
+  const [infoAppointmentsLoading, setInfoAppointmentsLoading] = useState(false);
+  const [infoAppointmentsError, setInfoAppointmentsError] = useState('');
+
+  // Payout data for the salon
+  const [infoPayoutsData, setInfoPayoutsData] = useState<any>(null);
+  const [infoPayoutsLoading, setInfoPayoutsLoading] = useState(false);
+  const [infoPayoutsError, setInfoPayoutsError] = useState('');
   const [salonSearch, setSalonSearch] = useState('');
   const [salonFilterModel, setSalonFilterModel] = useState('');
   const [salonSort, setSalonSort] = useState('name_asc');
-
 
   // Success notes fade on their own; errors stay until dismissed.
   useEffect(() => {
@@ -188,9 +198,10 @@ export default function SubscriptionsPage() {
   }, []);
 
   // The list row only carries subscription-scoped fields, so we go back to the
-  // salon endpoint for address, contact, city, staff and service counts, and to
-  // the subscription-history endpoint for current & past subscription records.
-  const openSalonInfo = (salon: any, initialTab: 'overview' | 'subscription' = 'overview') => {
+  // salon endpoint for address, contact, city, staff and service counts, to
+  // the subscription-history endpoint for plans, to appointments for recent bookings & finance,
+  // and to payouts for settlement cycle data.
+  const openSalonInfo = (salon: any, initialTab: SalonInfoTab = 'salon_info') => {
     if (!salon?.id) return;
     setInfoSalonTab(initialTab);
     setInfoSalon({ ...salon, detail: null });
@@ -198,7 +209,14 @@ export default function SubscriptionsPage() {
     setInfoSubscriptionData(null);
     setInfoSubscriptionLoading(true);
     setInfoSubscriptionError('');
+    setInfoAppointments([]);
+    setInfoAppointmentsLoading(true);
+    setInfoAppointmentsError('');
+    setInfoPayoutsData(null);
+    setInfoPayoutsLoading(true);
+    setInfoPayoutsError('');
 
+    // 1. Full Salon details & Owner admin info
     fetch(`/api/proxy/superadmin/salons/${salon.id}`, {
       headers: authHeaders(),
     })
@@ -211,6 +229,7 @@ export default function SubscriptionsPage() {
       .catch((e) => console.error('Failed to load salon details:', e))
       .finally(() => setInfoLoading(false));
 
+    // 2. Subscription plans & payment requests history
     fetch(`/api/proxy/superadmin/salons/${salon.id}/subscription-history`, {
       headers: authHeaders(),
     })
@@ -227,12 +246,140 @@ export default function SubscriptionsPage() {
         setInfoSubscriptionError('Could not reach the server.');
       })
       .finally(() => setInfoSubscriptionLoading(false));
+
+    // 3. Appointments & Appointment-related finance
+    fetch(`/api/proxy/superadmin/appointments?salon_id=${salon.id}&per_page=30`, {
+      headers: authHeaders(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setInfoAppointments(data.data);
+        } else if (Array.isArray(data.appointments)) {
+          setInfoAppointments(data.appointments);
+        } else if (Array.isArray(data)) {
+          setInfoAppointments(data);
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to load salon appointments:', e);
+        setInfoAppointmentsError('Could not load appointments.');
+      })
+      .finally(() => setInfoAppointmentsLoading(false));
+
+    // 4. Payout settlement data
+    fetch(`/api/proxy/superadmin/salons/${salon.id}/payouts`, {
+      headers: authHeaders(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setInfoPayoutsData(data);
+        } else {
+          // Fallback check for partner payouts endpoint
+          fetch(`/api/proxy/partner/salons/${salon.id}/payouts`, { headers: authHeaders() })
+            .then((r) => r.json())
+            .then((pData) => {
+              if (pData.success) setInfoPayoutsData(pData);
+              else setInfoPayoutsError(data.message || 'No payouts available yet.');
+            })
+            .catch(() => setInfoPayoutsError(data.message || 'No payouts available yet.'));
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to load salon payouts:', e);
+        setInfoPayoutsError('Could not reach payouts service.');
+      })
+      .finally(() => setInfoPayoutsLoading(false));
   };
 
   const openSalonPlanHistory = (salonId?: number | string | null, salonName?: string) => {
     if (!salonId) return;
     const existing = salons.find((s) => String(s.id) === String(salonId));
-    openSalonInfo(existing || { id: salonId, name: salonName || 'Salon' }, 'subscription');
+    openSalonInfo(existing || { id: salonId, name: salonName || 'Salon' }, 'plan_history');
+  };
+
+  // Financial KPIs derived from appointments
+  const financeMetrics = useMemo(() => {
+    if (!infoAppointments || infoAppointments.length === 0) {
+      return {
+        totalRevenue: 0,
+        advancesCollected: 0,
+        balanceCollected: 0,
+        completedCount: 0,
+        cancelledCount: 0,
+        avgTicket: 0,
+      };
+    }
+
+    let totalRevenue = 0;
+    let advancesCollected = 0;
+    let balanceCollected = 0;
+    let completedCount = 0;
+    let cancelledCount = 0;
+
+    for (const apt of infoAppointments) {
+      const isCompleted = apt.status === 'completed';
+      const isCancelled = apt.status === 'cancelled' || apt.status === 'no_show';
+      if (isCompleted) completedCount++;
+      if (isCancelled) cancelledCount++;
+
+      const bill = parseFloat(apt.final_billed_amount ?? apt.total_amount ?? 0) || 0;
+      const adv = parseFloat(apt.advance_amount ?? 0) || 0;
+      const bal = parseFloat(apt.balance_amount ?? (bill > adv ? bill - adv : 0)) || 0;
+
+      if (!isCancelled) {
+        totalRevenue += bill;
+        advancesCollected += adv;
+        balanceCollected += bal;
+      }
+    }
+
+    const validCount = infoAppointments.filter((a) => a.status !== 'cancelled' && a.status !== 'no_show').length;
+    const avgTicket = validCount > 0 ? totalRevenue / validCount : 0;
+
+    return {
+      totalRevenue,
+      advancesCollected,
+      balanceCollected,
+      completedCount,
+      cancelledCount,
+      avgTicket,
+    };
+  }, [infoAppointments]);
+
+  // Appointment counts
+  const appointmentCounts = useMemo(() => {
+    const total = infoAppointments.length;
+    let completed = 0;
+    let upcoming = 0;
+    let cancelled = 0;
+    for (const apt of infoAppointments) {
+      if (apt.status === 'completed') completed++;
+      else if (apt.status === 'cancelled' || apt.status === 'no_show') cancelled++;
+      else upcoming++;
+    }
+    return { total, completed, upcoming, cancelled };
+  }, [infoAppointments]);
+
+  const appointmentStatusTone = (status?: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' => {
+    switch (status) {
+      case 'completed': return 'success';
+      case 'confirmed':
+      case 'in_progress': return 'info';
+      case 'pending': return 'warning';
+      case 'cancelled':
+      case 'no_show': return 'danger';
+      default: return 'neutral';
+    }
+  };
+
+  const payoutStatusTone = (status?: string): 'success' | 'warning' | 'neutral' => {
+    switch (status) {
+      case 'distributed': return 'success';
+      case 'approved': return 'warning';
+      default: return 'neutral';
+    }
   };
 
 
@@ -1242,22 +1389,66 @@ export default function SubscriptionsPage() {
         onClose={() => setInfoSalon(null)}
         size="lg"
         title={infoSalon?.name ?? 'Salon'}
-        header={infoSalon && <Person name={infoSalon.name} sub={infoSalon.owner} size={44} />}
+        header={
+          infoSalon && (
+            <div className={styles.salonModalHead}>
+              <div className={styles.salonModalHeadMain}>
+                <Person name={infoSalon.name} sub={infoSalon.detail?.admin?.name || infoSalon.owner || 'Salon Owner'} size={44} />
+                <div className={styles.salonModalHeadPills}>
+                  <Badge tone={infoSalon.detail?.status === 'active' ? 'success' : 'neutral'} dot={infoSalon.detail?.status === 'active'}>
+                    {infoSalon.detail?.status ? infoSalon.detail.status.charAt(0).toUpperCase() + infoSalon.detail.status.slice(1) : 'Active'}
+                  </Badge>
+                  <Badge tone={infoSalon.billing_model === COMMISSION ? 'accent' : 'info'}>
+                    {infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)}
+                  </Badge>
+                  {infoSalon.current_plan && infoSalon.current_plan !== 'None' && (
+                    <Badge tone="neutral">{infoSalon.current_plan}</Badge>
+                  )}
+                  {infoSalon.detail?.city?.name && (
+                    <span className={styles.headCityPill}>
+                      <Icon name="pin" size={13} /> {infoSalon.detail.city.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        }
         footer={<Button variant="primary" onClick={() => setInfoSalon(null)}>Close</Button>}
       >
         {infoSalon && (
-          <div>
+          <div className={styles.salonModalWrapper}>
             <div className={styles.modalTabsWrap}>
-              <Tabs<'overview' | 'subscription'>
+              <Tabs<SalonInfoTab>
                 value={infoSalonTab}
                 onChange={setInfoSalonTab}
                 tabs={[
-                  { value: 'overview', label: 'Salon Overview' },
+                  { value: 'salon_info', label: <span><Icon name="store" size={15} /> Salon Info</span> },
+                  { value: 'owner_details', label: <span><Icon name="users" size={15} /> Owner Details</span> },
                   {
-                    value: 'subscription',
+                    value: 'appointments',
                     label: (
                       <span>
-                        Subscription History
+                        <Icon name="calendar" size={15} /> Appointments
+                        {infoAppointments?.length ? <span className={styles.tabBadge}>{infoAppointments.length}</span> : null}
+                      </span>
+                    ),
+                  },
+                  { value: 'finance', label: <span><Icon name="rupee" size={15} /> Finance</span> },
+                  {
+                    value: 'payouts',
+                    label: (
+                      <span>
+                        <Icon name="wallet" size={15} /> Payouts
+                        {infoPayoutsData?.payouts?.length ? <span className={styles.tabBadge}>{infoPayoutsData.payouts.length}</span> : null}
+                      </span>
+                    ),
+                  },
+                  {
+                    value: 'plan_history',
+                    label: (
+                      <span>
+                        <Icon name="history" size={15} /> Plan History
                         {infoSubscriptionData?.subscriptions?.length ? (
                           <span className={styles.tabBadge}>{infoSubscriptionData.subscriptions.length}</span>
                         ) : null}
@@ -1268,57 +1459,543 @@ export default function SubscriptionsPage() {
               />
             </div>
 
-            {infoSalonTab === 'overview' && (
+            {/* ===================== TAB 1: SALON INFO ===================== */}
+            {infoSalonTab === 'salon_info' && (
               infoLoading && infoSalon.detail == null ? (
-                <div className={styles.form}>
-                  <Skeleton height={140} radius={14} />
-                  <Skeleton height={100} radius={14} />
+                <div className={styles.historyLoadingWrap}>
+                  <Skeleton height={80} radius={14} />
+                  <Skeleton height={200} radius={14} />
                 </div>
               ) : infoSalon.detail ? (
-                <>
-                  <div className={styles.infoStats}>
-                    <div className={styles.fact}><span>Staff</span><b>{infoSalon.detail.providers?.length ?? '—'}</b></div>
-                    <div className={styles.fact}><span>Services</span><b>{infoSalon.detail.services?.length ?? '—'}</b></div>
-                    <div className={styles.fact}><span>Combos</span><b>{infoSalon.detail.combos?.length ?? '—'}</b></div>
+                <div className={styles.sectionFade}>
+                  <div className={styles.infoStatsGrid}>
+                    <div className={styles.statTile}>
+                      <div className={styles.statTileIcon}><Icon name="users" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Staff Members</span>
+                        <b className={styles.statTileValue}>{infoSalon.detail.providers?.length ?? 0}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={styles.statTileIcon}><Icon name="catalog" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Services Offered</span>
+                        <b className={styles.statTileValue}>{infoSalon.detail.services?.length ?? 0}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={styles.statTileIcon}><Icon name="sparkle" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Combos &amp; Packages</span>
+                        <b className={styles.statTileValue}>{infoSalon.detail.combos?.length ?? 0}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={styles.statTileIcon}><Icon name="store" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Gender Focus</span>
+                        <b className={styles.statTileValue}>{infoSalon.detail.gender_focus || 'Unisex'}</b>
+                      </div>
+                    </div>
                   </div>
-                  <h4 className={ui.sectionLabel}>Salon</h4>
-                  <DescriptionList
-                    items={[
-                      ['Status', infoSalon.detail.status],
-                      ['City', infoSalon.detail.city?.name],
-                      ['Address', infoSalon.detail.address],
-                      ['Pincode', infoSalon.detail.pincode],
-                      ['Gender focus', infoSalon.detail.gender_focus],
-                      ['Description', infoSalon.detail.description],
-                    ]}
-                  />
-                  <h4 className={ui.sectionLabel}>Owner</h4>
-                  <DescriptionList
-                    items={[
-                      ['Name', infoSalon.detail.admin?.name],
-                      ['Phone', infoSalon.detail.admin?.phone],
-                      ['Email', infoSalon.detail.admin?.email],
-                    ]}
-                  />
-                  <h4 className={ui.sectionLabel}>Billing</h4>
-                  <DescriptionList
-                    items={[
-                      ['Model', infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)],
-                      ['Plan', infoSalon.current_plan],
-                      ...(infoSalon.billing_model === COMMISSION
-                        ? ([['Commission', pct(infoSalon.commission_percentage)]] as [string, string][])
-                        : []),
-                      ['Access until', infoSalon.expiry ? fmtDay(infoSalon.expiry) : 'N/A'],
-                      ['Registered', infoSalon.detail.created_at ? new Date(infoSalon.detail.created_at).toLocaleDateString('en-IN') : '—'],
-                    ]}
-                  />
-                </>
+
+                  <div className={styles.detailsCard}>
+                    <h4 className={ui.sectionLabel}>Salon Details</h4>
+                    <DescriptionList
+                      items={[
+                        ['Salon Name', infoSalon.name],
+                        ['Slug', infoSalon.detail.slug || '—'],
+                        ['City', infoSalon.detail.city?.name || '—'],
+                        ['Address', infoSalon.detail.address || '—'],
+                        ['Pincode', infoSalon.detail.pincode || '—'],
+                        ['Gender focus', infoSalon.detail.gender_focus || 'Unisex'],
+                        ['Trading arrangement', modelLabel(infoSalon.billing_model)],
+                        ['Current plan', infoSalon.current_plan || 'None'],
+                        ['Assigned collaborator', infoSalon.detail.assigned_collaborator?.name ? (
+                          <span>{infoSalon.detail.assigned_collaborator.name} ({infoSalon.detail.assigned_collaborator.email})</span>
+                        ) : 'Unassigned'],
+                        ['Registered date', infoSalon.detail.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
+                        ...(infoSalon.detail.description ? ([['About / Description', infoSalon.detail.description]] as [string, string][]) : []),
+                      ]}
+                    />
+                  </div>
+                </div>
               ) : (
                 <EmptyState icon="alert" title="Could not load salon details" />
               )
             )}
 
-            {infoSalonTab === 'subscription' && (
+            {/* ===================== TAB 2: OWNER DETAILS ===================== */}
+            {infoSalonTab === 'owner_details' && (
+              <div className={styles.sectionFade}>
+                <div className={styles.ownerCard}>
+                  <div className={styles.ownerHead}>
+                    <div className={styles.ownerAvatar}>
+                      <Icon name="users" size={28} />
+                    </div>
+                    <div className={styles.ownerMeta}>
+                      <div className={styles.ownerNameRow}>
+                        <h3 className={styles.ownerName}>
+                          {infoSalon.detail?.admin?.name || infoSalon.owner || 'Unknown Owner'}
+                        </h3>
+                        <Badge tone="accent">Salon Admin / Owner</Badge>
+                      </div>
+                      <p className={styles.ownerSubtitle}>Primary account holder &amp; business manager for this salon</p>
+                    </div>
+                  </div>
+
+                  <div className={styles.ownerContactGrid}>
+                    <div className={styles.contactItem}>
+                      <span className={styles.contactIcon}><Icon name="phone" size={18} /></span>
+                      <div className={styles.contactInfo}>
+                        <span className={styles.contactLabel}>Phone Number</span>
+                        <b className={styles.contactValue}>{infoSalon.detail?.admin?.phone || 'Not provided'}</b>
+                      </div>
+                      {infoSalon.detail?.admin?.phone && (
+                        <a href={`tel:${infoSalon.detail.admin.phone}`} className={styles.contactActionBtn} title="Call phone number">
+                          <Icon name="phone" size={14} /> Call
+                        </a>
+                      )}
+                    </div>
+
+                    <div className={styles.contactItem}>
+                      <span className={styles.contactIcon}><Icon name="mail" size={18} /></span>
+                      <div className={styles.contactInfo}>
+                        <span className={styles.contactLabel}>Email Address</span>
+                        <b className={styles.contactValue}>{infoSalon.detail?.admin?.email || 'Not provided'}</b>
+                      </div>
+                      {infoSalon.detail?.admin?.email && (
+                        <a href={`mailto:${infoSalon.detail.admin.email}`} className={styles.contactActionBtn} title="Send email">
+                          <Icon name="mail" size={14} /> Email
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.detailsCard}>
+                  <h4 className={ui.sectionLabel}>Account &amp; Ownership Verification</h4>
+                  <DescriptionList
+                    items={[
+                      ['Owner full name', infoSalon.detail?.admin?.name || infoSalon.owner || '—'],
+                      ['Phone number', infoSalon.detail?.admin?.phone || '—'],
+                      ['Email address', infoSalon.detail?.admin?.email || '—'],
+                      ['Associated salon', `${infoSalon.name} (#${infoSalon.id})`],
+                      ['Registered on platform', infoSalon.detail?.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
+                      ['Arrangement with platform', modelLabel(infoSalon.billing_model)],
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ===================== TAB 3: APPOINTMENTS ===================== */}
+            {infoSalonTab === 'appointments' && (
+              infoAppointmentsLoading ? (
+                <div className={styles.historyLoadingWrap}>
+                  <Skeleton height={70} radius={14} />
+                  <Skeleton height={250} radius={14} />
+                </div>
+              ) : infoAppointmentsError ? (
+                <Alert tone="error">{infoAppointmentsError}</Alert>
+              ) : (
+                <div className={styles.sectionFade}>
+                  <div className={styles.infoStatsGrid}>
+                    <div className={styles.statTile}>
+                      <div className={styles.statTileIcon}><Icon name="calendar" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Recent Bookings</span>
+                        <b className={styles.statTileValue}>{appointmentCounts.total}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={cx(styles.statTileIcon, styles.iconSuccess)}><Icon name="checkCircle" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Completed</span>
+                        <b className={styles.statTileValue}>{appointmentCounts.completed}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={cx(styles.statTileIcon, styles.iconInfo)}><Icon name="clock" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Active / Upcoming</span>
+                        <b className={styles.statTileValue}>{appointmentCounts.upcoming}</b>
+                      </div>
+                    </div>
+                    <div className={styles.statTile}>
+                      <div className={cx(styles.statTileIcon, styles.iconDanger)}><Icon name="close" size={18} /></div>
+                      <div>
+                        <span className={styles.statTileLabel}>Cancelled</span>
+                        <b className={styles.statTileValue}>{appointmentCounts.cancelled}</b>
+                      </div>
+                    </div>
+                  </div>
+
+                  {infoAppointments.length === 0 ? (
+                    <EmptyState
+                      icon="calendar"
+                      title="No recent appointments"
+                      hint="Appointments booked by customers or walk-in guests will appear here."
+                    />
+                  ) : (
+                    <div className={styles.historySection}>
+                      <h4 className={ui.sectionLabel}>
+                        Recent Appointments ({infoAppointments.length})
+                      </h4>
+                      <div className={ui.tableWrap}>
+                        <table className={ui.table}>
+                          <thead>
+                            <tr>
+                              <th>ID / Date</th>
+                              <th>Customer</th>
+                              <th>Services</th>
+                              <th>Provider</th>
+                              <th>Source</th>
+                              <th>Status</th>
+                              <th className={ui.alignRight}>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {infoAppointments.slice(0, 15).map((apt) => {
+                              const custName = apt.customer?.name || apt.walk_in_customer_name || 'Walk-in Guest';
+                              const custPhone = apt.customer?.phone || apt.walk_in_customer_phone;
+                              const isWalkIn = apt.booking_source === 'walk_in' || !apt.customer;
+                              const serviceNames = (apt.services || []).map((s: any) => s.service?.template?.name || 'Service');
+
+                              return (
+                                <tr key={apt.id}>
+                                  <td>
+                                    <div className={styles.aptIdCol}>
+                                      <b>#{apt.id}</b>
+                                      <span>{fmtDay(apt.appointment_date)} {apt.start_time ? apt.start_time.slice(0, 5) : ''}</span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div className={styles.aptCustCol}>
+                                      <span className={styles.custName}>{custName}</span>
+                                      {custPhone && <span className={styles.custPhone}>{custPhone}</span>}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div className={styles.servicesPillsWrap}>
+                                      {serviceNames.length > 0 ? (
+                                        serviceNames.slice(0, 2).map((sn: string, idx: number) => (
+                                          <span key={idx} className={styles.servicePill} title={sn}>{sn}</span>
+                                        ))
+                                      ) : (
+                                        <span className={styles.mutedNote}>—</span>
+                                      )}
+                                      {serviceNames.length > 2 && (
+                                        <span className={styles.servicePillMore}>+{serviceNames.length - 2}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    {apt.appointed_provider?.user?.name || apt.serving_provider?.user?.name || <span className={styles.mutedNote}>Any staff</span>}
+                                  </td>
+                                  <td>
+                                    <Badge tone={isWalkIn ? 'accent' : 'info'}>
+                                      {isWalkIn ? 'Walk-in' : 'App'}
+                                    </Badge>
+                                  </td>
+                                  <td>
+                                    <Badge tone={appointmentStatusTone(apt.status)} dot={apt.status === 'completed' || apt.status === 'confirmed'}>
+                                      {apt.status ? apt.status.charAt(0).toUpperCase() + apt.status.slice(1).replace('_', ' ') : '—'}
+                                    </Badge>
+                                  </td>
+                                  <td className={cx(ui.alignRight, styles.boldNum)}>
+                                    {apt.final_billed_amount != null
+                                      ? formatINR(apt.final_billed_amount)
+                                      : apt.total_amount != null
+                                      ? formatINR(apt.total_amount)
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* ===================== TAB 4: FINANCE ===================== */}
+            {infoSalonTab === 'finance' && (
+              infoAppointmentsLoading ? (
+                <div className={styles.historyLoadingWrap}>
+                  <Skeleton height={80} radius={14} />
+                  <Skeleton height={250} radius={14} />
+                </div>
+              ) : (
+                <div className={styles.sectionFade}>
+                  <div className={styles.financeStatsGrid}>
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={styles.financeCardIcon}><Icon name="rupee" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Gross Appointment Revenue</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>{formatINR(financeMetrics.totalRevenue)}</b>
+                      <span className={styles.financeCardSub}>From active &amp; completed bookings</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconAccent)}><Icon name="smartphone" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Online Advances Collected</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>{formatINR(financeMetrics.advancesCollected)}</b>
+                      <span className={styles.financeCardSub}>Platform advances held for payout</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconSuccess)}><Icon name="store" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Balance Collected at Salon</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>{formatINR(financeMetrics.balanceCollected)}</b>
+                      <span className={styles.financeCardSub}>Collected at salon reception desk</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconInfo)}><Icon name="chart" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Average Booking Value</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>{formatINR(financeMetrics.avgTicket)}</b>
+                      <span className={styles.financeCardSub}>Average spend per customer booking</span>
+                    </div>
+                  </div>
+
+                  {infoAppointments.length === 0 ? (
+                    <EmptyState
+                      icon="rupee"
+                      title="No financial transactions yet"
+                      hint="Appointment billing records and advance splits will appear once bookings are placed."
+                    />
+                  ) : (
+                    <div className={styles.historySection}>
+                      <h4 className={ui.sectionLabel}>
+                        Appointment Financial Ledger ({infoAppointments.length})
+                      </h4>
+                      <div className={ui.tableWrap}>
+                        <table className={ui.table}>
+                          <thead>
+                            <tr>
+                              <th>Appointment</th>
+                              <th>Customer</th>
+                              <th className={ui.alignRight}>Total Bill</th>
+                              <th className={ui.alignRight}>Online Advance</th>
+                              <th className={ui.alignRight}>Counter Balance</th>
+                              <th>Option</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {infoAppointments.slice(0, 15).map((apt) => {
+                              const bill = parseFloat(apt.final_billed_amount ?? apt.total_amount ?? 0) || 0;
+                              const adv = parseFloat(apt.advance_amount ?? 0) || 0;
+                              const bal = parseFloat(apt.balance_amount ?? (bill > adv ? bill - adv : 0)) || 0;
+                              const custName = apt.customer?.name || apt.walk_in_customer_name || 'Walk-in Guest';
+
+                              return (
+                                <tr key={apt.id}>
+                                  <td>
+                                    <div className={styles.aptIdCol}>
+                                      <b>#{apt.id}</b>
+                                      <span>{fmtDay(apt.appointment_date)}</span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className={styles.custName}>{custName}</span>
+                                  </td>
+                                  <td className={cx(ui.alignRight, styles.boldNum)}>
+                                    {formatINR(bill)}
+                                  </td>
+                                  <td className={cx(ui.alignRight, styles.advanceCol)}>
+                                    {adv > 0 ? formatINR(adv) : <span className={styles.mutedNote}>—</span>}
+                                  </td>
+                                  <td className={cx(ui.alignRight, styles.balanceCol)}>
+                                    {bal > 0 ? formatINR(bal) : <span className={styles.mutedNote}>—</span>}
+                                  </td>
+                                  <td>
+                                    <Badge tone="neutral">
+                                      {apt.payment_option ? apt.payment_option.replace('_', ' ') : 'Standard'}
+                                    </Badge>
+                                  </td>
+                                  <td>
+                                    <Badge tone={appointmentStatusTone(apt.status)}>
+                                      {apt.status ? apt.status.charAt(0).toUpperCase() + apt.status.slice(1).replace('_', ' ') : '—'}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* ===================== TAB 5: PAYOUT DATA ===================== */}
+            {infoSalonTab === 'payouts' && (
+              infoPayoutsLoading ? (
+                <div className={styles.historyLoadingWrap}>
+                  <Skeleton height={80} radius={14} />
+                  <Skeleton height={200} radius={14} />
+                </div>
+              ) : infoPayoutsError && (!infoPayoutsData?.payouts || infoPayoutsData.payouts.length === 0) ? (
+                <div className={styles.sectionFade}>
+                  <Alert tone="info">{infoPayoutsError}</Alert>
+                  <EmptyState
+                    icon="wallet"
+                    title="No payouts generated yet"
+                    hint={
+                      infoSalon.billing_model === COMMISSION
+                        ? 'Monthly commission cycle runs automatically on the 1st of every month.'
+                        : 'Weekly advances payout cycle runs automatically every Monday.'
+                    }
+                  />
+                </div>
+              ) : (
+                <div className={styles.sectionFade}>
+                  <div className={styles.financeStatsGrid}>
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconSuccess)}><Icon name="wallet" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Lifetime Distributed</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>
+                        {formatINR(infoPayoutsData?.totals?.received_lifetime ?? 0)}
+                      </b>
+                      <span className={styles.financeCardSub}>Net paid to salon bank account</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={styles.financeCardIcon}><Icon name="receipt" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Advances Accounted</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>
+                        {formatINR(infoPayoutsData?.totals?.advances_held_lifetime ?? 0)}
+                      </b>
+                      <span className={styles.financeCardSub}>Gross advances processed</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconAccent)}><Icon name="percent" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Commission Deducted</span>
+                      </div>
+                      <b className={styles.financeCardAmount}>
+                        {formatINR(infoPayoutsData?.totals?.commission_deducted_lifetime ?? 0)}
+                      </b>
+                      <span className={styles.financeCardSub}>Retained by platform</span>
+                    </div>
+
+                    <div className={styles.financeCard}>
+                      <div className={styles.financeCardHead}>
+                        <span className={cx(styles.financeCardIcon, styles.iconInfo)}><Icon name="clock" size={18} /></span>
+                        <span className={styles.financeCardLabel}>Settlement Rhythm</span>
+                      </div>
+                      <b className={styles.financeCardAmount} style={{ fontSize: '15px' }}>
+                        {infoSalon.billing_model === COMMISSION ? 'Monthly, on 1st' : 'Weekly, Mondays'}
+                      </b>
+                      <span className={styles.financeCardSub}>
+                        {infoSalon.billing_model === COMMISSION ? 'Postpaid commission deduction' : 'Prepaid subscription advance payout'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {(!infoPayoutsData?.payouts || infoPayoutsData.payouts.length === 0) ? (
+                    <EmptyState
+                      icon="wallet"
+                      title="No payouts generated yet"
+                      hint={
+                        infoSalon.billing_model === COMMISSION
+                          ? 'Monthly commission cycle runs automatically on the 1st of every month.'
+                          : 'Weekly advances payout cycle runs automatically every Monday.'
+                      }
+                    />
+                  ) : (
+                    <div className={styles.historySection}>
+                      <h4 className={ui.sectionLabel}>
+                        Payout Settlement Cycles ({infoPayoutsData.payouts.length})
+                      </h4>
+                      <div className={ui.tableWrap}>
+                        <table className={ui.table}>
+                          <thead>
+                            <tr>
+                              <th>Cycle Period</th>
+                              <th>Arrangement</th>
+                              <th className={ui.alignRight}>Gross Advance</th>
+                              <th className={ui.alignRight}>Commission</th>
+                              <th className={ui.alignRight}>Net Payout</th>
+                              <th>Status</th>
+                              <th>Reference</th>
+                              <th className={ui.alignRight}>Statement</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {infoPayoutsData.payouts.map((p: any) => (
+                              <tr key={p.id}>
+                                <td>
+                                  <div className={styles.aptIdCol}>
+                                    <b>{p.cycle_label || `${fmtDay(p.cycle_start_date)} → ${fmtDay(p.cycle_end_date)}`}</b>
+                                    <span>{p.appointments_count ?? 0} bookings</span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <Badge tone={p.billing_type === COMMISSION ? 'accent' : 'info'}>
+                                    {p.billing_label || modelLabel(p.billing_type)}
+                                  </Badge>
+                                </td>
+                                <td className={ui.alignRight}>{formatINR(p.gross_amount, 2)}</td>
+                                <td className={cx(ui.alignRight, styles.advanceCol)}>
+                                  {p.commission_deducted > 0 ? `-${formatINR(p.commission_deducted, 2)}` : '—'}
+                                </td>
+                                <td className={cx(ui.alignRight, styles.boldNum)}>
+                                  {formatINR(p.net_amount, 2)}
+                                </td>
+                                <td>
+                                  <Badge tone={payoutStatusTone(p.status)} dot={p.status === 'distributed'}>
+                                    {p.status ? p.status.charAt(0).toUpperCase() + p.status.slice(1) : '—'}
+                                  </Badge>
+                                </td>
+                                <td>
+                                  {p.distribution_reference ? (
+                                    <b className={styles.refId}>{p.distribution_reference}</b>
+                                  ) : (
+                                    <span className={styles.mutedNote}>—</span>
+                                  )}
+                                </td>
+                                <td className={ui.alignRight}>
+                                  {p.settlement_invoice?.url ? (
+                                    <a href={p.settlement_invoice.url} target="_blank" rel="noreferrer" className={cx(ui.btn, ui.btnSm, ui.btnGhost)}>
+                                      Statement <Icon name="external" size={13} />
+                                    </a>
+                                  ) : (
+                                    <span className={styles.mutedNote}>—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+            {/* ===================== TAB 6: PLAN HISTORY ===================== */}
+            {infoSalonTab === 'plan_history' && (
               infoSubscriptionLoading ? (
                 <div className={styles.historyLoadingWrap}>
                   <Skeleton height={110} radius={14} />
@@ -1327,7 +2004,7 @@ export default function SubscriptionsPage() {
               ) : infoSubscriptionError ? (
                 <Alert tone="error">{infoSubscriptionError}</Alert>
               ) : (
-                <div>
+                <div className={styles.sectionFade}>
                   {/* Current Active Plan Details on top */}
                   {(() => {
                     const currentSub = infoSubscriptionData?.current_subscription;

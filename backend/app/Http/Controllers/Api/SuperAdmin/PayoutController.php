@@ -283,6 +283,48 @@ class PayoutController extends Controller
         ]);
     }
 
+    /**
+     * All payouts for a specific salon across cycles.
+     */
+    public function forSalon($salonId)
+    {
+        $salon = \App\Models\Salon::findOrFail($salonId);
+
+        $payouts = SalonPayout::with(['salon:id,name', 'settlementInvoice'])
+            ->where('salon_id', $salonId)
+            ->orderByDesc('cycle_start_date')
+            ->limit(52)
+            ->get();
+
+        $model = $salon->billingModel();
+
+        return response()->json([
+            'success' => true,
+            'salon' => ['id' => $salon->id, 'name' => $salon->name],
+            'billing_model' => $model,
+            'billing_label' => BillingModel::label($model),
+            'commission_percentage' => $salon->isOnCommissionModel()
+                ? (float) ($salon->commission_percentage ?? 0)
+                : null,
+            'settlement_rhythm' => PayoutCycle::forBillingModel($model),
+            'totals' => [
+                'commission_deducted_lifetime' => round((float) $payouts->sum('commission_deducted'), 2),
+                'advances_held_lifetime' => round((float) $payouts->sum('gross_amount'), 2),
+                'appointment_revenue_lifetime' => round((float) $payouts->sum('appointment_revenue'), 2),
+                'received_lifetime' => round(
+                    (float) $payouts->where('status', PayoutService::STATUS_DISTRIBUTED)->sum('net_amount'),
+                    2
+                ),
+                'pending_lifetime' => round(
+                    (float) $payouts->where('status', '!=', PayoutService::STATUS_DISTRIBUTED)->sum('net_amount'),
+                    2
+                ),
+                'count' => $payouts->count(),
+            ],
+            'payouts' => $payouts->map(fn (SalonPayout $p) => $this->payouts->present($p))->values(),
+        ]);
+    }
+
     // ------------------------------------------------------------- internals
 
     private function cycleType(Request $request): string
