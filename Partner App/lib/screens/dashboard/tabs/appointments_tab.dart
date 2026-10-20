@@ -10,6 +10,7 @@ import '../../../../theme/app_theme.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../../../../models/admin_provider_models.dart';
 import '../../../../services/admin_provider_api.dart';
+import '../../../../utils/lifecycle_poller.dart';
 
 const String _kAllDates = 'All Dates';
 const String _kAllProviders = 'All Providers';
@@ -74,14 +75,41 @@ class AppointmentsTabState extends State<AppointmentsTab> {
   AdminProviderStatus? _adminStatus;
   bool _isMyAppointmentsView = false;
 
+  LifecyclePoller? _poller;
+
+  /// Whether the background poll is currently active.
+  bool get isPolling => _poller?.isPolling ?? false;
+
+  /// Called by the parent shell or tests to control tab visibility.
+  void setActive(bool active) {
+    _poller?.setActive(active);
+  }
+
+  /// Exposed for external manual refresh requests.
+  Future<void> reload() => _loadAppointments(silent: true);
+
   @override
   void initState() {
     super.initState();
     loadFuture = _loadAppointments();
+    _poller = LifecyclePoller(
+      debugLabel: 'AppointmentsTab',
+      interval: const Duration(seconds: 12),
+      autoStart: true,
+      onPoll: ({bool silent = true}) => _loadAppointments(silent: silent),
+    );
   }
 
-  Future<void> _loadAppointments() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _poller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAppointments({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final results = await Future.wait([
         _service.getAppointments(widget.salonId),
@@ -96,16 +124,25 @@ class AppointmentsTabState extends State<AppointmentsTab> {
           upcomingAppointmentsCount: 0,
         )),
       ]);
+      if (!mounted) return;
       setState(() {
         _appointments = results[0] as List<dynamic>;
         _adminStatus = results[1] as AdminProviderStatus;
         _isLoading = false;
       });
     } catch (e, stack) {
-      print('AppointmentsTab error: $e');
-      print(stack);
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
+      debugPrint('AppointmentsTab error: $e');
+      if (!mounted) return;
+      if (!silent) {
+        debugPrint(stack.toString());
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(milliseconds: 2500),
+            content: Text('Failed to load appointments'),
+          ),
+        );
+      }
     }
   }
 
@@ -297,17 +334,28 @@ class AppointmentsTabState extends State<AppointmentsTab> {
             Expanded(
               child: _isLoading
                 ? Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
-                : visible.isEmpty
-                  ? _buildEmptyState(isDark)
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16.0),
-                      itemCount: visible.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final apt = visible[index];
-                        return _buildDynamicAppointmentCard(apt, isDark);
-                      },
-                    ),
+                : RefreshIndicator(
+                    color: AppTheme.accentColor,
+                    onRefresh: () => _loadAppointments(silent: false),
+                    child: visible.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            const SizedBox(height: 60),
+                            _buildEmptyState(isDark),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16.0),
+                          itemCount: visible.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final apt = visible[index];
+                            return _buildDynamicAppointmentCard(apt, isDark);
+                          },
+                        ),
+                  ),
             ),
           ],
         ),

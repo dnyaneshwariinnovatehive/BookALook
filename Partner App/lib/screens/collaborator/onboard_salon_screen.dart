@@ -260,6 +260,11 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
 
     try {
       final response = await CollaboratorApi.submit(draft);
+      draft.submitted = true;
+      draft.queuedForSubmission = false;
+      if (response['data']?['id'] != null) {
+        draft.editingSalonId = response['data']['id'].toString();
+      }
       await _store.discard(draft.enquiryId);
 
       if (!mounted) return;
@@ -268,11 +273,14 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     } on OnboardingRejected catch (e) {
       // The server read it and said no. Stay put so it can be fixed.
       draft.lastError = e.message;
+      draft.queuedForSubmission = false;
       await _store.save(draft);
       if (mounted) _say(e.message);
     } catch (_) {
-      // No signal. The draft is already saved and queued, so this is not a
-      // failure from the collaborator's point of view — they are done.
+      // No signal. The draft is now saved and queued for background sync once online.
+      draft.queuedForSubmission = true;
+      await _store.save(draft);
+
       if (!mounted) return;
       Navigator.pop(context, true);
       _say('No connection. Saved — it will submit itself once you are back online.');
@@ -782,15 +790,192 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     if (position == null) _say('Could not read the location. The salon can be pinned later.');
   }
 
+  ImageProvider _photoImageProvider(String path) {
+    if (kIsWeb || path.startsWith('http://') || path.startsWith('https://')) {
+      return NetworkImage(path);
+    }
+    return FileImage(File(path));
+  }
+
   Widget _buildPhotoGrid() {
     final photos = _draft!.photoPaths;
+    if (photos.isEmpty) {
+      return Row(
+        children: [
+          _buildAddPhotoTile(),
+        ],
+      );
+    }
 
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+    final safeCoverIndex = _draft!.coverIndex.clamp(0, photos.length - 1);
+    final coverPath = photos[safeCoverIndex];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < photos.length; i++) _buildPhotoTile(i, photos[i]),
-        _buildAddPhotoTile(),
+        // Featured Cover Photo Preview Card
+        GestureDetector(
+          onTap: () => _showCoverPhotoSelectorSheet(initialIndex: safeCoverIndex),
+          child: Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.black12,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+              image: DecorationImage(
+                image: _photoImageProvider(coverPath),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: Stack(
+              children: [
+                // Subtle gradient for contrast
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.4),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.6),
+                        ],
+                        stops: const [0.0, 0.45, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Top Badge: Cover Photo
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Main Cover Photo',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Top Right Action: Change Cover
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.tune, color: Colors.white, size: 13),
+                        SizedBox(width: 4),
+                        Text(
+                          'Change Cover',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Bottom Caption
+                Positioned(
+                  bottom: 12,
+                  left: 12,
+                  right: 12,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Photo ${safeCoverIndex + 1} of ${photos.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Text(
+                        'Tap to switch cover',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Section header for all photos
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'All Photos (${photos.length})',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.lightTextHeading,
+              ),
+            ),
+            const Text(
+              'Tap any photo to set as cover',
+              style: TextStyle(fontSize: 11, color: AppTheme.lightTextLight),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Thumbnails Wrap
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (var i = 0; i < photos.length; i++) _buildPhotoTile(i, photos[i]),
+            _buildAddPhotoTile(),
+          ],
+        ),
       ],
     );
   }
@@ -799,45 +984,68 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
     final isCover = index == _draft!.coverIndex;
 
     return GestureDetector(
-      onTap: () {
-        setState(() => _draft!.coverIndex = index);
-        _persist();
-      },
+      onTap: () => _showCoverPhotoSelectorSheet(initialIndex: index),
       child: Stack(
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             width: 96,
             height: 96,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isCover ? AppTheme.accentColor : AppTheme.lightBorder,
-                width: isCover ? 2 : 1,
+                width: isCover ? 2.5 : 1,
               ),
-              image: DecorationImage(image: kIsWeb ? NetworkImage(path) as ImageProvider : FileImage(File(path)), fit: BoxFit.cover),
+              boxShadow: isCover
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.accentColor.withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+              image: DecorationImage(
+                image: _photoImageProvider(path),
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           if (isCover)
             Positioned(
-              left: 4, bottom: 4,
+              left: 4,
+              bottom: 4,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppTheme.accentColor,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('Cover',
-                    style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star, size: 10, color: Colors.white),
+                    SizedBox(width: 2),
+                    Text('Cover',
+                        style: TextStyle(
+                            fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ),
           Positioned(
-            right: 0, top: 0,
+            right: 2,
+            top: 2,
             child: GestureDetector(
               onTap: () => _removePhoto(index),
               child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, size: 13, color: Colors.white),
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 12, color: Colors.white),
               ),
             ),
           ),
@@ -861,7 +1069,7 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
             children: [
               Icon(Icons.add_a_photo_outlined, color: AppTheme.accentColor),
               SizedBox(height: 6),
-              Text('Add', style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody)),
+              Text('Add Photos', style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody)),
             ],
           ),
         ),
@@ -870,20 +1078,40 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
   Future<void> _addPhoto() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Upload Salon Photos',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Take a photo'),
+              leading: const Icon(Icons.photo_camera_outlined, color: AppTheme.accentColor),
+              title: const Text('Take a photo with camera'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from gallery'),
+              leading: const Icon(Icons.photo_library_outlined, color: AppTheme.accentColor),
+              title: const Text('Choose from gallery (multiple supported)'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -891,16 +1119,374 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
 
     if (source == null) return;
 
-    final picked = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 1600);
-    if (picked == null) return;
+    final addedPaths = <String>[];
 
-    // Copied out of the picker's cache so the draft survives the OS reclaiming
-    // temporary files while the collaborator is still out of signal.
-    final kept = await _store.keepPhoto(picked.path);
+    if (source == ImageSource.gallery) {
+      final pickedFiles = await ImagePicker().pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 1600,
+      );
+      if (pickedFiles.isEmpty) return;
+      for (final xfile in pickedFiles) {
+        final kept = await _store.keepPhoto(xfile.path);
+        addedPaths.add(kept);
+      }
+    } else {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1600,
+      );
+      if (picked == null) return;
+      final kept = await _store.keepPhoto(picked.path);
+      addedPaths.add(kept);
+    }
 
-    if (!mounted) return;
-    setState(() => _draft!.photoPaths.add(kept));
+    if (!mounted || addedPaths.isEmpty) return;
+
+    setState(() {
+      _draft!.photoPaths.addAll(addedPaths);
+      if (_draft!.coverIndex >= _draft!.photoPaths.length) {
+        _draft!.coverIndex = 0;
+      }
+    });
+
     await _persist();
+
+    // Right when photos are uploaded, ask which photo should be cover photo and show preview!
+    if (mounted && _draft!.photoPaths.isNotEmpty) {
+      await _showCoverPhotoSelectorSheet();
+    }
+  }
+
+  /// Opens an interactive preview sheet asking the collaborator to choose
+  /// which uploaded photo should be the cover photo.
+  Future<void> _showCoverPhotoSelectorSheet({int? initialIndex}) async {
+    final draft = _draft;
+    if (draft == null || draft.photoPaths.isEmpty) return;
+
+    int candidateIndex = (initialIndex ?? draft.coverIndex).clamp(0, draft.photoPaths.length - 1);
+
+    await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final selectedPath = draft.photoPaths[candidateIndex];
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.star_rounded, color: AppTheme.accentColor, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Select Cover Photo',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.lightTextHeading,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Choose which photo will be the main cover for customers',
+                                style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Large Live Preview of Selected Cover Photo
+                    Text(
+                      'COVER PHOTO PREVIEW',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 200,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.black12,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        image: DecorationImage(
+                          image: _photoImageProvider(selectedPath),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Gradient overlay
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.4),
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.6),
+                                  ],
+                                  stops: const [0.0, 0.45, 1.0],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Badge: Main Storefront Cover
+                          Positioned(
+                            top: 12,
+                            left: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentColor,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.25),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star, color: Colors.white, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Main Cover Photo',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Indicator: Photo X of Y
+                          Positioned(
+                            bottom: 12,
+                            left: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Photo ${candidateIndex + 1} of ${draft.photoPaths.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Thumbnails label
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tap a photo to set as cover:',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        Text(
+                          '${draft.photoPaths.length} uploaded',
+                          style: const TextStyle(fontSize: 12, color: AppTheme.lightTextLight),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Thumbnails list
+                    SizedBox(
+                      height: 84,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: draft.photoPaths.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, idx) {
+                          final isSelected = idx == candidateIndex;
+                          final thumbPath = draft.photoPaths[idx];
+
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                candidateIndex = idx;
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? AppTheme.accentColor : Colors.grey.shade300,
+                                  width: isSelected ? 3 : 1,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: AppTheme.accentColor.withValues(alpha: 0.3),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                                image: DecorationImage(
+                                  image: _photoImageProvider(thumbPath),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  if (isSelected)
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: AppTheme.accentColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check, size: 14, color: Colors.white),
+                                      ),
+                                    ),
+                                  if (isSelected)
+                                    Positioned(
+                                      bottom: 4,
+                                      left: 4,
+                                      right: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.accentColor.withValues(alpha: 0.9),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'Cover',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Confirm Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext, candidateIndex);
+                        },
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: Text(
+                          'Set Photo #${candidateIndex + 1} as Cover',
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (candidateIndex != draft.coverIndex) {
+      setState(() {
+        draft.coverIndex = candidateIndex;
+      });
+      await _persist();
+      _say('Cover photo set to Photo #${candidateIndex + 1}');
+    }
   }
 
   Future<void> _removePhoto(int index) async {
@@ -910,8 +1496,12 @@ class _OnboardSalonScreenState extends State<OnboardSalonScreen> {
       unawaited(File(removed).delete().catchError((_) => File(removed)));
     }
 
-    if (draft.coverIndex >= draft.photoPaths.length) {
-      draft.coverIndex = draft.photoPaths.isEmpty ? 0 : draft.photoPaths.length - 1;
+    if (draft.photoPaths.isEmpty) {
+      draft.coverIndex = 0;
+    } else if (draft.coverIndex >= draft.photoPaths.length) {
+      draft.coverIndex = draft.photoPaths.length - 1;
+    } else if (draft.coverIndex > index) {
+      draft.coverIndex--;
     }
 
     setState(() {});

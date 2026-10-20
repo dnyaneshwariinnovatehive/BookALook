@@ -5,6 +5,7 @@ import '../services/appointment_service.dart';
 import 'walk_in_screen.dart';
 import 'qr_scanner_screen.dart';
 import 'provider_appointment_details_screen.dart';
+import '../utils/lifecycle_poller.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
   final String salonId;
@@ -25,28 +26,61 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
   String _dateFilter = 'Today'; // 'Today', 'Tomorrow', 'Custom'
   String _statusFilter = 'All'; // 'All', 'Scheduled', 'Completed'
 
+  LifecyclePoller? _poller;
+
+  /// Whether the background poll is currently active.
+  bool get isPolling => _poller?.isPolling ?? false;
+
+  /// Called by the parent shell or tests to control tab visibility.
+  void setActive(bool active) {
+    _poller?.setActive(active);
+  }
+
   @override
   void initState() {
     super.initState();
     _loadAppointments();
+    _poller = LifecyclePoller(
+      debugLabel: 'ProviderDashboardScreen',
+      interval: const Duration(seconds: 12),
+      autoStart: true,
+      onPoll: ({bool silent = true}) => _loadAppointments(silent: silent),
+    );
   }
 
-  Future<void> loadAppointments() => _loadAppointments();
+  @override
+  void dispose() {
+    _poller?.dispose();
+    super.dispose();
+  }
 
-  Future<void> _loadAppointments() async {
-    setState(() => _isLoading = true);
+  Future<void> loadAppointments({bool silent = false}) => _loadAppointments(silent: silent);
+
+  Future<void> _loadAppointments({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
       final data = await _service.getAppointments(widget.salonId, date: dateStr);
+      if (!mounted) return;
       setState(() {
         _appointments = data;
         _isLoading = false;
       });
     } catch (e, stack) {
-      print('Error fetching appointments: $e');
-      print(stack);
-      setState(() => _isLoading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
+      debugPrint('Error fetching appointments: $e');
+      if (!mounted) return;
+      if (!silent) {
+        debugPrint(stack.toString());
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(milliseconds: 2500),
+            content: Text('Failed to load appointments'),
+          ),
+        );
+      }
     }
   }
 

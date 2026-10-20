@@ -238,4 +238,50 @@ class CollaboratorDirectOnboardingTest extends TestCase
         $hackRes->assertStatus(403);
         $hackRes->assertJsonPath('success', false);
     }
+
+    public function test_uploading_multiple_photos_selects_correct_cover_and_does_not_duplicate_salon(): void
+    {
+        Sanctum::actingAs($this->collaborator);
+
+        $photo1 = UploadedFile::fake()->create('facade1.jpg', 150, 'image/jpeg');
+        $photo2 = UploadedFile::fake()->create('interior_cover.jpg', 200, 'image/jpeg');
+
+        // First onboarding submission with 2 photos, choosing photo 2 (index 1) as cover photo
+        $payload1 = $this->validPayload([
+            'salon_name' => 'Mirror & Mane Studio',
+            'owner_phone' => '9888877777',
+            'photos' => [$photo1, $photo2],
+            'cover_index' => 1,
+        ]);
+
+        $res1 = $this->post('/api/partner/collaborator/onboard', $payload1);
+        $res1->assertStatus(201);
+        $res1->assertJsonPath('success', true);
+
+        $salon = Salon::where('name', 'Mirror & Mane Studio')->first();
+        $this->assertNotNull($salon);
+        $this->assertEquals(1, Salon::where('name', 'Mirror & Mane Studio')->count());
+        $this->assertEquals(2, $salon->media()->count());
+
+        // The second photo must be the designated cover photo
+        $coverMedia = $salon->media()->where('is_cover', true)->first();
+        $this->assertNotNull($coverMedia);
+        $this->assertEquals(1, $coverMedia->sort_order);
+        $this->assertEquals($salon->cover_photo_url, $coverMedia->file_url);
+
+        // Simulate subsequent submission (e.g. background sync or re-submit when photos added)
+        $photo3 = UploadedFile::fake()->create('updated_cover.jpg', 250, 'image/jpeg');
+        $payload2 = $this->validPayload([
+            'salon_name' => 'Mirror & Mane Studio',
+            'owner_phone' => '9888877777',
+            'photos' => [$photo1, $photo3],
+            'cover_index' => 1,
+        ]);
+
+        $res2 = $this->post('/api/partner/collaborator/onboard', $payload2);
+        $res2->assertStatus(200);
+
+        // Verification: Still ONLY ONE salon exists in the database
+        $this->assertEquals(1, Salon::where('name', 'Mirror & Mane Studio')->count());
+    }
 }

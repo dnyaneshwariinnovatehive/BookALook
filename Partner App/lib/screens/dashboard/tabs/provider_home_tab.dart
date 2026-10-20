@@ -6,6 +6,7 @@ import '../../notifications_screen.dart';
 import '../../provider_appointment_details_screen.dart';
 import '../../qr_scanner_screen.dart';
 import 'package:partner_app/theme/app_theme.dart';
+import '../../../../utils/lifecycle_poller.dart';
 
 class ProviderHomeTab extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -31,27 +32,61 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
   List<dynamic> _appointments = [];
   bool _isLoading = true;
 
+  LifecyclePoller? _poller;
+
+  /// Whether the background poll is currently active.
+  bool get isPolling => _poller?.isPolling ?? false;
+
+  /// Called by the parent shell or tests to control tab visibility.
+  void setActive(bool active) {
+    _poller?.setActive(active);
+  }
+
   @override
   void initState() {
     super.initState();
     _loadAppointments();
+    _poller = LifecyclePoller(
+      debugLabel: 'ProviderHomeTab',
+      interval: const Duration(seconds: 12),
+      autoStart: true,
+      onPoll: ({bool silent = true}) => _loadAppointments(silent: silent),
+    );
   }
 
-  Future<void> loadAppointments() => _loadAppointments();
+  @override
+  void dispose() {
+    _poller?.dispose();
+    super.dispose();
+  }
 
-  Future<void> _loadAppointments() async {
-    setState(() => _isLoading = true);
+  Future<void> loadAppointments({bool silent = false}) => _loadAppointments(silent: silent);
+
+  Future<void> _loadAppointments({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
       // PartnerAppointmentService automatically fetches for the logged-in provider
       final data = await _service.getAppointments(widget.salon['id'].toString(), date: dateStr);
+      if (!mounted) return;
       setState(() {
         _appointments = data;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Failed to load appointments')));
+      debugPrint('ProviderHomeTab error: $e');
+      if (!mounted) return;
+      if (!silent) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(milliseconds: 2500),
+            content: Text('Failed to load appointments'),
+          ),
+        );
+      }
     }
   }
 

@@ -68,6 +68,11 @@ class OnboardingDraft {
   /// synced draft can be cleared rather than replayed forever.
   bool submitted;
 
+  /// Whether the user has explicitly clicked Submit and this draft is queued
+  /// for background submission (e.g. offline when submitted). In-progress drafts
+  /// being actively edited must NEVER be auto-submitted in the background.
+  bool queuedForSubmission;
+
   /// Why the last submission attempt failed, if it did. Shown to the
   /// collaborator so a validation problem does not look like a dead queue.
   String? lastError;
@@ -101,6 +106,7 @@ class OnboardingDraft {
     this.requestedCommissionPercentage,
     this.existingPhotoCount = 0,
     this.submitted = false,
+    this.queuedForSubmission = false,
     this.lastError,
     DateTime? updatedAt,
   })  : workingHours = workingHours ?? DraftWorkingDay.defaultWeek(),
@@ -281,6 +287,7 @@ class OnboardingDraft {
         'requested_commission_percentage': requestedCommissionPercentage,
         'existing_photo_count': existingPhotoCount,
         'submitted': submitted,
+        'queued_for_submission': queuedForSubmission,
         'last_error': lastError,
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -316,6 +323,7 @@ class OnboardingDraft {
         requestedCommissionPercentage: (json['requested_commission_percentage'] as num?)?.toDouble(),
         existingPhotoCount: json['existing_photo_count'] ?? 0,
         submitted: json['submitted'] == true,
+        queuedForSubmission: json['queued_for_submission'] == true,
         lastError: json['last_error'],
         updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
       );

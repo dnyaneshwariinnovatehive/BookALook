@@ -21,6 +21,7 @@ import '../../../services/insights_api.dart';
 import '../../../models/admin_provider_models.dart';
 import '../../../services/admin_provider_api.dart';
 import 'staff/admin_provider_config_sheet.dart';
+import '../../../utils/lifecycle_poller.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -63,20 +64,38 @@ class HomeTabState extends State<HomeTab> {
 
   int _unreadNotifications = 0;
 
-  Timer? _refreshTimer;
+  LifecyclePoller? _poller;
+
+  /// Whether the background poll is currently active.
+  bool get isPolling => _poller?.isPolling ?? false;
+
+  /// Called by the parent shell or tests to control tab visibility.
+  void setActive(bool active) {
+    _poller?.setActive(active);
+  }
+
+  /// Exposed for external manual refresh requests.
+  Future<void> reload() async {
+    await _fetchHomeData(silent: true);
+    await _refreshUnreadCount();
+  }
 
   @override
   void initState() {
     super.initState();
     loadFuture = _fetchHomeData();
     _refreshUnreadCount();
-    // Poll every 60 seconds
-    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-      if (mounted) {
-        _fetchHomeData(silent: true);
-        _refreshUnreadCount();
-      }
-    });
+    _poller = LifecyclePoller(
+      debugLabel: 'HomeTab',
+      interval: const Duration(seconds: 12),
+      autoStart: true,
+      onPoll: ({bool silent = true}) async {
+        if (mounted) {
+          await _fetchHomeData(silent: silent);
+          await _refreshUnreadCount();
+        }
+      },
+    );
   }
 
   Future<void> _refreshUnreadCount() async {
@@ -98,7 +117,7 @@ class HomeTabState extends State<HomeTab> {
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _poller?.dispose();
     super.dispose();
   }
 

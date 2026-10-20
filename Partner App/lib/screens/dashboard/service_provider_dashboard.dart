@@ -52,6 +52,15 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   void initState() {
     super.initState();
     _checkAccess();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncTabVisibility();
+    });
+  }
+
+  void _syncTabVisibility() {
+    _homeKey.currentState?.setActive(_currentIndex == 0);
+    _scheduleKey.currentState?.setActive(_currentIndex == 1);
   }
 
   Future<void> _checkAccess() async {
@@ -83,6 +92,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
       return;
     }
     setState(() => _currentIndex = index);
+    _syncTabVisibility();
     _refreshTab(index);
   }
 

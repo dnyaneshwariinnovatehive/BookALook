@@ -48,7 +48,7 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Drafts that are complete and waiting only for a connection, as opposed to
   /// ones the collaborator has not finished filling in.
-  int get queuedCount => pending.where((d) => d.isComplete).length;
+  int get queuedCount => pending.where((d) => d.queuedForSubmission && d.isComplete).length;
 
   bool get isSyncing => _syncing;
 
@@ -205,7 +205,9 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> sync() async {
     if (_syncing) return;
 
-    final ready = pending.where((d) => d.isComplete).toList();
+    // Only sync drafts that the collaborator has finished AND explicitly queued for submission.
+    // Drafts currently being filled in on device must NEVER be automatically submitted in the background.
+    final ready = pending.where((d) => d.queuedForSubmission && d.isComplete).toList();
     if (ready.isEmpty) return;
 
     _syncing = true;
@@ -213,9 +215,14 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
 
     for (final draft in ready) {
       try {
-        await CollaboratorApi.submit(draft);
+        final response = await CollaboratorApi.submit(draft);
         draft.submitted = true;
+        draft.queuedForSubmission = false;
         draft.lastError = null;
+
+        if (response['data']?['id'] != null) {
+          draft.editingSalonId = response['data']['id'].toString();
+        }
 
         // It is on the server now; the local copy is just clutter, and its
         // photos have been uploaded.
@@ -224,6 +231,7 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
         // The server will say the same thing next time. Stop retrying this one
         // and put the reason where the collaborator will see it.
         draft.lastError = e.message;
+        draft.queuedForSubmission = false;
         await save(draft);
       } catch (_) {
         // Almost certainly still offline. Leave it queued and say so.

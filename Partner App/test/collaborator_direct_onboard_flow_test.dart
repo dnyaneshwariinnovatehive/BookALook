@@ -36,6 +36,32 @@ void main() {
       expect(restored.isDirect, isTrue);
       expect(restored.editingSalonId, '99');
     });
+
+    test('queuedForSubmission defaults to false and round-trips via JSON', () {
+      final draft = OnboardingDraft.direct(salonId: '55');
+      expect(draft.queuedForSubmission, isFalse);
+
+      draft.queuedForSubmission = true;
+      final json = draft.toJson();
+      expect(json['queued_for_submission'], isTrue);
+
+      final restored = OnboardingDraft.fromJson(json);
+      expect(restored.queuedForSubmission, isTrue);
+    });
+
+    test('Cover photo index and photo paths are preserved and serialized', () {
+      final draft = OnboardingDraft.direct();
+      draft.photoPaths = ['/path/to/img1.jpg', '/path/to/img2.jpg'];
+      draft.coverIndex = 1;
+
+      final json = draft.toJson();
+      expect(json['cover_index'], 1);
+      expect(json['photo_paths'], ['/path/to/img1.jpg', '/path/to/img2.jpg']);
+
+      final restored = OnboardingDraft.fromJson(json);
+      expect(restored.coverIndex, 1);
+      expect(restored.photoPaths.length, 2);
+    });
   });
 
   group('CollaboratorHomeTab direct onboarding and statistics tests', () {

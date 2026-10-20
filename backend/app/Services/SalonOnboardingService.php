@@ -79,6 +79,22 @@ class SalonOnboardingService
             // races on the unique users.phone column just as badly.
             $owner = $this->resolveOwner($enquiry, $payload);
 
+            if (! $existing) {
+                $existing = Salon::where('enquiry_id', $enquiry->id)
+                    ->whereIn('status', self::EDITABLE_STATUSES)
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            if (! $existing) {
+                $existing = Salon::where('submitted_by', $collaborator->id)
+                    ->where('admin_id', $owner->id)
+                    ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($payload['salon_name']))])
+                    ->whereIn('status', self::EDITABLE_STATUSES)
+                    ->lockForUpdate()
+                    ->first();
+            }
+
             $salon = $existing
                 ? $this->reviseSalon($existing, $owner, $payload)
                 : $this->createSalon($enquiry, $collaborator, $owner, $payload);
@@ -121,6 +137,18 @@ class SalonOnboardingService
             }
 
             $owner = $this->resolveOwner(null, $payload);
+
+            if (! $existing) {
+                // Deduplication guard: if this collaborator already created a salon for this
+                // owner with the same name that is pending approval or in an editable state,
+                // reuse and revise that salon rather than creating a duplicate.
+                $existing = Salon::where('submitted_by', $collaborator->id)
+                    ->where('admin_id', $owner->id)
+                    ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($payload['salon_name']))])
+                    ->whereIn('status', self::EDITABLE_STATUSES)
+                    ->lockForUpdate()
+                    ->first();
+            }
 
             $salon = $existing
                 ? $this->reviseSalon($existing, $owner, $payload)

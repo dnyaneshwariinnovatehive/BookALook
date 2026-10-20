@@ -156,6 +156,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _checkAccess();
     _buildTabs();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncTabVisibility();
+    });
+  }
+
+  void _syncTabVisibility() {
+    _homeKey.currentState?.setActive(_selectedIndex == 0);
+    _appointmentsKey.currentState?.setActive(_selectedIndex == 1);
   }
 
   void _onItemTapped(int index) async {
@@ -163,6 +172,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Tapping the tab you are already on goes back to its first page.
       AppHaptics.selectionClick();
       _navigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+      if (index == 0) _homeKey.currentState?.reload();
+      if (index == 1) _appointmentsKey.currentState?.reload();
       return;
     }
 
@@ -209,6 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _selectedIndex = _targetTabIndex ?? index;
         _targetTabIndex = null;
       });
+      _syncTabVisibility();
       return;
     }
 
@@ -220,6 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loadingMessage = _getLoadingMessage(index);
       _selectedIndex = index; // Switch instantly under overlay
     });
+    _syncTabVisibility();
 
     try {
       await realOperation;
@@ -238,6 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _selectedIndex = finalIndex;
       }
     });
+    _syncTabVisibility();
 
     if (finalIndex != index) {
       _onItemTapped(finalIndex);
