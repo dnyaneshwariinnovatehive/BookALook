@@ -10,6 +10,7 @@ import 'reschedule_screen.dart';
 import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
+import '../widgets/complaint_bottom_sheet.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
 import '../utils/bottom_clearance.dart';
@@ -181,6 +182,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     if (submitted && mounted) {
       _hasChanges = true;
       Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _reportProblem() async {
+    final submitted = await ComplaintBottomSheet.show(context, _booking);
+    if (submitted && mounted) {
+      _hasChanges = true;
     }
   }
 
@@ -783,6 +791,29 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 ),
 
               if (!widget.isUpcoming) ..._buildReviewSection(headingColor, bodyColor),
+
+              if (!widget.isUpcoming)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: _reportProblem,
+                      icon: Icon(
+                        Icons.report_problem_outlined,
+                        size: 16,
+                        color: context.colors.textTertiary,
+                      ),
+                      label: Text(
+                        'Report a problem with this visit',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: context.colors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               
               SizedBox(height: bottomClearance(context, gap: 16)),
             ],

@@ -33,27 +33,20 @@ void main() {
     // Verify Heading and Subtitle
     expect(find.text('Turn on your location'), findsOneWidget);
     expect(
-      find.text(
-          'Discover salons near you and get a more\npersonalized BookALook experience.'),
+      find.text('Discover salons near you and get personalized recommendations.'),
       findsOneWidget,
     );
 
-    // Verify 3 Benefits
+    // Verify 2 Benefits
     expect(find.text('Discover salons near you'), findsOneWidget);
     expect(
-      find.text('Find salons and services available around your location.'),
-      findsOneWidget,
-    );
-
-    expect(find.text('Better recommendations'), findsOneWidget);
-    expect(
-      find.text('See relevant salons, services and availability nearby.'),
+      find.text('Explore salons and available services around your area.'),
       findsOneWidget,
     );
 
     expect(find.text('Plan your visit easily'), findsOneWidget);
     expect(
-      find.text('Get more accurate location-based salon information.'),
+      find.text('Get accurate distance, availability and instant booking.'),
       findsOneWidget,
     );
 

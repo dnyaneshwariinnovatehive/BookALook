@@ -429,6 +429,91 @@ class SubscriptionPlanController extends Controller
     }
 
     /**
+     * All subscription plans this salon has ever been on (active, expired, cancelled).
+     */
+    public function subscriptionHistory($salonId)
+    {
+        $salon = Salon::with(['admin'])->findOrFail($salonId);
+
+        // Keep expired plans accurate before listing
+        SalonSubscription::where('salon_id', $salon->id)
+            ->where('status', 'active')
+            ->whereDate('end_date', '<', Carbon::today())
+            ->update(['status' => 'expired']);
+
+        $currentSubscription = $salon->currentSubscription()->with('plan')->first();
+
+        $history = SalonSubscription::with('plan')
+            ->where('salon_id', $salon->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (SalonSubscription $sub) {
+                $isCommission = BillingModel::isCommission($sub->billing_type);
+
+                return [
+                    'id' => $sub->id,
+                    'plan_id' => $sub->plan_id,
+                    'plan_name' => $sub->plan?->name ?? ($isCommission ? 'Commission Plan' : 'Custom Plan'),
+                    'billing_type' => $sub->billing_type ?? BillingModel::SUBSCRIPTION,
+                    'billing_label' => BillingModel::label($sub->billing_type ?? BillingModel::SUBSCRIPTION),
+                    'price' => (float) ($sub->plan_price_snapshot ?? $sub->plan?->price ?? 0),
+                    'commission_percentage' => $sub->commission_percentage !== null ? (float) $sub->commission_percentage : null,
+                    'validity_days' => $sub->plan?->validity_days,
+                    'whatsapp_campaign_limit' => $sub->plan?->whatsapp_campaign_limit,
+                    'start_date' => $sub->start_date?->toDateString(),
+                    'end_date' => $sub->end_date?->toDateString(),
+                    'status' => $sub->status,
+                    'auto_renew' => (bool) $sub->auto_renew,
+                    'cancelled_at' => $sub->cancelled_at?->toDateTimeString(),
+                    'created_at' => $sub->created_at?->toDateTimeString(),
+                ];
+            })->values();
+
+        $paymentRequests = SubscriptionPaymentRequest::with('plan')
+            ->where('salon_id', $salon->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (SubscriptionPaymentRequest $pr) {
+                $model = BillingModel::normalise($pr->billing_type);
+
+                return [
+                    'id' => $pr->id,
+                    'plan_name' => $pr->plan?->name ?? '—',
+                    'billing_type' => $model,
+                    'billing_label' => BillingModel::label($model),
+                    'amount_payable_inr' => $pr->amount_payable_inr !== null ? (float) $pr->amount_payable_inr : null,
+                    'coins_to_redeem' => (int) $pr->coins_to_redeem,
+                    'transaction_id' => $pr->transaction_id,
+                    'note' => $pr->note,
+                    'status' => $pr->status,
+                    'screenshot_url' => $pr->screenshot_url,
+                    'created_at' => $pr->created_at?->toDateTimeString(),
+                ];
+            })->values();
+
+        return response()->json([
+            'success' => true,
+            'salon' => [
+                'id' => $salon->id,
+                'name' => $salon->name,
+                'owner' => $salon->admin->name ?? 'Unknown',
+                'billing_model' => $salon->billingModel(),
+                'billing_label' => BillingModel::label($salon->billingModel()),
+            ],
+            'current_subscription' => $currentSubscription ? [
+                'id' => $currentSubscription->id,
+                'plan_name' => $currentSubscription->plan?->name ?? 'Custom Plan',
+                'price' => (float) ($currentSubscription->plan_price_snapshot ?? $currentSubscription->plan?->price ?? 0),
+                'start_date' => $currentSubscription->start_date?->toDateString(),
+                'end_date' => $currentSubscription->end_date?->toDateString(),
+                'status' => $currentSubscription->status,
+            ] : null,
+            'subscriptions' => $history,
+            'payment_requests' => $paymentRequests,
+        ]);
+    }
+
+    /**
      * Requests made by salons: paid subscriptions to verify, and salons asking
      * to move onto the Commission Model.
      *

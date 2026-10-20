@@ -276,40 +276,40 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
     return Center(
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Material(
             color: Colors.transparent,
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 360),
               decoration: BoxDecoration(
                 color: context.colors.surface,
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isDark
                       ? context.colors.border
-                      : AppTheme.accentColor.withValues(alpha: 0.12),
+                      : AppTheme.accentColor.withValues(alpha: 0.10),
                   width: 1,
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: AppTheme.accentColor.withValues(
-                      alpha: isDark ? 0.25 : 0.14,
+                      alpha: isDark ? 0.22 : 0.12,
                     ),
-                    blurRadius: 36,
+                    blurRadius: 32,
                     spreadRadius: 0,
-                    offset: const Offset(0, 12),
+                    offset: const Offset(0, 10),
                   ),
                   BoxShadow(
                     color: Colors.black.withValues(
-                      alpha: isDark ? 0.5 : 0.10,
+                      alpha: isDark ? 0.45 : 0.08,
                     ),
-                    blurRadius: 20,
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -317,30 +317,15 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                     // Top Illustration Header with Close Button
                     Stack(
                       children: [
-                        const SalonIllustration(),
-                        // Soft bottom gradient blend
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: 36,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  context.colors.surface.withValues(alpha: 0.0),
-                                  context.colors.surface,
-                                ],
-                              ),
-                            ),
-                          ),
+                        const SizedBox(
+                          height: 115,
+                          width: double.infinity,
+                          child: SalonIllustration(),
                         ),
                         // Close Button (X)
                         Positioned(
-                          top: 14,
-                          right: 14,
+                          top: 10,
+                          right: 10,
                           child: Semantics(
                             label: 'Close location modal',
                             button: true,
@@ -350,24 +335,29 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                 Navigator.of(context).pop(false);
                               },
                               child: Container(
-                                width: 34,
-                                height: 34,
+                                width: 32,
+                                height: 32,
                                 decoration: BoxDecoration(
                                   color: context.colors.surface.withValues(alpha: 0.90),
                                   shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isDark
+                                        ? context.colors.border
+                                        : Colors.black.withValues(alpha: 0.06),
+                                    width: 1,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.12),
-                                      blurRadius: 8,
+                                      color: Colors.black.withValues(alpha: 0.08),
+                                      blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close_rounded,
-                                  size: 19,
-                                  color: Color(0xFF4B5563),
+                                  size: 18,
+                                  color: context.colors.textSecondary,
                                 ),
                               ),
                             ),
@@ -378,7 +368,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
 
                     // Main Content Section
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
+                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -387,71 +377,60 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                             'Turn on your location',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.outfit(
-                              fontSize: 22,
+                              fontSize: 18.5,
                               fontWeight: FontWeight.w700,
                               color: context.colors.textPrimary,
                               letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 3),
 
                           // Supporting Text
                           Text(
-                            'Discover salons near you and get a more\npersonalized BookALook experience.',
+                            'Discover salons near you and get personalized recommendations.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 13,
-                              height: 1.45,
+                              fontSize: 12,
+                              height: 1.35,
                               color: context.colors.textSecondary,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 10),
 
                           // Benefit 1: Discover salons near you
                           _buildBenefitRow(
                             icon: Icons.location_on_rounded,
                             iconColor: AppTheme.accentColor,
-                            iconBg: context.colors.accentSoft,
+                            iconBg: const Color(0xFFEDE9FE),
                             title: 'Discover salons near you',
                             description:
-                                'Find salons and services available around your location.',
+                                'Explore salons and available services around your area.',
                             context: context,
                           ),
 
-                          // Benefit 2: Better recommendations
-                          _buildBenefitRow(
-                            icon: Icons.star_rounded,
-                            iconColor: const Color(0xFFEC4899),
-                            iconBg: const Color(0xFFFCE7F3),
-                            title: 'Better recommendations',
-                            description:
-                                'See relevant salons, services and availability nearby.',
-                            context: context,
-                          ),
-
-                          // Benefit 3: Plan your visit easily
+                          // Benefit 2: Plan your visit easily
                           _buildBenefitRow(
                             icon: Icons.calendar_today_rounded,
-                            iconColor: const Color(0xFF3B82F6),
-                            iconBg: const Color(0xFFDBEAFE),
+                            iconColor: const Color(0xFF0284C7),
+                            iconBg: const Color(0xFFE0F2FE),
                             title: 'Plan your visit easily',
                             description:
-                                'Get more accurate location-based salon information.',
+                                'Get accurate distance, availability and instant booking.',
                             context: context,
                           ),
 
                           // Inline status / guidance notice if any
                           if (_statusMessage != null) ...[
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
+                                  horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: (_isPermanentlyDenied || _isServiceDisabled)
                                     ? context.colors.warningBg
                                     : context.colors.accentSoft,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 children: [
@@ -459,7 +438,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                     (_isPermanentlyDenied || _isServiceDisabled)
                                         ? Icons.info_outline_rounded
                                         : Icons.check_circle_outline_rounded,
-                                    size: 16,
+                                    size: 15,
                                     color: (_isPermanentlyDenied ||
                                             _isServiceDisabled)
                                         ? context.colors.warning
@@ -470,7 +449,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                     child: Text(
                                       _statusMessage!,
                                       style: TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 11,
                                         color: (_isPermanentlyDenied ||
                                                 _isServiceDisabled)
                                             ? context.colors.warning
@@ -484,7 +463,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                             ),
                           ],
 
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 12),
 
                           // Primary & Secondary CTAs
                           if (_isPermanentlyDenied) ...[
@@ -494,7 +473,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                               label: 'Select location manually',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 52,
+                                height: 44,
                                 child: ElevatedButton(
                                   onPressed:
                                       _loading ? null : _handleSelectManually,
@@ -504,7 +483,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                     elevation: 0,
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                   child: Ink(
@@ -517,13 +496,13 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       boxShadow: [
                                         BoxShadow(
                                           color: AppTheme.accentColor
                                               .withValues(alpha: 0.35),
-                                          blurRadius: 14,
-                                          offset: const Offset(0, 4),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
@@ -534,14 +513,14 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         children: [
                                           Icon(
                                             Icons.location_city_rounded,
-                                            size: 20,
+                                            size: 18,
                                             color: context.colors.onAccent,
                                           ),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 6),
                                           Text(
                                             'Select location manually',
                                             style: TextStyle(
-                                              fontSize: 15.5,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w700,
                                               color: context.colors.onAccent,
                                               letterSpacing: 0.2,
@@ -550,7 +529,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                           const SizedBox(width: 4),
                                           Icon(
                                             Icons.chevron_right_rounded,
-                                            size: 20,
+                                            size: 18,
                                             color: context.colors.onAccent,
                                           ),
                                         ],
@@ -560,14 +539,14 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             // Secondary CTA: Open Settings
                             Semantics(
                               button: true,
                               label: 'Open Phone Settings',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 48,
+                                height: 38,
                                 child: TextButton(
                                   onPressed:
                                       _loading ? null : _handleOpenSettings,
@@ -577,18 +556,18 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         : context.colors.accentSoft,
                                     foregroundColor: AppTheme.accentColor,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                   child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.settings_outlined, size: 18),
-                                      SizedBox(width: 8),
+                                      Icon(Icons.settings_outlined, size: 16),
+                                      SizedBox(width: 6),
                                       Text(
                                         'Open Phone Settings',
                                         style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 13,
                                           fontWeight: FontWeight.w700,
                                           color: AppTheme.accentColor,
                                         ),
@@ -605,7 +584,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                               label: 'Turn on GPS',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 52,
+                                height: 44,
                                 child: ElevatedButton(
                                   onPressed: _loading
                                       ? null
@@ -616,7 +595,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                     elevation: 0,
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                   child: Ink(
@@ -629,13 +608,13 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       boxShadow: [
                                         BoxShadow(
                                           color: AppTheme.accentColor
                                               .withValues(alpha: 0.35),
-                                          blurRadius: 14,
-                                          offset: const Offset(0, 4),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
@@ -646,14 +625,14 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         children: [
                                           Icon(
                                             Icons.gps_fixed_rounded,
-                                            size: 20,
+                                            size: 18,
                                             color: context.colors.onAccent,
                                           ),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 6),
                                           Text(
                                             'Turn on GPS in Settings',
                                             style: TextStyle(
-                                              fontSize: 15.5,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w700,
                                               color: context.colors.onAccent,
                                               letterSpacing: 0.2,
@@ -662,7 +641,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                           const SizedBox(width: 4),
                                           Icon(
                                             Icons.chevron_right_rounded,
-                                            size: 20,
+                                            size: 18,
                                             color: context.colors.onAccent,
                                           ),
                                         ],
@@ -672,14 +651,14 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             // Secondary CTA: Select location manually
                             Semantics(
                               button: true,
                               label: 'Select location manually',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 48,
+                                height: 38,
                                 child: TextButton(
                                   onPressed:
                                       _loading ? null : _handleSelectManually,
@@ -689,13 +668,13 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         : context.colors.accentSoft,
                                     foregroundColor: AppTheme.accentColor,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                   child: const Text(
                                     'Select location manually',
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.accentColor,
                                     ),
@@ -710,7 +689,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                               label: 'Enable location',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 52,
+                                height: 44,
                                 child: ElevatedButton(
                                   onPressed:
                                       _loading ? null : _handleEnableLocation,
@@ -720,7 +699,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                     elevation: 0,
                                     padding: EdgeInsets.zero,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                   child: Ink(
@@ -733,23 +712,23 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       boxShadow: [
                                         BoxShadow(
                                           color: AppTheme.accentColor
                                               .withValues(alpha: 0.35),
-                                          blurRadius: 14,
-                                          offset: const Offset(0, 4),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 3),
                                         ),
                                       ],
                                     ),
                                     child: Center(
                                       child: _loading
                                           ? SizedBox(
-                                              width: 22,
-                                              height: 22,
+                                              width: 20,
+                                              height: 20,
                                               child: CircularProgressIndicator(
-                                                strokeWidth: 2.2,
+                                                strokeWidth: 2,
                                                 color: context.colors.onAccent,
                                               ),
                                             )
@@ -759,15 +738,15 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                               children: [
                                                 Icon(
                                                   Icons.my_location_rounded,
-                                                  size: 20,
+                                                  size: 18,
                                                   color:
                                                       context.colors.onAccent,
                                                 ),
-                                                const SizedBox(width: 8),
+                                                const SizedBox(width: 6),
                                                 Text(
                                                   'Enable location',
-                                                  style: TextStyle(
-                                                    fontSize: 15.5,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 14.5,
                                                     fontWeight: FontWeight.w700,
                                                     color:
                                                         context.colors.onAccent,
@@ -777,7 +756,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                                 const SizedBox(width: 4),
                                                 Icon(
                                                   Icons.chevron_right_rounded,
-                                                  size: 20,
+                                                  size: 18,
                                                   color:
                                                       context.colors.onAccent,
                                                 ),
@@ -788,7 +767,7 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
 
                             // Secondary CTA: Select location manually
                             Semantics(
@@ -796,23 +775,30 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                               label: 'Select location manually',
                               child: SizedBox(
                                 width: double.infinity,
-                                height: 48,
+                                height: 38,
                                 child: TextButton(
                                   onPressed:
                                       _loading ? null : _handleSelectManually,
                                   style: TextButton.styleFrom(
                                     backgroundColor: isDark
                                         ? context.colors.surfaceMuted
-                                        : context.colors.accentSoft,
+                                        : const Color(0xFFF4EFFF),
                                     foregroundColor: AppTheme.accentColor,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(
+                                        color: isDark
+                                            ? context.colors.border
+                                            : AppTheme.accentColor
+                                                .withValues(alpha: 0.18),
+                                        width: 1,
+                                      ),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'Select location manually',
-                                    style: TextStyle(
-                                      fontSize: 14,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.accentColor,
                                     ),
@@ -821,14 +807,14 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
                               ),
                             ),
                           ],
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 8),
 
                           // Informational Footer
                           Text(
                             'You can change this anytime in Settings.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 10.5,
                               color: context.colors.textTertiary,
                               fontWeight: FontWeight.w400,
                             ),
@@ -857,49 +843,48 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: isDark ? context.colors.surfaceMuted : const Color(0xFFF7F6FC),
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? context.colors.surfaceMuted : const Color(0xFFF9F8FD),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(
           color: isDark
               ? context.colors.border
-              : AppTheme.accentColor.withValues(alpha: 0.07),
-          width: 0.8,
+              : AppTheme.accentColor.withValues(alpha: 0.08),
+          width: 0.9,
         ),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: iconBg,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: 20, color: iconColor),
+            child: Icon(icon, size: 17, color: iconColor),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 13.5,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: context.colors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   description,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     color: context.colors.textSecondary,
-                    height: 1.3,
+                    height: 1.25,
                   ),
                 ),
               ],

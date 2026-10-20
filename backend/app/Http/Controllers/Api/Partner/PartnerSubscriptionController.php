@@ -119,6 +119,7 @@ class PartnerSubscriptionController extends Controller
         return response()->json([
             'success' => true,
             'plans' => $plans,
+            'data' => $plans,
             'commission_model' => $commissionPlan ? [
                 'available' => true,
                 'plan_name' => $commissionPlan->name,

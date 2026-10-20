@@ -260,9 +260,16 @@ class OnboardingDraftStore extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
+  @visibleForTesting
+  void cancelTimerForTesting() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    _timer = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

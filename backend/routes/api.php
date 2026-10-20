@@ -77,6 +77,7 @@ Route::prefix('customer')->group(function () {
         // on opening — anything it returns becomes the rating prompt.
         Route::get('/reviews/pending', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'pending']);
         Route::post('/appointments/{id}/review', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'store']);
+        Route::post('/appointments/{id}/complaint', [\App\Http\Controllers\Api\Customer\ReviewController::class, 'storeComplaint']);
 
         // In-app notification inbox
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
@@ -153,6 +154,7 @@ Route::prefix('superadmin')->group(function () {
     // Salon Directory API (Unprotected for now)
     Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
     Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+    Route::get('/salons/{id}/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'forSalon']);
     Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
     // The directory is the only surface that holds partner-app salons, which
     // never passed through an enquiry to be assigned a collaborator.
@@ -203,6 +205,7 @@ Route::prefix('superadmin')->group(function () {
         // between the old rate and the new one stays honest.
         Route::put('/salons/{id}/commission-rate', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'setCommissionRate']);
         Route::get('/salons/{id}/commission-history', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'commissionHistory']);
+        Route::get('/salons/{id}/subscription-history', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'subscriptionHistory']);
         Route::get('/subscription-requests', [\App\Http\Controllers\Api\SuperAdmin\SubscriptionPlanController::class, 'getSubscriptionRequests']);
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);

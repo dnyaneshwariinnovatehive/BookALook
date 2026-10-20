@@ -8,6 +8,7 @@ import '../utils/app_haptics.dart';
 import '../widgets/invoice_actions.dart';
 import '../widgets/rating_bars.dart';
 import '../widgets/review_prompt_sheet.dart';
+import '../widgets/complaint_bottom_sheet.dart';
 import 'appointment_details_screen.dart';
 import 'reschedule_screen.dart';
 import '../theme/app_colors.dart';
@@ -1558,6 +1559,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     final review = booking['review'] as Map<String, dynamic>?;
     final canReview = booking['can_review'] == true;
     final blockedReason = booking['review_blocked_reason']?.toString();
+    final isPast = ['completed', 'cancelled', 'no_show']
+        .contains(booking['status']?.toString().toLowerCase());
 
     final bool mightHaveInvoice =
         booking['invoice'] is Map && booking['status'] == 'completed';
@@ -1565,6 +1568,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     if (!mightHaveInvoice &&
         review == null &&
         !canReview &&
+        !isPast &&
         (blockedReason == null || booking['status'] != 'completed')) {
       return const [];
     }
@@ -1574,50 +1578,150 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
       const Divider(color: Color(0xFFECEAF2), height: 1),
       const SizedBox(height: 4),
       InvoiceLinkButton(booking: booking),
-      if (review != null)
+      if (review != null) ...[
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: _buildCompactGivenRating(review),
-        )
-      else if (canReview)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: InkWell(
-            onTap: () => _rateVisit(booking),
-            borderRadius: BorderRadius.circular(30),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.star_outline_rounded,
-                    size: 16,
-                    color: AppTheme.accentColor,
+        ),
+        if (isPast)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 8),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: InkWell(
+                onTap: () => _reportProblem(booking),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.report_problem_outlined,
+                        size: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Report issue',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Rate your visit',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accentColor,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
+      ] else if (canReview)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: () => _rateVisit(booking),
+                borderRadius: BorderRadius.circular(30),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_outline_rounded,
+                        size: 16,
+                        color: AppTheme.accentColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Rate your visit',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.accentColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => _reportProblem(booking),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.report_problem_outlined,
+                        size: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Report issue',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         )
-      else if (blockedReason != null && booking['status'] == 'completed')
+      else if (isPast)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            blockedReason,
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: const Color(0xFF7C758D),
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (blockedReason != null && booking['status'] == 'completed')
+                Expanded(
+                  child: Text(
+                    blockedReason,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: const Color(0xFF7C758D),
+                    ),
+                  ),
+                )
+              else
+                const Spacer(),
+              InkWell(
+                onTap: () => _reportProblem(booking),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.report_problem_outlined,
+                        size: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Report issue',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
     ];
@@ -1684,6 +1788,11 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           : 'On ${DateFormat('d MMM yyyy').format(visitedOn)}',
     });
 
+    if (submitted && mounted) await _loadBookings();
+  }
+
+  Future<void> _reportProblem(Map<String, dynamic> booking) async {
+    final submitted = await ComplaintBottomSheet.show(context, booking);
     if (submitted && mounted) await _loadBookings();
   }
 

@@ -81,11 +81,15 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   Future<void> reload() => _fetch();
 
   Future<void> _fetch() async {
-    // Anything finished but unsent should go before the collaborator concludes
-    // from a short list that their afternoon vanished.
-    await OnboardingDraftStore.instance.sync();
-
     try {
+      // Anything finished but unsent should go before the collaborator concludes
+      // from a short list that their afternoon vanished.
+      try {
+        await OnboardingDraftStore.instance.sync();
+      } catch (e) {
+        debugPrint('Error syncing onboarding drafts: $e');
+      }
+
       final salons = await CollaboratorApi.onboardedSalons();
       if (!mounted) return;
       setState(() => _salons = salons);

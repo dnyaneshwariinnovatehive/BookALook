@@ -35,11 +35,17 @@ class ApiService {
 
   static Future<List<dynamic>> getSubscriptionPlans() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/public/subscription-plans'));
+      final response = await http.get(
+        Uri.parse('$baseUrl/public/subscription-plans'),
+        headers: {'Accept': 'application/json'},
+      );
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is List) return decoded;
-        if (decoded is Map && decoded['data'] is List) return decoded['data'];
+        if (decoded is Map) {
+          if (decoded['plans'] is List) return decoded['plans'];
+          if (decoded['data'] is List) return decoded['data'];
+        }
       }
       return [];
     } catch (e) {

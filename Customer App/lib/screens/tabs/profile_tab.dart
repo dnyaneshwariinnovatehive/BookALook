@@ -18,6 +18,9 @@ import '../../utils/bottom_clearance.dart';
 import '../../main.dart'; // To access themeNotifier
 import '../edit_profile_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../services/appointment_service.dart';
+import '../../widgets/complaint_bottom_sheet.dart';
 
 class ProfileTab extends StatefulWidget {
   final bool isGuest;
@@ -707,6 +710,16 @@ class _ProfileTabState extends State<ProfileTab> {
                   borderRadius: BorderRadius.circular(20),
                   child: Column(
                     children: [
+                      _buildNavActionRow(
+                        context,
+                        icon: Icons.report_problem_outlined,
+                        label: 'Report a Problem / Complaints',
+                        onTap: () {
+                          AppHaptics.lightImpact();
+                          _showComplaintOrHelpOptions();
+                        },
+                      ),
+                      Divider(height: 1, thickness: 1, color: borderColor),
                       for (int i = 0; i < _legalDocuments.length; i++) ...[
                         () {
                           final entry = _legalDocuments.entries.elementAt(i);
@@ -968,6 +981,272 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showComplaintOrHelpOptions() async {
+    if (widget.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to report a problem or file a complaint.'),
+        ),
+      );
+      return;
+    }
+
+    final surfaceColor = context.colors.surface;
+    final textPrimary = context.colors.textPrimary;
+    final textSecondary = context.colors.textSecondary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) => Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          bottomClearance(bottomSheetContext, gap: 20),
+        ),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Help & Complaints',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Have an issue with a visit or need assistance? We are here to help.',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                color: textSecondary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.receipt_long_outlined,
+                  color: AppTheme.accentColor,
+                  size: 22,
+                ),
+              ),
+              title: Text(
+                'Report an issue with an appointment',
+                style: GoogleFonts.outfit(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                'File a complaint or report a problem with a salon visit',
+                style: GoogleFonts.outfit(fontSize: 12, color: textSecondary),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(bottomSheetContext);
+                _pickAppointmentForComplaint();
+              },
+            ),
+            const Divider(height: 24),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.mail_outline_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 22,
+                ),
+              ),
+              title: Text(
+                'Contact Customer Support',
+                style: GoogleFonts.outfit(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                'Email $kLegalContactEmail',
+                style: GoogleFonts.outfit(fontSize: 12, color: textSecondary),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () async {
+                Navigator.pop(bottomSheetContext);
+                final uri = Uri.parse('mailto:$kLegalContactEmail?subject=Customer%20Support%20Inquiry');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAppointmentForComplaint() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<dynamic> pastBookings = [];
+    try {
+      final res = await AppointmentService().getMyBookings();
+      pastBookings = res['past'] ?? [];
+    } catch (_) {
+      // Ignored
+    } finally {
+      if (mounted) Navigator.pop(context); // close loader
+    }
+
+    if (!mounted) return;
+
+    if (pastBookings.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'No Past Appointments',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          content: Text(
+            'You do not have any past appointments to report an issue for yet.',
+            style: GoogleFonts.outfit(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+        ),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance(ctx, gap: 16)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Select Appointment',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: context.colors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Choose the visit you would like to report an issue with:',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                color: context.colors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: pastBookings.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (itemCtx, index) {
+                  final b = pastBookings[index];
+                  final salonName = b['salon']?['name'] ?? 'Salon';
+                  final date = b['appointment_date']?.toString() ?? '';
+                  final time = b['start_time']?.toString() ?? '';
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                    title: Text(
+                      salonName,
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '$date at $time',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      ComplaintBottomSheet.show(context, b);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

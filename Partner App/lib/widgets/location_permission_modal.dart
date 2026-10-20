@@ -102,157 +102,216 @@ class LocationPermissionModal extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 360),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: AppTheme.accentColor.withValues(alpha: 0.12),
               blurRadius: 32,
-              offset: const Offset(0, 16),
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: SingleChildScrollView(
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Top compact illustration header with close button
+                Stack(
                   children: [
-                    const SizedBox(height: 12),
-                    _buildIllustration(),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Share your salon location',
-                      style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.lightTextHeading,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Help customers find your salon easily\nand get more walk-ins.',
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        color: AppTheme.lightTextBody,
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    _buildBenefitRow(
-                      icon: Icons.radar,
-                      title: 'Appear in nearby search',
-                      description: 'Customers near you can discover your salon.',
-                      color: const Color(0xFFE3F2FD),
-                      iconColor: const Color(0xFF1565C0),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildBenefitRow(
-                      icon: Icons.directions_walk,
-                      title: 'Get more walk-ins',
-                      description: 'Your location helps nearby customers reach you.',
-                      color: const Color(0xFFEEE3FD),
-                      iconColor: AppTheme.accentColor,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildBenefitRow(
-                      icon: Icons.visibility_outlined,
-                      title: 'Better visibility',
-                      description: "Improve your salon's reach and business opportunities.",
-                      color: const Color(0xFFE8F5E9),
-                      iconColor: const Color(0xFF2E7D32),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
+                    const SizedBox(
+                      height: 115,
                       width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => _enableLocation(context),
-                        icon: const Icon(Icons.my_location, size: 20),
-                        label: Text(
-                          'Enable location',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.accentColor,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                      ),
+                      child: SalonIllustration(),
                     ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SalonLocationScreen(salonId: salonId),
+                    // Close button (X)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Semantics(
+                        label: 'Close location reminder',
+                        button: true,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.pop(context),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.92),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: AppTheme.lightTextBody,
+                              ),
+                            ),
                           ),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.lightTextBody,
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'View location details',
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Semantics(
-                  label: 'Close location reminder',
-                  button: true,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => Navigator.pop(context),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 24,
-                          color: AppTheme.lightTextLight,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Share your salon location',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.lightTextHeading,
+                          letterSpacing: -0.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Help nearby customers discover your salon and get walk-ins.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: AppTheme.lightTextBody,
+                          height: 1.35,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildBenefitRow(
+                        icon: Icons.radar,
+                        title: 'Appear in nearby search',
+                        description: 'Nearby clients discover your salon faster.',
+                        color: const Color(0xFFE0F2FE),
+                        iconColor: const Color(0xFF0284C7),
+                      ),
+                      _buildBenefitRow(
+                        icon: Icons.directions_walk_rounded,
+                        title: 'Get more walk-ins',
+                        description: 'Help customers easily find and reach your salon.',
+                        color: const Color(0xFFEDE9FE),
+                        iconColor: AppTheme.accentColor,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppTheme.accentGradientStart,
+                                AppTheme.accentGradientEnd,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.accentColor.withValues(alpha: 0.30),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _enableLocation(context),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.my_location, size: 18, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Enable location',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14.5,
+                                      color: Colors.white,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.white),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SalonLocationScreen(salonId: salonId),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFFF4EFFF),
+                            foregroundColor: AppTheme.accentColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: AppTheme.accentColor.withValues(alpha: 0.18),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            'View location details',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildIllustration() {
-    return const SalonIllustration();
   }
 
   Widget _buildBenefitRow({
@@ -262,42 +321,55 @@ class LocationPermissionModal extends StatelessWidget {
     required Color color,
     required Color iconColor,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, size: 20, color: iconColor),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F8FD),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: AppTheme.accentColor.withValues(alpha: 0.08),
+          width: 0.9,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.lightTextHeading,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  color: AppTheme.lightTextBody,
-                ),
-              ),
-            ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 17, color: iconColor),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.lightTextHeading,
+                  ),
+                ),
+                Text(
+                  description,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: AppTheme.lightTextBody,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
