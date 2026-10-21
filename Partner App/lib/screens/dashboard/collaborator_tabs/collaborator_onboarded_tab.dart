@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../models/onboarding_draft.dart';
 import '../../../services/collaborator_api.dart';
 import '../../../services/collaborator_badges.dart';
 import '../../../services/onboarding_draft_store.dart';
@@ -14,13 +15,8 @@ import '../../../widgets/collaborator/collaborator_skeleton.dart';
 import '../../../widgets/collaborator/collaborator_thumb.dart';
 import '../../collaborator/onboard_salon_screen.dart';
 
-/// Everything this collaborator has submitted, and what SuperAdmin did with it.
-///
-/// Two jobs. First, accountability in one direction: a collaborator should
-/// never have to ask anyone whether a salon they set up went live. Second, it
-/// is where editing happens — a salon can be corrected right up to the moment
-/// it is approved, and never after, so the edit button disappears at exactly
-/// the point the salon stops being theirs.
+/// All salons the collaborator manages: assigned enquiries to onboard,
+/// directory salons in their care, and submitted salons across all approval states.
 class CollaboratorOnboardedTab extends StatefulWidget {
   /// Counts the bottom navigation badges are drawn from. Null when the tab is
   /// used standalone.
@@ -39,33 +35,27 @@ class CollaboratorOnboardedTab extends StatefulWidget {
 
 /// Public so the shell can ask for a refresh when the tab is re-selected.
 class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
+  final _store = OnboardingDraftStore.instance;
+
   bool _isLoading = true;
   bool _firstLoad = true;
   List<dynamic> _salons = [];
+  List<dynamic> _enquiries = [];
+  List<dynamic> _assignedSalons = [];
+  List<dynamic> _alerts = [];
 
-  /// null = everything. Otherwise the salon status being shown.
-  ///
-  /// Kept across rebuilds now that the tab lives in an [IndexedStack] rather
-  /// than being rebuilt on every switch — previously the collaborator lost
-  /// their filter every time they glanced at Assigned and came back.
+  /// null = everything. Otherwise the salon status or group being shown:
+  /// 'assigned', 'pending_approval', 'active', 'rejected'.
   String? _filter;
 
   /// Salons whose details are currently unfolded, by id.
-  ///
-  /// Only ever holds approved salons — the editable ones open the form on tap
-  /// instead, so there is nothing here to remember for them.
   final Set<String> _expanded = {};
 
-  /// Days remaining at which a plan is worth colouring the whole card red.
-  ///
-  /// Deliberately not the backend's reminder window. The scheduler decides when
-  /// to send somebody an email; this decides what a collaborator sees before
-  /// they have opened anything, and five days is roughly how long it takes a
-  /// phone call to land with an owner who has not already decided.
   static const _urgentDays = 5;
 
   static const _filters = <String?, String>{
     null: 'All',
+    'assigned': 'Assigned',
     'pending_approval': 'Pending',
     'active': 'Approved',
     'rejected': 'Sent back',
@@ -74,7 +64,18 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   @override
   void initState() {
     super.initState();
+    _store.addListener(_onStoreChanged);
     _fetch();
+  }
+
+  @override
+  void dispose() {
+    _store.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Re-reads the list. Called by the shell when the tab is re-selected.
@@ -82,20 +83,29 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
 
   Future<void> _fetch() async {
     try {
-      // Anything finished but unsent should go before the collaborator concludes
-      // from a short list that their afternoon vanished.
       try {
-        await OnboardingDraftStore.instance.sync();
+        await _store.sync();
       } catch (e) {
         debugPrint('Error syncing onboarding drafts: $e');
       }
 
-      final salons = await CollaboratorApi.onboardedSalons();
+      final results = await Future.wait([
+        CollaboratorApi.onboardedSalons(),
+        CollaboratorApi.assignedEnquiries(),
+        CollaboratorApi.assignedSalons(),
+        CollaboratorApi.alerts(),
+      ]);
+
       if (!mounted) return;
-      setState(() => _salons = salons);
-      _reportBadges(salons);
+      setState(() {
+        _salons = results[0];
+        _enquiries = results[1];
+        _assignedSalons = results[2];
+        _alerts = results[3];
+      });
+      _reportBadges(_salons, _enquiries);
     } catch (e) {
-      debugPrint('Error fetching onboarded salons: $e');
+      debugPrint('Error fetching collaborator salons: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -106,48 +116,77 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     }
   }
 
-  /// Only `rejected` and `pending_approval` reach the badge.
-  ///
-  /// An approved salon is finished business — it belongs to its owner now, and
-  /// a badge that never clears because "Live" grows all session would train
-  /// the collaborator to ignore the dot.
-  void _reportBadges(List<dynamic> salons) {
+  void _reportBadges(List<dynamic> salons, List<dynamic> enquiries) {
+    final awaiting = salons.where((s) => (s as Map)['status'] == 'pending_approval').length;
+    final sentBack = salons.where((s) {
+      final st = (s as Map)['status'];
+      return st == 'rejected' || st == 'needs_correction';
+    }).length +
+        enquiries.where((e) =>
+            (e as Map)['needs_correction'] == true &&
+            !salons.any((s) => s['id']?.toString() == e['salon_id']?.toString())).length;
+
     widget.badges?.reportMySalons(
-      awaitingApproval: _statusCount(salons, 'pending_approval'),
-      sentBack: _statusCount(salons, 'rejected'),
+      awaitingApproval: awaiting,
+      sentBack: sentBack,
     );
   }
 
-  static int _statusCount(List<dynamic> salons, String status) =>
-      salons.where((s) => (s as Map)['status'] == status).length;
-
-  /// Replaces the fetched list with [salons], for tests.
-  ///
-  /// The card's subscription capsule and its red-at-five-days treatment are the
-  /// whole point of this tab's latest change, and both are decided from the
-  /// server payload. Reaching them through a widget test needs a way in that
-  /// does not involve standing up the API.
   @visibleForTesting
-  void seedForTest(List<Map<String, dynamic>> salons) {
+  void seedForTest(
+    List<Map<String, dynamic>> salons, {
+    List<dynamic>? enquiries,
+    List<dynamic>? assignedSalons,
+    List<dynamic>? alerts,
+  }) {
     setState(() {
       _salons = salons;
+      if (enquiries != null) _enquiries = enquiries;
+      if (assignedSalons != null) _assignedSalons = assignedSalons;
+      if (alerts != null) _alerts = alerts;
       _isLoading = false;
       _firstLoad = false;
     });
   }
 
-  List<Map<String, dynamic>> get _visible => _salons
-      .map((s) => Map<String, dynamic>.from(s as Map))
-      .where((s) => _filter == null || s['status'] == _filter)
-      .toList();
+  int _countOf(String? status) {
+    if (status == null) {
+      final unlinkedEnquiries = _enquiries.where(
+        (e) =>
+            e['salon_id'] == null ||
+            !_salons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
+      ).length;
+      return unlinkedEnquiries + _assignedSalons.length + _salons.length;
+    }
+    if (status == 'assigned') {
+      return _enquiries.length + _assignedSalons.length;
+    }
+    if (status == 'rejected') {
+      final rejectedSalons = _salons.where((s) {
+        final st = s['status'];
+        return st == 'rejected' || st == 'needs_correction';
+      }).length;
+      final rejectedEnquiries = _enquiries.where(
+        (e) =>
+            (e as Map)['needs_correction'] == true &&
+            !_salons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
+      ).length;
+      return rejectedSalons + rejectedEnquiries;
+    }
+    return _salons.where((s) => (s as Map)['status'] == status).length;
+  }
 
-  int _countOf(String? status) => status == null
-      ? _salons.length
-      : _salons.where((s) => (s as Map)['status'] == status).length;
+  Future<void> _openOnboarding(Map<String, dynamic> enquiry) async {
+    final submitted = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => OnboardSalonScreen(enquiry: enquiry)),
+    );
+
+    if (submitted == true) await _fetch();
+    if (mounted) setState(() {});
+  }
 
   Future<void> _edit(Map<String, dynamic> salon) async {
-    // The onboarding form can be for an assigned enquiry or direct onboarding.
-    // If direct (enquiry_id is null), pass enquiry: null and editingSalonId.
     final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -169,14 +208,42 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     if (saved == true) await _fetch();
   }
 
+  Future<void> _callOwner(String? phone, String salonName) async {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text('No phone number on file for $salonName.'),
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (!await launchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(milliseconds: 2500),
+          content: Text('Could not start a call. The number is $phone.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_firstLoad && _isLoading) {
       return const CollaboratorCardSkeleton(count: 3);
     }
-    if (_salons.isEmpty) return _buildEmptyState();
 
-    final visible = _visible;
+    final hasAnyData = _salons.isNotEmpty ||
+        _enquiries.isNotEmpty ||
+        _assignedSalons.isNotEmpty ||
+        _alerts.isNotEmpty ||
+        _store.queuedCount > 0;
+
+    if (!hasAnyData) return _buildEmptyState();
 
     return RefreshIndicator(
       onRefresh: _fetch,
@@ -185,13 +252,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         children: [
           _buildFilterBar(),
           Expanded(
-            child: visible.isEmpty
-                ? _buildNothingInFilter()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                    itemCount: visible.length,
-                    itemBuilder: (_, index) => _buildSalonCard(visible[index]),
-                  ),
+            child: _buildFilteredBody(),
           ),
         ],
       ),
@@ -217,6 +278,653 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     ),
   );
 
+  Widget _buildFilteredBody() {
+    if (_filter == 'assigned') {
+      final hasAssigned =
+          _enquiries.isNotEmpty || _assignedSalons.isNotEmpty || _store.queuedCount > 0;
+      if (!hasAssigned) {
+        return _buildNothingInFilter();
+      }
+
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        children: [
+          if (_store.queuedCount > 0) _buildQueueBanner(),
+          if (_enquiries.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                _enquiries.length == 1
+                    ? '1 salon to onboard'
+                    : '${_enquiries.length} salons to onboard',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+            ),
+            for (final enquiry in _enquiries)
+              _buildEnquiryCard(Map<String, dynamic>.from(enquiry as Map)),
+          ],
+          if (_assignedSalons.isNotEmpty) _buildAssignedSalonsSection(),
+        ],
+      );
+    }
+
+    if (_filter == 'pending_approval' || _filter == 'active' || _filter == 'rejected') {
+      final List<Map<String, dynamic>> visibleSalons = _salons
+          .map((s) => Map<String, dynamic>.from(s as Map))
+          .where((s) {
+            final st = s['status'];
+            if (_filter == 'rejected') {
+              return st == 'rejected' || st == 'needs_correction';
+            }
+            return st == _filter;
+          })
+          .toList();
+
+      final List<Map<String, dynamic>> extraEnquiries = _filter == 'rejected'
+          ? _enquiries
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .where((e) =>
+                  e['needs_correction'] == true &&
+                  !visibleSalons.any((s) => s['id']?.toString() == e['salon_id']?.toString()))
+              .toList()
+          : [];
+
+      if (visibleSalons.isEmpty && extraEnquiries.isEmpty) {
+        return _buildNothingInFilter();
+      }
+
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        children: [
+          for (final enquiry in extraEnquiries) _buildEnquiryCard(enquiry),
+          for (final salon in visibleSalons) _buildSalonCard(salon),
+        ],
+      );
+    }
+
+    // _filter == null (All)
+    final hasItems = _salons.isNotEmpty ||
+        _enquiries.isNotEmpty ||
+        _assignedSalons.isNotEmpty ||
+        _alerts.isNotEmpty ||
+        _store.queuedCount > 0;
+    if (!hasItems) {
+      return _buildNothingInFilter();
+    }
+
+    // Deduplicate: enquiries whose salon is already in _salons
+    final deduplicatedEnquiries = _enquiries.where((e) {
+      final salonId = e['salon_id']?.toString();
+      final enquiryId = e['id']?.toString();
+      return !_salons.any((s) =>
+          (salonId != null && s['id']?.toString() == salonId) ||
+          (enquiryId != null && s['enquiry_id']?.toString() == enquiryId));
+    }).toList();
+
+    final hasMultipleSections =
+        (deduplicatedEnquiries.isNotEmpty || _assignedSalons.isNotEmpty) && _salons.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+      children: [
+        if (_store.queuedCount > 0) _buildQueueBanner(),
+        if (_alerts.isNotEmpty) _buildAlertsSection(),
+        if (deduplicatedEnquiries.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Text(
+              deduplicatedEnquiries.length == 1
+                  ? '1 salon to onboard'
+                  : '${deduplicatedEnquiries.length} salons to onboard',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.bold,
+                color: context.colors.textPrimary,
+              ),
+            ),
+          ),
+          for (final raw in deduplicatedEnquiries)
+            _buildEnquiryCard(Map<String, dynamic>.from(raw as Map)),
+        ],
+        if (_assignedSalons.isNotEmpty) _buildAssignedSalonsSection(),
+        if (_salons.isNotEmpty) ...[
+          if (hasMultipleSections)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12, top: 8),
+              child: Text(
+                _salons.length == 1
+                    ? '1 submitted salon'
+                    : '${_salons.length} submitted salons',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+            ),
+          for (final raw in _salons)
+            _buildSalonCard(Map<String, dynamic>.from(raw as Map)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEnquiryCard(Map<String, dynamic> enquiry) {
+    final id = enquiry['id'].toString();
+    final draft = _store.forEnquiry(id);
+    final needsCorrection = enquiry['needs_correction'] == true;
+    final palette = context.colors;
+    final phone = enquiry['phone']?.toString();
+    final salonName = enquiry['salon_name']?.toString() ?? 'the salon';
+
+    return CollaboratorCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  enquiry['salon_name']?.toString() ?? 'Unknown salon',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ),
+              _statusChip(needsCorrection, draft),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          _detail(
+            Icons.person_outline,
+            enquiry['owner_name']?.toString() ?? 'Unknown owner',
+          ),
+          _detail(
+            Icons.phone_outlined,
+            phone ?? 'No phone',
+          ),
+          _detail(
+            Icons.location_city_outlined,
+            enquiry['city']?.toString() ?? 'Unknown city',
+          ),
+
+          if ((enquiry['message']?.toString() ?? '').isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                enquiry['message'].toString(),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: palette.textSecondary,
+                ),
+              ),
+            ),
+          ],
+
+          if (needsCorrection &&
+              (enquiry['rejection_reason']?.toString() ?? '').isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: palette.dangerBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline, size: 16, color: palette.danger),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SuperAdmin sent this back: ${enquiry['rejection_reason']}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: palette.danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          if (draft?.lastError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Last submission was refused: ${draft!.lastError}',
+              style: TextStyle(fontSize: 12, color: palette.danger),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+          Divider(height: 1, color: palette.border),
+          const SizedBox(height: 10),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                draft != null
+                    ? 'Draft saved ${_ago(draft.updatedAt)}'
+                    : 'Assigned ${_assignedOn(enquiry['assigned_at'])}',
+                style: TextStyle(fontSize: 11.5, color: palette.textTertiary),
+              ),
+              if (phone != null && phone.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () => _callOwner(phone, salonName),
+                  icon: const Icon(Icons.call, size: 14),
+                  label: const Text('Call', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.accentColor,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _openOnboarding(enquiry),
+              icon: Icon(
+                needsCorrection
+                    ? Icons.edit_outlined
+                    : draft != null
+                        ? Icons.play_arrow_rounded
+                        : Icons.rocket_launch_outlined,
+                size: 19,
+              ),
+              label: Text(
+                needsCorrection
+                    ? 'Fix and resubmit'
+                    : draft != null
+                        ? 'Continue onboarding'
+                        : 'Start onboarding',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: palette.onAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(bool needsCorrection, OnboardingDraft? draft) {
+    final palette = context.colors;
+
+    final (label, colour) = switch (true) {
+      _ when needsCorrection => ('Needs fixing', palette.danger),
+      _ when draft != null && draft.isComplete => (
+        'Ready to send',
+        palette.warning,
+      ),
+      _ when draft != null => ('In progress', palette.info),
+      _ => ('Assigned', AppTheme.accentColor),
+    };
+
+    return CollaboratorChip(label: label, colour: colour);
+  }
+
+  Widget _detail(IconData icon, String text) {
+    final palette = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: palette.textTertiary),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13, color: palette.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _assignedOn(dynamic raw) {
+    final parsed = DateTime.tryParse(raw?.toString() ?? '');
+    return parsed == null
+        ? 'recently'
+        : 'on ${DateFormat('d MMM yyyy').format(parsed.toLocal())}';
+  }
+
+  static String _ago(DateTime when) {
+    final gap = DateTime.now().difference(when);
+
+    if (gap.inMinutes < 1) return 'just now';
+    if (gap.inHours < 1) return '${gap.inMinutes} min ago';
+    if (gap.inDays < 1) return '${gap.inHours}h ago';
+    return 'on ${DateFormat('d MMM').format(when)}';
+  }
+
+  Widget _buildAssignedSalonsSection() {
+    final palette = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Icon(Icons.how_to_reg_outlined, size: 17, color: palette.info),
+            const SizedBox(width: 8),
+            Text(
+              _assignedSalons.length == 1
+                  ? '1 salon in your care'
+                  : '${_assignedSalons.length} salons in your care',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.bold,
+                color: palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Already registered by their owners. SuperAdmin put you on them — no onboarding needed.',
+          style: TextStyle(
+            fontSize: 11.5,
+            height: 1.4,
+            color: palette.textTertiary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final raw in _assignedSalons)
+          _buildAssignedSalonCard(Map<String, dynamic>.from(raw as Map)),
+      ],
+    );
+  }
+
+  Widget _buildAssignedSalonCard(Map<String, dynamic> salon) {
+    final needsPlan = salon['needs_plan'] == true;
+    final daysLeft = salon['days_left'] as int?;
+    final noServices = (salon['services_count'] ?? 0) == 0;
+    final palette = context.colors;
+
+    return CollaboratorCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CollaboratorThumb(url: salon['cover_photo_url']?.toString()),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      salon['name']?.toString() ?? 'Salon',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.bold,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      [salon['address'], salon['city']]
+                          .where((p) => p != null && p.toString().isNotEmpty)
+                          .join(', '),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '${salon['owner_name'] ?? 'Owner'} · '
+                      '${salon['services_count'] ?? 0} '
+                      '${salon['services_count'] == 1 ? 'service' : 'services'}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: palette.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          if (needsPlan ||
+              noServices ||
+              (daysLeft != null && daysLeft <= 7)) ...[
+            const SizedBox(height: 11),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (needsPlan)
+                  CollaboratorChip(
+                    label: 'No plan chosen yet',
+                    colour: palette.warning,
+                  ),
+                if (daysLeft != null && daysLeft <= 7)
+                  CollaboratorChip(
+                    label: daysLeft <= 0
+                        ? 'Plan ends today'
+                        : 'Plan ends in $daysLeft days',
+                    colour: palette.danger,
+                  ),
+                if (noServices)
+                  CollaboratorChip(
+                    label: 'Menu is empty',
+                    colour: palette.info,
+                  ),
+              ],
+            ),
+          ] else if (salon['plan_name'] != null) ...[
+            const SizedBox(height: 11),
+            CollaboratorChip(
+              label: 'On ${salon['plan_name']}',
+              colour: palette.success,
+            ),
+          ],
+
+          const SizedBox(height: 12),
+          Divider(height: 1, color: palette.border),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _callOwner(
+                salon['owner_phone']?.toString(),
+                salon['name']?.toString() ?? 'the salon',
+              ),
+              icon: const Icon(Icons.call, size: 16),
+              label: Text(
+                'Call ${salon['owner_name'] ?? 'owner'}',
+                style: const TextStyle(fontSize: 12.5),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accentColor,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertsSection() {
+    final palette = context.colors;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.notifications_active_outlined,
+              size: 17,
+              color: palette.warning,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _alerts.length == 1
+                  ? '1 salon needs a call'
+                  : '${_alerts.length} salons need a call',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.bold,
+                color: palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        for (final raw in _alerts)
+          _buildAlertCard(Map<String, dynamic>.from(raw as Map)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildAlertCard(Map<String, dynamic> alert) {
+    final lapsed = alert['severity'] == 'lapsed';
+    final palette = context.colors;
+    final colour = lapsed ? palette.danger : palette.warning;
+
+    return CollaboratorCard(
+      padding: const EdgeInsets.all(14),
+      color: lapsed ? palette.dangerBg : palette.warningBg,
+      borderColor: colour.withValues(alpha: 0.3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                lapsed ? Icons.wifi_off_rounded : Icons.timer_outlined,
+                size: 18,
+                color: colour,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  alert['message']?.toString() ?? '',
+                  style: TextStyle(fontSize: 13, height: 1.4, color: colour),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${alert['owner_name'] ?? 'Owner'}'
+                  '${alert['city'] != null ? ' · ${alert['city']}' : ''}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: palette.textSecondary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _callOwner(
+                  alert['owner_phone']?.toString(),
+                  alert['salon_name']?.toString() ?? 'the salon',
+                ),
+                icon: const Icon(Icons.call, size: 15),
+                label: const Text(
+                  'Call owner',
+                  style: TextStyle(fontSize: 12.5),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: colour,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQueueBanner() {
+    final palette = context.colors;
+    final warning = palette.warning;
+
+    return CollaboratorCard(
+      padding: const EdgeInsets.all(14),
+      color: palette.warningBg,
+      borderColor: warning.withValues(alpha: 0.3),
+      child: Row(
+        children: [
+          if (_store.isSyncing)
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: warning),
+            )
+          else
+            Icon(Icons.cloud_upload_outlined, size: 20, color: warning),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _store.isSyncing
+                  ? 'Sending ${_store.queuedCount} finished ${_store.queuedCount == 1 ? 'salon' : 'salons'}…'
+                  : '${_store.queuedCount} finished ${_store.queuedCount == 1 ? 'salon is' : 'salons are'} '
+                      'waiting for a connection. They will send themselves.',
+              style: TextStyle(fontSize: 12.5, height: 1.4, color: warning),
+            ),
+          ),
+          if (!_store.isSyncing)
+            TextButton(
+              onPressed: _store.sync,
+              style: TextButton.styleFrom(
+                foregroundColor: warning,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Retry', style: TextStyle(fontSize: 12.5)),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSalonCard(Map<String, dynamic> salon) {
     final status = salon['status']?.toString() ?? '';
     final (statusLabel, statusColour, statusIcon) = _statusLook(status);
@@ -230,17 +938,11 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     final expanded = expandableFor(salon) && _expanded.contains(id);
 
     return CollaboratorCard(
-      // An editable salon spends its tap on the form, which is the fastest route
-      // to fixing it. An approved one has nothing left to edit, so the same tap
-      // is spent on the details instead.
       onTap: canEdit
           ? () => _edit(salon)
           : expandableFor(salon)
               ? () => _toggleExpanded(id)
               : null,
-      // Whole-card red rather than a single red capsule: five days is close
-      // enough that scrolling past the card should catch it, not just looking
-      // directly at it.
       color: urgent ? palette.dangerBg : null,
       borderColor: urgent ? palette.danger.withValues(alpha: 0.35) : null,
       child: Column(
@@ -276,9 +978,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Wrap, not Row: two capsules side by side is the normal case
-                    // now, and a long plan name must not push the approval
-                    // status off the edge of the card.
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
@@ -299,8 +998,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                   ],
                 ),
               ),
-              // Spells out that the card opens, since a tap that expands reads
-              // as broken until you know it is meant to.
               if (expandableFor(salon))
                 AnimatedRotation(
                   turns: expanded ? 0.5 : 0,
@@ -395,8 +1092,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                   ),
                 )
               else
-                // Approved: the salon now belongs to its owner, and saying so
-                // is kinder than a button that would be refused.
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -427,11 +1122,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     );
   }
 
-  /// The details panel an approved salon opens instead of the edit form.
-  ///
-  /// Everything here is something the collaborator can no longer change but
-  /// still has to act on, which for an approved salon is almost entirely about
-  /// reaching the owner.
   Widget _buildSalonDetails(Map<String, dynamic> salon) {
     final palette = context.colors;
 
@@ -477,8 +1167,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
             (salon['services_count'] ?? 0) == 0
                 ? 'No services priced yet'
                 : '${salon['services_count']} '
-                      '${salon['services_count'] == 1 ? 'service' : 'services'} '
-                      'priced',
+                    '${salon['services_count'] == 1 ? 'service' : 'services'} priced',
           ),
           const SizedBox(height: 2),
           Align(
@@ -540,7 +1229,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     );
   }
 
-  /// Whether this card unfolds in place rather than opening the edit form.
   bool expandableFor(Map<String, dynamic> salon) => salon['can_edit'] != true;
 
   void _toggleExpanded(String? id) {
@@ -550,10 +1238,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     });
   }
 
-  /// Whether the plan is close enough to ending to turn the whole card red.
-  ///
-  /// A lapsed plan counts even though there are no days left to count: the
-  /// salon is offline right now, which is worse than any countdown.
   bool _isUrgent(Map<String, dynamic> salon) {
     if (salon['status'] != 'active') return false;
     if (salon['lapsed'] == true) return true;
@@ -561,12 +1245,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     return days != null && days <= _urgentDays;
   }
 
-  /// The subscription capsule for an approved salon, or null when there is
-  /// nothing worth saying.
-  ///
-  /// Only ever shown once a salon is live. A salon still sitting in SuperAdmin's
-  /// queue has no plan to run out, so a capsule there would be inventing a
-  /// deadline that nobody set.
   (String, Color, IconData)? _subscriptionLook(Map<String, dynamic> salon) {
     if (salon['status'] != 'active') return null;
     final palette = context.colors;
@@ -593,7 +1271,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     return ('Ends in $days days', palette.success, Icons.event_available_outlined);
   }
 
-  /// The renewal line in the details panel, in words rather than a number.
   static String _renewsOn(Map<String, dynamic> salon) {
     if (salon['lapsed'] == true) return 'Expired — salon is offline';
     if (salon['needs_plan'] == true) return 'Waiting on the owner to pick a plan';
@@ -608,35 +1285,9 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         ? ''
         : ' on ${DateFormat('d MMM yyyy').format(parsed.toLocal())}';
 
-    return days == 1
-        ? 'Last day$date'
-        : '$days days left$date';
+    return days == 1 ? 'Last day$date' : '$days days left$date';
   }
 
-  Future<void> _callOwner(String? phone, String salonName) async {
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(duration: const Duration(milliseconds: 2500), content: Text('No phone number on file for $salonName.')),
-      );
-      return;
-    }
-
-    final uri = Uri(scheme: 'tel', path: phone);
-    if (!await launchUrl(uri)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not start a call. The number is $phone.')));
-    }
-  }
-
-  /// Salon status as the collaborator experiences it, not as the column spells
-  /// it.
-  ///
-  /// Takes a [context] rather than reaching for the light-mode constants:
-  /// these are read as ink on a card, and the card is a different colour in
-  /// dark mode. A hardcoded success green on a near-black card is not the same
-  /// signal as the one on white.
   (String, Color, IconData) _statusLook(String status) {
     final palette = context.colors;
 
@@ -663,25 +1314,51 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         : DateFormat('d MMM yyyy').format(parsed.toLocal());
   }
 
-  Widget _buildNothingInFilter() => CollaboratorEmptyState(
-    icon: Icons.filter_alt_off_outlined,
-    title: 'Nothing ${_filters[_filter]!.toLowerCase()}',
-    body:
-        'No salon you submitted is ${_filters[_filter]!.toLowerCase()} at the '
-        'moment. Switch filters to see the rest.',
-    actionLabel: 'Show all',
-    onAction: () => setState(() => _filter = null),
-  );
-
-  Widget _buildEmptyState() {
-    final assignedHint = widget.onGoToAssigned != null;
+  Widget _buildNothingInFilter() {
+    final filterName = _filters[_filter] ?? 'selected';
+    final (icon, title, body) = switch (_filter) {
+      'assigned' => (
+        Icons.inbox_outlined,
+        'No assigned salons',
+        'No salons are currently assigned to you for onboarding or care.',
+      ),
+      'pending_approval' => (
+        Icons.hourglass_empty,
+        'No pending salons',
+        'No submitted salons are currently waiting for SuperAdmin approval.',
+      ),
+      'active' => (
+        Icons.check_circle_outline,
+        'No approved salons',
+        'No salons have completed onboarding and gone live yet.',
+      ),
+      'rejected' => (
+        Icons.error_outline,
+        'No salons sent back',
+        'No salons currently need corrections or fixes.',
+      ),
+      _ => (
+        Icons.filter_alt_off_outlined,
+        'Nothing ${filterName.toLowerCase()}',
+        'No salons match this filter at the moment.',
+      ),
+    };
 
     return CollaboratorEmptyState(
+      icon: icon,
+      title: title,
+      body: body,
+      actionLabel: 'Show all',
+      onAction: () => setState(() => _filter = null),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return CollaboratorEmptyState(
       icon: Icons.storefront_outlined,
-      title: 'Nothing submitted yet',
+      title: 'No salons yet',
       body:
-          'Salons you onboard show up here with their approval status, so you '
-          'always know which ones went live.',
+          'Salons assigned to you or submitted by you will appear here with their status.',
       actionLabel: 'Onboard New Salon',
       onAction: () async {
         final saved = await Navigator.push<bool>(
@@ -692,8 +1369,6 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         );
         if (saved == true) await _fetch();
       },
-      secondaryLabel: assignedHint ? 'Go to Assigned' : null,
-      onSecondary: widget.onGoToAssigned,
     );
   }
 }

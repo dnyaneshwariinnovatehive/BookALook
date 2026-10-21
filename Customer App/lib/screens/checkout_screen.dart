@@ -147,6 +147,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final data = await _appointmentService.getSalonProviders(widget.salonId);
       setState(() {
         _providers = data['providers'] ?? [];
+        final eligible = _providers
+            .where((p) => p['is_eligible'] == true)
+            .map((p) => p['id']?.toString())
+            .toSet();
+        if (_selectedProviderKey != null &&
+            !eligible.contains(_selectedProviderKey)) {
+          _selectedProviderKey = null;
+          _selectedTime = null;
+          _slots = [];
+        }
         final returnedTotal = _toDouble(data['total_amount']);
         if (returnedTotal > 0 || _totalAmount == 0) {
           _totalAmount = returnedTotal;
@@ -593,7 +603,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _sectionTitle('1. Choose Service Provider'),
               const SizedBox(height: 4),
               Text(
-                'Staff who cannot perform every service in your cart are shown greyed out.',
+                'Select a specialist to perform your services.',
                 style: GoogleFonts.outfit(
                   fontSize: 13,
                   color: context.colors.textSecondary,
@@ -899,22 +909,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
 
+    final eligibleProviders = _providers.where((provider) {
+      return provider['is_eligible'] == true;
+    }).toList();
+
+    if (eligibleProviders.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: context.colors.warning, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No staff members are currently available who can perform all selected services.',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
-        ..._providers.map((provider) {
-          final isEligible = provider['is_eligible'] == true;
-          final missing =
-              (provider['missing_service_names'] as List?)?.cast<String>() ??
-              [];
-
+        ...eligibleProviders.map((provider) {
           return _providerTile(
             key: provider['id'].toString(),
             name: provider['name'] ?? 'Staff',
-            subtitle: isEligible
-                ? (provider['specialization'] ??
-                      'Available for all your services')
-                : 'Does not perform: ${missing.join(', ')}',
-            isEligible: isEligible,
+            subtitle: provider['specialization'] ??
+                'Available for all your services',
+            isEligible: true,
           );
         }),
       ],

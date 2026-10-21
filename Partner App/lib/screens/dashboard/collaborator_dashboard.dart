@@ -208,7 +208,7 @@ class _CollaboratorDashboardScreenState
   PreferredSizeWidget _buildAppBar() {
     const subtitles = <int, String>{
       _homeTab: 'Where to pick up today',
-      _mySalonsTab: 'Salons you submitted, and their approval status',
+      _mySalonsTab: 'All your assigned, onboarded, and in-review salons',
       _assignedTab: 'Salons waiting to be onboarded',
       _profileTab: 'Your details and your tally',
     };
