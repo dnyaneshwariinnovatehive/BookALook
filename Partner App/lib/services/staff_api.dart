@@ -3,7 +3,18 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/staff_models.dart';
 import '../models/leave_models.dart';
+import '../models/service_models.dart';
 import 'api_config.dart';
+
+class StaffResult {
+  final List<StaffMember> staff;
+  final List<UnassignedServiceItem> unassignedServices;
+
+  StaffResult({
+    required this.staff,
+    required this.unassignedServices,
+  });
+}
 
 class StaffApi {
   static String get baseUrl => '${ApiConfig.baseUrl}/partner';
@@ -18,7 +29,14 @@ class StaffApi {
     };
   }
 
+  // Fetch staff list only (kept for backward compatibility with existing callers)
   static Future<List<StaffMember>> fetchStaff(String salonId) async {
+    final result = await fetchStaffDetailed(salonId);
+    return result.staff;
+  }
+
+  // Fetch staff along with unassigned services list
+  static Future<StaffResult> fetchStaffDetailed(String salonId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/salons/$salonId/staff'),
       headers: await _getHeaders(),
@@ -26,8 +44,12 @@ class StaffApi {
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
-      final List<dynamic> data = jsonResponse['staff'];
-      return data.map((json) => StaffMember.fromJson(json)).toList();
+      final List<dynamic> data = jsonResponse['staff'] ?? [];
+      final staffList = data.map((json) => StaffMember.fromJson(json)).toList();
+      final unassigned = (jsonResponse['unassigned_services'] as List? ?? [])
+          .map((item) => UnassignedServiceItem.fromJson(item))
+          .toList();
+      return StaffResult(staff: staffList, unassignedServices: unassigned);
     } else {
       throw Exception('Failed to fetch staff: ${response.body}');
     }

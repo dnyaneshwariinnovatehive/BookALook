@@ -62,8 +62,25 @@ class ServiceManagementController extends Controller
             $grouped[$categoryId]['services'][] = $service;
         }
 
+        $unassigned = Service::getUnassignedForSalon($salon_id);
+
         return response()->json([
-            'grouped_services' => array_values($grouped)
+            'grouped_services' => array_values($grouped),
+            'unassigned_services' => Service::formatUnassigned($unassigned),
+        ]);
+    }
+
+    public function getUnassignedServices($salon_id, Request $request)
+    {
+        $salon = Salon::findOrFail($salon_id);
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized for this salon'], 403);
+        }
+
+        $unassigned = Service::getUnassignedForSalon($salon_id);
+
+        return response()->json([
+            'unassigned_services' => Service::formatUnassigned($unassigned),
         ]);
     }
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\ServiceProvider;
 use App\Models\ProviderWorkingHour;
 use App\Models\ProviderLeave;
+use App\Models\Service;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -27,7 +28,12 @@ class StaffManagementController extends Controller
             $provider->is_admin_provider = ($adminId && $provider->user_id === $adminId);
         });
 
-        return response()->json(['staff' => $staff]);
+        $unassigned = Service::getUnassignedForSalon($salonId);
+
+        return response()->json([
+            'staff' => $staff,
+            'unassigned_services' => Service::formatUnassigned($unassigned),
+        ]);
     }
 
     public function store(Request $request, $salonId)

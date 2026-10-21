@@ -83,3 +83,43 @@ class SalonService {
     );
   }
 }
+
+class UnassignedServiceItem {
+  final String id;
+  final String name;
+  final String categoryName;
+  final double price;
+  final String? genderFocus;
+  final int? durationMinutes;
+
+  UnassignedServiceItem({
+    required this.id,
+    required this.name,
+    required this.categoryName,
+    required this.price,
+    this.genderFocus,
+    this.durationMinutes,
+  });
+
+  factory UnassignedServiceItem.fromJson(Map<String, dynamic> json) {
+    return UnassignedServiceItem(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Service',
+      categoryName: json['category_name']?.toString() ?? 'General',
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      genderFocus: json['gender_focus']?.toString(),
+      durationMinutes: json['duration_minutes'] != null
+          ? int.tryParse(json['duration_minutes'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'category_name': categoryName,
+    'price': price,
+    'gender_focus': genderFocus,
+    'duration_minutes': durationMinutes,
+  };
+}

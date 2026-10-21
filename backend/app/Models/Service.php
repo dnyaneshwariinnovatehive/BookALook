@@ -41,4 +41,40 @@ class Service extends Model
     {
         return $this->belongsToMany(ServiceProvider::class, 'provider_services', 'service_id', 'provider_id');
     }
+
+    /**
+     * Retrieve all active services in the given salon that have no active
+     * provider assigned (including regular staff and Admin provider).
+     */
+    public static function getUnassignedForSalon(string $salonId)
+    {
+        return static::with(['template.category'])
+            ->where('salon_id', $salonId)
+            ->where('is_active', true)
+            ->whereDoesntHave('providers', function ($q) use ($salonId) {
+                $q->where('service_providers.salon_id', $salonId)
+                  ->where('service_providers.is_active', true)
+                  ->whereNull('service_providers.deleted_at');
+            })
+            ->orderBy('display_order')
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * Format a collection of unassigned services into a clean, consistent array.
+     */
+    public static function formatUnassigned(iterable $services)
+    {
+        return collect($services)->map(function ($s) {
+            return [
+                'id' => $s->id,
+                'name' => $s->template->name ?? $s->description ?? 'Service',
+                'category_name' => $s->template->category->name ?? 'General',
+                'price' => (float) $s->price,
+                'gender_focus' => $s->gender_focus,
+                'duration_minutes' => $s->template->estimated_duration_minutes ?? null,
+            ];
+        })->values();
+    }
 }

@@ -397,6 +397,7 @@ Route::prefix('partner')->group(function () {
         // Service Management
         Route::get('/salons/{salon_id}/master-catalog', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getMasterCatalog']);
         Route::get('/salons/{salon_id}/services', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getSalonServices']);
+        Route::get('/salons/{salon_id}/unassigned-services', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'getUnassignedServices']);
         Route::post('/salons/{salon_id}/services', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'addService']);
         Route::put('/salons/{salon_id}/services/{service_id}', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'updateService']);
         Route::delete('/salons/{salon_id}/services/{service_id}', [\App\Http\Controllers\Api\Partner\ServiceManagementController::class, 'deleteService']);

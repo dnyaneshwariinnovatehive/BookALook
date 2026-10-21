@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/staff_models.dart';
 import '../../../models/leave_models.dart';
+import '../../../models/service_models.dart';
 import '../../../services/staff_api.dart';
+import '../../../services/service_management_api.dart';
 import '../../../theme/app_theme.dart';
 import 'staff/add_staff_screen.dart';
 import 'staff/admin_provider_config_sheet.dart';
 import '../../../models/admin_provider_models.dart';
 import '../../../services/admin_provider_api.dart';
 import '../../../widgets/wallet_coin_pill.dart';
+import '../../../widgets/unassigned_services_warning_banner.dart';
 
 class StaffTab extends StatefulWidget {
   final String salonId;
@@ -26,6 +29,8 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
   Future<void>? loadFuture;
   List<StaffMember> _staff = [];
   String? _staffError;
+  List<UnassignedServiceItem> _unassignedServices = [];
+  bool _isActiveTab = false;
 
   bool _isLoadingLeaves = true;
   List<ProviderLeave> _leaves = [];
@@ -38,6 +43,53 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
   /// Which leave status is shown in the Leave Requests view. Defaults to the
   /// most actionable bucket — the ones still waiting for a decision.
   String _leaveFilter = 'pending';
+
+  @visibleForTesting
+  void setTestData({
+    List<StaffMember>? staff,
+    List<ProviderLeave>? leaves,
+    AdminProviderStatus? adminStatus,
+    List<UnassignedServiceItem>? unassignedServices,
+  }) {
+    setState(() {
+      if (staff != null) {
+        _staff = staff;
+        _isLoadingStaff = false;
+        _staffError = null;
+      }
+      if (leaves != null) {
+        _leaves = leaves;
+        _isLoadingLeaves = false;
+        _leaveError = null;
+      }
+      if (adminStatus != null) {
+        _adminStatus = adminStatus;
+        _isLoadingAdminStatus = false;
+      }
+      if (unassignedServices != null) {
+        _unassignedServices = unassignedServices;
+      }
+    });
+  }
+
+  void setActive(bool active) {
+    if (_isActiveTab == active) return;
+    _isActiveTab = active;
+    if (active && !_isLoadingStaff) {
+      _silentRefreshUnassigned();
+    }
+  }
+
+  Future<void> _silentRefreshUnassigned() async {
+    try {
+      final unassigned = await ServiceManagementApi.getUnassignedServices(widget.salonId);
+      if (mounted) {
+        setState(() {
+          _unassignedServices = unassigned;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -62,16 +114,21 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
       _staffError = null;
     });
     try {
-      final staffList = await StaffApi.fetchStaff(widget.salonId);
-      setState(() {
-        _staff = staffList;
-        _isLoadingStaff = false;
-      });
+      final result = await StaffApi.fetchStaffDetailed(widget.salonId);
+      if (mounted) {
+        setState(() {
+          _staff = result.staff;
+          _unassignedServices = result.unassignedServices;
+          _isLoadingStaff = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _staffError = e.toString();
-        _isLoadingStaff = false;
-      });
+      if (mounted) {
+        setState(() {
+          _staffError = e.toString();
+          _isLoadingStaff = false;
+        });
+      }
     }
   }
 
@@ -782,9 +839,12 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
                 children: [
                   Row(
                     children: [
-                      Text(
-                        member.user?['name'] ?? 'Unknown',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      Flexible(
+                        child: Text(
+                          member.user?['name'] ?? 'Unknown',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       if (member.isActive)
@@ -1060,155 +1120,203 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
           )
         ],
       ),
-      body: Column(
-        children: [
-          _buildSummaryRow(),
-          // Segmented Tab Bar
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppTheme.accentColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(26),
-                boxShadow: [
-                  BoxShadow(color: Theme.of(context).colorScheme.onSurface.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05), blurRadius: 4, offset: Offset(0, 2))
-                ]
+      body: RefreshIndicator(
+        onRefresh: _refreshAll,
+        color: AppTheme.accentColor,
+        child: NestedScrollView(
+          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+            return [
+              SliverToBoxAdapter(
+                child: _buildSummaryRow(),
               ),
-              labelColor: Theme.of(context).textTheme.bodyLarge?.color,
-              unselectedLabelColor: AppTheme.accentColor,
-              labelStyle: TextStyle(fontWeight: FontWeight.bold),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              tabs: [
-                Tab(text: _isLoadingStaff ? 'All Staff' : 'All Staff ($_totalStaff)'),
-                Tab(text: _isLoadingLeaves ? 'Leave Requests' : 'Leave Requests ($_pendingLeaveRequests)'),
-              ],
-            ),
-          ),
-          
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // All Staff View
-                _isLoadingStaff
-                    ? const Center(child: CircularProgressIndicator())
-                    : _staffError != null
-                        ? Center(child: Text(_staffError!))
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildAdminProviderCard(),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                                child: Row(
-                                  children: [
-                                    _buildStaffFilterChip('all', 'All Staff'),
-                                    const SizedBox(width: 8),
-                                    _buildStaffFilterChip('active', 'Active'),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: _staff.isEmpty
-                                    ? RefreshIndicator(
-                                        onRefresh: _refreshAll,
-                                        color: AppTheme.accentColor,
-                                        child: ListView(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          children: const [
-                                            SizedBox(height: 100),
-                                            Center(child: Text('No staff added yet.')),
-                                          ],
-                                        ),
-                                      )
-                                    : RefreshIndicator(
-                                        onRefresh: _refreshAll,
-                                        color: AppTheme.accentColor,
-                                        child: _filteredStaff.isEmpty
-                                            ? ListView(
-                                                physics: const AlwaysScrollableScrollPhysics(),
-                                                children: const [
-                                                  SizedBox(height: 100),
-                                                  Center(child: Text('No active staff found.')),
-                                                ],
-                                              )
-                                            : ListView.builder(
-                                                physics: const AlwaysScrollableScrollPhysics(),
-                                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                                itemCount: _filteredStaff.length,
-                                                itemBuilder: (context, index) => _buildStaffCard(_filteredStaff[index]),
-                                              ),
-                                      ),
-                              ),
-                            ],
+              if (_unassignedServices.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: UnassignedServicesWarningBanner(
+                    unassignedServices: _unassignedServices,
+                    actionLabel: 'Assign to Admin',
+                    onActionPressed: () async {
+                      final updated = await AdminProviderConfigSheet.show(
+                        context,
+                        salonId: widget.salonId,
+                        initialStatus: _adminStatus,
+                      );
+                      if (updated == true) {
+                        _refreshAll();
+                      }
+                    },
+                    onServicePressed: (service) async {
+                      final updated = await AdminProviderConfigSheet.show(
+                        context,
+                        salonId: widget.salonId,
+                        initialStatus: _adminStatus,
+                      );
+                      if (updated == true) {
+                        _refreshAll();
+                      }
+                    },
+                  ),
+                ),
+              // Segmented Tab Bar
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicator: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(
+                            Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05,
                           ),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    labelColor: Theme.of(context).textTheme.bodyLarge?.color,
+                    unselectedLabelColor: AppTheme.accentColor,
+                    labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    dividerColor: Colors.transparent,
+                    tabs: [
+                      Tab(text: _isLoadingStaff ? 'All Staff' : 'All Staff ($_totalStaff)'),
+                      Tab(text: _isLoadingLeaves ? 'Leave Requests' : 'Leave Requests ($_pendingLeaveRequests)'),
+                    ],
+                  ),
+                ),
+              ),
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              // All Staff View
+              _buildAllStaffTab(context),
 
-                // Leave Requests View
-                _isLoadingLeaves
-                    ? const Center(child: CircularProgressIndicator())
-                    : _leaveError != null
-                        ? Center(child: Text(_leaveError!))
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Status filters — default to the pending bucket.
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                                child: Row(
-                                  children: [
-                                    _buildLeaveFilterChip('pending', 'Pending'),
-                                    const SizedBox(width: 8),
-                                    _buildLeaveFilterChip('approved', 'Approved'),
-                                    const SizedBox(width: 8),
-                                    _buildLeaveFilterChip('rejected', 'Rejected'),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: RefreshIndicator(
-                                  onRefresh: _refreshAll,
-                                  color: AppTheme.accentColor,
-                                  child: _filteredLeaves.isEmpty
-                                      ? ListView(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          children: [
-                                            const SizedBox(height: 100),
-                                            Center(
-                                              child: Text(
-                                                _leaves.isEmpty
-                                                    ? 'No leave requests found.'
-                                                    : 'No $_leaveFilter leave requests.',
-                                                style: TextStyle(
-                                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        )
-                                      : ListView.builder(
-                                          physics: const AlwaysScrollableScrollPhysics(),
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          itemCount: _filteredLeaves.length,
-                                          itemBuilder: (context, index) =>
-                                              _buildLeaveCard(_filteredLeaves[index]),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
+              // Leave Requests View
+              _buildLeaveRequestsTab(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAllStaffTab(BuildContext context) {
+    if (_isLoadingStaff) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_staffError != null) {
+      return Center(child: Text(_staffError!));
+    }
+
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildAdminProviderCard(),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Row(
+              children: [
+                _buildStaffFilterChip('all', 'All Staff'),
+                const SizedBox(width: 8),
+                _buildStaffFilterChip('active', 'Active'),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        if (_staff.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text('No staff added yet.')),
+          )
+        else if (_filteredStaff.isEmpty)
+          const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text('No active staff found.')),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index >= _filteredStaff.length) return null;
+                  return _buildStaffCard(_filteredStaff[index]);
+                },
+                childCount: _filteredStaff.length,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLeaveRequestsTab(BuildContext context) {
+    if (_isLoadingLeaves) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_leaveError != null) {
+      return Center(child: Text(_leaveError!));
+    }
+
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        // Status filters — default to the pending bucket.
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Row(
+              children: [
+                _buildLeaveFilterChip('pending', 'Pending'),
+                const SizedBox(width: 8),
+                _buildLeaveFilterChip('approved', 'Approved'),
+                const SizedBox(width: 8),
+                _buildLeaveFilterChip('rejected', 'Rejected'),
+              ],
+            ),
+          ),
+        ),
+        if (_filteredLeaves.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Text(
+                _leaves.isEmpty
+                    ? 'No leave requests found.'
+                    : 'No $_leaveFilter leave requests.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index >= _filteredLeaves.length) return null;
+                  return _buildLeaveCard(_filteredLeaves[index]);
+                },
+                childCount: _filteredLeaves.length,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

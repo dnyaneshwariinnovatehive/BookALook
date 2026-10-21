@@ -56,7 +56,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
         _assignedStaffIds.toList(),
       );
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Staff updated successfully')));
       }
     } catch (e) {

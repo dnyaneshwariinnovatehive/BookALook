@@ -4,6 +4,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_models.dart';
 import 'api_config.dart';
 
+class SalonServicesResult {
+  final List<Map<String, dynamic>> groupedServices;
+  final List<UnassignedServiceItem> unassignedServices;
+
+  SalonServicesResult({
+    required this.groupedServices,
+    required this.unassignedServices,
+  });
+}
+
 class ServiceManagementApi {
   static String get baseUrl => '${ApiConfig.baseUrl}/partner';
 
@@ -32,14 +42,41 @@ class ServiceManagementApi {
   }
 
   // Fetch Salon's Services (grouped by category)
-  // We'll return a List of Map containing category and services
+  // Kept for backward compatibility with existing callers
   static Future<List<Map<String, dynamic>>> getSalonServices(String salonId) async {
+    final result = await getSalonServicesDetailed(salonId);
+    return result.groupedServices;
+  }
+
+  // Fetch Salon's Services along with unassigned services list
+  static Future<SalonServicesResult> getSalonServicesDetailed(String salonId) async {
     final response = await http.get(Uri.parse('$baseUrl/salons/$salonId/services'), headers: await _getHeaders());
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
-      return List<Map<String, dynamic>>.from(jsonResponse['grouped_services']);
+      final grouped = List<Map<String, dynamic>>.from(jsonResponse['grouped_services'] ?? []);
+      final unassigned = (jsonResponse['unassigned_services'] as List? ?? [])
+          .map((item) => UnassignedServiceItem.fromJson(item))
+          .toList();
+      return SalonServicesResult(
+        groupedServices: grouped,
+        unassignedServices: unassigned,
+      );
     } else {
       throw Exception('Failed to fetch salon services: ${response.body}');
+    }
+  }
+
+  // Fetch only unassigned services
+  static Future<List<UnassignedServiceItem>> getUnassignedServices(String salonId) async {
+    final response = await http.get(Uri.parse('$baseUrl/salons/$salonId/unassigned-services'), headers: await _getHeaders());
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final unassigned = (jsonResponse['unassigned_services'] as List? ?? [])
+          .map((item) => UnassignedServiceItem.fromJson(item))
+          .toList();
+      return unassigned;
+    } else {
+      throw Exception('Failed to fetch unassigned services: ${response.body}');
     }
   }
 

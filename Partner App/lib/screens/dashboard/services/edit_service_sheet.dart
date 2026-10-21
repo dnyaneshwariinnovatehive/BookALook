@@ -157,8 +157,8 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                final result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (context) => ManageStaffScreen(
@@ -168,6 +168,9 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
                     ),
                   ),
                 );
+                if (result == true && mounted) {
+                  Navigator.pop(context, true);
+                }
               },
               icon: Icon(Icons.people),
               label: Text('Manage Assigned Staff'),

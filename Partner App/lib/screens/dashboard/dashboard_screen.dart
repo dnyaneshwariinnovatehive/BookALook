@@ -165,6 +165,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _syncTabVisibility() {
     _homeKey.currentState?.setActive(_selectedIndex == 0);
     _appointmentsKey.currentState?.setActive(_selectedIndex == 1);
+    _staffKey.currentState?.setActive(_selectedIndex == 2);
+    _servicesKey.currentState?.setActive(_selectedIndex == 3);
   }
 
   void _onItemTapped(int index) async {

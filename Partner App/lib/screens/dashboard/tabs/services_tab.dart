@@ -5,7 +5,9 @@ import '../../../services/service_management_api.dart';
 import '../services/add_service_flow.dart';
 import '../services/edit_service_sheet.dart';
 import '../services/add_combo_screen.dart';
+import '../services/manage_staff_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
+import '../../../widgets/unassigned_services_warning_banner.dart';
 
 class ServicesTab extends StatefulWidget {
   final String salonId;
@@ -22,6 +24,8 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
   Future<void>? loadFuture;
   List<Map<String, dynamic>> _groupedServices = [];
   String? _error;
+  List<UnassignedServiceItem> _unassignedServices = [];
+  bool _isActiveTab = false;
 
   /// Which category sections are expanded. Starts empty; tapping a category
   /// header toggles it — same browsing pattern as the master catalog page.
@@ -30,6 +34,64 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
   List<dynamic> _combos = [];
   bool _isLoadingCombos = true;
   String? _combosError;
+
+  @visibleForTesting
+  void setTestData({
+    List<Map<String, dynamic>>? groupedServices,
+    List<dynamic>? combos,
+    List<UnassignedServiceItem>? unassignedServices,
+  }) {
+    setState(() {
+      if (groupedServices != null) {
+        _groupedServices = groupedServices;
+        _isLoading = false;
+        _error = null;
+      }
+      if (combos != null) {
+        _combos = combos;
+        _isLoadingCombos = false;
+        _combosError = null;
+      }
+      if (unassignedServices != null) {
+        _unassignedServices = unassignedServices;
+      }
+    });
+  }
+
+  void setActive(bool active) {
+    if (_isActiveTab == active) return;
+    _isActiveTab = active;
+    if (active && !_isLoading) {
+      _silentRefreshUnassigned();
+    }
+  }
+
+  Future<void> _silentRefreshUnassigned() async {
+    try {
+      final unassigned = await ServiceManagementApi.getUnassignedServices(widget.salonId);
+      if (mounted) {
+        setState(() {
+          _unassignedServices = unassigned;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openManageStaffForService(UnassignedServiceItem service) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManageStaffScreen(
+          salonId: widget.salonId,
+          serviceId: service.id,
+          serviceName: service.name,
+        ),
+      ),
+    );
+    if (updated == true || mounted) {
+      _fetchServices();
+    }
+  }
 
   @override
   void initState() {
@@ -53,16 +115,21 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
       _error = null;
     });
     try {
-      final grouped = await ServiceManagementApi.getSalonServices(widget.salonId);
-      setState(() {
-        _groupedServices = grouped;
-        _isLoading = false;
-      });
+      final result = await ServiceManagementApi.getSalonServicesDetailed(widget.salonId);
+      if (mounted) {
+        setState(() {
+          _groupedServices = result.groupedServices;
+          _unassignedServices = result.unassignedServices;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -132,6 +199,20 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
       ),
       body: Column(
         children: [
+          if (_unassignedServices.isNotEmpty)
+            UnassignedServicesWarningBanner(
+              unassignedServices: _unassignedServices,
+              actionLabel: 'Assign Staff',
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              onActionPressed: () {
+                if (_unassignedServices.isNotEmpty) {
+                  _openManageStaffForService(_unassignedServices.first);
+                }
+              },
+              onServicePressed: (service) {
+                _openManageStaffForService(service);
+              },
+            ),
           // Segmented Tab Bar
           Container(
             margin: const EdgeInsets.all(16),

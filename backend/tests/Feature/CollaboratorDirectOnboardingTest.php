@@ -239,7 +239,6 @@ class CollaboratorDirectOnboardingTest extends TestCase
         $hackRes->assertJsonPath('success', false);
     }
 
-<<<<<<< HEAD
     public function test_uploading_multiple_photos_selects_correct_cover_and_does_not_duplicate_salon(): void
     {
         Sanctum::actingAs($this->collaborator);
@@ -284,7 +283,8 @@ class CollaboratorDirectOnboardingTest extends TestCase
 
         // Verification: Still ONLY ONE salon exists in the database
         $this->assertEquals(1, Salon::where('name', 'Mirror & Mane Studio')->count());
-=======
+    }
+
     public function test_collaborator_can_onboard_salon_without_reception_phone_number(): void
     {
         Sanctum::actingAs($this->collaborator);
@@ -299,6 +299,5 @@ class CollaboratorDirectOnboardingTest extends TestCase
 
         $salon = Salon::where('name', 'Receptionless Salon')->firstOrFail();
         $this->assertNull($salon->phone_num);
->>>>>>> c648da65372b1a05f820bd7b69851052e98dac6f
     }
 }
