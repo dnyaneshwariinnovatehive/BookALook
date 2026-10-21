@@ -8,10 +8,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
+import '../../services/api_service.dart';
 
-class SalonSelectionScreen extends StatelessWidget {
+class SalonSelectionScreen extends StatefulWidget {
   final List<dynamic> salons;
   const SalonSelectionScreen({super.key, required this.salons});
+
+  @override
+  State<SalonSelectionScreen> createState() => _SalonSelectionScreenState();
+}
+
+class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
+  late List<dynamic> _salons;
+
+  @override
+  void initState() {
+    super.initState();
+    _salons = List<dynamic>.from(widget.salons);
+  }
+
+  Future<void> _refreshSalons() async {
+    final fetched = await ApiService.getMySalons();
+    if (fetched != null && mounted) {
+      setState(() {
+        _salons = fetched;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final authStateStr = prefs.getString('auth_state');
+      if (authStateStr != null) {
+        try {
+          final authState = Map<String, dynamic>.from(jsonDecode(authStateStr));
+          authState['salons'] = fetched;
+          await prefs.setString('auth_state', jsonEncode(authState));
+        } catch (_) {}
+      }
+    }
+  }
 
   void _selectSalon(BuildContext context, dynamic salon) {
     final status = salon['status']?.toString();
@@ -220,7 +252,7 @@ class SalonSelectionScreen extends StatelessWidget {
     }
 
     if (context.mounted) {
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => AdminRegistrationScreen(
@@ -230,6 +262,9 @@ class SalonSelectionScreen extends StatelessWidget {
           ),
         ),
       );
+      if (mounted) {
+        _refreshSalons();
+      }
     }
   }
 
@@ -305,11 +340,14 @@ class SalonSelectionScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: salons.length + 1, // +1 for "Add new salon"
-                itemBuilder: (context, index) {
-                  if (index < salons.length) {
-                    final salon = salons[index];
+              child: RefreshIndicator(
+                onRefresh: _refreshSalons,
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: _salons.length + 1, // +1 for "Add new salon"
+                  itemBuilder: (context, index) {
+                    if (index < _salons.length) {
+                      final salon = _salons[index];
                     final status = salon['status']?.toString();
                     final isPending = status == 'pending_approval';
                     final isNeedsCorrection = status == 'needs_correction';
@@ -527,6 +565,7 @@ class SalonSelectionScreen extends StatelessWidget {
                 },
               ),
             ),
+          ),
           ],
         ),
       ),

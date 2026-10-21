@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/main.dart';
 import 'package:partner_app/screens/phone_screen.dart';
+import 'package:partner_app/screens/dashboard/salon_selection_screen.dart';
+import 'package:partner_app/services/api_service.dart';
 import 'package:partner_app/screens/notifications_screen.dart';
 import 'package:partner_app/screens/help_support_screen.dart';
 import 'package:partner_app/screens/dashboard/more/subscription_billing_screen.dart';
@@ -136,8 +139,36 @@ class MoreMenuCatalog {
               'branch',
               'switch',
             ],
-            onSelect: (ctx, salonData, _) =>
-                logout(ctx, action: 'Switch Salon', salonData: salonData),
+            onSelect: (ctx, salonData, _) async {
+              final prefs = await SharedPreferences.getInstance();
+              final authStateStr = prefs.getString('auth_state');
+              List<dynamic> salons = [];
+              if (authStateStr != null) {
+                try {
+                  final authState = jsonDecode(authStateStr);
+                  if (authState['salons'] is List) {
+                    salons = List<dynamic>.from(authState['salons']);
+                  }
+                } catch (_) {}
+              }
+
+              // Also try refreshing in background if salons list is empty
+              if (salons.isEmpty) {
+                final fetched = await ApiService.getMySalons();
+                if (fetched != null && fetched.isNotEmpty) {
+                  salons = fetched;
+                }
+              }
+
+              if (ctx.mounted) {
+                Navigator.of(ctx, rootNavigator: true).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => SalonSelectionScreen(salons: salons),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
           ),
           MoreMenuItem(
             id: 'salon_location',

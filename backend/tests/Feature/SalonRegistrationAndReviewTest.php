@@ -431,4 +431,114 @@ class SalonRegistrationAndReviewTest extends TestCase
         $subscriptionCount = SalonSubscription::where('salon_id', $salon->id)->count();
         $this->assertEquals(0, $subscriptionCount, 'Registration approval must NOT create an active subscription.');
     }
+
+    public function test_authenticated_admin_with_existing_salon_can_add_second_salon(): void
+    {
+        $city = City::first() ?? City::create(['name' => 'Pune', 'state' => 'Maharashtra', 'is_active' => true]);
+        $subArea = SubArea::first() ?? SubArea::create(['city_id' => $city->id, 'name' => 'Koregaon Park']);
+
+        $admin = User::create([
+            'name' => 'Multi Salon Admin',
+            'email' => 'multisalon' . uniqid() . '@example.com',
+            'phone' => '91111' . rand(10000, 99999),
+            'role' => 'admin',
+            'password_hash' => 'random_hash_from_otp',
+            'is_active' => true,
+        ]);
+
+        // First salon already exists
+        $firstSalon = Salon::create([
+            'name' => 'First Salon',
+            'slug' => 'first-salon-' . uniqid(),
+            'admin_id' => $admin->id,
+            'submitted_by' => $admin->id,
+            'city_id' => $city->id,
+            'sub_area_id' => $subArea->id,
+            'address' => '1st Branch Road',
+            'pincode' => '411001',
+            'status' => 'active',
+            'preferred_commercial_model' => 'subscription',
+        ]);
+
+        $photo = UploadedFile::fake()->create('salon2.jpg', 100, 'image/jpeg');
+
+        // Authenticate as this admin via Sanctum
+        Sanctum::actingAs($admin, ['*']);
+
+        // Admin adds second salon with NO password provided (since password is hidden for existing admin)
+        $payload = [
+            'salon_name' => 'Second Salon Branch',
+            'description' => 'Second branch of our salon chain',
+            'street_address' => '2nd Branch Avenue',
+            'city_id' => $city->id,
+            'sub_area_id' => $subArea->id,
+            'pincode' => '411002',
+            'gender_focus' => 'Unisex',
+            'preferred_commercial_model' => 'subscription',
+            'photos' => [$photo],
+            'cover_index' => 0,
+        ];
+
+        $response = $this->post('/api/partner/register', $payload);
+        $response->assertStatus(201)
+            ->assertJsonPath('user.id', $admin->id)
+            ->assertJsonPath('salon.name', 'Second Salon Branch');
+
+        // Both salons should be present in the returned 'salons' list
+        $returnedSalons = $response->json('salons');
+        $this->assertCount(2, $returnedSalons);
+        $salonNames = collect($returnedSalons)->pluck('name')->all();
+        $this->assertContains('First Salon', $salonNames);
+        $this->assertContains('Second Salon Branch', $salonNames);
+
+        // Verify in DB that admin_id is properly linked to the existing admin
+        $secondSalon = Salon::where('name', 'Second Salon Branch')->first();
+        $this->assertNotNull($secondSalon);
+        $this->assertEquals($admin->id, $secondSalon->admin_id);
+    }
+
+    public function test_authenticated_admin_can_fetch_all_their_salons(): void
+    {
+        $city = City::first() ?? City::create(['name' => 'Pune', 'state' => 'Maharashtra', 'is_active' => true]);
+
+        $admin = User::create([
+            'name' => 'Chain Admin',
+            'email' => 'chain' . uniqid() . '@example.com',
+            'phone' => '92222' . rand(10000, 99999),
+            'role' => 'admin',
+            'password_hash' => 'x',
+            'is_active' => true,
+        ]);
+
+        Salon::create([
+            'name' => 'Branch A',
+            'slug' => 'branch-a-' . uniqid(),
+            'admin_id' => $admin->id,
+            'submitted_by' => $admin->id,
+            'city_id' => $city->id,
+            'address' => 'Branch A Address',
+            'pincode' => '411001',
+            'status' => 'active',
+        ]);
+
+        Salon::create([
+            'name' => 'Branch B',
+            'slug' => 'branch-b-' . uniqid(),
+            'admin_id' => $admin->id,
+            'submitted_by' => $admin->id,
+            'city_id' => $city->id,
+            'address' => 'Branch B Address',
+            'pincode' => '411002',
+            'status' => 'pending_approval',
+        ]);
+
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->getJson('/api/partner/salons');
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        $salons = $response->json('salons');
+        $this->assertCount(2, $salons);
+    }
 }

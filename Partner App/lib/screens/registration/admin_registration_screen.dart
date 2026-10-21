@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
@@ -66,16 +67,62 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
     
     if (mounted) setState(() => _isLoading = false);
 
-    if (result['success']) {
+    if (result['success'] == true) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isRegistered', true);
       
+      final data = result['data'] ?? {};
+      final newSalon = data['salon'];
+      List<dynamic> allSalons = [];
+
+      if (data['salons'] is List && (data['salons'] as List).isNotEmpty) {
+        allSalons = List<dynamic>.from(data['salons']);
+      } else {
+        // Fallback: merge newly registered salon into existing salons list in auth_state
+        final authStateStr = prefs.getString('auth_state');
+        if (authStateStr != null) {
+          try {
+            final authState = jsonDecode(authStateStr);
+            final existing = authState['salons'];
+            if (existing is List) {
+              allSalons = List<dynamic>.from(existing);
+            }
+          } catch (_) {}
+        }
+        if (newSalon != null) {
+          final exists = allSalons.any((s) => s['id']?.toString() == newSalon['id']?.toString());
+          if (!exists) {
+            allSalons.insert(0, newSalon);
+          }
+        }
+      }
+
+      // Update auth_state so splash screen and future app launches have all salons
+      final authStateStr = prefs.getString('auth_state');
+      Map<String, dynamic> authState = {};
+      if (authStateStr != null) {
+        try {
+          authState = Map<String, dynamic>.from(jsonDecode(authStateStr));
+        } catch (_) {}
+      }
+      authState['salons'] = allSalons;
+      if (data['user'] != null) {
+        authState['user'] = data['user'];
+      }
+      if (data['token'] != null && (prefs.getString('auth_token') ?? '').isEmpty) {
+        await prefs.setString('auth_token', data['token']);
+        authState['token'] = data['token'];
+      }
+      authState['role'] = 'admin';
+      await prefs.setString('auth_state', jsonEncode(authState));
+      await prefs.setString('role', 'admin');
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => SalonSelectionScreen(
-              salons: result['data']?['salon'] != null ? [result['data']['salon']] : [],
+              salons: allSalons,
             ),
           ),
           (route) => false,

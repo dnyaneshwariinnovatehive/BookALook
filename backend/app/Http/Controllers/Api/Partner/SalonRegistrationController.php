@@ -16,7 +16,14 @@ class SalonRegistrationController extends Controller
 {
     public function register(Request $request)
     {
-        $isExistingAdmin = auth('sanctum')->check();
+        $authenticatedUser = $request->user('sanctum') ?: auth('sanctum')->user();
+        $isExistingAdmin = ($authenticatedUser !== null && in_array($authenticatedUser->role, ['admin', 'salon_owner'], true));
+
+        if ($authenticatedUser && ! $isExistingAdmin) {
+            return response()->json([
+                'message' => 'Only admin accounts can register or manage a salon.',
+            ], 403);
+        }
         
         $request->validate([
             // Editing existing salon application
@@ -65,7 +72,7 @@ class SalonRegistrationController extends Controller
             DB::beginTransaction();
 
             if ($isExistingAdmin) {
-                $adminUser = $request->user();
+                $adminUser = $authenticatedUser;
             } else {
                 // 1. Find or Create the Admin User
                 $adminUser = User::where('email', $request->email)
@@ -228,10 +235,22 @@ class SalonRegistrationController extends Controller
                 ? 'Salon application resubmitted successfully. Pending SuperAdmin approval.'
                 : 'Salon registered successfully. Pending SuperAdmin approval.';
 
+            $allSalons = Salon::with(['city:id,name', 'admin:id,name,phone', 'media'])
+                ->where('admin_id', $adminUser->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $token = null;
+            if (! $isExistingAdmin) {
+                $token = $adminUser->createToken('partner-auth-token')->plainTextToken;
+            }
+
             return response()->json([
                 'message' => $message,
                 'user' => $adminUser,
-                'salon' => $salon->fresh()->load('media')
+                'salon' => $salon->fresh()->load(['media', 'city:id,name']),
+                'salons' => $allSalons,
+                'token' => $token,
             ], $statusCode);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -244,5 +263,29 @@ class SalonRegistrationController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Retrieve all salons owned by the authenticated admin.
+     */
+    public function mySalons(Request $request)
+    {
+        $user = $request->user('sanctum') ?: auth('sanctum')->user();
+        if (! $user || ! in_array($user->role, ['admin', 'salon_owner'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized or not an admin account.',
+            ], 403);
+        }
+
+        $salons = Salon::with(['city:id,name', 'admin:id,name,phone', 'media'])
+            ->where('admin_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'salons' => $salons,
+        ]);
     }
 }

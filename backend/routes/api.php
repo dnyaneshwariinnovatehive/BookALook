@@ -314,6 +314,9 @@ Route::prefix('partner')->group(function () {
     Route::post('/register', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'register']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        // Retrieve all salons owned by the authenticated admin
+        Route::get('/salons', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'mySalons']);
+
         // Always reachable, even when the plan has lapsed — otherwise a salon
         // that cannot reach the renew button could never get out of the lock.
         Route::get('/salons/{salon_id}/access', [\App\Http\Controllers\Api\Partner\SalonAccessController::class, 'show']);

@@ -121,4 +121,32 @@ class ApiService {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
+
+  /// Fetches all salons belonging to the authenticated admin.
+  static Future<List<dynamic>?> getMySalons() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null || token.isEmpty) return null;
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/partner/salons'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['salons'] is List) {
+          return decoded['salons'];
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching my salons: $e');
+      return null;
+    }
+  }
 }
