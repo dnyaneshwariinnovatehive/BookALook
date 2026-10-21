@@ -8,9 +8,19 @@ import styles from './page.module.css';
 
 interface SalonMedia {
   id: string;
-  file_path: string;
+  file_url?: string;
+  file_path?: string;
+  url?: string;
+  thumbnail_url?: string;
+  media_type?: string;
   file_type?: string;
   is_cover: boolean | number;
+  alt_text?: string | null;
+}
+
+function getMediaUrl(media?: SalonMedia | null): string {
+  if (!media) return '';
+  return media.file_url || media.file_path || media.url || media.thumbnail_url || '';
 }
 
 interface WorkingHour {
@@ -78,9 +88,32 @@ const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'F
 
 function resolveImageUrl(url?: string | null): string {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
   const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.bookalook.in').replace(/\/$/, '');
-  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+
+  // If already absolute URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    // In production or when accessed via HTTPS, upgrade http://api.bookalook.in or http://bookalook.in to https://
+    if (trimmed.startsWith('http://api.bookalook.in') || trimmed.startsWith('http://bookalook.in')) {
+      return trimmed.replace('http://', 'https://');
+    }
+
+    // If the image was saved with localhost/127.0.0.1 domain, rewrite the host to backendBase in non-local environments
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+        const match = trimmed.match(/https?:\/\/[^\/]+(\/.*)$/);
+        if (match && match[1]) {
+          return `${backendBase}${match[1]}`;
+        }
+      }
+    }
+
+    return trimmed;
+  }
+
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   return `${backendBase}${cleanPath}`;
 }
 
@@ -254,7 +287,7 @@ export default function SalonReviewPage() {
 
   // Media calculations
   const coverMedia = salon.media?.find((m) => Boolean(m.is_cover));
-  const coverImageUrl = coverMedia?.file_path || salon.cover_photo_url;
+  const coverImageUrl = getMediaUrl(coverMedia) || salon.cover_photo_url;
   const isCommissionModel = salon.preferred_commercial_model === 'commission';
 
   return (
@@ -318,19 +351,29 @@ export default function SalonReviewPage() {
             <div>
               <span className={styles.label} style={{ marginBottom: '0.5rem' }}>All Uploaded Photos ({salon.media.length})</span>
               <div className={styles.galleryGrid}>
-                {salon.media.map((media) => (
-                  <div
-                    key={media.id}
-                    className={`${styles.galleryItem} ${Boolean(media.is_cover) ? styles.galleryItemActive : ''}`}
-                  >
-                    <img
-                      src={resolveImageUrl(media.file_path)}
-                      alt="Salon Gallery Item"
-                      className={styles.galleryImg}
-                    />
-                    {Boolean(media.is_cover) && <span className={styles.thumbCoverTag}>Cover</span>}
-                  </div>
-                ))}
+                {salon.media.map((media) => {
+                  const mediaUrl = getMediaUrl(media);
+                  const isCover = Boolean(media.is_cover);
+                  return (
+                    <div
+                      key={media.id}
+                      className={`${styles.galleryItem} ${isCover ? styles.galleryItemActive : ''}`}
+                    >
+                      <img
+                        src={resolveImageUrl(mediaUrl)}
+                        alt={media.alt_text || 'Salon Gallery Item'}
+                        className={styles.galleryImg}
+                        loading="lazy"
+                        onError={(e) => {
+                          if (media.thumbnail_url && e.currentTarget.src !== resolveImageUrl(media.thumbnail_url)) {
+                            e.currentTarget.src = resolveImageUrl(media.thumbnail_url);
+                          }
+                        }}
+                      />
+                      {isCover && <span className={styles.thumbCoverTag}>Cover</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

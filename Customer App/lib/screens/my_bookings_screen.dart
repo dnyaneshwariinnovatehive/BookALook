@@ -939,7 +939,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                 ),
               ),
             );
-            if (changed == true) {
+            if (changed == true || mounted) {
               _loadBookings();
             }
           },
@@ -1435,7 +1435,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                   AppointmentDetailsScreen(booking: booking, isUpcoming: false),
             ),
           );
-          if (changed == true) {
+          if (changed == true || mounted) {
             _loadBookings();
           }
         },

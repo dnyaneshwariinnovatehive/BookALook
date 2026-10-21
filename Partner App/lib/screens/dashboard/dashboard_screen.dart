@@ -76,13 +76,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       WalletBalance.seedFrom(access);
 
       bool showWelcome = false;
-      if (access.hasNeverSubscribed) {
+      final prefs = await SharedPreferences.getInstance();
+      final salonIdStr = widget.salonData['id']?.toString() ?? '';
+      final key = 'welcome_shown_$salonIdStr';
+
+      // Never show the welcome/coin animation if the salon has already submitted a
+      // plan payment proof (pending review) or has a rejected payment.
+      // In those states, go directly to the subscription locked screen.
+      final bool hasPlanEngagement = access.hasPendingRequest ||
+          access.isPendingApproval ||
+          access.hasRejectedPayment;
+
+      if (hasPlanEngagement) {
+        if (salonIdStr.isNotEmpty) {
+          await prefs.setBool(key, true);
+        }
+      } else if (access.hasNeverSubscribed) {
         final grantedAt = access.welcomeBonusGrantedAt;
         if (grantedAt != null) {
           final now = DateTime.now();
           if (now.isAfter(grantedAt) && now.difference(grantedAt).inDays < 7) {
-            final prefs = await SharedPreferences.getInstance();
-            final key = 'welcome_shown_${widget.salonData['id']}';
             if (prefs.getBool(key) != true) {
               showWelcome = true;
               await prefs.setBool(key, true);
@@ -300,7 +313,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (_access != null && _access!.isLocked) {
-      if (_showWelcome) {
+      if (_showWelcome &&
+          !_access!.hasPendingRequest &&
+          !_access!.isPendingApproval &&
+          !_access!.hasRejectedPayment) {
         return WelcomeSuccessScreen(
           access: _access!,
           onContinue: () {

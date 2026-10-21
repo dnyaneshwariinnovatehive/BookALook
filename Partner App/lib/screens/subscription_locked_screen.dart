@@ -63,7 +63,14 @@ class SubscriptionLockedScreen extends StatelessWidget {
   Future<void> _logout(BuildContext context) async {
     await PushNotificationService().unregisterDevice();
     final prefs = await SharedPreferences.getInstance();
+    final welcomeKeys = prefs.getKeys().where((k) => k.startsWith('welcome_shown_')).toList();
+    final welcomeBackup = {for (final k in welcomeKeys) k: prefs.getBool(k)};
     await prefs.clear();
+    for (final entry in welcomeBackup.entries) {
+      if (entry.value != null) {
+        await prefs.setBool(entry.key, entry.value!);
+      }
+    }
 
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(

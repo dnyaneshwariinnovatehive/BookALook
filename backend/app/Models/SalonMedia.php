@@ -15,6 +15,21 @@ class SalonMedia extends Model
         'is_cover' => 'boolean',
     ];
 
+    protected $appends = [
+        'file_path',
+        'url',
+    ];
+
+    public function getFilePathAttribute()
+    {
+        return $this->file_url;
+    }
+
+    public function getUrlAttribute()
+    {
+        return $this->file_url;
+    }
+
     public function salon()
     {
         return $this->belongsTo(Salon::class);

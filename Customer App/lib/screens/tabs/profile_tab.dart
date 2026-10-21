@@ -1124,130 +1124,299 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _pickAppointmentForComplaint() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    List<dynamic> pastBookings = [];
-    try {
-      final res = await AppointmentService().getMyBookings();
-      pastBookings = res['past'] ?? [];
-    } catch (_) {
-      // Ignored
-    } finally {
-      if (mounted) Navigator.pop(context); // close loader
-    }
-
-    if (!mounted) return;
-
-    if (pastBookings.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'No Past Appointments',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          content: Text(
-            'You do not have any past appointments to report an issue for yet.',
-            style: GoogleFonts.outfit(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.75,
-        ),
-        padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance(ctx, gap: 16)),
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+      builder: (_) => _AppointmentPickerSheet(
+        onSelected: (booking) => ComplaintBottomSheet.show(context, booking),
+      ),
+    );
+  }
+}
+
+class _AppointmentPickerSheet extends StatefulWidget {
+  final ValueChanged<Map<String, dynamic>> onSelected;
+
+  const _AppointmentPickerSheet({required this.onSelected});
+
+  @override
+  State<_AppointmentPickerSheet> createState() => _AppointmentPickerSheetState();
+}
+
+class _AppointmentPickerSheetState extends State<_AppointmentPickerSheet> {
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _bookings = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBookings();
+  }
+
+  Future<void> _fetchBookings() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final res = await AppointmentService().getMyBookings();
+      if (!mounted) return;
+      final upcoming = ((res['upcoming'] as List?) ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final past = ((res['past'] as List?) ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final all = [...upcoming, ...past];
+      setState(() {
+        _bookings = all;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load your appointments. Please try again.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatDate(dynamic dateStr) {
+    if (dateStr == null) return '';
+    final parsed = DateTime.tryParse(dateStr.toString());
+    if (parsed == null) return dateStr.toString();
+    return DateFormat('EEE, d MMM yyyy').format(parsed);
+  }
+
+  Color _getStatusColor(String status, BuildContext context) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return context.colors.success;
+      case 'in_progress':
+      case 'scheduled':
+      case 'confirmed':
+        return context.colors.info;
+      case 'cancelled':
+      case 'no_show':
+        return context.colors.danger;
+      default:
+        return context.colors.textSecondary;
+    }
+  }
+
+  String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        return 'In Progress';
+      case 'scheduled':
+        return 'Scheduled';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'no_show':
+        return 'No Show';
+      default:
+        return status.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance(context, gap: 16)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select Appointment',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: context.colors.textPrimary,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Select Appointment',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: context.colors.textPrimary,
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => Navigator.pop(context),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Choose the visit you would like to report an issue with:',
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              color: context.colors.textSecondary,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Choose the visit you would like to report an issue with:',
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                color: context.colors.textSecondary,
+          ),
+          const SizedBox(height: 16),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.accentColor),
               ),
-            ),
-            const SizedBox(height: 12),
+            )
+          else if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline, size: 40, color: context.colors.danger),
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchBookings,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_bookings.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event_busy, size: 48, color: context.colors.textTertiary),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No Appointments Found',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'You do not have any appointments to report an issue for yet.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
-                itemCount: pastBookings.length,
+                itemCount: _bookings.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (itemCtx, index) {
-                  final b = pastBookings[index];
-                  final salonName = b['salon']?['name'] ?? 'Salon';
-                  final date = b['appointment_date']?.toString() ?? '';
+                  final b = _bookings[index];
+                  final salonName = b['salon']?['name'] ?? b['salon_name'] ?? 'Salon';
+                  final date = _formatDate(b['appointment_date']);
                   final time = b['start_time']?.toString() ?? '';
+                  final status = b['status']?.toString() ?? '';
+                  final statusColor = _getStatusColor(status, context);
+
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                    title: Text(
-                      salonName,
-                      style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14.5,
-                      ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            salonName,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: context.colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (status.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _formatStatus(status),
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    subtitle: Text(
-                      '$date at $time',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: context.colors.textSecondary,
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        time.isNotEmpty ? '$date at $time' : date,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12.5,
+                          color: context.colors.textSecondary,
+                        ),
                       ),
                     ),
                     trailing: const Icon(Icons.chevron_right, size: 20),
                     onTap: () {
-                      Navigator.pop(ctx);
-                      ComplaintBottomSheet.show(context, b);
+                      Navigator.pop(context);
+                      widget.onSelected(b);
                     },
                   );
                 },
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

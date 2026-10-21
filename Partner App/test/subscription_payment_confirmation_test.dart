@@ -5,6 +5,7 @@ import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/widgets/subscription/subscription_bill_summary_sheet.dart';
 import 'package:partner_app/widgets/subscription/payment_proof_viewer.dart';
 import 'package:partner_app/screens/subscription_locked_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Widget _wrap(Widget child) {
   return MaterialApp(
@@ -230,6 +231,88 @@ void main() {
 
         expect(find.text('Choose your plan'), findsOneWidget);
         expect(find.text('Choose a plan'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Displays Payment Received — Under Review wall when brand new salon submitted proof (never shows Choose your plan)',
+      (tester) async {
+        final access = SalonAccess(
+          salonName: 'Newly Approved Salon',
+          isLocked: true,
+          canRenew: true,
+          reason: 'no_subscription',
+          hasPendingRequest: true,
+          pendingRequest: {
+            'id': 301,
+            'plan_name': 'Growth Plan',
+            'amount_payable_inr': 1999.0,
+            'transaction_id': 'GROWTH-REF-99',
+            'status': 'pending',
+          },
+        );
+
+        await tester.pumpWidget(
+          _wrap(
+            SubscriptionLockedScreen(access: access, onRecheck: () async {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Must show the Under Review screen and wall
+        expect(find.text('Payment Received — Under Review'), findsOneWidget);
+        expect(find.text('UNDER REVIEW'), findsOneWidget);
+        expect(find.text('Growth Plan'), findsOneWidget);
+        expect(find.text('Check Review Status'), findsOneWidget);
+
+        // Must NOT show the first-time choose your plan welcome
+        expect(find.text('Choose your plan'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Preserves welcome_shown flags across logout on SubscriptionLockedScreen',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'auth_token': 'dummy-token',
+          'welcome_shown_101': true,
+          'welcome_shown_102': true,
+          'other_key': 'to_be_cleared',
+        });
+
+        final access = SalonAccess(
+          salonName: 'Test Salon',
+          isLocked: true,
+          canRenew: true,
+          reason: 'no_subscription',
+          hasPendingRequest: true,
+          pendingRequest: {
+            'id': 1,
+            'plan_name': 'Growth',
+            'status': 'pending',
+          },
+        );
+
+        await tester.pumpWidget(
+          _wrap(
+            SubscriptionLockedScreen(access: access, onRecheck: () async {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Scroll to and tap log out
+        await tester.ensureVisible(find.text('Log out'));
+        await tester.tap(find.text('Log out'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+
+        final prefs = await SharedPreferences.getInstance();
+        // Auth keys should be wiped
+        expect(prefs.getString('auth_token'), isNull);
+        expect(prefs.getString('other_key'), isNull);
+        // welcome_shown flags must be preserved!
+        expect(prefs.getBool('welcome_shown_101'), isTrue);
+        expect(prefs.getBool('welcome_shown_102'), isTrue);
       },
     );
   });

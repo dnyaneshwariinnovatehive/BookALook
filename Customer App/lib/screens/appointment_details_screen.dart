@@ -185,6 +185,33 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     }
   }
 
+  Future<void> _refreshBookingDetails() async {
+    try {
+      final response = await _appointmentService.getAppointment(_booking['id'].toString());
+      if (!mounted) return;
+      final updated = response['appointment'];
+      if (updated != null && updated is Map<String, dynamic>) {
+        setState(() {
+          _booking = Map<String, dynamic>.from(updated);
+        });
+      }
+    } catch (_) {
+      // Keep existing booking data if network fails
+    }
+  }
+
+  Future<void> _openQrCode() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QrCodeScreen(appointmentId: _booking['id'].toString()),
+      ),
+    );
+
+    _hasChanges = true;
+    await _refreshBookingDetails();
+  }
+
   Future<void> _reportProblem() async {
     final submitted = await ComplaintBottomSheet.show(context, _booking);
     if (submitted && mounted) {
@@ -344,9 +371,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
           ),
           title: Text('Appointment Details', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: headingColor)),
         ),
-        body: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: Column(
+        body: RefreshIndicator(
+          onRefresh: _refreshBookingDetails,
+          color: AppTheme.accentColor,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Salon & Service Summary
@@ -744,12 +775,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: TextButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => QrCodeScreen(appointmentId: _booking['id'].toString()),
-                              ),
-                            ),
+                            onPressed: _openQrCode,
                             style: TextButton.styleFrom(
                               backgroundColor: context.colors.surface,
                               foregroundColor: AppTheme.accentColor,
@@ -819,6 +845,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

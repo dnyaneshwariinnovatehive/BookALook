@@ -385,6 +385,8 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
         final bool paidWithCoins =
             data['paid_with_coins'] == true || _fullyPaidByCoins;
         if (paidWithCoins) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('welcome_shown_${widget.salonId}', true);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -417,6 +419,9 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
                       'status': 'pending',
                       'created_at': DateTime.now().toIso8601String(),
                     });
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('welcome_shown_${widget.salonId}', true);
 
         if (mounted) {
           await _showSubmissionConfirmation(requestMap);

@@ -266,6 +266,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   Widget _buildDocument() {
     return Stack(
+      alignment: Alignment.center,
+      fit: StackFit.expand,
       children: [
         // The PDF fills the page, but the last of it has to stay readable: the
         // system navigation bar sits on top of whatever the WebView paints.
@@ -281,15 +283,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               opacity: _showLoader ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOut,
-              child: _InvoiceAnimatedLoader(
-                isWebViewReady: !_isLoading,
-                onFinished: () {
-                  if (mounted) {
-                    setState(() {
-                      _showLoader = false;
-                    });
-                  }
-                },
+              child: SizedBox.expand(
+                child: _InvoiceAnimatedLoader(
+                  isWebViewReady: !_isLoading,
+                  onFinished: () {
+                    if (mounted) {
+                      setState(() {
+                        _showLoader = false;
+                      });
+                    }
+                  },
+                ),
               ),
             ),
           ),
@@ -315,7 +319,6 @@ class _InvoiceAnimatedLoader extends StatefulWidget {
   final VoidCallback onFinished;
 
   const _InvoiceAnimatedLoader({
-    super.key,
     required this.isWebViewReady,
     required this.onFinished,
   });
@@ -395,30 +398,39 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFFCFAFF),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildDocumentVisual(),
-            const SizedBox(height: 36),
-            _buildText(),
-          ],
+    return SizedBox.expand(
+      child: Container(
+        color: const Color(0xFFFCFAFF),
+        alignment: Alignment.center,
+        child: Center(
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDocumentVisual(),
+                const SizedBox(height: 36),
+                _buildText(),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDocumentVisual() {
-    return ScaleTransition(
-      scale: Tween<double>(begin: 0.96, end: 1.0).animate(CurvedAnimation(
-        parent: _docController,
-        curve: Curves.easeOutCubic,
-      )),
-      child: FadeTransition(
-        opacity: _docController,
-        child: Stack(
+    return Center(
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1.0).animate(CurvedAnimation(
+          parent: _docController,
+          curve: Curves.easeOutCubic,
+        )),
+        child: FadeTransition(
+          opacity: _docController,
+          child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
@@ -533,6 +545,7 @@ class _InvoiceAnimatedLoaderState extends State<_InvoiceAnimatedLoader>
           ]
         )
       )
+     ),
     );
   }
 
