@@ -1,11 +1,13 @@
-import 'package:partner_app/theme/app_theme.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
 import '../../services/auth_service.dart';
+import '../../services/staff_api.dart';
 import 'tabs/provider_profile_tab.dart';
 import 'tabs/provider_home_tab.dart';
 import 'tabs/provider_walk_in_tab.dart';
@@ -27,8 +29,10 @@ class ServiceProviderDashboard extends StatefulWidget {
   State<ServiceProviderDashboard> createState() => _ServiceProviderDashboardState();
 }
 
-class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
+class _ServiceProviderDashboardState extends State<ServiceProviderDashboard>
+    with WidgetsBindingObserver {
   int _currentIndex = 0; // Default to home tab as requested
+  late Map<String, dynamic> _provider;
 
   /// One navigator per tab so a page pushed from inside a tab stays inside
   /// that tab and the bottom navigation bar remains visible.
@@ -42,6 +46,8 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   final GlobalKey<ProviderHomeTabState> _homeKey = GlobalKey<ProviderHomeTabState>();
   final GlobalKey<ProviderDashboardScreenState> _scheduleKey =
       GlobalKey<ProviderDashboardScreenState>();
+  final GlobalKey<ProviderProfileTabState> _profileKey =
+      GlobalKey<ProviderProfileTabState>();
 
   /// The salon's plan gates the whole shell, so it is checked before the tabs
   /// are drawn rather than letting each screen fail on its own.
@@ -51,11 +57,52 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   @override
   void initState() {
     super.initState();
+    _provider = Map<String, dynamic>.from(widget.provider);
+    WidgetsBinding.instance.addObserver(this);
     _checkAccess();
+    _refreshProviderProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncTabVisibility();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshProviderProfile();
+      _checkAccess();
+    }
+  }
+
+  Future<void> _refreshProviderProfile() async {
+    try {
+      final res = await StaffApi.fetchMyProfile(widget.salon['id'].toString());
+      if (res['provider'] != null && mounted) {
+        final updatedProvider = Map<String, dynamic>.from(res['provider']);
+        setState(() {
+          _provider = updatedProvider;
+        });
+        _homeKey.currentState?.updateProvider(updatedProvider);
+        _profileKey.currentState?.updateProvider(updatedProvider);
+
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final authStr = prefs.getString('auth_state');
+          if (authStr != null) {
+            final authData = jsonDecode(authStr) as Map<String, dynamic>;
+            authData['provider'] = updatedProvider;
+            await prefs.setString('auth_state', jsonEncode(authData));
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   void _syncTabVisibility() {
@@ -102,10 +149,14 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
   void _refreshTab(int index) {
     switch (index) {
       case 0:
+        _refreshProviderProfile();
         _homeKey.currentState?.loadAppointments();
         break;
       case 1:
         _scheduleKey.currentState?.loadAppointments();
+        break;
+      case 3:
+        _refreshProviderProfile();
         break;
     }
   }
@@ -178,16 +229,17 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard> {
 
   Widget _buildShell(BuildContext context) {
     final List<Widget> pages = [
-      ProviderHomeTab(key: _homeKey, salon: widget.salon, provider: widget.provider, user: widget.user),
+      ProviderHomeTab(key: _homeKey, salon: widget.salon, provider: _provider, user: widget.user),
       ProviderDashboardScreen(key: _scheduleKey, salonId: widget.salon['id'].toString()),
       ProviderWalkInTab(
         salon: widget.salon,
-        provider: widget.provider,
+        provider: _provider,
         onCreated: () => _homeKey.currentState?.loadAppointments(),
       ),
       ProviderProfileTab(
+        key: _profileKey,
         salon: widget.salon,
-        provider: widget.provider,
+        provider: _provider,
         user: widget.user,
       ),
     ];

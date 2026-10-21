@@ -31,6 +31,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
   final PartnerAppointmentService _service = PartnerAppointmentService();
   List<dynamic> _appointments = [];
   bool _isLoading = true;
+  late Map<String, dynamic> _provider;
 
   LifecyclePoller? _poller;
 
@@ -42,9 +43,16 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
     _poller?.setActive(active);
   }
 
+  void updateProvider(Map<String, dynamic> newProvider) {
+    if (mounted) {
+      setState(() => _provider = newProvider);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _provider = widget.provider;
     _loadAppointments();
     _poller = LifecyclePoller(
       debugLabel: 'ProviderHomeTab',
@@ -91,7 +99,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
   }
 
   String _getShiftTiming() {
-    final List workingHours = widget.provider['working_hours'] ?? [];
+    final List workingHours = _provider['working_hours'] ?? [];
     // PHP date('w') maps 0=Sunday, 6=Saturday. Dart weekday is 1=Monday, 7=Sunday.
     int currentDartDay = DateTime.now().weekday;
     int phpDay = currentDartDay == 7 ? 0 : currentDartDay;

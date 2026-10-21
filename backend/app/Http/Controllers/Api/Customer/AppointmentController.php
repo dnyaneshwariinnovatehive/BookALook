@@ -41,12 +41,18 @@ class AppointmentController extends Controller
      */
     public function getProviders(Request $request, $salon_id)
     {
+        $date = $request->query('date');
         $cart = $this->activeCart($request, $salon_id);
         $requirements = $cart
             ? $this->availability->summariseCart($cart)
             : ['service_ids' => [], 'duration' => AvailabilityService::SLOT_MINUTES, 'total' => 0, 'advance' => 0];
 
-        $providers = $this->availability->providersForSalon($salon_id, $requirements['service_ids']);
+        $providers = $this->availability->providersForSalon(
+            $salon_id,
+            $requirements['service_ids'],
+            $date,
+            $requirements['duration']
+        );
 
         return response()->json([
             'providers' => $providers,
@@ -143,7 +149,13 @@ class AppointmentController extends Controller
         }
 
         $requirements = $this->availability->summariseCart($cart);
-        $candidates = $this->candidateProviders($salon_id, $requirements['service_ids'], $request->provider_id);
+        $candidates = $this->candidateProviders(
+            $salon_id,
+            $requirements['service_ids'],
+            $request->provider_id,
+            $request->date,
+            $requirements['duration']
+        );
 
         if ($candidates instanceof \Illuminate\Http\JsonResponse) {
             return $candidates;
@@ -605,8 +617,13 @@ class AppointmentController extends Controller
      *
      * @return string[]|\Illuminate\Http\JsonResponse
      */
-    private function candidateProviders(string $salonId, array $serviceIds, ?string $providerId)
-    {
+    private function candidateProviders(
+        string $salonId,
+        array $serviceIds,
+        ?string $providerId,
+        ?string $date = null,
+        int $durationMinutes = AvailabilityService::SLOT_MINUTES
+    ) {
         if ($providerId === null || $providerId === '') {
             return response()->json([
                 'message' => 'Please choose a service provider for this booking.',
@@ -626,6 +643,16 @@ class AppointmentController extends Controller
             return response()->json([
                 'message' => "{$chosen['name']} does not perform: {$missing}.",
             ], 422);
+        }
+
+        if ($date !== null) {
+            $availableOnDate = $this->availability->providersForSalon($salonId, $serviceIds, $date, $durationMinutes);
+            $stillAvailable = collect($availableOnDate)->firstWhere('id', $providerId);
+            if (!$stillAvailable) {
+                return response()->json([
+                    'message' => "{$chosen['name']} is not available on this date.",
+                ], 422);
+            }
         }
 
         return [$providerId];
@@ -915,7 +942,9 @@ class AppointmentController extends Controller
         $candidates = $this->candidateProviders(
             $appointment->salon_id,
             $requirements['service_ids'],
-            $request->provider_id
+            $request->provider_id,
+            $request->date,
+            $requirements['duration']
         );
 
         if ($candidates instanceof \Illuminate\Http\JsonResponse) {

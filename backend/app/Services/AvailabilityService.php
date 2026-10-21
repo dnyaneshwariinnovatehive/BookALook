@@ -66,20 +66,102 @@ class AvailabilityService
     }
 
     /**
-     * Every active provider of the salon, flagged with whether they can perform
-     * the whole basket. Ineligible providers are returned too so the app can
-     * grey them out instead of hiding them.
+     * Active providers of the salon for customer booking.
+     *
+     * When $date is passed:
+     * - Filters out providers who cannot perform every required service.
+     * - Filters out providers on approved full-day leave on that date.
+     * - Filters out providers who are not scheduled to work (weekly off or no shift) on that date.
+     * - Filters out providers who have no bookable slots remaining for the required duration on that date.
+     * - If the salon itself is closed or on a closure day, returns an empty array.
+     *
+     * When $date is omitted:
+     * - Returns all active providers flagged with is_eligible (legacy / non-date scoped listing).
      *
      * @param  string[]  $requiredServiceIds
      */
-    public function providersForSalon(string $salonId, array $requiredServiceIds): array
-    {
+    public function providersForSalon(
+        string $salonId,
+        array $requiredServiceIds,
+        ?string $date = null,
+        int $durationMinutes = self::SLOT_MINUTES
+    ): array {
         $providers = ServiceProvider::with(['user:id,name', 'services:id'])
             ->where('salon_id', $salonId)
             ->where('is_active', true)
             ->get();
 
         $serviceNames = $this->serviceNames($requiredServiceIds);
+
+        if ($date !== null) {
+            $day = Carbon::parse($date)->dayOfWeek;
+
+            $salonHours = SalonWorkingHour::where('salon_id', $salonId)
+                ->where('day_of_week', $day)
+                ->first();
+
+            if (! $salonHours || $salonHours->is_closed) {
+                return [];
+            }
+
+            $salonOpen = $this->toMinutes($salonHours->open_time);
+            $salonClose = $this->toMinutes($salonHours->close_time);
+            if ($salonOpen === null || $salonClose === null || $salonClose <= $salonOpen) {
+                return [];
+            }
+
+            $isClosureDay = DB::table('salon_closures')
+                ->where('salon_id', $salonId)
+                ->whereDate('closed_date', $date)
+                ->whereNull('reopened_at')
+                ->exists();
+
+            if ($isClosureDay) {
+                return [];
+            }
+
+            $result = [];
+            foreach ($providers as $provider) {
+                $offered = $provider->services->pluck('id')->all();
+                $missing = array_values(array_diff($requiredServiceIds, $offered));
+                if (! empty($missing)) {
+                    continue;
+                }
+
+                $schedule = $this->providerSchedule($provider->id, $date, $day, null);
+                if ($schedule['off']) {
+                    continue;
+                }
+
+                $slotsResult = $this->generateSlots($salonId, $date, [$provider->id], $durationMinutes);
+                if ($slotsResult['closed'] || empty($slotsResult['slots'])) {
+                    continue;
+                }
+
+                $hasBookableSlot = false;
+                foreach ($slotsResult['slots'] as $slot) {
+                    if ($slot['available']) {
+                        $hasBookableSlot = true;
+                        break;
+                    }
+                }
+
+                if (! $hasBookableSlot) {
+                    continue;
+                }
+
+                $result[] = [
+                    'id' => $provider->id,
+                    'name' => $provider->user->name ?? 'Staff',
+                    'specialization' => $provider->specialization,
+                    'is_eligible' => true,
+                    'missing_service_ids' => [],
+                    'missing_service_names' => [],
+                ];
+            }
+
+            return $result;
+        }
 
         return $providers->map(function (ServiceProvider $provider) use ($requiredServiceIds, $serviceNames) {
             $offered = $provider->services->pluck('id')->all();
@@ -229,6 +311,24 @@ class AvailabilityService
         $hours = ProviderWorkingHour::where('provider_id', $providerId)
             ->where('day_of_week', $day)
             ->first();
+
+        if (! $hours) {
+            $provider = ServiceProvider::find($providerId);
+            if ($provider && $provider->use_salon_hours) {
+                $sh = SalonWorkingHour::where('salon_id', $provider->salon_id)
+                    ->where('day_of_week', $day)
+                    ->first();
+                if ($sh) {
+                    $hours = new ProviderWorkingHour([
+                        'provider_id' => $providerId,
+                        'day_of_week' => $day,
+                        'is_weekly_off' => (bool) $sh->is_closed,
+                        'shift_start' => $sh->is_closed ? null : $sh->open_time,
+                        'shift_end' => $sh->is_closed ? null : $sh->close_time,
+                    ]);
+                }
+            }
+        }
 
         if (! $hours || $hours->is_weekly_off) {
             return ['off' => true, 'reason' => 'provider_off', 'shift' => null, 'busy' => []];

@@ -25,14 +25,43 @@ class ProviderProfileTab extends StatefulWidget {
   });
 
   @override
-  State<ProviderProfileTab> createState() => _ProviderProfileTabState();
+  State<ProviderProfileTab> createState() => ProviderProfileTabState();
 }
 
-class _ProviderProfileTabState extends State<ProviderProfileTab> {
+class ProviderProfileTabState extends State<ProviderProfileTab> {
+  late Map<String, dynamic> _provider;
   bool _showAllServices = false;
   bool _showWorkingHours = false;
   bool _showPersonalInfo = false;
   static const int _maxVisibleServices = 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _provider = Map<String, dynamic>.from(widget.provider);
+  }
+
+  void updateProvider(Map<String, dynamic> newProvider) {
+    if (mounted) {
+      setState(() {
+        _provider = Map<String, dynamic>.from(newProvider);
+      });
+    }
+  }
+
+  Future<void> refreshProfile() async {
+    try {
+      final salonId = widget.salon['id']?.toString();
+      if (salonId != null) {
+        final res = await StaffApi.fetchMyProfile(salonId);
+        if (res['provider'] != null && mounted) {
+          setState(() {
+            _provider = Map<String, dynamic>.from(res['provider']);
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   Future<void> _logout() async {
     final name = widget.user['name']?.toString();
@@ -445,13 +474,12 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final List<dynamic> services = widget.provider['services'] ?? [];
-    final List<dynamic> workingHours = widget.provider['working_hours'] ?? [];
+    final List<dynamic> services = _provider['services'] ?? [];
+    final List<dynamic> workingHours = _provider['working_hours'] ?? [];
 
     workingHours.sort(
       (a, b) => (a['day_of_week'] as int).compareTo(b['day_of_week'] as int),
@@ -477,13 +505,16 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
         elevation: 0,
         centerTitle: false,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Top Card
-            Container(
+      body: RefreshIndicator(
+        onRefresh: refreshProfile,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Card
+              Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(24),
@@ -561,8 +592,10 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  children: [
                   // Personal Information
                   Theme(
                     data: Theme.of(
@@ -831,6 +864,7 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
                 ],
               ),
             ),
+          ),
 
             const SizedBox(height: 24),
 
@@ -861,8 +895,9 @@ class _ProviderProfileTabState extends State<ProviderProfileTab> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildOptionTile(
     BuildContext context, {

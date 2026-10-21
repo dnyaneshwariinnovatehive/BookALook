@@ -162,6 +162,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           serviceIds: _selectedServiceIds.toList(),
           workingHours: workingHoursToSave,
           autoApproveLeave: _autoApproveLeave,
+          useSalonWorkingHours: _useSalonWorkingHours,
         );
       } else {
         await StaffApi.addStaff(
@@ -175,6 +176,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
           serviceIds: _selectedServiceIds.toList(),
           workingHours: workingHoursToSave,
           autoApproveLeave: _autoApproveLeave,
+          useSalonWorkingHours: _useSalonWorkingHours,
         );
       }
       if (mounted) {

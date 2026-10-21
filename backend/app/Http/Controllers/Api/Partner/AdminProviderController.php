@@ -86,6 +86,7 @@ class AdminProviderController extends Controller
                 'salon_id' => $provider->salon_id,
                 'specialization' => $provider->specialization,
                 'is_active' => (bool) $provider->is_active,
+                'use_salon_hours' => (bool) ($provider->use_salon_hours ?? true),
                 'auto_approve_leave' => (bool) $provider->auto_approve_leave,
                 'services_count' => $provider->services->count(),
                 'services' => $provider->services->map(fn ($s) => [
@@ -168,6 +169,8 @@ class AdminProviderController extends Controller
             }
 
             // Enabling provider mode:
+            $useSalonHours = $request->has('use_salon_hours') ? $request->boolean('use_salon_hours') : true;
+
             if ($provider) {
                 if ($provider->trashed()) {
                     $provider->restore();
@@ -175,6 +178,7 @@ class AdminProviderController extends Controller
                 $provider->salon_id = $salonId;
                 $provider->is_active = true;
                 $provider->auto_approve_leave = true;
+                $provider->use_salon_hours = $useSalonHours;
                 if ($request->filled('specialization')) {
                     $provider->specialization = $request->specialization;
                 }
@@ -187,6 +191,7 @@ class AdminProviderController extends Controller
                     'base_salary' => 0.00,
                     'commission_percentage' => 0.00,
                     'auto_approve_leave' => true,
+                    'use_salon_hours' => $useSalonHours,
                     'is_active' => true,
                     'joined_at' => now(),
                 ]);

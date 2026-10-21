@@ -20,6 +20,7 @@ class ServiceProvider extends Model
         'commission_percentage',
         'auto_approve_leave',
         'paid_leave_allowance',
+        'use_salon_hours',
         'is_active',
         'joined_at',
     ];
@@ -27,6 +28,7 @@ class ServiceProvider extends Model
     protected $casts = [
         'auto_approve_leave' => 'boolean',
         'paid_leave_allowance' => 'integer',
+        'use_salon_hours' => 'boolean',
         'is_active' => 'boolean',
         'base_salary' => 'decimal:2',
         'commission_percentage' => 'decimal:2',

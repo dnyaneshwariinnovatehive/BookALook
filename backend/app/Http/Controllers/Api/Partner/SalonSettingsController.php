@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Salon;
 use App\Models\SalonWorkingHour;
+use App\Models\ServiceProvider;
+use App\Models\ProviderWorkingHour;
 use App\Services\GeoService;
 use App\Services\SalonLinkService;
 use Illuminate\Support\Facades\Validator;
@@ -154,6 +156,27 @@ class SalonSettingsController extends Controller
                     'close_time' => $hour['is_closed'] ? null : $hour['close_time'],
                 ]
             );
+        }
+
+        // Automatically synchronize working hours for providers configured to follow salon timings.
+        // Providers with customized schedules (use_salon_hours = false) are preserved untouched.
+        $syncProviders = ServiceProvider::where('salon_id', $salon_id)
+            ->where('use_salon_hours', true)
+            ->get();
+
+        foreach ($syncProviders as $syncProvider) {
+            ProviderWorkingHour::where('provider_id', $syncProvider->id)->delete();
+            foreach ($hours as $hour) {
+                ProviderWorkingHour::create([
+                    'provider_id' => $syncProvider->id,
+                    'day_of_week' => $hour['day_of_week'],
+                    'is_weekly_off' => (bool) $hour['is_closed'],
+                    'shift_start' => $hour['is_closed'] ? null : $hour['open_time'],
+                    'shift_end' => $hour['is_closed'] ? null : $hour['close_time'],
+                    'break_start' => null,
+                    'break_end' => null,
+                ]);
+            }
         }
 
         return response()->json(['message' => 'Working hours updated successfully']);

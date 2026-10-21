@@ -66,6 +66,7 @@ class StaffApi {
     required List<String> serviceIds,
     required List<StaffWorkingHour> workingHours,
     bool autoApproveLeave = false,
+    bool useSalonWorkingHours = true,
   }) async {
     final body = {
       'name': name,
@@ -76,6 +77,7 @@ class StaffApi {
       'commission_percentage': commissionPercentage,
       'service_ids': serviceIds,
       'auto_approve_leave': autoApproveLeave,
+      'use_salon_hours': useSalonWorkingHours,
       'working_hours': workingHours.map((h) => h.toJson()).toList(),
     };
 
@@ -102,6 +104,7 @@ class StaffApi {
     List<String>? serviceIds,
     List<StaffWorkingHour>? workingHours,
     bool? autoApproveLeave,
+    bool? useSalonWorkingHours,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -112,6 +115,7 @@ class StaffApi {
     if (commissionPercentage != null) body['commission_percentage'] = commissionPercentage;
     if (serviceIds != null) body['service_ids'] = serviceIds;
     if (autoApproveLeave != null) body['auto_approve_leave'] = autoApproveLeave;
+    if (useSalonWorkingHours != null) body['use_salon_hours'] = useSalonWorkingHours;
     if (workingHours != null) body['working_hours'] = workingHours.map((h) => h.toJson()).toList();
 
     final response = await http.put(
@@ -122,6 +126,19 @@ class StaffApi {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to update staff: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchMyProfile(String salonId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/salons/$salonId/provider-profile'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to fetch provider profile: ${response.body}');
     }
   }
 

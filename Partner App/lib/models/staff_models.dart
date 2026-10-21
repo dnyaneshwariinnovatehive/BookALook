@@ -20,6 +20,9 @@ class StaffMember {
   /// Whether this profile belongs to the salon owner/admin
   final bool isAdminProvider;
 
+  /// Whether this staff member inherits salon working hours
+  final bool useSalonHours;
+
   StaffMember({
     required this.id,
     required this.userId,
@@ -30,6 +33,7 @@ class StaffMember {
     required this.isActive,
     this.autoApproveLeave = false,
     this.isAdminProvider = false,
+    this.useSalonHours = true,
     this.user,
     this.services,
     this.workingHours = const [],
@@ -43,15 +47,16 @@ class StaffMember {
     hours.sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
 
     return StaffMember(
-      id: json['id'],
-      userId: json['user_id'],
-      salonId: json['salon_id'],
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      salonId: json['salon_id']?.toString() ?? '',
       specialization: json['specialization'],
       baseSalary: double.tryParse(json['base_salary'].toString()) ?? 0.0,
       commissionPercentage: double.tryParse(json['commission_percentage'].toString()) ?? 0.0,
       isActive: json['is_active'] == 1 || json['is_active'] == true,
       autoApproveLeave: json['auto_approve_leave'] == 1 || json['auto_approve_leave'] == true,
       isAdminProvider: json['is_admin_provider'] == 1 || json['is_admin_provider'] == true,
+      useSalonHours: json['use_salon_hours'] == null || json['use_salon_hours'] == 1 || json['use_salon_hours'] == true,
       user: json['user'],
       services: json['services'],
       workingHours: hours,
@@ -77,15 +82,19 @@ class StaffWorkingHour {
   });
 
   factory StaffWorkingHour.fromJson(Map<String, dynamic> json) {
+    bool isOff = json['is_weekly_off'] == 1 || json['is_weekly_off'] == true;
+    if (json.containsKey('is_working')) {
+      isOff = json['is_working'] == 0 || json['is_working'] == false;
+    }
     return StaffWorkingHour(
       dayOfWeek: json['day_of_week'] is int
           ? json['day_of_week']
           : int.tryParse('${json['day_of_week']}') ?? 0,
-      isWeeklyOff: json['is_weekly_off'] == 1 || json['is_weekly_off'] == true,
-      shiftStart: normaliseTime(json['shift_start']),
-      shiftEnd: normaliseTime(json['shift_end']),
-      breakStart: normaliseTime(json['break_start']),
-      breakEnd: normaliseTime(json['break_end']),
+      isWeeklyOff: isOff,
+      shiftStart: normaliseTime(json['shift_start'] ?? json['start_time']),
+      shiftEnd: normaliseTime(json['shift_end'] ?? json['end_time']),
+      breakStart: normaliseTime(json['break_start'] ?? json['break_start_time']),
+      breakEnd: normaliseTime(json['break_end'] ?? json['break_end_time']),
     );
   }
 

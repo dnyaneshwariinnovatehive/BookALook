@@ -144,7 +144,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final data = await _appointmentService.getSalonProviders(widget.salonId);
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final data = await _appointmentService.getSalonProviders(
+        widget.salonId,
+        date: dateStr,
+      );
       setState(() {
         _providers = data['providers'] ?? [];
         final eligible = _providers
@@ -290,6 +294,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void _selectDate(DateTime date) {
     AppHaptics.selectionClick();
     setState(() => _selectedDate = date);
+    _loadProviders();
     _fetchSlots();
   }
 
@@ -928,7 +933,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'No staff members are currently available who can perform all selected services.',
+                'No staff members are currently available on this date who can perform all selected services.',
                 style: GoogleFonts.outfit(
                   fontSize: 13,
                   color: context.colors.textSecondary,

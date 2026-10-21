@@ -437,6 +437,8 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/staff', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'store']);
         Route::put('/salons/{salon_id}/staff/{staff_id}', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'update']);
         Route::delete('/salons/{salon_id}/staff/{staff_id}', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'destroy']);
+        Route::get('/salons/{salon_id}/provider-profile', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'myProfile']);
+        Route::get('/salons/{salon_id}/provider/me', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'myProfile']);
         
         // Staff Leaves
         Route::get('/salons/{salon_id}/leaves', [\App\Http\Controllers\Api\Partner\StaffManagementController::class, 'getLeaves']);

@@ -46,6 +46,7 @@ class StaffManagementController extends Controller
             'base_salary' => 'numeric|min:0',
             'commission_percentage' => 'numeric|min:0|max:100',
             'auto_approve_leave' => 'boolean',
+            'use_salon_hours' => 'nullable|boolean',
             'service_ids' => 'array',
             'service_ids.*' => 'exists:services,id',
             'working_hours' => 'required|array|size:7',
@@ -74,6 +75,8 @@ class StaffManagementController extends Controller
                 'is_active' => true,
             ]);
 
+            $useSalonHours = $request->has('use_salon_hours') ? $request->boolean('use_salon_hours') : true;
+
             // 2. Create Service Provider profile
             $provider = ServiceProvider::create([
                 'user_id' => $user->id,
@@ -82,6 +85,7 @@ class StaffManagementController extends Controller
                 'base_salary' => $request->base_salary ?? 0,
                 'commission_percentage' => $request->commission_percentage ?? 0,
                 'auto_approve_leave' => $request->boolean('auto_approve_leave'),
+                'use_salon_hours' => $useSalonHours,
                 'is_active' => true,
                 'joined_at' => now(),
             ]);
@@ -92,11 +96,26 @@ class StaffManagementController extends Controller
             }
 
             // 4. Insert working hours
-            foreach ($request->working_hours as $hour) {
+            $hoursToInsert = $request->working_hours;
+            if ($useSalonHours) {
+                $salonHours = \App\Models\SalonWorkingHour::where('salon_id', $salonId)->get();
+                if ($salonHours->count() === 7) {
+                    $hoursToInsert = $salonHours->map(fn ($sh) => [
+                        'day_of_week' => $sh->day_of_week,
+                        'is_weekly_off' => (bool) $sh->is_closed,
+                        'shift_start' => $sh->is_closed ? null : $sh->open_time,
+                        'shift_end' => $sh->is_closed ? null : $sh->close_time,
+                        'break_start' => null,
+                        'break_end' => null,
+                    ])->all();
+                }
+            }
+
+            foreach ($hoursToInsert as $hour) {
                 ProviderWorkingHour::create([
                     'provider_id' => $provider->id,
                     'day_of_week' => $hour['day_of_week'],
-                    'is_weekly_off' => $hour['is_weekly_off'],
+                    'is_weekly_off' => (bool) $hour['is_weekly_off'],
                     'shift_start' => $hour['is_weekly_off'] ? null : $hour['shift_start'],
                     'shift_end' => $hour['is_weekly_off'] ? null : $hour['shift_end'],
                     'break_start' => $hour['break_start'] ?? null,
@@ -106,7 +125,7 @@ class StaffManagementController extends Controller
 
             DB::commit();
 
-            return response()->json(['message' => 'Staff added successfully', 'provider' => $provider->load('user')], 201);
+            return response()->json(['message' => 'Staff added successfully', 'provider' => $provider->load(['user', 'workingHours'])], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to add staff', 'error' => $e->getMessage()], 500);
@@ -126,6 +145,7 @@ class StaffManagementController extends Controller
             'base_salary' => 'sometimes|numeric|min:0',
             'commission_percentage' => 'sometimes|numeric|min:0|max:100',
             'auto_approve_leave' => 'sometimes|boolean',
+            'use_salon_hours' => 'sometimes|boolean',
             'service_ids' => 'sometimes|array',
             'service_ids.*' => 'exists:services,id',
             'working_hours' => 'sometimes|required|array|size:7',
@@ -153,19 +173,38 @@ class StaffManagementController extends Controller
             if ($request->has('base_salary')) $provider->base_salary = $request->base_salary;
             if ($request->has('commission_percentage')) $provider->commission_percentage = $request->commission_percentage;
             if ($request->has('auto_approve_leave')) $provider->auto_approve_leave = $request->boolean('auto_approve_leave');
+            if ($request->has('use_salon_hours')) $provider->use_salon_hours = $request->boolean('use_salon_hours');
             $provider->save();
 
             if ($request->has('service_ids')) {
                 $provider->services()->sync($request->service_ids);
             }
 
-            if ($request->has('working_hours')) {
+            if ($provider->use_salon_hours && ($request->has('use_salon_hours') || $request->has('working_hours'))) {
+                // Inherited schedule: sync to latest salon working hours
+                $salonHours = \App\Models\SalonWorkingHour::where('salon_id', $salonId)->get();
+                if ($salonHours->count() === 7) {
+                    ProviderWorkingHour::where('provider_id', $provider->id)->delete();
+                    foreach ($salonHours as $sh) {
+                        ProviderWorkingHour::create([
+                            'provider_id' => $provider->id,
+                            'day_of_week' => $sh->day_of_week,
+                            'is_weekly_off' => (bool) $sh->is_closed,
+                            'shift_start' => $sh->is_closed ? null : $sh->open_time,
+                            'shift_end' => $sh->is_closed ? null : $sh->close_time,
+                            'break_start' => null,
+                            'break_end' => null,
+                        ]);
+                    }
+                }
+            } elseif (! $provider->use_salon_hours && $request->has('working_hours')) {
+                // Customized schedule: store specific provider shifts and breaks
                 ProviderWorkingHour::where('provider_id', $provider->id)->delete();
                 foreach ($request->working_hours as $hour) {
                     ProviderWorkingHour::create([
                         'provider_id' => $provider->id,
                         'day_of_week' => $hour['day_of_week'],
-                        'is_weekly_off' => $hour['is_weekly_off'],
+                        'is_weekly_off' => (bool) $hour['is_weekly_off'],
                         'shift_start' => $hour['is_weekly_off'] ? null : $hour['shift_start'],
                         'shift_end' => $hour['is_weekly_off'] ? null : $hour['shift_end'],
                         'break_start' => $hour['break_start'] ?? null,
@@ -176,7 +215,7 @@ class StaffManagementController extends Controller
 
             DB::commit();
 
-            return response()->json(['message' => 'Staff updated successfully', 'provider' => $provider->load('user')], 200);
+            return response()->json(['message' => 'Staff updated successfully', 'provider' => $provider->load(['user', 'workingHours'])], 200);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to update staff', 'error' => $e->getMessage()], 500);
@@ -355,5 +394,81 @@ class StaffManagementController extends Controller
         $leave->save();
 
         return response()->json(['message' => 'Leave status updated', 'leave' => $leave]);
+    }
+
+    /**
+     * Get the authenticated provider's current profile, services, and latest working hours.
+     */
+    public function myProfile(Request $request, $salonId = null)
+    {
+        $user = $request->user();
+        $query = ServiceProvider::with(['user', 'services.template:id,name', 'workingHours'])
+            ->where('user_id', $user->id);
+
+        if ($salonId) {
+            $query->where('salon_id', $salonId);
+        }
+
+        $provider = $query->first();
+
+        if (! $provider) {
+            return response()->json(['message' => 'Service provider profile not found.'], 404);
+        }
+
+        // If provider follows salon hours, ensure they are up to date
+        if ($provider->use_salon_hours) {
+            $salonHours = \App\Models\SalonWorkingHour::where('salon_id', $provider->salon_id)->get();
+            if ($salonHours->count() === 7) {
+                $provHours = $provider->workingHours->keyBy('day_of_week');
+                $outOfSync = false;
+                foreach ($salonHours as $sh) {
+                    $ph = $provHours->get($sh->day_of_week);
+                    if (! $ph || (bool) $ph->is_weekly_off !== (bool) $sh->is_closed) {
+                        $outOfSync = true;
+                        break;
+                    }
+                    if (! $sh->is_closed) {
+                        if ($ph->shift_start !== $sh->open_time || $ph->shift_end !== $sh->close_time) {
+                            $outOfSync = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($outOfSync) {
+                    ProviderWorkingHour::where('provider_id', $provider->id)->delete();
+                    foreach ($salonHours as $sh) {
+                        ProviderWorkingHour::create([
+                            'provider_id' => $provider->id,
+                            'day_of_week' => $sh->day_of_week,
+                            'is_weekly_off' => (bool) $sh->is_closed,
+                            'shift_start' => $sh->is_closed ? null : $sh->open_time,
+                            'shift_end' => $sh->is_closed ? null : $sh->close_time,
+                            'break_start' => null,
+                            'break_end' => null,
+                        ]);
+                    }
+                    $provider->load('workingHours');
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'provider' => [
+                'id' => $provider->id,
+                'user_id' => $provider->user_id,
+                'salon_id' => $provider->salon_id,
+                'specialization' => $provider->specialization,
+                'base_salary' => (float) $provider->base_salary,
+                'commission_percentage' => (float) $provider->commission_percentage,
+                'auto_approve_leave' => (bool) $provider->auto_approve_leave,
+                'use_salon_hours' => (bool) $provider->use_salon_hours,
+                'is_active' => (bool) $provider->is_active,
+                'services' => $provider->services,
+                'working_hours' => $provider->workingHours->sortBy('day_of_week')->values(),
+            ],
+            'user' => $provider->user,
+        ]);
     }
 }

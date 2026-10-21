@@ -7,14 +7,21 @@ class AppointmentService {
   final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
 
   /// Staff of the salon, each flagged with `is_eligible` against the services
-  /// currently in the cart. Ineligible staff are returned too, so the UI can
-  /// grey them out instead of hiding them.
-  Future<Map<String, dynamic>> getSalonProviders(String salonId) async {
+  /// Staff of the salon, each flagged with `is_eligible` against the services
+  /// currently in the cart. If [date] is provided, unavailable staff (e.g. on leave
+  /// or weekly off) are excluded.
+  Future<Map<String, dynamic>> getSalonProviders(String salonId, {String? date}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
+    final uri = Uri.parse('$baseUrl/customer/salons/$salonId/providers').replace(
+      queryParameters: {
+        if (date != null && date.isNotEmpty) 'date': date,
+      },
+    );
+
     final response = await http.get(
-      Uri.parse('$baseUrl/customer/salons/$salonId/providers'),
+      uri,
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
