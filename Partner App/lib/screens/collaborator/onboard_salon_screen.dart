@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/onboarding_draft.dart';
+import '../../models/subscription_plan.dart';
 import '../../services/api_service.dart';
 import '../../services/collaborator_api.dart';
 import '../../services/onboarding_draft_store.dart';
@@ -547,32 +549,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
           if ((_draft!.preferredCommercialModel) == 'subscription') ...[
             const SizedBox(height: 14),
             _label('Preferred subscription plan', optional: true),
-            _dropdown<String>(
-              value: _draft!.preferredPlanId,
-              hint: 'Not sure yet (Choose after approval)',
-              icon: Icons.card_membership_outlined,
-              items: [
-                const DropdownMenuItem<String>(
-                  value: null,
-                  child: Text('Not sure yet (Choose after approval)'),
-                ),
-                ..._subscriptionPlans.map((p) {
-                  final map = p is Map ? Map<String, dynamic>.from(p) : <String, dynamic>{};
-                  final id = map['id']?.toString() ?? '';
-                  return DropdownMenuItem<String>(
-                    value: id,
-                    child: Text(
-                      _formatPlanDetails(map),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  );
-                }),
-              ],
-              onChanged: (val) {
-                setState(() => _draft!.preferredPlanId = val);
-                _persist();
-              },
-            ),
+            _buildSubscriptionPlanSelector(),
             const SizedBox(height: 6),
             const Text(
               'Registration preference only. The salon confirms and purchases their actual plan after approval.',
@@ -2049,25 +2026,583 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
           _draft!.preferredCommercialModel = value;
           if (value == 'commission') {
             _draft!.preferredPlanId = null;
+          } else if (value == 'subscription') {
+            // "Choose after approval" is selected by default
+            _draft!.preferredPlanId ??= null;
           }
         });
         _persist();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         decoration: BoxDecoration(
           color: selected ? AppTheme.lightAccentSoft : Colors.white,
-          border: Border.all(color: selected ? AppTheme.accentColor : AppTheme.lightBorder),
+          border: Border.all(
+            color: selected ? AppTheme.accentColor : AppTheme.lightBorder,
+            width: selected ? 1.5 : 1.0,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            color: selected ? AppTheme.accentColor : AppTheme.lightTextBody,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              size: 16,
+              color: selected ? AppTheme.accentColor : AppTheme.lightTextLight,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? AppTheme.accentColor : AppTheme.lightTextBody,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionPlanSelector() {
+    String displayText = 'Not sure yet (Choose after approval)';
+    if (_draft!.preferredPlanId != null) {
+      final selectedMap = _subscriptionPlans.cast<dynamic>().firstWhere(
+        (p) {
+          final map = p is Map ? p : (p is SubscriptionPlan ? p.rawJson : <String, dynamic>{});
+          return map['id']?.toString() == _draft!.preferredPlanId;
+        },
+        orElse: () => null,
+      );
+      if (selectedMap != null) {
+        final map = selectedMap is Map
+            ? Map<String, dynamic>.from(selectedMap)
+            : (selectedMap as SubscriptionPlan).rawJson;
+        displayText = _formatPlanDetails(map);
+      }
+    }
+
+    return InkWell(
+      onTap: _openSubscriptionPlanSheet,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.lightBorder),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.card_membership_outlined,
+              size: 20,
+              color: AppTheme.lightTextLight,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                displayText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.lightTextHeading,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: AppTheme.lightTextLight,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openSubscriptionPlanSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (sheetContext) {
+        return _SubscriptionPlanBottomSheet(
+          selectedPlanId: _draft!.preferredPlanId,
+          plans: _subscriptionPlans,
+          formatPlanDetails: _formatPlanDetails,
+          onSelect: (selectedId) {
+            setState(() => _draft!.preferredPlanId = selectedId);
+            _persist();
+            Navigator.pop(sheetContext);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SubscriptionPlanBottomSheet extends StatelessWidget {
+  final String? selectedPlanId;
+  final List<dynamic> plans;
+  final String Function(Map<String, dynamic>) formatPlanDetails;
+  final ValueChanged<String?> onSelect;
+
+  const _SubscriptionPlanBottomSheet({
+    required this.selectedPlanId,
+    required this.plans,
+    required this.formatPlanDetails,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      height: screenHeight * 0.70,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 20,
+            offset: Offset(0, -4),
           ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 44,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+            ),
+
+            // Header row with Title and Dismiss (Close) button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Choose Subscription Plan',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppTheme.lightTextHeading,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Select a plan to express preference or decide after approval',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : AppTheme.lightTextBody,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 22),
+                    tooltip: 'Dismiss',
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            // Scrollable list of plans
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  // Preferred default option: "Choose after approval"
+                  _buildChooseAfterApprovalCard(context, isDark),
+                  const SizedBox(height: 18),
+
+                  if (plans.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Text(
+                          'AVAILABLE PLANS (${plans.length})',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: isDark ? Colors.white54 : AppTheme.lightTextLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Responsive grid of cards
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isWide = constraints.maxWidth >= 550;
+                        final cardWidth = isWide ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            for (var p in plans)
+                              SizedBox(
+                                width: cardWidth,
+                                child: _buildPlanCard(context, p, isDark),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ] else ...[
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Text(
+                          'No subscription plans available right now.',
+                          style: TextStyle(
+                            color: isDark ? Colors.white54 : AppTheme.lightTextLight,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChooseAfterApprovalCard(BuildContext context, bool isDark) {
+    final isSelected = selectedPlanId == null;
+
+    return InkWell(
+      onTap: () => onSelect(null),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? AppTheme.accentColor.withValues(alpha: 0.12) : AppTheme.lightAccentSoft)
+              : (isDark ? const Color(0xFF252538) : Colors.white),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppTheme.accentColor : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+            width: isSelected ? 2.0 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.accentColor.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppTheme.accentColor : AppTheme.lightTextLight,
+                  width: 2.0,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: isSelected
+                  ? Container(
+                      width: 11,
+                      height: 11,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.accentColor,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Not sure yet (Choose after approval)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? AppTheme.accentColor : (isDark ? Colors.white : AppTheme.lightTextHeading),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'RECOMMENDED',
+                          style: GoogleFonts.outfit(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'No upfront commitment. The salon can compare plans and activate their subscription once approved.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: isDark ? Colors.white70 : AppTheme.lightTextBody,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlanCard(BuildContext context, dynamic p, bool isDark) {
+    final map = p is Map ? Map<String, dynamic>.from(p) : (p is SubscriptionPlan ? p.rawJson : <String, dynamic>{});
+    final planId = map['id']?.toString() ?? '';
+    final isSelected = selectedPlanId == planId;
+    final name = (map['name'] ?? 'Plan').toString();
+
+    final rawPrice = map['price'];
+    final numPrice = rawPrice != null ? double.tryParse(rawPrice.toString()) : null;
+    final priceStr = numPrice != null
+        ? '₹${numPrice.toStringAsFixed(numPrice.truncateToDouble() == numPrice ? 0 : 2)}'
+        : (rawPrice != null ? '₹$rawPrice' : '₹0');
+
+    final days = map['validity_days'] ?? map['duration_days'] ?? 30;
+
+    final campaigns = map['whatsapp_campaign_limit'];
+    final parsedCampaigns = campaigns != null ? int.tryParse(campaigns.toString()) : null;
+
+    final hasPriority = map['has_priority_visibility'] == true ||
+        map['has_priority_visibility'] == 1 ||
+        map['has_priority_visibility'] == '1';
+
+    final formattedDetails = formatPlanDetails(map);
+
+    return InkWell(
+      onTap: () => onSelect(planId),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? AppTheme.accentColor.withValues(alpha: 0.12) : AppTheme.lightAccentSoft)
+              : (isDark ? const Color(0xFF252538) : Colors.white),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppTheme.accentColor : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+            width: isSelected ? 2.0 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.accentColor.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Row: Radio, Name, Badges
+            Row(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? AppTheme.accentColor : AppTheme.lightTextLight,
+                      width: 2.0,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: isSelected
+                      ? Container(
+                          width: 11,
+                          height: 11,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.accentColor,
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '$name Plan',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? AppTheme.accentColor : (isDark ? Colors.white : AppTheme.lightTextHeading),
+                    ),
+                  ),
+                ),
+                if (hasPriority)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, size: 13, color: Colors.amber),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Priority',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Price & Duration
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  priceStr,
+                  style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: isSelected ? AppTheme.accentColor : (isDark ? Colors.white : AppTheme.lightTextHeading),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  ' / $days days',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white70 : AppTheme.lightTextBody,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Formatted details summary
+            Text(
+              formattedDetails,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white70 : AppTheme.lightTextBody,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+
+            if (parsedCampaigns != null && parsedCampaigns > 0) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded, size: 12, color: AppTheme.accentColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$parsedCampaigns WA Campaigns',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white70 : AppTheme.lightTextBody,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -12,7 +12,8 @@ void main() {
         ..description = 'A lovely salon'
         ..ownerName = 'John Doe'
         ..ownerPhone = '9876543210'
-        ..salonPhone = ''; // empty reception number
+        ..salonPhone = '' // empty reception number
+        ..preferredCommercialModel = 'subscription';
 
       // Step 0 required fields should be satisfied even with empty salonPhone
       expect(draft.missingOn(0), isEmpty);

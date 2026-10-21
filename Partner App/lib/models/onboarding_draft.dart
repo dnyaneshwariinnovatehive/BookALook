@@ -102,7 +102,7 @@ class OnboardingDraft {
     List<String>? photoPaths,
     this.coverIndex = 0,
     this.preferredPlanId,
-    this.preferredCommercialModel = 'subscription',
+    this.preferredCommercialModel = '',
     this.requestedCommissionPercentage,
     this.existingPhotoCount = 0,
     this.submitted = false,
@@ -233,6 +233,7 @@ class OnboardingDraft {
             if (description.trim().isEmpty) 'Description',
             if (ownerName.trim().isEmpty) 'Owner name',
             if (!_isPhone(ownerPhone)) 'Owner phone (10 digits)',
+            if (preferredCommercialModel.trim().isEmpty) 'Commercial model',
             if (preferredCommercialModel == 'commission' &&
                 (requestedCommissionPercentage == null ||
                     requestedCommissionPercentage! < 0 ||
@@ -318,7 +319,7 @@ class OnboardingDraft {
         photoPaths: (json['photo_paths'] as List?)?.map((p) => p.toString()).toList(),
         coverIndex: json['cover_index'] ?? 0,
         preferredPlanId: json['preferred_plan_id']?.toString(),
-        preferredCommercialModel: json['preferred_commercial_model']?.toString() ?? 'subscription',
+        preferredCommercialModel: json['preferred_commercial_model']?.toString() ?? '',
         requestedCommissionPercentage: (json['requested_commission_percentage'] as num?)?.toDouble(),
         existingPhotoCount: json['existing_photo_count'] ?? 0,
         submitted: json['submitted'] == true,
