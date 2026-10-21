@@ -167,7 +167,7 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $salons = Salon::with([
+        $query = Salon::with([
             'city:id,name,state',
             'admin:id,name,phone',
             'enquiry',
@@ -184,8 +184,25 @@ class CollaboratorController extends Controller
                   ->orWhereHas('enquiry', function ($eq) use ($user) {
                       $eq->where('assigned_collaborator_id', $user->id);
                   });
-            })
-            ->orderByDesc('created_at')
+            });
+
+        if ($request->filled('status')) {
+            $status = strtolower(trim($request->query('status')));
+            if ($status === 'approved' || $status === 'active') {
+                $query->where(function ($q) {
+                    $q->whereIn('status', ['active', 'approved'])
+                      ->orWhereNotNull('approved_at');
+                })->whereNotIn('status', ['pending_approval', 'pending', 'rejected', 'needs_correction']);
+            } elseif ($status === 'pending' || $status === 'pending_approval') {
+                $query->whereIn('status', ['pending_approval', 'pending']);
+            } elseif ($status === 'rejected' || $status === 'needs_correction') {
+                $query->whereIn('status', ['rejected', 'needs_correction']);
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        $salons = $query->orderByDesc('created_at')
             ->get()
             ->map(function (Salon $salon) {
                 $subscription = $salon->currentSubscription;
@@ -197,7 +214,8 @@ class CollaboratorController extends Controller
                 // than nothing at all. Reading an empty capsule as "never paid"
                 // would send the collaborator after the wrong problem.
                 $lapsed = $subscription === null && $salon->latestSubscription !== null;
-                $isApproved = in_array($salon->status, ['active', 'approved'], true) || $salon->approved_at !== null;
+                $isApproved = (in_array($salon->status, ['active', 'approved'], true) || $salon->approved_at !== null)
+                    && ! in_array($salon->status, ['pending_approval', 'pending', 'rejected', 'needs_correction'], true);
 
                 return [
                     'id' => $salon->id,
@@ -230,6 +248,78 @@ class CollaboratorController extends Controller
                     // Editable right up to approval, and never again after it. Once
                     // a salon is live it belongs to its owner.
                     'can_edit' => in_array($salon->status, ['pending_approval', 'pending', 'rejected', 'needs_correction'], true),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $salons,
+        ]);
+    }
+
+    /**
+     * Salons associated with this collaborator that have been explicitly approved by SuperAdmin.
+     */
+    public function approvedSalons(Request $request)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $salons = Salon::with([
+            'city:id,name,state',
+            'admin:id,name,phone',
+            'enquiry',
+            'currentSubscription.plan:id,name',
+            'latestSubscription.plan:id,name',
+        ])
+            ->withCount('services')
+            ->where(function ($q) use ($user) {
+                $q->where('submitted_by', $user->id)
+                  ->orWhere('assigned_collaborator_id', $user->id)
+                  ->orWhereHas('enquiry', function ($eq) use ($user) {
+                      $eq->where('assigned_collaborator_id', $user->id);
+                  });
+            })
+            ->where(function ($q) {
+                $q->whereIn('status', ['active', 'approved'])
+                  ->orWhereNotNull('approved_at');
+            })
+            ->whereNotIn('status', ['pending_approval', 'pending', 'rejected', 'needs_correction'])
+            ->orderByDesc('approved_at')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function (Salon $salon) {
+                $subscription = $salon->currentSubscription;
+                $daysLeft = $subscription
+                    ? (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false)
+                    : null;
+                $lapsed = $subscription === null && $salon->latestSubscription !== null;
+
+                return [
+                    'id' => $salon->id,
+                    'name' => $salon->name,
+                    'status' => $salon->status,
+                    'is_approved' => true,
+                    'approved_at' => $salon->approved_at,
+                    'cover_photo_url' => $salon->cover_photo_url,
+                    'address' => $salon->address,
+                    'city' => $salon->city?->name,
+                    'services_count' => $salon->services_count,
+                    'owner_name' => $salon->admin?->name,
+                    'owner_phone' => $salon->admin?->phone,
+                    'submitted_at' => $salon->created_at,
+                    'enquiry_id' => $salon->enquiry_id,
+                    'services_priced' => $salon->services_count > 0,
+                    'plan_name' => $subscription?->plan?->name
+                        ?? $salon->latestSubscription?->plan?->name,
+                    'days_left' => $daysLeft,
+                    'renews_on' => $subscription?->end_date,
+                    'lapsed' => $lapsed,
+                    'needs_plan' => $subscription === null && ! $lapsed,
+                    'can_edit' => false,
                 ];
             });
 

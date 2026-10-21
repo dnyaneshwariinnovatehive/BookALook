@@ -367,6 +367,7 @@ Route::prefix('partner')->group(function () {
         // can sit behind the salon.active gate.
         Route::get('/collaborator/assigned-enquiries', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'getAssignedEnquiries']);
         Route::get('/collaborator/onboarded-salons', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'onboardedSalons']);
+        Route::get('/collaborator/approved-salons', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'approvedSalons']);
         // Existing salons SuperAdmin assigned from the directory. Not onboarding
         // work — these already exist and just needed somebody looking after them.
         Route::get('/collaborator/assigned-salons', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'assignedSalons']);

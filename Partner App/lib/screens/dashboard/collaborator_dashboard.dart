@@ -7,7 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/collaborator/collaborator_notification_bell.dart';
 import '../../widgets/collaborator/collaborator_pill_nav_bar.dart';
 import '../../widgets/tab_navigator.dart';
-import 'collaborator_tabs/collaborator_assigned_tab.dart';
+import 'collaborator_tabs/collaborator_approved_tab.dart';
 import 'collaborator_tabs/collaborator_home_tab.dart';
 import 'collaborator_tabs/collaborator_onboarded_tab.dart';
 import 'collaborator_tabs/collaborator_profile_tab.dart';
@@ -45,7 +45,7 @@ class _CollaboratorDashboardScreenState
 
   static const _homeTab = 0;
   static const _mySalonsTab = 1;
-  static const _assignedTab = 2;
+  static const _approvedTab = 2;
   static const _profileTab = 3;
 
   /// One navigator per tab so a page pushed from inside a tab renders in that
@@ -57,13 +57,13 @@ class _CollaboratorDashboardScreenState
   );
 
   /// The tabs live inside an [IndexedStack] and stay mounted, so the shell keeps
-  /// a handle on each one in order to tell it to reload or to stop polling.
+  /// a handle on each one in order to tell it to reload.
   final GlobalKey<CollaboratorHomeTabState> _homeKey =
       GlobalKey<CollaboratorHomeTabState>();
   final GlobalKey<CollaboratorOnboardedTabState> _mySalonsKey =
       GlobalKey<CollaboratorOnboardedTabState>();
-  final GlobalKey<CollaboratorAssignedTabState> _assignedKey =
-      GlobalKey<CollaboratorAssignedTabState>();
+  final GlobalKey<CollaboratorApprovedTabState> _approvedKey =
+      GlobalKey<CollaboratorApprovedTabState>();
   final GlobalKey<CollaboratorProfileTabState> _profileKey =
       GlobalKey<CollaboratorProfileTabState>();
 
@@ -78,16 +78,6 @@ class _CollaboratorDashboardScreenState
     // submission queued during yesterday's visit goes out today without anyone
     // opening the tab it lives in.
     OnboardingDraftStore.instance.load();
-
-    // A tab's own initState runs during the first build, so its State handle
-    // does not exist yet while this frame is being assembled. Anything the
-    // shell has to tell a tab on frame one has to be delivered afterwards, or
-    // the tab silently runs the whole session on whatever default it shipped
-    // with. Assigned defaults to "not visible", so this is what starts its poll.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncTabVisibility();
-    });
   }
 
   @override
@@ -96,17 +86,8 @@ class _CollaboratorDashboardScreenState
     super.dispose();
   }
 
-  /// Tells each tab whether anyone is looking at it.
-  ///
-  /// Only Assigned acts on this today, but the shell is the only thing that
-  /// knows the answer, so it stays here rather than becoming an Assigned
-  /// concern.
-  void _syncTabVisibility() {
-    _assignedKey.currentState?.setActive(_currentIndex == _assignedTab);
-  }
-
   /// Tapping the tab you are already on returns it to its first page and
-  /// refreshes it, so "I'm on Assigned and I want to see it again" is one tap.
+  /// refreshes it.
   void _onItemTapped(int index) {
     if (index == _currentIndex) {
       _refreshTab(index);
@@ -115,7 +96,6 @@ class _CollaboratorDashboardScreenState
     }
 
     setState(() => _currentIndex = index);
-    _syncTabVisibility();
     _refreshTab(index);
   }
 
@@ -127,8 +107,8 @@ class _CollaboratorDashboardScreenState
       case _mySalonsTab:
         _mySalonsKey.currentState?.reload();
         break;
-      case _assignedTab:
-        _assignedKey.currentState?.reload();
+      case _approvedTab:
+        _approvedKey.currentState?.reload();
         break;
       case _profileTab:
         _profileKey.currentState?.reload();
@@ -149,7 +129,6 @@ class _CollaboratorDashboardScreenState
 
     if (_currentIndex != _homeTab) {
       setState(() => _currentIndex = _homeTab);
-      _syncTabVisibility();
       return;
     }
 
@@ -179,43 +158,44 @@ class _CollaboratorDashboardScreenState
     _homeTab => CollaboratorHomeTab(
       key: _homeKey,
       badges: _badges,
-      onGoToAssigned: () => _goTo(_assignedTab),
+      onGoToAssigned: () {
+        _goTo(_mySalonsTab);
+        _mySalonsKey.currentState?.setFilter('assigned');
+      },
       onGoToMySalons: () => _goTo(_mySalonsTab),
+      onGoToApproved: () => _goTo(_approvedTab),
     ),
     _mySalonsTab => CollaboratorOnboardedTab(
       key: _mySalonsKey,
       badges: _badges,
-      onGoToAssigned: () => _goTo(_assignedTab),
+      onGoToAssigned: () {
+        _mySalonsKey.currentState?.setFilter('assigned');
+      },
     ),
-    _assignedTab => CollaboratorAssignedTab(key: _assignedKey, badges: _badges),
+    _approvedTab => CollaboratorApprovedTab(
+      key: _approvedKey,
+      badges: _badges,
+      onGoToMySalons: () => _goTo(_mySalonsTab),
+    ),
     _ => CollaboratorProfileTab(key: _profileKey),
   };
 
   void _goTo(int index) {
     setState(() => _currentIndex = index);
-    _syncTabVisibility();
     _refreshTab(index);
   }
 
-  /// The app bar used to say "Collaborator Dashboard", which told a
-  /// collaborator nothing they did not already know and repeated the greeting
-  /// already shown on Home.
-  ///
-  /// It now carries the tab's name and a one-line explanation of what lives in
-  /// it. "My Salons" and "Assigned" are two similar nouns for two different
-  /// queues, and this is where that gets disambiguated — the labels stay as they
-  /// are, but nothing is left to guess about.
   PreferredSizeWidget _buildAppBar() {
     const subtitles = <int, String>{
       _homeTab: 'Where to pick up today',
-      _mySalonsTab: 'All your assigned, onboarded, and in-review salons',
-      _assignedTab: 'Salons waiting to be onboarded',
+      _mySalonsTab: 'All your onboarded, in-review, and assigned salons',
+      _approvedTab: 'Salons explicitly approved by Super Admin',
       _profileTab: 'Your details and your tally',
     };
     const titles = <int, String>{
       _homeTab: 'Home',
       _mySalonsTab: 'My Salons',
-      _assignedTab: 'Assigned',
+      _approvedTab: 'Approved Salons',
       _profileTab: 'Profile',
     };
 
@@ -244,9 +224,6 @@ class _CollaboratorDashboardScreenState
           ),
         ],
       ),
-      // Dropped entirely on the other tabs, not just hidden. Dropping it is what
-      // disposes the bell and cancels its poll — a bell kept alive behind three
-      // tabs the collaborator cannot see would be a request a minute for nothing.
       actions: _currentIndex == _homeTab
           ? const [CollaboratorNotificationBell()]
           : null,
@@ -255,18 +232,8 @@ class _CollaboratorDashboardScreenState
 
   Widget _buildNavBar() {
     return ListenableBuilder(
-      // Both sources matter: the tabs push queue counts in through [_badges],
-      // and the draft store pushes the number of finished-but-unsent
-      // submissions. The store is a ChangeNotifier that outlives every tab, so
-      // merging the two keeps the badge live whether the count came from a
-      // network read or from the device.
-      listenable: Listenable.merge([_badges, OnboardingDraftStore.instance]),
+      listenable: _badges,
       builder: (context, _) {
-        // Drafts waiting for signal are the collaborator's own unsent work, so
-        // they ride along on the Assigned badge rather than needing a tab of
-        // their own.
-        final queued = _badges.queuedDrafts(OnboardingDraftStore.instance);
-
         final items = [
           const CollaboratorNavItem(
             label: 'Home',
@@ -280,10 +247,10 @@ class _CollaboratorDashboardScreenState
             badge: _badges.mySalonsCount,
           ),
           CollaboratorNavItem(
-            label: 'Assigned',
-            icon: Icons.inbox_outlined,
-            activeIcon: Icons.inbox,
-            badge: _badges.assignedCount + queued,
+            label: 'Approved Salons',
+            icon: Icons.verified_outlined,
+            activeIcon: Icons.verified,
+            badge: _badges.approvedCount,
           ),
           const CollaboratorNavItem(
             label: 'Profile',

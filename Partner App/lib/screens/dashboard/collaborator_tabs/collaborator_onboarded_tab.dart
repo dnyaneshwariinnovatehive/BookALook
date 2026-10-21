@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,6 +41,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
 
   bool _isLoading = true;
   bool _firstLoad = true;
+  String? _errorMessage;
   List<dynamic> _salons = [];
   List<dynamic> _enquiries = [];
   List<dynamic> _assignedSalons = [];
@@ -78,10 +81,24 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     if (mounted) setState(() {});
   }
 
+  /// Sets the active filter programmatically (e.g. from Home tab shortcuts).
+  void setFilter(String? filter) {
+    if (mounted) {
+      setState(() => _filter = filter);
+    }
+  }
+
   /// Re-reads the list. Called by the shell when the tab is re-selected.
   Future<void> reload() => _fetch();
 
   Future<void> _fetch() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
     try {
       try {
         await _store.sync();
@@ -102,10 +119,18 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         _enquiries = results[1];
         _assignedSalons = results[2];
         _alerts = results[3];
+        _errorMessage = null;
       });
       _reportBadges(_salons, _enquiries);
     } catch (e) {
       debugPrint('Error fetching collaborator salons: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e is HttpException
+              ? e.message
+              : 'Unable to load salons. Please check your internet connection.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -298,6 +323,10 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         _assignedSalons.isNotEmpty ||
         _alerts.isNotEmpty ||
         _store.queuedCount > 0;
+
+    if (_errorMessage != null && !hasAnyData) {
+      return _buildErrorState();
+    }
 
     if (!hasAnyData) return _buildEmptyState();
 
@@ -1415,6 +1444,16 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
       body: body,
       actionLabel: 'Show all',
       onAction: () => setState(() => _filter = null),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return CollaboratorEmptyState(
+      icon: Icons.cloud_off_outlined,
+      title: 'Could not load salons',
+      body: _errorMessage ?? 'Something went wrong while connecting to the server.',
+      actionLabel: 'Retry',
+      onAction: _fetch,
     );
   }
 

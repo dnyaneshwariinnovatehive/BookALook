@@ -10,6 +10,9 @@ use App\Models\ServiceProvider;
 use App\Models\ProviderWorkingHour;
 use App\Services\GeoService;
 use App\Services\SalonLinkService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use App\Models\SalonPayout;
 use App\Models\Appointment;
@@ -99,84 +102,162 @@ class SalonSettingsController extends Controller
             'salon' => $salon
         ]);
     }
-    public function getWorkingHours($salon_id)
+    public function getWorkingHours(Request $request, $salon_id)
     {
+        $salon = Salon::find($salon_id);
+        if (! $salon) {
+            return response()->json(['message' => 'Salon not found.'], 404);
+        }
+
         $hours = SalonWorkingHour::where('salon_id', $salon_id)
             ->orderBy('day_of_week', 'asc')
             ->get();
 
-        if ($hours->isEmpty()) {
-            // Provide default structure if nothing exists
-            $defaultHours = [];
-            for ($i = 0; $i < 7; $i++) {
-                $defaultHours[] = [
-                    'day_of_week' => $i,
+        $keyed = $hours->keyBy('day_of_week');
+        $fullWeek = [];
+        $hasAny = $hours->isNotEmpty();
+
+        for ($day = 0; $day < 7; $day++) {
+            if ($keyed->has($day)) {
+                $fullWeek[] = $keyed->get($day);
+            } else {
+                $fullWeek[] = [
+                    'day_of_week' => $day,
                     'is_closed' => false,
                     'open_time' => '09:00:00',
                     'close_time' => '18:00:00',
                 ];
             }
-            return response()->json([
-                'working_hours' => $defaultHours,
-                'is_default' => true
-            ]);
         }
 
         return response()->json([
-            'working_hours' => $hours,
-            'is_default' => false
+            'working_hours' => $fullWeek,
+            'is_default' => ! $hasAny,
         ]);
     }
 
     public function updateWorkingHours(Request $request, $salon_id)
     {
+        $salon = Salon::find($salon_id);
+        if (! $salon) {
+            return response()->json(['message' => 'Salon not found.'], 404);
+        }
+
+        $user = $request->user();
+        if ($user && $user->role !== 'superadmin' && $salon->admin_id !== $user->id) {
+            return response()->json(['message' => 'You are not authorized to update timings for this salon.'], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'working_hours' => 'required|array|size:7',
             'working_hours.*.day_of_week' => 'required|integer|min:0|max:6',
             'working_hours.*.is_closed' => 'required|boolean',
-            'working_hours.*.open_time' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_closed,false',
-            'working_hours.*.close_time' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_closed,false',
+            'working_hours.*.open_time' => 'nullable|date_format:H:i:s,H:i|required_if:working_hours.*.is_closed,false',
+            'working_hours.*.close_time' => 'nullable|date_format:H:i:s,H:i|required_if:working_hours.*.is_closed,false',
         ]);
+
+        $validator->after(function ($validator) use ($request) {
+            $hours = $request->input('working_hours');
+            if (! is_array($hours)) {
+                return;
+            }
+
+            foreach ($hours as $index => $hour) {
+                if (! empty($hour['is_closed'])) {
+                    continue;
+                }
+                $open = $hour['open_time'] ?? null;
+                $close = $hour['close_time'] ?? null;
+                if ($open && $close) {
+                    $openSec = strtotime("1970-01-01 $open");
+                    $closeSec = strtotime("1970-01-01 $close");
+                    if ($openSec !== false && $closeSec !== false && $closeSec <= $openSec) {
+                        $validator->errors()->add("working_hours.{$index}.close_time", 'Closing time must be after opening time.');
+                    }
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $hours = $request->working_hours;
-        
+
+        // Normalize time strings to ensure H:i:s format and clean nulls for closed days
+        $normalizedHours = [];
         foreach ($hours as $hour) {
-            SalonWorkingHour::updateOrCreate(
-                [
-                    'salon_id' => $salon_id,
-                    'day_of_week' => $hour['day_of_week'],
-                ],
-                [
-                    'is_closed' => $hour['is_closed'],
-                    'open_time' => $hour['is_closed'] ? null : $hour['open_time'],
-                    'close_time' => $hour['is_closed'] ? null : $hour['close_time'],
-                ]
-            );
+            $isClosed = (bool) $hour['is_closed'];
+            $open = $isClosed ? null : ($hour['open_time'] ?? null);
+            $close = $isClosed ? null : ($hour['close_time'] ?? null);
+
+            if ($open && strlen($open) === 5) {
+                $open .= ':00';
+            }
+            if ($close && strlen($close) === 5) {
+                $close .= ':00';
+            }
+
+            $normalizedHours[] = [
+                'day_of_week' => (int) $hour['day_of_week'],
+                'is_closed' => $isClosed,
+                'open_time' => $open,
+                'close_time' => $close,
+            ];
         }
 
-        // Automatically synchronize working hours for providers configured to follow salon timings.
-        // Providers with customized schedules (use_salon_hours = false) are preserved untouched.
-        $syncProviders = ServiceProvider::where('salon_id', $salon_id)
-            ->where('use_salon_hours', true)
-            ->get();
+        try {
+            DB::transaction(function () use ($salon_id, $normalizedHours) {
+                foreach ($normalizedHours as $hour) {
+                    SalonWorkingHour::updateOrCreate(
+                        [
+                            'salon_id' => $salon_id,
+                            'day_of_week' => $hour['day_of_week'],
+                        ],
+                        [
+                            'is_closed' => $hour['is_closed'],
+                            'open_time' => $hour['open_time'],
+                            'close_time' => $hour['close_time'],
+                        ]
+                    );
+                }
 
-        foreach ($syncProviders as $syncProvider) {
-            ProviderWorkingHour::where('provider_id', $syncProvider->id)->delete();
-            foreach ($hours as $hour) {
-                ProviderWorkingHour::create([
-                    'provider_id' => $syncProvider->id,
-                    'day_of_week' => $hour['day_of_week'],
-                    'is_weekly_off' => (bool) $hour['is_closed'],
-                    'shift_start' => $hour['is_closed'] ? null : $hour['open_time'],
-                    'shift_end' => $hour['is_closed'] ? null : $hour['close_time'],
-                    'break_start' => null,
-                    'break_end' => null,
-                ]);
-            }
+                // Automatically synchronize working hours for providers configured to follow salon timings.
+                // Providers with customized schedules (use_salon_hours = false) are preserved untouched.
+                $hasUseSalonHours = Schema::hasColumn('service_providers', 'use_salon_hours');
+                $syncProvidersQuery = ServiceProvider::where('salon_id', $salon_id);
+                if ($hasUseSalonHours) {
+                    $syncProvidersQuery->where('use_salon_hours', true);
+                }
+                $syncProviders = $syncProvidersQuery->get();
+
+                foreach ($syncProviders as $syncProvider) {
+                    foreach ($normalizedHours as $hour) {
+                        ProviderWorkingHour::updateOrCreate(
+                            [
+                                'provider_id' => $syncProvider->id,
+                                'day_of_week' => $hour['day_of_week'],
+                            ],
+                            [
+                                'is_weekly_off' => (bool) $hour['is_closed'],
+                                'shift_start' => $hour['open_time'],
+                                'shift_end' => $hour['close_time'],
+                                'break_start' => null,
+                                'break_end' => null,
+                            ]
+                        );
+                    }
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::error('Failed to update working hours: ' . $e->getMessage(), [
+                'salon_id' => $salon_id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update working hours: ' . $e->getMessage(),
+            ], 500);
         }
 
         return response()->json(['message' => 'Working hours updated successfully']);

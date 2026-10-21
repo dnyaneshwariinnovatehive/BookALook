@@ -47,6 +47,36 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
   }
 
   Future<void> _saveWorkingHours() async {
+    for (final hour in _workingHours) {
+      if (!hour.isClosed) {
+        if (hour.openTime == null || hour.closeTime == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(milliseconds: 2500),
+              content: Text('Please set opening and closing hours for ${_daysOfWeek[hour.dayOfWeek]}.'),
+            ),
+          );
+          return;
+        }
+
+        final openParts = hour.openTime!.split(':');
+        final closeParts = hour.closeTime!.split(':');
+        if (openParts.length >= 2 && closeParts.length >= 2) {
+          final openMinutes = (int.tryParse(openParts[0]) ?? 0) * 60 + (int.tryParse(openParts[1]) ?? 0);
+          final closeMinutes = (int.tryParse(closeParts[0]) ?? 0) * 60 + (int.tryParse(closeParts[1]) ?? 0);
+          if (closeMinutes <= openMinutes) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                duration: const Duration(milliseconds: 2500),
+                content: Text('Closing time must be after opening time for ${_daysOfWeek[hour.dayOfWeek]}.'),
+              ),
+            );
+            return;
+          }
+        }
+      }
+    }
+
     setState(() => _isSaving = true);
     try {
       await SalonSettingsApi.updateWorkingHours(widget.salonId, _workingHours);
@@ -56,7 +86,11 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
+        String msg = e.toString();
+        if (msg.startsWith('Exception: ')) {
+          msg = msg.substring(11);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(msg)));
       }
     } finally {
       if (mounted) {

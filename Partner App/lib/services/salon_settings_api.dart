@@ -49,7 +49,24 @@ class SalonSettingsApi {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to update working hours: ${response.body}');
+      String errorMessage = response.body;
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          if (decoded['errors'] is Map) {
+            final errors = decoded['errors'] as Map;
+            final firstErrorList = errors.values.first;
+            if (firstErrorList is List && firstErrorList.isNotEmpty) {
+              errorMessage = firstErrorList.first.toString();
+            } else {
+              errorMessage = firstErrorList.toString();
+            }
+          } else if (decoded['message'] != null) {
+            errorMessage = decoded['message'].toString();
+          }
+        }
+      } catch (_) {}
+      throw Exception(errorMessage);
     }
   }
 

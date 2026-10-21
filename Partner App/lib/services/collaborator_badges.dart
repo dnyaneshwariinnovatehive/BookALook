@@ -21,6 +21,7 @@ class CollaboratorBadges extends ChangeNotifier {
   int _assignedCount = 0;
   int _awaitingApproval = 0;
   int _sentBack = 0;
+  int _approvedCount = 0;
 
   /// Salons SuperAdmin has handed this collaborator to onboard.
   int get assignedCount => _assignedCount;
@@ -35,12 +36,21 @@ class CollaboratorBadges extends ChangeNotifier {
 
   int get mySalonsCount => _awaitingApproval + _sentBack;
 
+  /// Salons explicitly approved by SuperAdmin.
+  int get approvedCount => _approvedCount;
+
   /// Finished submissions still on this device, waiting for signal.
   int queuedDrafts(OnboardingDraftStore store) => store.queuedCount;
 
   void reportAssigned(int count) {
     if (count == _assignedCount) return;
     _assignedCount = count;
+    notifyListeners();
+  }
+
+  void reportApproved(int count) {
+    if (count == _approvedCount) return;
+    _approvedCount = count;
     notifyListeners();
   }
 

@@ -515,4 +515,149 @@ class WorkingHoursSyncAndAvailabilityTest extends TestCase
         $doubleBookRes->assertStatus(409);
         $this->assertTrue($doubleBookRes->json('slot_unavailable'));
     }
+
+    public function test_get_working_hours_returns_full_week_even_with_missing_days(): void
+    {
+        // Delete days 2 and 4 from salon_working_hours
+        SalonWorkingHour::where('salon_id', $this->salon->id)
+            ->whereIn('day_of_week', [2, 4])
+            ->delete();
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->getJson("/api/partner/salons/{$this->salon->id}/working-hours");
+
+        $res->assertStatus(200);
+        $hours = $res->json('working_hours');
+        $this->assertCount(7, $hours);
+        $daysOfWeek = array_column($hours, 'day_of_week');
+        $this->assertEquals([0, 1, 2, 3, 4, 5, 6], $daysOfWeek);
+    }
+
+    public function test_salon_working_hours_validation_checks_closing_after_opening(): void
+    {
+        $invalidHours = [];
+        for ($i = 0; $i < 7; $i++) {
+            $invalidHours[] = [
+                'day_of_week' => $i,
+                'is_closed' => false,
+                // Monday (1) has closing time before opening time
+                'open_time' => ($i === 1) ? '18:00:00' : '09:00:00',
+                'close_time' => ($i === 1) ? '09:00:00' : '18:00:00',
+            ];
+        }
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $invalidHours,
+            ]);
+
+        $res->assertStatus(422);
+        $res->assertJsonValidationErrors(['working_hours.1.close_time']);
+        $this->assertStringContainsString('Closing time must be after opening time', $res->json('errors')['working_hours.1.close_time'][0]);
+    }
+
+    public function test_salon_working_hours_accepts_short_time_format_and_normalizes(): void
+    {
+        $shortHours = [];
+        for ($i = 0; $i < 7; $i++) {
+            $shortHours[] = [
+                'day_of_week' => $i,
+                'is_closed' => ($i === 0),
+                'open_time' => ($i === 0) ? null : '10:00',
+                'close_time' => ($i === 0) ? null : '19:30',
+            ];
+        }
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $shortHours,
+            ]);
+
+        $res->assertStatus(200);
+
+        // Verify normalized to H:i:s in database
+        $monday = SalonWorkingHour::where('salon_id', $this->salon->id)
+            ->where('day_of_week', 1)
+            ->first();
+        $this->assertEquals('10:00:00', $monday->open_time);
+        $this->assertEquals('19:30:00', $monday->close_time);
+    }
+
+    public function test_salon_working_hours_closing_and_reopening_individual_days_persists(): void
+    {
+        // 1. Close Tuesday (2) and Wednesday (3)
+        $hours1 = [];
+        for ($i = 0; $i < 7; $i++) {
+            $isClosed = in_array($i, [2, 3], true);
+            $hours1[] = [
+                'day_of_week' => $i,
+                'is_closed' => $isClosed,
+                'open_time' => $isClosed ? null : '09:00:00',
+                'close_time' => $isClosed ? null : '18:00:00',
+            ];
+        }
+
+        $res1 = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $hours1,
+            ]);
+        $res1->assertStatus(200);
+
+        $tuesday = SalonWorkingHour::where('salon_id', $this->salon->id)->where('day_of_week', 2)->first();
+        $this->assertTrue((bool) $tuesday->is_closed);
+        $this->assertNull($tuesday->open_time);
+
+        // 2. Re-open Tuesday with new timings
+        $hours2 = $hours1;
+        $hours2[2] = [
+            'day_of_week' => 2,
+            'is_closed' => false,
+            'open_time' => '11:00:00',
+            'close_time' => '20:00:00',
+        ];
+
+        $res2 = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $hours2,
+            ]);
+        $res2->assertStatus(200);
+
+        $tuesdayReopened = SalonWorkingHour::where('salon_id', $this->salon->id)->where('day_of_week', 2)->first();
+        $this->assertFalse((bool) $tuesdayReopened->is_closed);
+        $this->assertEquals('11:00:00', $tuesdayReopened->open_time);
+        $this->assertEquals('20:00:00', $tuesdayReopened->close_time);
+
+        // Wednesday remains closed
+        $wednesday = SalonWorkingHour::where('salon_id', $this->salon->id)->where('day_of_week', 3)->first();
+        $this->assertTrue((bool) $wednesday->is_closed);
+    }
+
+    public function test_salon_working_hours_unauthorized_user_forbidden(): void
+    {
+        $otherAdmin = User::create([
+            'id' => (string) Str::uuid(),
+            'name' => "Other Admin {$this->unique}",
+            'phone' => '91' . substr((string) crc32($this->unique . 'oth'), 0, 8),
+            'password_hash' => bcrypt('password'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $hours = [];
+        for ($i = 0; $i < 7; $i++) {
+            $hours[] = [
+                'day_of_week' => $i,
+                'is_closed' => false,
+                'open_time' => '09:00:00',
+                'close_time' => '18:00:00',
+            ];
+        }
+
+        $res = $this->actingAs($otherAdmin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $hours,
+            ]);
+
+        $res->assertStatus(403);
+    }
 }

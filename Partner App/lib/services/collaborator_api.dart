@@ -29,8 +29,17 @@ class CollaboratorApi {
   }
 
   /// Salons this collaborator has submitted, and where each one got to.
-  static Future<List<dynamic>> onboardedSalons() async {
-    final response = await http.get(Uri.parse('$_baseUrl/onboarded-salons'), headers: await _headers());
+  static Future<List<dynamic>> onboardedSalons({String? status}) async {
+    final uri = status != null && status.isNotEmpty
+        ? Uri.parse('$_baseUrl/onboarded-salons?status=${Uri.encodeComponent(status)}')
+        : Uri.parse('$_baseUrl/onboarded-salons');
+    final response = await http.get(uri, headers: await _headers());
+    return _list(response);
+  }
+
+  /// Salons associated with this collaborator that have been explicitly approved by SuperAdmin.
+  static Future<List<dynamic>> approvedSalons() async {
+    final response = await http.get(Uri.parse('$_baseUrl/approved-salons'), headers: await _headers());
     return _list(response);
   }
 
@@ -211,9 +220,22 @@ class CollaboratorApi {
   }
 
   static List<dynamic> _list(http.Response response) {
-    if (response.statusCode != 200) return [];
+    if (response.statusCode == 200) {
+      final body = _decode(response.body);
+      return body['success'] == true ? (body['data'] as List<dynamic>? ?? []) : [];
+    }
+
+    if (response.statusCode == 401) {
+      throw const HttpException('Session expired. Please log in again.');
+    }
+
+    if (response.statusCode == 403) {
+      throw const HttpException('Access denied. Collaborator account required.');
+    }
+
     final body = _decode(response.body);
-    return body['success'] == true ? (body['data'] as List<dynamic>? ?? []) : [];
+    final msg = _messageFrom(body, response.statusCode);
+    throw HttpException(msg);
   }
 
   static Map<String, dynamic> _decode(String body) {

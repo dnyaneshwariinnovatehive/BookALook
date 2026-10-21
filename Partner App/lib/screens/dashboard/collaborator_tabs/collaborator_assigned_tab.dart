@@ -530,7 +530,7 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     body:
         'Salons reach you through the enquiry form on the website. Once '
         'SuperAdmin assigns one to you, it appears here ready to onboard.',
-    actionLabel: 'Check again',
+    actionLabel: 'Refresh',
     onAction: _fetchEnquiries,
   );
 }

@@ -23,6 +23,9 @@ class CollaboratorHomeTab extends StatefulWidget {
   /// Takes them to My Salons, where approval status lives.
   final VoidCallback onGoToMySalons;
 
+  /// Takes them to Approved Salons tab.
+  final VoidCallback? onGoToApproved;
+
   /// Counts the bottom navigation badges are drawn from. Null when the tab is
   /// used standalone.
   final CollaboratorBadges? badges;
@@ -31,6 +34,7 @@ class CollaboratorHomeTab extends StatefulWidget {
     super.key,
     required this.onGoToAssigned,
     required this.onGoToMySalons,
+    this.onGoToApproved,
     this.badges,
   });
 
@@ -609,7 +613,7 @@ class CollaboratorHomeTabState extends State<CollaboratorHomeTab> {
                 label: 'Approved',
                 icon: Icons.verified_outlined,
                 colour: palette.success,
-                onTap: widget.onGoToMySalons,
+                onTap: widget.onGoToApproved ?? widget.onGoToMySalons,
               ),
             ),
             const SizedBox(width: 10),
