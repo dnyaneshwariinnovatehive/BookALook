@@ -5,6 +5,7 @@ import '../screens/salon_detail_screen.dart';
 import '../theme/app_theme.dart';
 import 'category_service_strip.dart';
 import '../theme/app_colors.dart';
+import '../utils/feature_flags.dart';
 
 class DiscoverySalonCard extends StatelessWidget {
   /// Transparent padding that grows the 26dp favourite heart to a 48dp
@@ -278,7 +279,7 @@ class DiscoverySalonCard extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  if (distance != null)
+                                  if (FeatureFlags.showCalculatedDistance && distance != null)
                                     Text(
                                       '${salon['distance_is_approximate'] == true ? '~' : ''}$distance km',
                                       style: GoogleFonts.outfit(

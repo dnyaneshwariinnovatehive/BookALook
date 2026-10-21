@@ -10,6 +10,7 @@ use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Salon;
+use App\Models\ServiceProvider;
 
 class ServiceManagementController extends Controller
 {
@@ -111,9 +112,39 @@ class ServiceManagementController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $advancePercentage = $request->has('advance_percentage') && $request->advance_percentage !== null
+            ? (float) $request->advance_percentage
+            : null;
+
+        if (($advancePercentage === null || $advancePercentage <= 0) && $request->boolean('will_refund_advance_if_cancelled')) {
+            return response()->json([
+                'message' => 'Refund advance cannot be enabled when minimum advance is 0%.',
+                'errors' => ['will_refund_advance_if_cancelled' => ['Refund advance cannot be enabled when minimum advance is 0%.']]
+            ], 422);
+        }
+
+        $willRefund = ($advancePercentage !== null && $advancePercentage > 0)
+            ? (bool) ($request->will_refund_advance_if_cancelled ?? false)
+            : false;
+
         $templateId = $request->template_id;
 
         if ($request->is_custom) {
+            $customName = trim($request->custom_template_name ?? '');
+            $normalizedCustomName = mb_strtolower($customName);
+
+            // Check if active service with this name already exists in this salon
+            $alreadyExists = Service::where('salon_id', $salon_id)
+                ->where('is_active', true)
+                ->whereHas('template', function ($q) use ($normalizedCustomName) {
+                    $q->whereRaw('LOWER(TRIM(name)) = ?', [$normalizedCustomName]);
+                })
+                ->exists();
+
+            if ($alreadyExists) {
+                return response()->json(['message' => 'A service with this name already exists in this salon'], 400);
+            }
+
             $categoryId = $request->category_id;
             
             if ($categoryId === 'new_custom') {
@@ -133,6 +164,27 @@ class ServiceManagementController extends Controller
                 'created_by_salon_id' => $salon_id,
             ]);
             $templateId = $template->id;
+        } else {
+            $template = ServiceTemplate::find($templateId);
+            if (!$template) {
+                return response()->json(['message' => 'Service template not found'], 404);
+            }
+            $normalizedTemplateName = mb_strtolower(trim($template->name));
+
+            // Check if active service with this template ID or identical template name exists
+            $alreadyExists = Service::where('salon_id', $salon_id)
+                ->where('is_active', true)
+                ->where(function ($q) use ($templateId, $normalizedTemplateName) {
+                    $q->where('template_id', $templateId)
+                      ->orWhereHas('template', function ($sub) use ($normalizedTemplateName) {
+                          $sub->whereRaw('LOWER(TRIM(name)) = ?', [$normalizedTemplateName]);
+                      });
+                })
+                ->exists();
+
+            if ($alreadyExists) {
+                return response()->json(['message' => 'This service already exists in this salon'], 400);
+            }
         }
 
         // Check if service already exists (including soft-deleted ones)
@@ -148,9 +200,9 @@ class ServiceManagementController extends Controller
             $exists->update([
                 'price' => $request->price,
                 'description' => $request->description,
-                'advance_percentage' => $request->advance_percentage,
+                'advance_percentage' => $advancePercentage,
                 'gender_focus' => $request->gender_focus ?? 'Unisex',
-                'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
+                'will_refund_advance_if_cancelled' => $willRefund,
                 'is_active' => true,
             ]);
             
@@ -161,9 +213,9 @@ class ServiceManagementController extends Controller
                 'template_id' => $templateId,
                 'price' => $request->price,
                 'description' => $request->description,
-                'advance_percentage' => $request->advance_percentage,
+                'advance_percentage' => $advancePercentage,
                 'gender_focus' => $request->gender_focus ?? 'Unisex',
-                'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
+                'will_refund_advance_if_cancelled' => $willRefund,
             ]);
         }
 
@@ -352,10 +404,22 @@ class ServiceManagementController extends Controller
 
         $service = Service::where('salon_id', $salon_id)->findOrFail($service_id);
         
+        $adminId = $salon->admin_id;
+
         $allStaff = \App\Models\ServiceProvider::with('user')
-            ->where('salon_id', $salon_id)
+            ->where(function ($q) use ($salon_id, $adminId) {
+                $q->where('salon_id', $salon_id)
+                  ->orWhere(function ($adminQ) use ($adminId) {
+                      $adminQ->where('user_id', $adminId);
+                  });
+            })
             ->where('is_active', true)
+            ->whereNull('deleted_at')
             ->get();
+
+        $allStaff->each(function ($provider) use ($adminId) {
+            $provider->is_admin_provider = ($adminId && $provider->user_id === $adminId);
+        });
 
         $assignedStaffIds = $service->providers()->pluck('service_providers.id')->toArray();
 
@@ -381,6 +445,17 @@ class ServiceManagementController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // If one of the staff_ids belongs to the admin provider, ensure salon_id is set
+        $adminId = $salon->admin_id;
+        $providers = ServiceProvider::whereIn('id', $request->staff_ids)->get();
+        foreach ($providers as $p) {
+            if ($p->user_id === $adminId && ($p->salon_id !== $salon_id || !$p->is_active)) {
+                $p->salon_id = $salon_id;
+                $p->is_active = true;
+                $p->save();
+            }
         }
 
         $service->providers()->sync($request->staff_ids);

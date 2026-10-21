@@ -12,6 +12,7 @@ import '../../../models/admin_provider_models.dart';
 import '../../../services/admin_provider_api.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../../../widgets/unassigned_services_warning_banner.dart';
+import '../../../widgets/assign_service_staff_sheet.dart';
 
 class StaffTab extends StatefulWidget {
   final String salonId;
@@ -1133,22 +1134,28 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
                 SliverToBoxAdapter(
                   child: UnassignedServicesWarningBanner(
                     unassignedServices: _unassignedServices,
-                    actionLabel: 'Assign to Admin',
+                    actionLabel: 'Assign to Staff',
                     onActionPressed: () async {
-                      final updated = await AdminProviderConfigSheet.show(
-                        context,
-                        salonId: widget.salonId,
-                        initialStatus: _adminStatus,
-                      );
-                      if (updated == true) {
-                        _refreshAll();
+                      if (_unassignedServices.isNotEmpty) {
+                        final updated = await AssignServiceStaffSheet.show(
+                          context,
+                          salonId: widget.salonId,
+                          serviceId: _unassignedServices.first.id,
+                          serviceName: _unassignedServices.first.name,
+                          unassignedServices: _unassignedServices,
+                        );
+                        if (updated == true) {
+                          _refreshAll();
+                        }
                       }
                     },
                     onServicePressed: (service) async {
-                      final updated = await AdminProviderConfigSheet.show(
+                      final updated = await AssignServiceStaffSheet.show(
                         context,
                         salonId: widget.salonId,
-                        initialStatus: _adminStatus,
+                        serviceId: service.id,
+                        serviceName: service.name,
+                        unassignedServices: _unassignedServices,
                       );
                       if (updated == true) {
                         _refreshAll();

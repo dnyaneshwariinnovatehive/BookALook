@@ -10,6 +10,7 @@ import '../utils/app_haptics.dart';
 import '../utils/error_text.dart';
 import '../utils/bottom_clearance.dart';
 import '../widgets/discount_badge.dart';
+import '../utils/feature_flags.dart';
 
 class ComboDetailScreen extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -299,7 +300,7 @@ class _ComboDetailScreenState extends State<ComboDetailScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    distance != null ? '$address · ${widget.salon['distance_is_approximate'] == true ? '~' : ''}$distance km' : address,
+                    FeatureFlags.showCalculatedDistance && distance != null ? '$address · ${widget.salon['distance_is_approximate'] == true ? '~' : ''}$distance km' : address,
                     style: GoogleFonts.outfit(fontSize: 14, color: context.colors.textSecondary),
                   ),
                 ),

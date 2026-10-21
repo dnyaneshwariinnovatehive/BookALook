@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 import '../utils/error_text.dart';
 import 'discount_badge.dart';
+import '../utils/feature_flags.dart';
 
 class ComboDiscoveryCard extends StatefulWidget {
   final Map<String, dynamic> salon;
@@ -363,7 +364,7 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
                                       ),
                                     ),
                                   ),
-                                  if (distance != null)
+                                  if (FeatureFlags.showCalculatedDistance && distance != null)
                                     Text(
                                       '${widget.salon['distance_is_approximate'] == true ? '~' : ''}$distance km',
                                       style: GoogleFonts.outfit(

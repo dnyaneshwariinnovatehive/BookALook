@@ -8,6 +8,7 @@ import '../services/add_combo_screen.dart';
 import '../services/manage_staff_screen.dart';
 import '../../../widgets/wallet_coin_pill.dart';
 import '../../../widgets/unassigned_services_warning_banner.dart';
+import '../../../widgets/assign_service_staff_sheet.dart';
 
 class ServicesTab extends StatefulWidget {
   final String salonId;
@@ -78,17 +79,14 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
   }
 
   Future<void> _openManageStaffForService(UnassignedServiceItem service) async {
-    final updated = await Navigator.push<bool>(
+    final updated = await AssignServiceStaffSheet.show(
       context,
-      MaterialPageRoute(
-        builder: (context) => ManageStaffScreen(
-          salonId: widget.salonId,
-          serviceId: service.id,
-          serviceName: service.name,
-        ),
-      ),
+      salonId: widget.salonId,
+      serviceId: service.id,
+      serviceName: service.name,
+      unassignedServices: _unassignedServices,
     );
-    if (updated == true || mounted) {
+    if (updated == true && mounted) {
       _fetchServices();
     }
   }
@@ -202,7 +200,7 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
           if (_unassignedServices.isNotEmpty)
             UnassignedServicesWarningBanner(
               unassignedServices: _unassignedServices,
-              actionLabel: 'Assign Staff',
+              actionLabel: 'Assign to Staff',
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               onActionPressed: () {
                 if (_unassignedServices.isNotEmpty) {

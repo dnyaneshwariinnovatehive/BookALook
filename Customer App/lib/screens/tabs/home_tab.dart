@@ -30,6 +30,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/skeleton.dart';
 import '../../utils/bottom_clearance.dart';
 import '../../widgets/animated_search_field.dart';
+import '../../utils/feature_flags.dart';
 
 class HomeTab extends StatefulWidget {
   final bool isGuest;
@@ -1614,7 +1615,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                     // Real Distance Badge (rendered only when distance data is available)
-                    if (distanceKm != null)
+                    if (FeatureFlags.showCalculatedDistance && distanceKm != null)
                       Positioned(
                         bottom: 8,
                         right: 8,
@@ -1931,7 +1932,7 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                   // Distance badge (only if real distance available)
-                  if (distanceKm != null)
+                  if (FeatureFlags.showCalculatedDistance && distanceKm != null)
                     Positioned(
                       bottom: 8,
                       right: 8,

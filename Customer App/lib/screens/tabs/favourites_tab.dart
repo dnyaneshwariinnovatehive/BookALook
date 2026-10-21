@@ -10,6 +10,7 @@ import '../../utils/error_text.dart';
 import '../../widgets/feedback_states.dart';
 import '../../widgets/skeleton.dart';
 import '../../utils/bottom_clearance.dart';
+import '../../utils/feature_flags.dart';
 
 class FavouritesTab extends StatefulWidget {
   final bool isGuest;
@@ -285,7 +286,7 @@ class FavouritesTabState extends State<FavouritesTab> {
                                                   ),
                                                 ),
                                           ),
-                                          if (salon['distance_km'] != null)
+                                          if (FeatureFlags.showCalculatedDistance && salon['distance_km'] != null)
                                             Positioned(
                                               bottom: 8,
                                               left: 8,

@@ -293,4 +293,66 @@ class UnassignedServicesWarningTest extends TestCase
         $unassignedIds = collect($res->json('unassigned_services'))->pluck('id')->all();
         $this->assertContains($this->service1->id, $unassignedIds);
     }
+
+    public function test_assign_service_staff_assigns_to_staff_and_admin_provider_correctly(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        // 1. Regular staff
+        $staffUser = User::create([
+            'id' => (string) Str::uuid(),
+            'name' => 'Stylist Sarah',
+            'phone' => '91' . substr((string) crc32($this->unique . 'sarah'), 0, 8),
+            'password_hash' => bcrypt('password'),
+            'role' => 'service_provider',
+            'is_active' => true,
+        ]);
+        $staffProvider = ServiceProvider::create([
+            'id' => (string) Str::uuid(),
+            'user_id' => $staffUser->id,
+            'salon_id' => $this->salon->id,
+            'specialization' => 'Hair Specialist',
+            'is_active' => true,
+        ]);
+
+        // 2. Admin provider enabled
+        $adminProvider = ServiceProvider::create([
+            'id' => (string) Str::uuid(),
+            'user_id' => $this->admin->id,
+            'salon_id' => $this->salon->id,
+            'specialization' => 'Owner & Master Stylist',
+            'is_active' => true,
+        ]);
+
+        // 3. Fetch staff for unassigned service1
+        $resStaff = $this->getJson("/api/partner/salons/{$this->salon->id}/services/{$this->service1->id}/staff");
+        $resStaff->assertStatus(200);
+        $allStaff = $resStaff->json('all_staff');
+        $this->assertCount(2, $allStaff);
+
+        // Verify admin is flagged as admin provider
+        $adminItem = collect($allStaff)->firstWhere('user_id', $this->admin->id);
+        $this->assertNotNull($adminItem);
+        $this->assertTrue($adminItem['is_admin_provider']);
+
+        $staffItem = collect($allStaff)->firstWhere('user_id', $staffUser->id);
+        $this->assertNotNull($staffItem);
+        $this->assertFalse($staffItem['is_admin_provider']);
+
+        // 4. Assign both to service1
+        $assignRes = $this->postJson("/api/partner/salons/{$this->salon->id}/services/{$this->service1->id}/staff", [
+            'staff_ids' => [$staffProvider->id, $adminProvider->id],
+        ]);
+        $assignRes->assertStatus(200);
+
+        // Verify service1 is in both providers' skillset
+        $this->assertTrue($staffProvider->fresh()->services->contains('id', $this->service1->id));
+        $this->assertTrue($adminProvider->fresh()->services->contains('id', $this->service1->id));
+
+        // Verify service1 is no longer unassigned
+        $resAfter = $this->getJson("/api/partner/salons/{$this->salon->id}/services");
+        $resAfter->assertStatus(200);
+        $unassignedIds = collect($resAfter->json('unassigned_services'))->pluck('id')->all();
+        $this->assertNotContains($this->service1->id, $unassignedIds);
+    }
 }

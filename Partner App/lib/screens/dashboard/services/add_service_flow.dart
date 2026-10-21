@@ -6,7 +6,15 @@ import '../../../../services/insights_api.dart';
 
 class AddServiceFlow extends StatefulWidget {
   final String salonId;
-  const AddServiceFlow({super.key, required this.salonId});
+  final List<ServiceCategory>? initialCategories;
+  final List<SalonService>? initialSalonServices;
+
+  const AddServiceFlow({
+    super.key,
+    required this.salonId,
+    this.initialCategories,
+    this.initialSalonServices,
+  });
 
   @override
   State<AddServiceFlow> createState() => _AddServiceFlowState();
@@ -34,13 +42,122 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   bool _isSaving = false;
 
   List<SalonService> _allServices = [];
-  List<String> _linkedServiceIds = [];
+  final List<String> _linkedServiceIds = [];
   SalonInsights? _insights;
+
+  // Track existing services in salon to prevent duplicates
+  final Set<String> _existingTemplateIds = {};
+  final Set<String> _existingNormalizedNames = {};
+  final Set<String> _existingIdentities = {};
+
+  static String _normalize(String str) => str.trim().toLowerCase();
+
+  static String normalizeCustomIdentity(String category, String name) {
+    final cat = _normalize(category);
+    final n = _normalize(name);
+    return '$cat::$n';
+  }
+
+  void _indexExistingServices(List<SalonService> flatServices) {
+    _existingTemplateIds.clear();
+    _existingNormalizedNames.clear();
+    _existingIdentities.clear();
+
+    for (final s in flatServices) {
+      if (s.templateId.isNotEmpty) {
+        _existingTemplateIds.add(s.templateId);
+      }
+      if (s.template != null) {
+        final t = s.template!;
+        if (t.id.isNotEmpty) {
+          _existingTemplateIds.add(t.id);
+        }
+        final normName = _normalize(t.name);
+        if (normName.isNotEmpty) {
+          _existingNormalizedNames.add(normName);
+          if (t.categoryId.isNotEmpty) {
+            _existingIdentities.add('${t.categoryId}::$normName');
+          }
+          final catName = t.category?.name;
+          if (catName != null && catName.isNotEmpty) {
+            _existingIdentities.add(normalizeCustomIdentity(catName, normName));
+          }
+        }
+      }
+    }
+  }
+
+  bool _isTemplateAlreadyAdded(ServiceTemplate t, [ServiceCategory? category]) {
+    if (_existingTemplateIds.contains(t.id)) return true;
+    final normName = _normalize(t.name);
+    if (normName.isNotEmpty) {
+      if (_existingNormalizedNames.contains(normName)) return true;
+      if (t.categoryId.isNotEmpty && _existingIdentities.contains('${t.categoryId}::$normName')) {
+        return true;
+      }
+      final catName = category?.name ?? t.category?.name;
+      if (catName != null && catName.isNotEmpty && _existingIdentities.contains(normalizeCustomIdentity(catName, normName))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<ServiceTemplate> _getAvailableTemplates(ServiceCategory? category) {
+    if (category == null || category.templates == null) return [];
+    return category.templates!
+        .where((t) => !_isTemplateAlreadyAdded(t, category))
+        .toList();
+  }
+
+  bool _isCustomServiceDuplicate(String name, ServiceCategory? category) {
+    final normName = _normalize(name);
+    if (normName.isEmpty) return false;
+    if (_existingNormalizedNames.contains(normName)) return true;
+    final catId = category?.id ?? 'new_custom';
+    if (_existingIdentities.contains('$catId::$normName')) return true;
+    final catName = category?.name ?? _customCategoryController.text.trim();
+    if (catName.isNotEmpty && _existingIdentities.contains(normalizeCustomIdentity(catName, normName))) {
+      return true;
+    }
+    return false;
+  }
+
+  double get _currentAdvancePercentage {
+    final text = _advanceController.text.trim();
+    if (text.isEmpty) return 0;
+    return double.tryParse(text) ?? 0;
+  }
+
+  bool get _canRefundAdvance => _currentAdvancePercentage > 0;
+
+  void _onAdvanceChanged() {
+    if (!_canRefundAdvance && _refundAdvance) {
+      setState(() {
+        _refundAdvance = false;
+      });
+    } else {
+      setState(() {});
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _advanceController.addListener(_onAdvanceChanged);
     _fetchMasterCatalog();
+  }
+
+  @override
+  void dispose() {
+    _advanceController.removeListener(_onAdvanceChanged);
+    _customCategoryController.dispose();
+    _customTemplateController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _durationController.dispose();
+    _advanceController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchMasterCatalog() async {
@@ -49,35 +166,61 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       _error = null;
     });
     try {
-      final futures = await Future.wait([
-        ServiceManagementApi.getMasterCatalog(widget.salonId),
-        ServiceManagementApi.getSalonServices(widget.salonId),
-      ]);
-      final categories = futures[0] as List<ServiceCategory>;
-      final groupedServices = futures[1] as List<Map<String, dynamic>>;
-      
-      final List<SalonService> flatServices = [];
-      for (var group in groupedServices) {
-        if (group['services'] != null) {
-          for (var s in group['services']) {
-             flatServices.add(SalonService.fromJson(s));
+      List<ServiceCategory> categories;
+      List<SalonService> flatServices;
+
+      if (widget.initialCategories != null && widget.initialSalonServices != null) {
+        categories = widget.initialCategories!;
+        flatServices = widget.initialSalonServices!;
+      } else {
+        final futures = await Future.wait([
+          widget.initialCategories != null
+              ? Future.value(widget.initialCategories!)
+              : ServiceManagementApi.getMasterCatalog(widget.salonId),
+          widget.initialSalonServices != null
+              ? Future.value(<Map<String, dynamic>>[])
+              : ServiceManagementApi.getSalonServices(widget.salonId),
+        ]);
+        categories = widget.initialCategories ?? (futures[0] as List<ServiceCategory>);
+
+        if (widget.initialSalonServices != null) {
+          flatServices = widget.initialSalonServices!;
+        } else {
+          final groupedServices = futures[1] as List<Map<String, dynamic>>;
+          flatServices = [];
+          for (var group in groupedServices) {
+            if (group['services'] != null) {
+              for (var s in group['services']) {
+                flatServices.add(SalonService.fromJson(s));
+              }
+            }
           }
         }
       }
 
+      _indexExistingServices(flatServices);
+
       SalonInsights? insights;
-      try {
-        insights = await InsightsApi.fetch(widget.salonId);
-      } catch (_) {}
+      if (widget.initialCategories == null) {
+        try {
+          insights = await InsightsApi.fetch(widget.salonId);
+        } catch (_) {}
+      }
 
       setState(() {
         _masterCategories = categories;
         _allServices = flatServices;
         _insights = insights;
-        if (_selectedCategory == null && _masterCategories.isNotEmpty) {
-          _selectedCategory = _masterCategories.first;
-          if (_selectedCategory!.templates != null && _selectedCategory!.templates!.isNotEmpty) {
-            _selectedTemplate = _selectedCategory!.templates!.first;
+
+        if (_masterCategories.isNotEmpty) {
+          final firstWithAvailable = _masterCategories.firstWhere(
+            (c) => _getAvailableTemplates(c).isNotEmpty,
+            orElse: () => _masterCategories.first,
+          );
+          _selectedCategory = firstWithAvailable;
+          final available = _getAvailableTemplates(_selectedCategory);
+          if (available.isNotEmpty) {
+            _selectedTemplate = available.first;
             _isCustom = false;
           } else {
             _selectedTemplate = null;
@@ -95,8 +238,33 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   }
 
   Future<void> _saveService() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
-    
+
+    if (!_isCustom) {
+      if (_selectedTemplate == null) {
+        _say('Please select a service or choose custom service.');
+        return;
+      }
+      if (_isTemplateAlreadyAdded(_selectedTemplate!, _selectedCategory)) {
+        _say('This service has already been added to your salon.');
+        return;
+      }
+    } else {
+      final customName = _customTemplateController.text.trim();
+      if (customName.isEmpty) {
+        _say('Give the service a name.');
+        return;
+      }
+      if (_isCustomServiceDuplicate(customName, _selectedCategory)) {
+        _say('A service named "$customName" already exists in this salon.');
+        return;
+      }
+    }
+
+    final advancePercentage = _currentAdvancePercentage;
+    final willRefund = advancePercentage > 0 ? _refundAdvance : false;
+
     setState(() { _isSaving = true; });
 
     try {
@@ -110,9 +278,9 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
         customCategoryName: _isCustom && _customCategoryController.text.isNotEmpty ? _customCategoryController.text : null,
         customTemplateName: _isCustom && _customTemplateController.text.isNotEmpty ? _customTemplateController.text : null,
         estimatedDurationMinutes: _isCustom && _durationController.text.isNotEmpty ? int.parse(_durationController.text) : null,
-        advancePercentage: _advanceController.text.isNotEmpty ? double.tryParse(_advanceController.text) : null,
+        advancePercentage: advancePercentage,
         genderFocus: _genderFocus,
-        willRefundAdvanceIfCancelled: _refundAdvance,
+        willRefundAdvanceIfCancelled: willRefund,
         linkedServiceIds: _linkedServiceIds.isNotEmpty ? _linkedServiceIds : null,
       );
 
@@ -122,9 +290,15 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
     } catch (e) {
       setState(() { _isSaving = false; });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Error: $e')));
+        _say('Error: $e');
       }
     }
+  }
+
+  void _say(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)),
+    );
   }
 
   @override
@@ -175,8 +349,9 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                 onChanged: (val) {
                   setState(() {
                     _selectedCategory = val;
-                    if (val != null && val.templates != null && val.templates!.isNotEmpty) {
-                      _selectedTemplate = val.templates!.first;
+                    final available = _getAvailableTemplates(val);
+                    if (available.isNotEmpty) {
+                      _selectedTemplate = available.first;
                       _isCustom = false;
                     } else {
                       _selectedTemplate = null;
@@ -190,40 +365,53 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           const SizedBox(height: 16),
           
           _buildLabel('Template'),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<ServiceTemplate?>(
-                isExpanded: true,
-                value: _isCustom ? null : _selectedTemplate,
-                items: [
-                  if (_selectedCategory?.templates != null)
-                    ..._selectedCategory!.templates!.map((t) => DropdownMenuItem(value: t, child: Text(t.name))),
-                  const DropdownMenuItem(value: null, child: Text('➕ Create Custom Service', style: TextStyle(fontWeight: FontWeight.bold))),
-                ],
-                onChanged: (val) {
-                  setState(() {
-                    if (val == null) {
-                      _isCustom = true;
-                      _selectedTemplate = null;
-                    } else {
-                      _isCustom = false;
-                      _selectedTemplate = val;
-                    }
-                  });
-                },
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final available = _getAvailableTemplates(_selectedCategory);
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<ServiceTemplate?>(
+                    isExpanded: true,
+                    value: _isCustom ? null : _selectedTemplate,
+                    items: [
+                      ...available.map((t) => DropdownMenuItem(value: t, child: Text(t.name))),
+                      const DropdownMenuItem(value: null, child: Text('➕ Create Custom Service', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == null) {
+                          _isCustom = true;
+                          _selectedTemplate = null;
+                        } else {
+                          _isCustom = false;
+                          _selectedTemplate = val;
+                        }
+                      });
+                    },
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
 
           if (_isCustom) ...[
             _buildLabel('Name'),
-            _buildTextField(_customTemplateController),
+            _buildTextField(
+              _customTemplateController,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Required';
+                if (_isCustomServiceDuplicate(v.trim(), _selectedCategory)) {
+                  return 'This service already exists in this salon';
+                }
+                return null;
+              },
+            ),
             const SizedBox(height: 16),
           ],
 
@@ -295,7 +483,17 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           const SizedBox(height: 16),
           
           _buildLabel('Min Advance %'),
-          _buildTextField(_advanceController, isNumber: true),
+          _buildTextField(
+            _advanceController,
+            isNumber: true,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Required';
+              final n = double.tryParse(v.trim());
+              if (n == null) return 'Enter a valid number';
+              if (n < 0 || n > 100) return 'Must be between 0% and 100%';
+              return null;
+            },
+          ),
           const SizedBox(height: 16),
           
           // Category dropdown was moved up
@@ -320,20 +518,44 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           ),
           const SizedBox(height: 16),
           
-          Row(
-            children: [
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: Checkbox(
-                  value: _refundAdvance,
-                  onChanged: (val) => setState(() => _refundAdvance = val!),
-                  activeColor: AppTheme.accentColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text('Refund advance if cancelled', style: TextStyle(fontSize: 14)),
-            ],
+          Builder(
+            builder: (context) {
+              final canRefund = _canRefundAdvance;
+              final theme = Theme.of(context);
+              final isDark = theme.brightness == Brightness.dark;
+              final textColor = canRefund
+                  ? (theme.textTheme.bodyMedium?.color ?? theme.colorScheme.onSurface)
+                  : (isDark ? Colors.white38 : Colors.black38);
+
+              return Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: canRefund ? _refundAdvance : false,
+                      onChanged: canRefund
+                          ? (val) => setState(() => _refundAdvance = val ?? false)
+                          : null,
+                      activeColor: AppTheme.accentColor,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: canRefund
+                        ? () => setState(() => _refundAdvance = !_refundAdvance)
+                        : null,
+                    child: Text(
+                      'Refund advance if cancelled',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 24),
           
@@ -374,7 +596,11 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, {bool isNumber = false}) {
+  Widget _buildTextField(
+    TextEditingController controller, {
+    bool isNumber = false,
+    String? Function(String?)? validator,
+  }) {
     return TextFormField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
@@ -393,7 +619,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           borderSide: BorderSide(color: AppTheme.accentColor),
         ),
       ),
-      validator: (v) => v!.isEmpty ? 'Required' : null,
+      validator: validator ?? ((v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
     );
   }
 
@@ -460,7 +686,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                           child: const Text('Add'),
                         ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),

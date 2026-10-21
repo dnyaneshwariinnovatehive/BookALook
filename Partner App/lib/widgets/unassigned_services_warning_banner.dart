@@ -98,7 +98,7 @@ class _UnassignedServicesWarningBannerState extends State<UnassignedServicesWarn
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'These services cannot be booked by customers until assigned to at least one staff member or Admin provider.',
+                      'These services cannot be booked by customers until assigned to at least one staff member or service provider.',
                       style: TextStyle(
                         fontSize: 12,
                         color: subtextColor,
@@ -223,7 +223,7 @@ class _UnassignedServicesWarningBannerState extends State<UnassignedServicesWarn
                 ),
                 icon: const Icon(Icons.arrow_forward, size: 14),
                 label: Text(
-                  widget.actionLabel ?? 'Assign Now',
+                  widget.actionLabel ?? 'Assign to Staff',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
                 ),
               ),

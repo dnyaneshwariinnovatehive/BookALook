@@ -19,6 +19,7 @@ import '../../widgets/feedback_states.dart';
 import '../../widgets/skeleton.dart';
 import '../../utils/bottom_clearance.dart';
 import '../../widgets/animated_search_field.dart';
+import '../../utils/feature_flags.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -821,7 +822,7 @@ class ExploreTabState extends State<ExploreTab> {
                             ),
                           ),
                         ),
-                        if (salon['distance_km'] != null)
+                        if (FeatureFlags.showCalculatedDistance && salon['distance_km'] != null)
                           Positioned(
                             bottom: 8,
                             right: 8,
@@ -1119,7 +1120,7 @@ class ExploreTabState extends State<ExploreTab> {
                         ),
                       ),
                     ),
-                    if (salon['distance_km'] != null)
+                    if (FeatureFlags.showCalculatedDistance && salon['distance_km'] != null)
                       Positioned(
                         bottom: 8,
                         left: 8,
@@ -1383,7 +1384,7 @@ class ExploreTabState extends State<ExploreTab> {
                           ),
                         ),
                       ),
-                      if (salon['distance_km'] != null)
+                      if (FeatureFlags.showCalculatedDistance && salon['distance_km'] != null)
                         Positioned(
                           bottom: 12,
                           right: 12,

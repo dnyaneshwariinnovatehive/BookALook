@@ -7,6 +7,7 @@ import 'package:partner_app/screens/dashboard/tabs/services_tab.dart';
 import 'package:partner_app/screens/dashboard/tabs/staff_tab.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/widgets/unassigned_services_warning_banner.dart';
+import 'package:partner_app/widgets/assign_service_staff_sheet.dart';
 
 Widget _wrap(Widget child) {
   return MaterialApp(
@@ -166,7 +167,7 @@ void main() {
       expect(find.text('2 Services Not Assigned to Staff'), findsOneWidget);
       expect(find.text('Hair Spa Detox'), findsOneWidget);
       expect(find.text('Beard Styling'), findsOneWidget);
-      expect(find.text('Assign to Admin'), findsOneWidget);
+      expect(find.text('Assign to Staff'), findsOneWidget);
     });
 
     testWidgets('hides warning banner when all services are assigned', (tester) async {
@@ -227,7 +228,7 @@ void main() {
 
       expect(find.text('1 Service Not Assigned to Staff'), findsOneWidget);
       expect(find.text('Hair Spa Detox'), findsWidgets);
-      expect(find.text('Assign Staff'), findsOneWidget);
+      expect(find.text('Assign to Staff'), findsOneWidget);
     });
 
     testWidgets('hides warning banner in services tab when all services are covered', (tester) async {
@@ -247,6 +248,123 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Not Assigned to Staff'), findsNothing);
+    });
+  });
+
+  group('AssignServiceStaffSheet Modal Tests', () {
+    final sampleStaff = [
+      {
+        'id': 'provider-1',
+        'user_id': 'user-1',
+        'specialization': 'Senior Stylist',
+        'is_admin_provider': false,
+        'user': {'name': 'Rohan Sharma', 'role': 'service_provider'},
+      },
+      {
+        'id': 'provider-2',
+        'user_id': 'user-2',
+        'specialization': 'Color Specialist',
+        'is_admin_provider': false,
+        'user': {'name': 'Priya Patel', 'role': 'service_provider'},
+      },
+      {
+        'id': 'provider-admin',
+        'user_id': 'user-admin',
+        'specialization': 'Owner & Specialist',
+        'is_admin_provider': true,
+        'user': {'name': 'Salon Admin', 'role': 'admin'},
+      },
+    ];
+
+    testWidgets('renders service name, providers list and admin provider badge', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: AssignServiceStaffSheet(
+            salonId: 'test-salon-id',
+            serviceId: 'srv-1',
+            serviceName: 'Hair Spa Detox',
+            unassignedServices: sampleUnassigned,
+            initialStaff: sampleStaff,
+            initialAssignedStaffIds: const {},
+          ),
+        ),
+      ));
+
+      expect(find.text('Assign to Staff'), findsWidgets);
+      expect(find.text('Hair Spa Detox'), findsWidgets);
+      expect(find.text('Rohan Sharma'), findsOneWidget);
+      expect(find.text('Senior Stylist'), findsOneWidget);
+      expect(find.text('Priya Patel'), findsOneWidget);
+      expect(find.text('Salon Admin'), findsOneWidget);
+      expect(find.text('Admin (Provider)'), findsOneWidget);
+      expect(find.text('Providers (0/3 selected)'), findsOneWidget);
+    });
+
+    testWidgets('allows selecting single or multiple providers and toggles Select All', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: AssignServiceStaffSheet(
+            salonId: 'test-salon-id',
+            serviceId: 'srv-1',
+            serviceName: 'Hair Spa Detox',
+            unassignedServices: sampleUnassigned,
+            initialStaff: sampleStaff,
+            initialAssignedStaffIds: const {},
+          ),
+        ),
+      ));
+
+      // 1. Tap on Rohan Sharma tile
+      await tester.tap(find.text('Rohan Sharma'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Providers (1/3 selected)'), findsOneWidget);
+      expect(find.text('Assign (1 Staff)'), findsOneWidget);
+
+      // 2. Tap on Salon Admin (Admin provider) tile
+      await tester.tap(find.text('Salon Admin'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Providers (2/3 selected)'), findsOneWidget);
+      expect(find.text('Assign (2 Staff)'), findsOneWidget);
+
+      // 3. Tap Select All
+      await tester.tap(find.text('Select All'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Providers (3/3 selected)'), findsOneWidget);
+      expect(find.text('Deselect All'), findsOneWidget);
+      expect(find.text('Assign (3 Staff)'), findsOneWidget);
+
+      // 4. Tap Deselect All
+      await tester.tap(find.text('Deselect All'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Providers (0/3 selected)'), findsOneWidget);
+      expect(find.text('Select All'), findsOneWidget);
+    });
+
+    testWidgets('shows multiple unassigned service chips switcher', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: AssignServiceStaffSheet(
+            salonId: 'test-salon-id',
+            serviceId: 'srv-1',
+            serviceName: 'Hair Spa Detox',
+            unassignedServices: sampleUnassigned,
+            initialStaff: sampleStaff,
+            initialAssignedStaffIds: const {},
+          ),
+        ),
+      ));
+
+      expect(find.text('Hair Spa Detox'), findsWidgets);
+      expect(find.text('Beard Styling'), findsOneWidget);
+      expect(find.text('Keratin Gloss'), findsOneWidget);
+      expect(find.text('Charcoal Facial'), findsOneWidget);
     });
   });
 }
