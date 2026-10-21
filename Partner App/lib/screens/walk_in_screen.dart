@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/walk_in_api.dart';
 import '../theme/app_theme.dart';
 import 'collect_payment_sheet.dart';
+import 'walk_in_history_screen.dart';
 
 /// Add a customer who walked in off the street.
 ///
@@ -263,15 +264,36 @@ class _WalkInScreenState extends State<WalkInScreen> {
     );
   }
 
+  void _openHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WalkInHistoryScreen(salonId: widget.salonId),
+      ),
+    );
+  }
+
   // ------------------------------------------------------------- build
 
   @override
   Widget build(BuildContext context) {
-    final body = _isLoading
+    final content = _isLoading
         ? const Center(child: CircularProgressIndicator())
         : _loadError != null
             ? _buildLoadError()
             : _buildForm();
+
+    final body = widget.embedded
+        ? Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: _buildEmbeddedHeader(),
+              ),
+              Expanded(child: content),
+            ],
+          )
+        : content;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
@@ -283,6 +305,40 @@ class _WalkInScreenState extends State<WalkInScreen> {
               backgroundColor: Colors.white,
               elevation: 0,
               iconTheme: const IconThemeData(color: Colors.black87),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    child: InkWell(
+                      onTap: _openHistory,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3E8FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.accentColor.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.history_rounded, size: 16, color: AppTheme.accentColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              'History',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
       body: widget.embedded ? SafeArea(child: body) : body,
       bottomNavigationBar: _isLoading || _loadError != null ? null : _buildFooter(),
@@ -307,17 +363,56 @@ class _WalkInScreenState extends State<WalkInScreen> {
         ),
       );
 
+  Widget _buildEmbeddedHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            'Add walk-in customer',
+            style: GoogleFonts.outfit(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF1F2937),
+            ),
+          ),
+        ),
+        InkWell(
+          onTap: _openHistory,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3E8FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.history_rounded, size: 16, color: AppTheme.accentColor),
+                const SizedBox(width: 5),
+                Text(
+                  'History',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.accentColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildForm() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       children: [
-        if (widget.embedded) ...[
-          Text('Add walk-in customer',
-              style: GoogleFonts.outfit(
-                  fontSize: 26, fontWeight: FontWeight.w900, color: const Color(0xFF1F2937))),
-          const SizedBox(height: 16),
-        ],
-
         _sectionTitle('Customer'),
         const SizedBox(height: 10),
         _field(

@@ -96,6 +96,38 @@ class WalkInApi {
     throw Exception(_errorFrom(response));
   }
 
+  /// History of walk-in customers with metrics, search and filters.
+  static Future<WalkInHistoryResponse> history(
+    String salonId, {
+    String? search,
+    String? date,
+    String? status,
+    String? scope,
+    String? providerId,
+    int page = 1,
+    int perPage = 50,
+  }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+      if (date != null && date.isNotEmpty) 'date': date,
+      if (status != null && status.isNotEmpty) 'status': status,
+      if (scope != null && scope.isNotEmpty) 'scope': scope,
+      if (providerId != null && providerId.isNotEmpty) 'provider_id': providerId,
+    };
+
+    final uri = Uri.parse('$_baseUrl/salons/$salonId/walk-in/history')
+        .replace(queryParameters: queryParams);
+
+    final response = await http.get(uri, headers: await _headers());
+
+    if (response.statusCode == 200) {
+      return WalkInHistoryResponse.fromJson(jsonDecode(response.body));
+    }
+    throw Exception(_errorFrom(response));
+  }
+
   static String _errorFrom(http.Response response) {
     try {
       final body = jsonDecode(response.body);
@@ -261,3 +293,231 @@ class WalkInResult {
         bill: Bill.fromJson(json['bill'] ?? const {}),
       );
 }
+
+class WalkInHistoryResponse {
+  final WalkInHistorySummary summary;
+  final List<WalkInHistoryItem> walkIns;
+  final int currentPage;
+  final int lastPage;
+  final int total;
+  final String? viewerRole;
+  final String? viewerProviderId;
+
+  WalkInHistoryResponse({
+    required this.summary,
+    required this.walkIns,
+    required this.currentPage,
+    required this.lastPage,
+    required this.total,
+    this.viewerRole,
+    this.viewerProviderId,
+  });
+
+  factory WalkInHistoryResponse.fromJson(Map<String, dynamic> json) {
+    final pag = json['pagination'] as Map<String, dynamic>? ?? {};
+    final viewer = json['viewer'] as Map<String, dynamic>? ?? {};
+    return WalkInHistoryResponse(
+      summary: WalkInHistorySummary.fromJson(json['summary'] as Map<String, dynamic>? ?? {}),
+      walkIns: ((json['walk_ins'] as List?) ?? [])
+          .map((e) => WalkInHistoryItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      currentPage: pag['current_page'] ?? 1,
+      lastPage: pag['last_page'] ?? 1,
+      total: pag['total'] ?? 0,
+      viewerRole: viewer['role']?.toString(),
+      viewerProviderId: viewer['provider_id']?.toString(),
+    );
+  }
+}
+
+class WalkInHistorySummary {
+  final int totalWalkIns;
+  final int todayWalkIns;
+  final int inProgress;
+  final int completed;
+  final double totalRevenue;
+
+  WalkInHistorySummary({
+    required this.totalWalkIns,
+    required this.todayWalkIns,
+    required this.inProgress,
+    required this.completed,
+    required this.totalRevenue,
+  });
+
+  factory WalkInHistorySummary.fromJson(Map<String, dynamic> json) => WalkInHistorySummary(
+        totalWalkIns: json['total_walk_ins'] ?? 0,
+        todayWalkIns: json['today_walk_ins'] ?? 0,
+        inProgress: json['in_progress'] ?? 0,
+        completed: json['completed'] ?? 0,
+        totalRevenue: double.tryParse('${json['total_revenue'] ?? 0}') ?? 0.0,
+      );
+}
+
+class WalkInHistoryItem {
+  final String id;
+  final String status;
+  final String bookingSource;
+  final String appointmentDate;
+  final String startTime;
+  final String endTime;
+  final String? startedAt;
+  final String? completedAt;
+  final String customerName;
+  final String customerPhone;
+  final String? customerGender;
+  final String? appointedProviderName;
+  final String? servingProviderName;
+  final List<WalkInHistoryServiceLine> services;
+  final List<WalkInHistoryAdditionLine> serviceAdditions;
+  final double totalAmount;
+  final double advanceAmount;
+  final double balanceAmount;
+  final double? finalBilledAmount;
+  final String? paymentMode;
+  final String? paymentCollectedAt;
+  final String? paymentCollectedByName;
+  final String? invoiceId;
+  final String? invoiceNumber;
+  final String? manualCheckInReason;
+
+  WalkInHistoryItem({
+    required this.id,
+    required this.status,
+    required this.bookingSource,
+    required this.appointmentDate,
+    required this.startTime,
+    required this.endTime,
+    this.startedAt,
+    this.completedAt,
+    required this.customerName,
+    required this.customerPhone,
+    this.customerGender,
+    this.appointedProviderName,
+    this.servingProviderName,
+    required this.services,
+    required this.serviceAdditions,
+    required this.totalAmount,
+    required this.advanceAmount,
+    required this.balanceAmount,
+    this.finalBilledAmount,
+    this.paymentMode,
+    this.paymentCollectedAt,
+    this.paymentCollectedByName,
+    this.invoiceId,
+    this.invoiceNumber,
+    this.manualCheckInReason,
+  });
+
+  bool get isInProgress => status == 'in_progress';
+  bool get isCompleted => status == 'completed';
+  bool get isScheduled => status == 'scheduled';
+  bool get isCancelled => status == 'cancelled' || status == 'no_show';
+  bool get hasBalance => balanceAmount > 0;
+
+  double get displayAmount => finalBilledAmount ?? totalAmount;
+
+  factory WalkInHistoryItem.fromJson(Map<String, dynamic> json) {
+    final appProvider = json['appointed_provider'] as Map<String, dynamic>?;
+    final servProvider = json['serving_provider'] as Map<String, dynamic>?;
+
+    return WalkInHistoryItem(
+      id: json['id']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'scheduled',
+      bookingSource: json['booking_source']?.toString() ?? 'walk_in',
+      appointmentDate: json['appointment_date']?.toString() ?? '',
+      startTime: json['start_time']?.toString() ?? '',
+      endTime: json['end_time']?.toString() ?? '',
+      startedAt: json['started_at']?.toString(),
+      completedAt: json['completed_at']?.toString(),
+      customerName: json['customer_name']?.toString() ?? 'Walk-in',
+      customerPhone: json['customer_phone']?.toString() ?? '',
+      customerGender: json['customer_gender']?.toString(),
+      appointedProviderName: appProvider?['name']?.toString(),
+      servingProviderName: servProvider?['name']?.toString(),
+      services: ((json['services'] as List?) ?? [])
+          .map((e) => WalkInHistoryServiceLine.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      serviceAdditions: ((json['service_additions'] as List?) ?? [])
+          .map((e) => WalkInHistoryAdditionLine.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      totalAmount: double.tryParse('${json['total_amount'] ?? 0}') ?? 0.0,
+      advanceAmount: double.tryParse('${json['advance_amount'] ?? 0}') ?? 0.0,
+      balanceAmount: double.tryParse('${json['balance_amount'] ?? 0}') ?? 0.0,
+      finalBilledAmount: json['final_billed_amount'] != null
+          ? double.tryParse('${json['final_billed_amount']}')
+          : null,
+      paymentMode: json['payment_mode']?.toString(),
+      paymentCollectedAt: json['payment_collected_at']?.toString(),
+      paymentCollectedByName: json['payment_collected_by_name']?.toString(),
+      invoiceId: json['invoice_id']?.toString(),
+      invoiceNumber: json['invoice_number']?.toString(),
+      manualCheckInReason: json['manual_check_in_reason']?.toString(),
+    );
+  }
+}
+
+class WalkInHistoryServiceLine {
+  final String id;
+  final String name;
+  final String category;
+  final double price;
+  final int durationMinutes;
+  final String? servingProviderName;
+  final String? lineStatus;
+
+  WalkInHistoryServiceLine({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.price,
+    required this.durationMinutes,
+    this.servingProviderName,
+    this.lineStatus,
+  });
+
+  factory WalkInHistoryServiceLine.fromJson(Map<String, dynamic> json) => WalkInHistoryServiceLine(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? 'Service',
+        category: json['category']?.toString() ?? 'General',
+        price: double.tryParse('${json['price'] ?? 0}') ?? 0.0,
+        durationMinutes: json['duration_minutes'] ?? 0,
+        servingProviderName: json['serving_provider_name']?.toString(),
+        lineStatus: json['line_status']?.toString(),
+      );
+}
+
+class WalkInHistoryAdditionLine {
+  final String id;
+  final String name;
+  final double price;
+  final int durationMinutes;
+  final String? providerName;
+  final String? addedByName;
+  final String status;
+  final String? addedAt;
+
+  WalkInHistoryAdditionLine({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.durationMinutes,
+    this.providerName,
+    this.addedByName,
+    required this.status,
+    this.addedAt,
+  });
+
+  factory WalkInHistoryAdditionLine.fromJson(Map<String, dynamic> json) =>
+      WalkInHistoryAdditionLine(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? 'Additional Service',
+        price: double.tryParse('${json['price'] ?? 0}') ?? 0.0,
+        durationMinutes: json['duration_minutes'] ?? 0,
+        providerName: json['provider_name']?.toString(),
+        addedByName: json['added_by_name']?.toString(),
+        status: json['status']?.toString() ?? 'active',
+        addedAt: json['added_at']?.toString(),
+      );
+}
+

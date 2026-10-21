@@ -90,4 +90,9 @@ class Appointment extends Model
     {
         return $this->belongsTo(SalonClosure::class, 'salon_closure_id');
     }
+
+    public function paymentCollector()
+    {
+        return $this->belongsTo(User::class, 'payment_collected_by');
+    }
 }
