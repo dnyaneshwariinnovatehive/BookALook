@@ -138,6 +138,10 @@ class SuperAdminEnquiryController extends Controller
             'status' => 'assigned'
         ]);
 
+        if ($enquiry->salon) {
+            $enquiry->salon->update(['assigned_collaborator_id' => $collaborator->id]);
+        }
+
         AuditLogger::record(
             action: AuditLog::SALON_COLLABORATOR_ASSIGNED,
             label: $enquiry->salon_name,

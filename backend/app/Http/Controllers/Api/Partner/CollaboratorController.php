@@ -48,6 +48,14 @@ class CollaboratorController extends Controller
         $enquiries = SalonEnquiry::with('salon:id,name,status,rejection_reason,enquiry_id')
             ->where('assigned_collaborator_id', $user->id)
             ->where('status', 'assigned')
+            ->where(function ($q) {
+                // Only enquiries whose onboarding has NOT been completed.
+                // If a salon is active or pending approval, onboarding has already been submitted/completed.
+                $q->whereDoesntHave('salon')
+                  ->orWhereHas('salon', function ($sq) {
+                      $sq->whereIn('status', ['rejected', 'needs_correction']);
+                  });
+            })
             ->orderBy('assigned_at', 'desc')
             ->get()
             ->map(function (SalonEnquiry $enquiry) {
@@ -62,6 +70,7 @@ class CollaboratorController extends Controller
                     'needs_correction' => $needsCorrection,
                     'rejection_reason' => $reason,
                     'salon_id' => $enquiry->salon?->id,
+                    'salon_status' => $enquiry->salon?->status,
                 ];
             });
 
@@ -105,7 +114,7 @@ class CollaboratorController extends Controller
                   ->orWhere('submitted_by', '!=', $user->id);
             })
             ->whereNull('enquiry_id')
-            ->whereIn('status', ['active', 'pending_approval', 'suspended'])
+            ->whereIn('status', ['active', 'approved', 'pending_approval', 'pending', 'suspended'])
             ->orderByDesc('updated_at')
             ->get()
             ->map(function (Salon $salon) {
@@ -113,11 +122,14 @@ class CollaboratorController extends Controller
                 $daysLeft = $subscription
                     ? (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false)
                     : null;
+                $isApproved = in_array($salon->status, ['active', 'approved'], true) || $salon->approved_at !== null;
 
                 return [
                     'id' => $salon->id,
                     'name' => $salon->name,
                     'status' => $salon->status,
+                    'is_approved' => $isApproved,
+                    'approved_at' => $salon->approved_at,
                     'cover_photo_url' => $salon->cover_photo_url,
                     'address' => $salon->address,
                     'city' => $salon->city?->name,
@@ -168,7 +180,10 @@ class CollaboratorController extends Controller
             ->withCount('services')
             ->where(function ($q) use ($user) {
                 $q->where('submitted_by', $user->id)
-                  ->orWhere('assigned_collaborator_id', $user->id);
+                  ->orWhere('assigned_collaborator_id', $user->id)
+                  ->orWhereHas('enquiry', function ($eq) use ($user) {
+                      $eq->where('assigned_collaborator_id', $user->id);
+                  });
             })
             ->orderByDesc('created_at')
             ->get()
@@ -182,11 +197,14 @@ class CollaboratorController extends Controller
                 // than nothing at all. Reading an empty capsule as "never paid"
                 // would send the collaborator after the wrong problem.
                 $lapsed = $subscription === null && $salon->latestSubscription !== null;
+                $isApproved = in_array($salon->status, ['active', 'approved'], true) || $salon->approved_at !== null;
 
                 return [
                     'id' => $salon->id,
                     'name' => $salon->name,
                     'status' => $salon->status,
+                    'is_approved' => $isApproved,
+                    'approved_at' => $salon->approved_at,
                     'rejection_reason' => $salon->correction_notes ?: $salon->rejection_reason,
                     'correction_notes' => $salon->correction_notes,
                     'cover_photo_url' => $salon->cover_photo_url,
@@ -211,7 +229,7 @@ class CollaboratorController extends Controller
                     'needs_plan' => $subscription === null && ! $lapsed,
                     // Editable right up to approval, and never again after it. Once
                     // a salon is live it belongs to its owner.
-                    'can_edit' => in_array($salon->status, ['pending_approval', 'rejected', 'needs_correction'], true),
+                    'can_edit' => in_array($salon->status, ['pending_approval', 'pending', 'rejected', 'needs_correction'], true),
                 ];
             });
 
@@ -238,11 +256,18 @@ class CollaboratorController extends Controller
 
         $byStatus = Salon::where(function ($q) use ($user) {
             $q->where('submitted_by', $user->id)
-              ->orWhere('assigned_collaborator_id', $user->id);
+              ->orWhere('assigned_collaborator_id', $user->id)
+              ->orWhereHas('enquiry', function ($eq) use ($user) {
+                  $eq->where('assigned_collaborator_id', $user->id);
+              });
         })
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
+
+        $approvedCount = (int) (($byStatus['active'] ?? 0) + ($byStatus['approved'] ?? 0));
+        $pendingCount = (int) (($byStatus['pending_approval'] ?? 0) + ($byStatus['pending'] ?? 0));
+        $rejectedCount = (int) (($byStatus['rejected'] ?? 0) + ($byStatus['needs_correction'] ?? 0));
 
         return response()->json([
             'success' => true,
@@ -262,9 +287,9 @@ class CollaboratorController extends Controller
                     'assigned' => SalonEnquiry::where('assigned_collaborator_id', $user->id)
                         ->where('status', 'assigned')->count(),
                     'submitted' => (int) $byStatus->sum(),
-                    'approved' => (int) ($byStatus['active'] ?? 0),
-                    'pending' => (int) ($byStatus['pending_approval'] ?? 0),
-                    'rejected' => (int) ($byStatus['rejected'] ?? 0),
+                    'approved' => $approvedCount,
+                    'pending' => $pendingCount,
+                    'rejected' => $rejectedCount,
                 ],
             ],
         ]);

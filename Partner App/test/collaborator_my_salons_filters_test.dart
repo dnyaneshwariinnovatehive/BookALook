@@ -224,5 +224,52 @@ void main() {
       expect(find.text('Handed over'), findsOneWidget);
       expect(find.text('Salon In Review'), findsNothing);
     });
+
+    testWidgets('Recognizes approved and active status across onboarded and directory-assigned salons', (tester) async {
+      await pumpTab(
+        tester,
+        salons: [
+          sampleSalon(id: '1', name: 'Salon Active Status', status: 'active'),
+          sampleSalon(id: '2', name: 'Salon Approved Literal', status: 'approved'),
+          sampleSalon(id: '3', name: 'Salon Pending Literal', status: 'pending', canEdit: true),
+        ],
+        assignedSalons: [
+          {
+            'id': '201',
+            'name': 'Assigned Approved Salon',
+            'status': 'active',
+            'address': 'Kothrud',
+            'city': 'Pune',
+            'owner_name': 'Ramesh',
+            'owner_phone': '9876500000',
+            'services_count': 5,
+            'plan_name': 'Starter',
+            'days_left': 15,
+            'needs_plan': false,
+          },
+        ],
+      );
+
+      // Total approved: 'Salon Active Status' (1) + 'Salon Approved Literal' (1) + 'Assigned Approved Salon' (1) = 3
+      // Total pending: 'Salon Pending Literal' (1)
+      expect(find.text('Approved · 3'), findsOneWidget);
+      expect(find.text('Pending · 1'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Approved · 3'));
+      await tester.tap(find.text('Approved · 3'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Salon Active Status'), findsOneWidget);
+      expect(find.text('Salon Approved Literal'), findsOneWidget);
+      expect(find.text('Assigned Approved Salon'), findsOneWidget);
+      expect(find.text('Salon Pending Literal'), findsNothing);
+
+      await tester.ensureVisible(find.text('Pending · 1'));
+      await tester.tap(find.text('Pending · 1'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Salon Pending Literal'), findsOneWidget);
+      expect(find.text('Salon Active Status'), findsNothing);
+    });
   });
 }
