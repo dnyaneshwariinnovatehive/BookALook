@@ -117,10 +117,10 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   }
 
   void _reportBadges(List<dynamic> salons, List<dynamic> enquiries) {
-    final awaiting = salons.where((s) => (s as Map)['status'] == 'pending_approval').length;
+    final awaiting = salons.where((s) => _isPending((s as Map)['status']?.toString())).length;
     final sentBack = salons.where((s) {
-      final st = (s as Map)['status'];
-      return st == 'rejected' || st == 'needs_correction';
+      final st = (s as Map)['status']?.toString();
+      return _isRejected(st);
     }).length +
         enquiries.where((e) =>
             (e as Map)['needs_correction'] == true &&
@@ -149,12 +149,54 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     });
   }
 
+  static bool _isApproved(String? status) {
+    final s = status?.toLowerCase().trim();
+    return s == 'active' || s == 'approved';
+  }
+
+  static bool _isPending(String? status) {
+    final s = status?.toLowerCase().trim();
+    return s == 'pending_approval' || s == 'pending';
+  }
+
+  static bool _isRejected(String? status) {
+    final s = status?.toLowerCase().trim();
+    return s == 'rejected' || s == 'needs_correction';
+  }
+
+  List<Map<String, dynamic>> get _combinedSalons {
+    final seen = <String>{};
+    final combined = <Map<String, dynamic>>[];
+
+    for (final raw in _salons) {
+      if (raw is Map) {
+        final item = Map<String, dynamic>.from(raw);
+        final id = item['id']?.toString();
+        if (id != null && seen.add(id)) {
+          combined.add(item);
+        }
+      }
+    }
+
+    for (final raw in _assignedSalons) {
+      if (raw is Map) {
+        final item = Map<String, dynamic>.from(raw);
+        final id = item['id']?.toString();
+        if (id != null && seen.add(id)) {
+          combined.add(item);
+        }
+      }
+    }
+
+    return combined;
+  }
+
   int _countOf(String? status) {
     if (status == null) {
       final unlinkedEnquiries = _enquiries.where(
         (e) =>
             e['salon_id'] == null ||
-            !_salons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
+            !_combinedSalons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
       ).length;
       return unlinkedEnquiries + _assignedSalons.length + _salons.length;
     }
@@ -162,16 +204,30 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
       return _enquiries.length + _assignedSalons.length;
     }
     if (status == 'rejected') {
-      final rejectedSalons = _salons.where((s) {
-        final st = s['status'];
-        return st == 'rejected' || st == 'needs_correction';
+      final rejectedSalons = _combinedSalons.where((s) {
+        final st = s['status']?.toString();
+        return _isRejected(st);
       }).length;
       final rejectedEnquiries = _enquiries.where(
         (e) =>
             (e as Map)['needs_correction'] == true &&
-            !_salons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
+            !_combinedSalons.any((s) => s['id']?.toString() == e['salon_id']?.toString()),
       ).length;
       return rejectedSalons + rejectedEnquiries;
+    }
+    if (status == 'pending_approval' || status == 'pending') {
+      final fromSalons = _salons.where((s) => _isPending(s['status']?.toString())).length;
+      final fromAssigned = _assignedSalons.where((s) =>
+          _isPending(s['status']?.toString()) &&
+          !_salons.any((ms) => ms['id']?.toString() == s['id']?.toString())).length;
+      return fromSalons + fromAssigned;
+    }
+    if (status == 'active' || status == 'approved') {
+      final fromSalons = _salons.where((s) => _isApproved(s['status']?.toString())).length;
+      final fromAssigned = _assignedSalons.where((s) =>
+          _isApproved(s['status']?.toString()) &&
+          !_salons.any((ms) => ms['id']?.toString() == s['id']?.toString())).length;
+      return fromSalons + fromAssigned;
     }
     return _salons.where((s) => (s as Map)['status'] == status).length;
   }
@@ -313,12 +369,17 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
     }
 
     if (_filter == 'pending_approval' || _filter == 'active' || _filter == 'rejected') {
-      final List<Map<String, dynamic>> visibleSalons = _salons
-          .map((s) => Map<String, dynamic>.from(s as Map))
+      final List<Map<String, dynamic>> visibleSalons = _combinedSalons
           .where((s) {
-            final st = s['status'];
+            final st = s['status']?.toString();
             if (_filter == 'rejected') {
-              return st == 'rejected' || st == 'needs_correction';
+              return _isRejected(st);
+            }
+            if (_filter == 'active') {
+              return _isApproved(st);
+            }
+            if (_filter == 'pending_approval') {
+              return _isPending(st);
             }
             return st == _filter;
           })
@@ -1064,7 +1125,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Submitted ${_submittedOn(salon['submitted_at'])}',
+                      'Submitted ${_submittedOn(salon['submitted_at'] ?? salon['registered_at'])}',
                       style: TextStyle(
                         fontSize: 11,
                         color: palette.textTertiary,
@@ -1239,14 +1300,14 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   }
 
   bool _isUrgent(Map<String, dynamic> salon) {
-    if (salon['status'] != 'active') return false;
+    if (!_isApproved(salon['status']?.toString())) return false;
     if (salon['lapsed'] == true) return true;
     final days = (salon['days_left'] as num?)?.toInt();
     return days != null && days <= _urgentDays;
   }
 
   (String, Color, IconData)? _subscriptionLook(Map<String, dynamic> salon) {
-    if (salon['status'] != 'active') return null;
+    if (!_isApproved(salon['status']?.toString())) return null;
     final palette = context.colors;
 
     if (salon['lapsed'] == true) {
@@ -1291,20 +1352,24 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
   (String, Color, IconData) _statusLook(String status) {
     final palette = context.colors;
 
-    return switch (status) {
-      'active' => (
+    if (_isApproved(status)) {
+      return (
         'Approved & live',
         palette.success,
         Icons.check_circle_outline,
-      ),
-      'rejected' => ('Sent back', palette.danger, Icons.error_outline),
-      'suspended' => (
+      );
+    }
+    if (_isRejected(status)) {
+      return ('Sent back', palette.danger, Icons.error_outline);
+    }
+    if (status.toLowerCase().trim() == 'suspended' || status.toLowerCase().trim() == 'deactivated') {
+      return (
         'Suspended',
         palette.textSecondary,
         Icons.pause_circle_outline,
-      ),
-      _ => ('Waiting on SuperAdmin', palette.warning, Icons.hourglass_empty),
-    };
+      );
+    }
+    return ('Waiting on SuperAdmin', palette.warning, Icons.hourglass_empty);
   }
 
   static String _submittedOn(dynamic raw) {

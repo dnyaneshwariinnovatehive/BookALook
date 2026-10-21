@@ -14,7 +14,6 @@ import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_chip.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/collaborator/collaborator_skeleton.dart';
-import '../../../widgets/collaborator/collaborator_thumb.dart';
 import '../../collaborator/onboard_salon_screen.dart';
 
 /// The collaborator's worklist: salons SuperAdmin has handed them to onboard.
@@ -42,14 +41,6 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
   bool _isLoading = true;
   bool _firstLoad = true;
   List<dynamic> _enquiries = [];
-
-  /// Salons this collaborator onboarded whose plan is running out. They sit
-  /// here as well as on Home because this is the tab a collaborator lives in.
-  List<dynamic> _alerts = [];
-
-  /// Existing salons SuperAdmin handed over from the directory. Not onboarding
-  /// work — these already exist and have owners.
-  List<dynamic> _assignedSalons = [];
 
   /// SuperAdmin assigns from a web page the collaborator cannot see, so a new
   /// assignment has to turn up on its own rather than waiting for a pull.
@@ -99,8 +90,6 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     List<dynamic>? assignedSalons,
   }) {
     if (enquiries != null) _enquiries = enquiries;
-    if (alerts != null) _alerts = alerts;
-    if (assignedSalons != null) _assignedSalons = assignedSalons;
     _isLoading = false;
     _firstLoad = false;
   }
@@ -149,22 +138,23 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     unawaited(_store.sync());
 
     try {
-      final results = await Future.wait([
-        CollaboratorApi.assignedEnquiries(),
-        CollaboratorApi.alerts(),
-        CollaboratorApi.assignedSalons(),
-      ]);
+      final enquiries = await CollaboratorApi.assignedEnquiries();
 
       if (!mounted) return;
 
-      // A silent poll that found nothing new must not rebuild the list under
-      // the collaborator's thumb while they are reading it.
-      if (silent && !_hasChanged(results)) return;
+      // Only salons whose onboarding has NOT been completed
+      final incomplete = enquiries.where((e) {
+        final salonStatus = e['salon_status']?.toString();
+        if (salonStatus == 'active' || salonStatus == 'pending_approval') {
+          return false;
+        }
+        return true;
+      }).toList();
+
+      if (silent && !_hasChanged(incomplete)) return;
 
       setState(() {
-        _enquiries = results[0];
-        _alerts = results[1];
-        _assignedSalons = results[2];
+        _enquiries = incomplete;
       });
 
       widget.badges?.reportAssigned(_enquiries.length);
@@ -180,10 +170,8 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     }
   }
 
-  bool _hasChanged(List<List<dynamic>> results) =>
-      results[0].length != _enquiries.length ||
-      results[1].length != _alerts.length ||
-      results[2].length != _assignedSalons.length;
+  bool _hasChanged(List<dynamic> enquiries) =>
+      enquiries.length != _enquiries.length;
 
   Future<void> _callOwner(String? phone, String salonName) async {
     if (phone == null || phone.isEmpty) {
@@ -224,10 +212,16 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     // another device, or reassigned) would otherwise be invisible forever.
     final pending = _store.pending;
 
-    if (_enquiries.isEmpty &&
-        pending.isEmpty &&
-        _alerts.isEmpty &&
-        _assignedSalons.isEmpty) {
+    // Filter to only salons whose onboarding has not completed
+    final incompleteEnquiries = _enquiries.where((e) {
+      final salonStatus = e['salon_status']?.toString();
+      if (salonStatus == 'active' || salonStatus == 'pending_approval') {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    if (incompleteEnquiries.isEmpty && pending.isEmpty) {
       return _buildEmptyState();
     }
 
@@ -238,14 +232,13 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
         padding: const EdgeInsets.all(16),
         children: [
           if (_store.queuedCount > 0) _buildQueueBanner(),
-          if (_alerts.isNotEmpty) _buildAlertsSection(),
-          if (_enquiries.isNotEmpty) ...[
+          if (incompleteEnquiries.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                _enquiries.length == 1
+                incompleteEnquiries.length == 1
                     ? '1 salon to onboard'
-                    : '${_enquiries.length} salons to onboard',
+                    : '${incompleteEnquiries.length} salons to onboard',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
@@ -253,302 +246,15 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
                 ),
               ),
             ),
-            for (final enquiry in _enquiries)
+            for (final enquiry in incompleteEnquiries)
               _buildEnquiryCard(Map<String, dynamic>.from(enquiry as Map)),
-          ] else if (_alerts.isEmpty && _assignedSalons.isEmpty)
-            _buildNothingAssignedNote(),
-
-          if (_assignedSalons.isNotEmpty) _buildAssignedSalonsSection(),
-        ],
-      ),
-    );
-  }
-
-  /// Salons SuperAdmin assigned straight from the directory.
-  ///
-  /// These registered themselves from the partner app, so there is nothing to
-  /// onboard — they already exist and already have an owner. What they need is
-  /// somebody to call, which is why the card leads with the owner and the plan
-  /// rather than a form.
-  Widget _buildAssignedSalonsSection() {
-    final palette = context.colors;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Icon(Icons.how_to_reg_outlined, size: 17, color: palette.info),
-            const SizedBox(width: 8),
-            Text(
-              _assignedSalons.length == 1
-                  ? '1 salon in your care'
-                  : '${_assignedSalons.length} salons in your care',
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.bold,
-                color: palette.textPrimary,
-              ),
-            ),
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Already registered by their owners. SuperAdmin put you on them — no '
-          'onboarding needed.',
-          style: TextStyle(
-            fontSize: 11.5,
-            height: 1.4,
-            color: palette.textTertiary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (final raw in _assignedSalons)
-          _buildAssignedSalonCard(Map<String, dynamic>.from(raw as Map)),
-      ],
-    );
-  }
-
-  Widget _buildAssignedSalonCard(Map<String, dynamic> salon) {
-    final needsPlan = salon['needs_plan'] == true;
-    final daysLeft = salon['days_left'] as int?;
-    final noServices = (salon['services_count'] ?? 0) == 0;
-    final palette = context.colors;
-
-    return CollaboratorCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CollaboratorThumb(url: salon['cover_photo_url']?.toString()),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      salon['name']?.toString() ?? 'Salon',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.bold,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      [salon['address'], salon['city']]
-                          .where((p) => p != null && p.toString().isNotEmpty)
-                          .join(', '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      '${salon['owner_name'] ?? 'Owner'} · '
-                      '${salon['services_count'] ?? 0} '
-                      '${salon['services_count'] == 1 ? 'service' : 'services'}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: palette.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // The two things actually worth a call on a self-registered salon.
-          if (needsPlan ||
-              noServices ||
-              (daysLeft != null && daysLeft <= 7)) ...[
-            const SizedBox(height: 11),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                if (needsPlan)
-                  CollaboratorChip(
-                    label: 'No plan chosen yet',
-                    colour: palette.warning,
-                  ),
-                if (daysLeft != null && daysLeft <= 7)
-                  CollaboratorChip(
-                    label: daysLeft <= 0
-                        ? 'Plan ends today'
-                        : 'Plan ends in $daysLeft days',
-                    colour: palette.danger,
-                  ),
-                if (noServices)
-                  CollaboratorChip(
-                    label: 'Menu is empty',
-                    colour: palette.info,
-                  ),
-              ],
-            ),
-          ] else if (salon['plan_name'] != null) ...[
-            const SizedBox(height: 11),
-            CollaboratorChip(
-              label: 'On ${salon['plan_name']}',
-              colour: palette.success,
-            ),
-          ],
-
-          const SizedBox(height: 12),
-          Divider(height: 1, color: palette.border),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => _callOwner(
-                salon['owner_phone']?.toString(),
-                salon['name']?.toString() ?? 'the salon',
-              ),
-              icon: const Icon(Icons.call, size: 16),
-              label: Text(
-                'Call ${salon['owner_name'] ?? 'owner'}',
-                style: const TextStyle(fontSize: 12.5),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.accentColor,
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  /// Expiry alerts for salons this collaborator already onboarded.
-  ///
-  /// They cannot renew anything — only the owner can pay — so the one action
-  /// offered is the call to the owner they already met.
-  Widget _buildAlertsSection() {
-    final palette = context.colors;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.notifications_active_outlined,
-              size: 17,
-              color: palette.warning,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _alerts.length == 1
-                  ? '1 salon needs a call'
-                  : '${_alerts.length} salons need a call',
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.bold,
-                color: palette.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        for (final raw in _alerts)
-          _buildAlertCard(Map<String, dynamic>.from(raw as Map)),
-        const SizedBox(height: 10),
-      ],
-    );
-  }
-
-  Widget _buildAlertCard(Map<String, dynamic> alert) {
-    final lapsed = alert['severity'] == 'lapsed';
-    final palette = context.colors;
-    final colour = lapsed ? palette.danger : palette.warning;
-
-    return CollaboratorCard(
-      padding: const EdgeInsets.all(14),
-      color: lapsed ? palette.dangerBg : palette.warningBg,
-      borderColor: colour.withValues(alpha: 0.3),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                lapsed ? Icons.wifi_off_rounded : Icons.timer_outlined,
-                size: 18,
-                color: colour,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  alert['message']?.toString() ?? '',
-                  style: TextStyle(fontSize: 13, height: 1.4, color: colour),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${alert['owner_name'] ?? 'Owner'}'
-                  '${alert['city'] != null ? ' · ${alert['city']}' : ''}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: palette.textSecondary,
-                  ),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () => _callOwner(
-                  alert['owner_phone']?.toString(),
-                  alert['salon_name']?.toString() ?? 'the salon',
-                ),
-                icon: const Icon(Icons.call, size: 15),
-                label: const Text(
-                  'Call owner',
-                  style: TextStyle(fontSize: 12.5),
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: colour,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNothingAssignedNote() {
-    final palette = context.colors;
-
-    return CollaboratorCard(
-      radius: 12,
-      child: Row(
-        children: [
-          Icon(Icons.check_circle_outline, size: 18, color: palette.success),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'No salons waiting to be onboarded.',
-              style: TextStyle(fontSize: 13, color: palette.textSecondary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Finished drafts that have not reached the server yet. Shown as a fact, not
   /// an error — the collaborator has done their part.
@@ -629,6 +335,12 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
           _detail(
             Icons.phone_outlined,
             enquiry['phone']?.toString() ?? 'No phone',
+            onTap: (enquiry['phone']?.toString() ?? '').trim().isNotEmpty
+                ? () => _callOwner(
+                    enquiry['phone']?.toString(),
+                    enquiry['salon_name']?.toString() ?? 'the salon',
+                  )
+                : null,
           ),
           _detail(
             Icons.location_city_outlined,
@@ -757,24 +469,43 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
   }
 
 
-  Widget _detail(IconData icon, String text) {
+  Widget _detail(IconData icon, String text, {VoidCallback? onTap}) {
     final palette = context.colors;
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: palette.textTertiary),
+          Icon(
+            icon,
+            size: 16,
+            color: onTap != null ? AppTheme.accentColor : palette.textTertiary,
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 13, color: palette.textSecondary),
+              style: TextStyle(
+                fontSize: 13,
+                color: onTap != null ? AppTheme.accentColor : palette.textSecondary,
+                fontWeight: onTap != null ? FontWeight.w500 : FontWeight.normal,
+              ),
             ),
           ),
+          if (onTap != null)
+            Icon(Icons.call, size: 14, color: AppTheme.accentColor),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: row,
+      );
+    }
+    return row;
   }
 
   static String _assignedOn(dynamic raw) {
