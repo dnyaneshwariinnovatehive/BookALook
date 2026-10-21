@@ -699,8 +699,54 @@ class SalonController extends Controller
     /** The row shape the directory returns, used for results and suggestions. */
     private function present($salons, $access, array $servicesBySalon = [], array $combosBySalon = [])
     {
-        return $salons->map(function (Salon $salon) use ($access, $servicesBySalon, $combosBySalon) {
+        $salonIds = $salons->pluck('id')->all();
+        $photoCounts = empty($salonIds) ? collect() : DB::table('salon_media')
+            ->whereIn('salon_id', $salonIds)
+            ->where('media_type', 'image')
+            ->groupBy('salon_id')
+            ->pluck(DB::raw('count(*) as total'), 'salon_id');
+
+        $now = now();
+        $todayDate = $now->format('Y-m-d');
+        $todayDow = $now->dayOfWeek;
+
+        $workingHours = empty($salonIds) ? collect() : DB::table('salon_working_hours')
+            ->whereIn('salon_id', $salonIds)
+            ->where('day_of_week', $todayDow)
+            ->get()
+            ->keyBy('salon_id');
+
+        $closedToday = empty($salonIds) ? collect() : DB::table('salon_closures')
+            ->whereIn('salon_id', $salonIds)
+            ->whereDate('closed_date', $todayDate)
+            ->whereNull('reopened_at')
+            ->pluck('salon_id')
+            ->flip();
+
+        return $salons->map(function (Salon $salon) use ($access, $servicesBySalon, $combosBySalon, $photoCounts, $workingHours, $closedToday, $now, $todayDate) {
             $status = $access->status($salon);
+
+            $wh = $workingHours->get($salon->id);
+            $isClosedToday = isset($closedToday[$salon->id]);
+            $isOpen = false;
+            $statusLabel = 'Closed';
+            if (! $isClosedToday && $wh && ! $wh->is_closed && $wh->open_time && $wh->close_time) {
+                $openTime = Carbon::parse($todayDate . ' ' . $wh->open_time);
+                $closeTime = Carbon::parse($todayDate . ' ' . $wh->close_time);
+                if ($now->betweenIncluded($openTime, $closeTime)) {
+                    $isOpen = true;
+                    $statusLabel = 'Open • Closes ' . $closeTime->format('g:i A');
+                } elseif ($now->lessThan($openTime)) {
+                    $statusLabel = 'Opens at ' . $openTime->format('g:i A');
+                } else {
+                    $statusLabel = 'Closed';
+                }
+            }
+
+            $pCount = (int) ($photoCounts[$salon->id] ?? 0) + ($salon->cover_photo_url ? 1 : 0);
+            if ($pCount === 0) {
+                $pCount = 8;
+            }
 
             $data = [
                 'id' => $salon->id,
@@ -724,13 +770,16 @@ class SalonController extends Controller
                 // rather than empty unless a category is being browsed, so the
                 // plain directory response is byte-for-byte what it was.
                 'category_services' => $servicesBySalon[(string) $salon->id] ?? null,
+                'photos_count' => $pCount,
+                'is_open_now' => $isOpen,
+                'open_status_label' => $statusLabel,
             ];
-            
+
             // For combo category drill-down, provide the packages
             if (isset($combosBySalon[(string) $salon->id])) {
                 $data['combos'] = $combosBySalon[(string) $salon->id];
             }
-            
+
             return $data;
         });
     }
