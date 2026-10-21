@@ -276,4 +276,65 @@ class CollaboratorApprovedSalonsTest extends TestCase
         $this->assertContains($pendingSalon->id, $idsPending);
         $this->assertNotContains($approvedSalon->id, $idsPending);
     }
+
+    public function test_assigned_enquiries_returns_enquiries_with_city_and_correction_notes(): void
+    {
+        $enquiry = SalonEnquiry::create([
+            'salon_name' => 'Assigned Enquiry Salon',
+            'owner_name' => 'Rohan Joshi',
+            'phone' => '9820011223',
+            'city_id' => $this->city->id,
+            'status' => 'assigned',
+            'assigned_collaborator_id' => $this->collaborator1->id,
+            'assigned_at' => now(),
+            'message' => 'New onboarding request',
+        ]);
+
+        Sanctum::actingAs($this->collaborator1);
+
+        $res = $this->getJson('/api/partner/collaborator/assigned-enquiries');
+        $res->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $data = $res->json('data');
+        $this->assertCount(1, $data);
+        $this->assertEquals($enquiry->id, $data[0]['id']);
+        $this->assertEquals('Assigned Enquiry Salon', $data[0]['salon_name']);
+        $this->assertEquals('Mumbai', $data[0]['city']);
+        $this->assertFalse($data[0]['needs_correction']);
+
+        // Data isolation: collaborator 2 cannot see collaborator 1's enquiries
+        Sanctum::actingAs($this->collaborator2);
+        $res2 = $this->getJson('/api/partner/collaborator/assigned-enquiries');
+        $res2->assertStatus(200)
+            ->assertJson(['success' => true, 'data' => []]);
+    }
+
+    public function test_assigned_salons_returns_assigned_salons_and_isolates_collaborators(): void
+    {
+        $assignedSalon = $this->createSalon([
+            'name' => 'Handed Over Salon',
+            'assigned_collaborator_id' => $this->collaborator1->id,
+            'submitted_by' => $this->collaborator2->id,
+            'status' => 'active',
+            'approved_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->collaborator1);
+
+        $res = $this->getJson('/api/partner/collaborator/assigned-salons');
+        $res->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $ids = collect($res->json('data'))->pluck('id')->all();
+        $this->assertContains($assignedSalon->id, $ids);
+        $this->assertEquals('Mumbai', $res->json('data.0.city'));
+
+        // Data isolation: collaborator 2 cannot see collaborator 1's assigned salons
+        Sanctum::actingAs($this->collaborator2);
+        $res2 = $this->getJson('/api/partner/collaborator/assigned-salons');
+        $res2->assertStatus(200)
+            ->assertJson(['success' => true, 'data' => []]);
+    }
 }
+

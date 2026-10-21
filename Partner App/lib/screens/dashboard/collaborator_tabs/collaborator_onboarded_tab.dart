@@ -106,19 +106,31 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
         debugPrint('Error syncing onboarding drafts: $e');
       }
 
-      final results = await Future.wait([
-        CollaboratorApi.onboardedSalons(),
-        CollaboratorApi.assignedEnquiries(),
-        CollaboratorApi.assignedSalons(),
-        CollaboratorApi.alerts(),
-      ]);
+      final salonsFuture = CollaboratorApi.onboardedSalons();
+      final enquiriesFuture = CollaboratorApi.assignedEnquiries().catchError((e) {
+        debugPrint('Non-critical error loading assigned enquiries: $e');
+        return <dynamic>[];
+      });
+      final assignedSalonsFuture = CollaboratorApi.assignedSalons().catchError((e) {
+        debugPrint('Non-critical error loading assigned salons: $e');
+        return <dynamic>[];
+      });
+      final alertsFuture = CollaboratorApi.alerts().catchError((e) {
+        debugPrint('Non-critical error loading alerts: $e');
+        return <dynamic>[];
+      });
+
+      final salons = await salonsFuture;
+      final enquiries = await enquiriesFuture;
+      final assignedSalons = await assignedSalonsFuture;
+      final alerts = await alertsFuture;
 
       if (!mounted) return;
       setState(() {
-        _salons = results[0];
-        _enquiries = results[1];
-        _assignedSalons = results[2];
-        _alerts = results[3];
+        _salons = salons;
+        _enquiries = enquiries;
+        _assignedSalons = assignedSalons;
+        _alerts = alerts;
         _errorMessage = null;
       });
       _reportBadges(_salons, _enquiries);

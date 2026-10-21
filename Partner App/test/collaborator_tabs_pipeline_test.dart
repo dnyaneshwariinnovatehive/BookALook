@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partner_app/main.dart' show themeNotifier;
 import 'package:partner_app/screens/dashboard/collaborator_dashboard.dart';
-import 'package:partner_app/screens/dashboard/collaborator_tabs/collaborator_approved_tab.dart';
+import 'package:partner_app/screens/dashboard/collaborator_tabs/collaborator_assigned_tab.dart';
 import 'package:partner_app/screens/dashboard/collaborator_tabs/collaborator_onboarded_tab.dart';
 import 'package:partner_app/services/collaborator_badges.dart';
+import 'package:partner_app/services/onboarding_draft_store.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/widgets/collaborator/collaborator_card.dart';
 import 'package:partner_app/widgets/collaborator/collaborator_empty_state.dart';
@@ -14,81 +15,101 @@ import 'package:partner_app/widgets/collaborator/collaborator_empty_state.dart';
 void main() {
   tearDown(() {
     themeNotifier.value = ThemeMode.light;
+    OnboardingDraftStore.instance.cancelTimerForTesting();
   });
 
-  group('3rd Tab — CollaboratorApprovedTab', () {
-    testWidgets('shows empty state without "Check Again" when no salons are approved', (tester) async {
-      var navigatedToMySalons = false;
-
+  group('3rd Tab — CollaboratorAssignedTab', () {
+    testWidgets('shows empty state when no assigned salons exist', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
-          home: Scaffold(
-            body: CollaboratorApprovedTab(
-              onGoToMySalons: () => navigatedToMySalons = true,
-            ),
+          home: const Scaffold(
+            body: CollaboratorAssignedTab(),
           ),
         ),
       );
       await tester.pump();
 
-      final state = tester.state<CollaboratorApprovedTabState>(
-        find.byType(CollaboratorApprovedTab),
+      final state = tester.state<CollaboratorAssignedTabState>(
+        find.byType(CollaboratorAssignedTab),
       );
-      state.seedForTest([]);
-      await tester.pumpAndSettle();
+      state.seedForTest(enquiries: []);
+      await tester.pump();
 
-      expect(find.text('No approved salons yet'), findsOneWidget);
-      expect(find.text('View My Salons'), findsOneWidget);
-      expect(find.text('Check again'), findsNothing);
-      expect(find.text('Check Again'), findsNothing);
-
-      await tester.tap(find.text('View My Salons'));
-      expect(navigatedToMySalons, isTrue);
+      expect(find.text('No assigned salons'), findsOneWidget);
+      expect(find.text('Refresh'), findsOneWidget);
+      OnboardingDraftStore.instance.cancelTimerForTesting();
     });
 
-    testWidgets('displays approved salon card with all details and live status', (tester) async {
+    testWidgets('displays assigned enquiry card with owner and city details', (tester) async {
       final badges = CollaboratorBadges();
 
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
           home: Scaffold(
-            body: CollaboratorApprovedTab(badges: badges),
+            body: CollaboratorAssignedTab(badges: badges),
           ),
         ),
       );
       await tester.pump();
 
-      final state = tester.state<CollaboratorApprovedTabState>(
-        find.byType(CollaboratorApprovedTab),
+      final state = tester.state<CollaboratorAssignedTabState>(
+        find.byType(CollaboratorAssignedTab),
       );
-      state.seedForTest([
-        {
-          'id': 'salon-1',
-          'name': 'Glow & Glamour',
-          'status': 'active',
-          'is_approved': true,
-          'approved_at': '2026-10-15T12:00:00Z',
-          'city': 'Mumbai',
-          'address': 'Bandra West',
-          'services_count': 8,
-          'plan_name': 'Pro Plan',
-          'days_left': 25,
-          'owner_name': 'Aarav Sharma',
-          'owner_phone': '9876543210',
-        },
-      ]);
-      await tester.pumpAndSettle();
+      state.seedForTest(
+        enquiries: [
+          {
+            'id': 'enquiry-1',
+            'salon_name': 'Velvet Touch Unisex Salon',
+            'owner_name': 'Rohan Joshi',
+            'phone': '9820011223',
+            'city': 'Mumbai',
+            'message': 'Looking to onboard quickly',
+            'assigned_at': '2026-10-18T10:00:00Z',
+            'needs_correction': false,
+            'salon_status': null,
+          },
+        ],
+      );
+      await tester.pump();
 
-      expect(find.text('Glow & Glamour'), findsOneWidget);
-      expect(find.text('Bandra West, Mumbai'), findsOneWidget);
-      expect(find.text('Approved & live'), findsOneWidget);
-      expect(find.text('8 services'), findsOneWidget);
-      expect(find.text('Plan: Pro Plan'), findsOneWidget);
-      expect(find.text('Aarav Sharma'), findsOneWidget);
-      expect(find.text('Call Aarav Sharma'), findsOneWidget);
-      expect(badges.approvedCount, 1);
+      expect(find.text('Velvet Touch Unisex Salon'), findsOneWidget);
+      expect(find.text('Rohan Joshi'), findsOneWidget);
+      expect(find.text('9820011223'), findsOneWidget);
+      expect(find.text('Mumbai'), findsOneWidget);
+      expect(find.text('Assigned'), findsOneWidget);
+      expect(find.text('Start onboarding'), findsOneWidget);
+      expect(badges.assignedCount, 1);
+      OnboardingDraftStore.instance.cancelTimerForTesting();
+    });
+
+    testWidgets('displays error state with retry on failure', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Scaffold(
+            body: CollaboratorAssignedTab(),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final state = tester.state<CollaboratorAssignedTabState>(
+        find.byType(CollaboratorAssignedTab),
+      );
+      state.seedForTest(
+        enquiries: [],
+        errorMessage: 'Unable to load assigned salons. Please check your internet connection.',
+      );
+      await tester.pump();
+
+      expect(
+        find.text('Unable to load assigned salons. Please check your internet connection.'),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+      OnboardingDraftStore.instance.cancelTimerForTesting();
     });
   });
 
@@ -136,7 +157,7 @@ void main() {
       ];
 
       state.seedForTest(salons);
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('Approved Salon'), findsOneWidget);
       expect(find.text('Pending Salon'), findsOneWidget);
@@ -170,11 +191,11 @@ void main() {
       state.seedForTest([
         mockSalon(id: '1', name: 'Approved Salon', status: 'active', isApproved: true),
       ]);
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       // Tap 'Pending' filter
       await tester.tap(find.textContaining('Pending'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('No pending salons'), findsOneWidget);
       expect(find.text('Show all'), findsOneWidget);
@@ -183,14 +204,14 @@ void main() {
 
       // Reset filter
       await tester.tap(find.text('Show all'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('Approved Salon'), findsOneWidget);
     });
   });
 
   group('CollaboratorDashboardScreen Integration', () {
-    testWidgets('mounts Approved Salons as the 3rd tab in bottom navigation', (tester) async {
+    testWidgets('mounts Assigned as the 3rd tab in bottom navigation', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
@@ -202,16 +223,17 @@ void main() {
 
       expect(find.text('Home'), findsWidgets);
       expect(find.text('My Salons'), findsWidgets);
-      expect(find.text('Approved Salons'), findsWidgets);
+      expect(find.text('Assigned'), findsWidgets);
       expect(find.text('Profile'), findsWidgets);
 
-      // Verify 3rd tab has 'Approved Salons' title in app bar when selected
-      await tester.tap(find.text('Approved Salons').last);
+      // Verify 3rd tab has 'Assigned' title in app bar when selected
+      await tester.tap(find.text('Assigned').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('Approved Salons'), findsWidgets);
-      expect(find.text('Salons explicitly approved by Super Admin'), findsOneWidget);
+      expect(find.text('Assigned'), findsWidgets);
+      expect(find.text('Salons waiting to be onboarded'), findsOneWidget);
+      OnboardingDraftStore.instance.cancelTimerForTesting();
     });
   });
 }

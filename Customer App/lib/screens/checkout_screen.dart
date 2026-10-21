@@ -32,7 +32,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _cart;
   List<dynamic> _providers = [];
   bool _isLoadingProviders = true;
+  bool _firstLoadProviders = true;
+  bool _isRefreshingDate = false;
   String _providersError = '';
+  bool _isSalonClosed = false;
+  String? _salonClosedReason;
+  String? _noProvidersReason;
+  String? _providerWarning;
 
   /// The chosen staff member's id, or null until one is picked. There is no
   /// "any staff" choice: the booked provider is the one who scans the
@@ -45,6 +51,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isLoadingSlots = false;
   bool _isClosed = false;
   String? _closedReason;
+  bool _hasAvailableSlots = false;
+  String? _slotUnavailableReason;
 
   double _totalAmount = 0;
   double _advanceAmount = 0;
@@ -137,9 +145,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _toast('Continuing with ${response.walletName}.');
   }
 
-  Future<void> _loadProviders() async {
+  Future<void> _loadProviders({bool isDateChange = false}) async {
     setState(() {
-      _isLoadingProviders = true;
+      if (!isDateChange) {
+        _isLoadingProviders = true;
+      } else {
+        _isRefreshingDate = true;
+      }
       _providersError = '';
     });
 
@@ -149,18 +161,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         widget.salonId,
         date: dateStr,
       );
+
+      final rawProviders = (data['providers'] as List? ?? []);
+      final isSalonClosed = data['salon_closed'] == true;
+      final salonClosedReason = data['closed_reason'] as String?;
+      final noProvidersReason = data['no_providers_reason'] as String?;
+
+      final eligible = rawProviders
+          .where((p) => p['is_eligible'] == true)
+          .map((p) => p['id']?.toString())
+          .toSet();
+
+      String? providerWarning;
+      bool keepSelectedProvider = false;
+
+      if (_selectedProviderKey != null) {
+        if (eligible.contains(_selectedProviderKey)) {
+          keepSelectedProvider = true;
+        } else {
+          final oldProvider = _providers.firstWhere(
+            (p) => p['id']?.toString() == _selectedProviderKey,
+            orElse: () => null,
+          );
+          final providerName =
+              oldProvider?['name'] ?? 'The selected service provider';
+          providerWarning =
+              '$providerName is not available on this date. Please choose another provider or date.';
+        }
+      }
+
       setState(() {
-        _providers = data['providers'] ?? [];
-        final eligible = _providers
-            .where((p) => p['is_eligible'] == true)
-            .map((p) => p['id']?.toString())
-            .toSet();
-        if (_selectedProviderKey != null &&
-            !eligible.contains(_selectedProviderKey)) {
+        _providers = rawProviders;
+        _isSalonClosed = isSalonClosed;
+        _salonClosedReason = salonClosedReason;
+        _noProvidersReason = noProvidersReason;
+
+        if (!keepSelectedProvider && _selectedProviderKey != null) {
           _selectedProviderKey = null;
           _selectedTime = null;
           _slots = [];
+          _providerWarning = providerWarning;
+        } else if (keepSelectedProvider) {
+          _providerWarning = null;
+          _selectedTime = null; // Clear stale slot time on date change
         }
+
         final returnedTotal = _toDouble(data['total_amount']);
         if (returnedTotal > 0 || _totalAmount == 0) {
           _totalAmount = returnedTotal;
@@ -174,11 +219,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _totalDuration = duration;
         }
         _isLoadingProviders = false;
+        _firstLoadProviders = false;
+        _isRefreshingDate = false;
       });
+
+      if (keepSelectedProvider) {
+        await _fetchSlots();
+      }
     } catch (e) {
       setState(() {
         _providersError = 'Could not load service providers.';
         _isLoadingProviders = false;
+        _firstLoadProviders = false;
+        _isRefreshingDate = false;
       });
     }
   }
@@ -193,6 +246,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _slots = [];
       _isClosed = false;
       _closedReason = null;
+      _hasAvailableSlots = false;
+      _slotUnavailableReason = null;
     });
 
     try {
@@ -227,6 +282,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _slots = processedSlots;
         _isClosed = data['closed'] == true;
         _closedReason = data['closed_reason'];
+        _hasAvailableSlots = data['has_available_slots'] == true;
+        _slotUnavailableReason = data['unavailable_reason'];
         final returnedTotal = _toDouble(data['total_amount']);
         if (returnedTotal > 0 || _totalAmount == 0) {
           _totalAmount = returnedTotal;
@@ -245,15 +302,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _slots = [];
         _isLoadingSlots = false;
-      });
-      if (mounted) {
-        setState(
-          () => _slotsError = describeError(
-            e,
-            fallback: 'Could not load the time slots.',
-          ),
+        _slotsError = describeError(
+          e,
+          fallback: 'Could not load the time slots.',
         );
-      }
+      });
     }
   }
 
@@ -265,6 +318,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _dateHint = null;
       _slotHint = null;
       _selectedTime = null;
+      _providerWarning = null;
     });
     _fetchSlots();
 
@@ -291,11 +345,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// "yyyy-MM-dd" for a date — the key both the chips and the API use.
   String _dateKey(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
-  void _selectDate(DateTime date) {
+  void _selectDate(DateTime date) async {
+    if (_dateKey(date) == _dateKey(_selectedDate) && !_firstLoadProviders) {
+      return;
+    }
     AppHaptics.selectionClick();
-    setState(() => _selectedDate = date);
-    _loadProviders();
-    _fetchSlots();
+    setState(() {
+      _selectedDate = date;
+      _selectedTime = null;
+      _providerWarning = null;
+      _dateHint = null;
+      _slotHint = null;
+    });
+    await _loadProviders(isDateChange: true);
   }
 
   Future<void> _pickDate() async {
@@ -891,10 +953,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   );
 
   Widget _buildProviderList() {
-    if (_isLoadingProviders) {
+    if (_firstLoadProviders && _isLoadingProviders) {
       return Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24),
+          padding: const EdgeInsets.symmetric(vertical: 24),
           child: CircularProgressIndicator(color: AppTheme.accentColor),
         ),
       );
@@ -907,10 +969,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
 
+    if (_isSalonClosed) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.event_busy, color: context.colors.warning, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _salonClosedReason ??
+                        'This salon is closed on the selected day.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Please choose another date.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_providers.isEmpty) {
-      return Text(
-        'This salon has no staff available right now.',
-        style: GoogleFonts.outfit(color: context.colors.textSecondary),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: context.colors.warning, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _noProvidersReason ??
+                    'No service provider is available for the selected date or time.',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -933,7 +1058,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'No staff members are currently available on this date who can perform all selected services.',
+                _noProvidersReason ??
+                    'No service provider is available for the selected date or time.',
                 style: GoogleFonts.outfit(
                   fontSize: 13,
                   color: context.colors.textSecondary,
@@ -946,7 +1072,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_isRefreshingDate)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                color: AppTheme.accentColor,
+                backgroundColor: context.colors.accentSoft,
+              ),
+            ),
+          ),
         ...eligibleProviders.map((provider) {
           return _providerTile(
             key: provider['id'].toString(),
@@ -1043,65 +1182,80 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Step 2 offers one-tap "Today" and "Tomorrow", plus a calendar button that
   /// still opens the full 30-day picker.
   Widget _buildDatePicker() {
-    final enabled = _selectedProviderKey != null;
     final today = _today();
     final tomorrow = today.add(const Duration(days: 1));
     final selected = _dateKey(_selectedDate);
     final isCustom =
         selected != _dateKey(today) && selected != _dateKey(tomorrow);
 
-    void guard(void Function() action) {
-      if (!enabled) {
-        AppHaptics.error();
-        setState(() => _dateHint = 'Choose a service provider first.');
-        return;
-      }
-      action();
-    }
-
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.5,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _dateTile(
-                  label: 'Today',
-                  date: today,
-                  isSelected: selected == _dateKey(today),
-                  onTap: () => guard(() => _selectDate(today)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _dateTile(
+                label: 'Today',
+                date: today,
+                isSelected: selected == _dateKey(today),
+                onTap: () => _selectDate(today),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _dateTile(
+                label: 'Tomorrow',
+                date: tomorrow,
+                isSelected: selected == _dateKey(tomorrow),
+                onTap: () => _selectDate(tomorrow),
+              ),
+            ),
+            SizedBox(width: 12),
+            _calendarButton(
+              isActive: isCustom,
+              onTap: _pickDate,
+            ),
+          ],
+        ),
+        if (_providerWarning != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.colors.warning.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+              border:
+                  Border.all(color: context.colors.warning.withOpacity(0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline,
+                    color: context.colors.warning, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _providerWarning!,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
                 ),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: _dateTile(
-                  label: 'Tomorrow',
-                  date: tomorrow,
-                  isSelected: selected == _dateKey(tomorrow),
-                  onTap: () => guard(() => _selectDate(tomorrow)),
-                ),
-              ),
-              SizedBox(width: 12),
-              _calendarButton(
-                isActive: isCustom,
-                onTap: () => guard(_pickDate),
-              ),
-            ],
-          ),
-          SizedBox(height: 10),
-          Text(
-            isCustom
-                ? 'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)}'
-                : 'Pick Today or Tomorrow, or tap the calendar to choose any other date.',
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: context.colors.textTertiary,
+              ],
             ),
           ),
         ],
-      ),
+        SizedBox(height: 10),
+        Text(
+          isCustom
+              ? 'Selected: ${DateFormat('EEEE, MMM d, yyyy').format(_selectedDate)}'
+              : 'Pick Today or Tomorrow, or tap the calendar to choose any other date.',
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            color: context.colors.textTertiary,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1192,6 +1346,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildSlots() {
+    if (_isSalonClosed) {
+      return _hintBox(
+        _salonClosedReason ?? 'This salon is closed on the selected day.',
+      );
+    }
+
     if (_selectedProviderKey == null) {
       return _hintBox(
         'Choose a service provider above to see their free time slots.',
@@ -1212,11 +1372,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     if (_isClosed) {
-      return _hintBox(_closedReason ?? 'No slots available for this date.');
+      return _hintBox(
+        _closedReason ??
+            _salonClosedReason ??
+            'This salon is closed on the selected day.',
+      );
     }
 
     if (_slots.isEmpty) {
-      return _hintBox('No slots available for this date.');
+      return _hintBox(
+        _slotUnavailableReason ??
+            'No service provider is available for the selected date or time.',
+      );
     }
 
     final hasAnyAvailable = _slots.any((s) => s['available'] == true);
@@ -1226,13 +1393,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       children: [
         if (!hasAnyAvailable)
           Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'This staff member is fully booked on this date. Try another date or provider.',
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                color: context.colors.warning,
-              ),
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline,
+                    color: context.colors.warning, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _slotUnavailableReason ??
+                        'All appointment slots are fully booked for this date. Try another date or provider.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: context.colors.warning,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         Wrap(

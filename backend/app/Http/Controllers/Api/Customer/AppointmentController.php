@@ -47,6 +47,8 @@ class AppointmentController extends Controller
             ? $this->availability->summariseCart($cart)
             : ['service_ids' => [], 'duration' => AvailabilityService::SLOT_MINUTES, 'total' => 0, 'advance' => 0];
 
+        $closure = $this->availability->salonClosureStatus($salon_id, $date);
+
         $providers = $this->availability->providersForSalon(
             $salon_id,
             $requirements['service_ids'],
@@ -54,7 +56,17 @@ class AppointmentController extends Controller
             $requirements['duration']
         );
 
+        $noProvidersReason = null;
+        if ($closure['closed']) {
+            $noProvidersReason = $closure['reason'];
+        } elseif (empty($providers)) {
+            $noProvidersReason = 'No service provider is available for the selected date or time.';
+        }
+
         return response()->json([
+            'salon_closed' => $closure['closed'],
+            'closed_reason' => $closure['reason'],
+            'no_providers_reason' => $noProvidersReason,
             'providers' => $providers,
             'total_duration_minutes' => $requirements['duration'],
             'total_amount' => $requirements['total'],
@@ -114,6 +126,8 @@ class AppointmentController extends Controller
             'same_day_change_threshold' => $requirement['threshold'],
             'closed' => $result['closed'],
             'closed_reason' => $result['reason'],
+            'has_available_slots' => $result['has_available_slots'] ?? false,
+            'unavailable_reason' => $result['unavailable_reason'] ?? null,
             'slots' => $result['slots'],
         ]);
     }

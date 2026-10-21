@@ -45,7 +45,7 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $enquiries = SalonEnquiry::with('salon:id,name,status,rejection_reason,enquiry_id')
+        $enquiries = SalonEnquiry::with(['cityRecord:id,name', 'salon:id,name,status,rejection_reason,correction_notes,enquiry_id'])
             ->where('assigned_collaborator_id', $user->id)
             ->where('status', 'assigned')
             ->where(function ($q) {
@@ -64,9 +64,14 @@ class CollaboratorController extends Controller
                 $needsCorrection = $enquiry->salon && in_array($enquiry->salon->status, ['rejected', 'needs_correction'], true);
                 $reason = $needsCorrection ? ($enquiry->salon->correction_notes ?: $enquiry->salon->rejection_reason) : null;
 
-                return $enquiry->only([
-                    'id', 'salon_name', 'owner_name', 'phone', 'city', 'message', 'assigned_at',
-                ]) + [
+                return [
+                    'id' => $enquiry->id,
+                    'salon_name' => $enquiry->salon_name,
+                    'owner_name' => $enquiry->owner_name,
+                    'phone' => $enquiry->phone,
+                    'city' => $enquiry->cityRecord?->name ?? ($enquiry->getAttribute('city') ?: ''),
+                    'message' => $enquiry->message,
+                    'assigned_at' => $enquiry->assigned_at,
                     'needs_correction' => $needsCorrection,
                     'rejection_reason' => $reason,
                     'salon_id' => $enquiry->salon?->id,
@@ -113,7 +118,6 @@ class CollaboratorController extends Controller
                 $q->whereNull('submitted_by')
                   ->orWhere('submitted_by', '!=', $user->id);
             })
-            ->whereNull('enquiry_id')
             ->whereIn('status', ['active', 'approved', 'pending_approval', 'pending', 'suspended'])
             ->orderByDesc('updated_at')
             ->get()

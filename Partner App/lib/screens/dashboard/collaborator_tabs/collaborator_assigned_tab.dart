@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -40,6 +41,7 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
 
   bool _isLoading = true;
   bool _firstLoad = true;
+  String? _errorMessage;
   List<dynamic> _enquiries = [];
 
   /// SuperAdmin assigns from a web page the collaborator cannot see, so a new
@@ -88,10 +90,17 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
     List<dynamic>? enquiries,
     List<dynamic>? alerts,
     List<dynamic>? assignedSalons,
+    String? errorMessage,
   }) {
-    if (enquiries != null) _enquiries = enquiries;
-    _isLoading = false;
-    _firstLoad = false;
+    setState(() {
+      if (enquiries != null) {
+        _enquiries = enquiries;
+        widget.badges?.reportAssigned(_enquiries.length);
+      }
+      _errorMessage = errorMessage;
+      _isLoading = false;
+      _firstLoad = false;
+    });
   }
 
   /// Called by the shell whenever this tab gains or loses visibility.
@@ -155,11 +164,19 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
 
       setState(() {
         _enquiries = incomplete;
+        _errorMessage = null;
       });
 
       widget.badges?.reportAssigned(_enquiries.length);
     } catch (e) {
       debugPrint('Error fetching assigned work: $e');
+      if (mounted && !silent) {
+        setState(() {
+          _errorMessage = e is HttpException
+              ? e.message
+              : 'Unable to load assigned salons. Please check your internet connection.';
+        });
+      }
     } finally {
       if (mounted && !silent) {
         setState(() {
@@ -220,6 +237,34 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
       }
       return true;
     }).toList();
+
+    if (_errorMessage != null && incompleteEnquiries.isEmpty && pending.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: context.colors.danger),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _fetchEnquiries,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (incompleteEnquiries.isEmpty && pending.isEmpty) {
       return _buildEmptyState();

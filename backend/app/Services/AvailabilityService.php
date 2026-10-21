@@ -182,12 +182,53 @@ class AvailabilityService
     }
 
     /**
+     * Check if the salon is closed on a given date (either weekly off or salon closure day).
+     *
+     * @return array{closed: bool, reason: ?string}
+     */
+    public function salonClosureStatus(string $salonId, ?string $date): array
+    {
+        if ($date === null) {
+            return ['closed' => false, 'reason' => null];
+        }
+
+        $day = Carbon::parse($date)->dayOfWeek;
+
+        $salonHours = SalonWorkingHour::where('salon_id', $salonId)
+            ->where('day_of_week', $day)
+            ->first();
+
+        if (! $salonHours || $salonHours->is_closed) {
+            return ['closed' => true, 'reason' => 'This salon is closed on the selected day.'];
+        }
+
+        $salonOpen = $this->toMinutes($salonHours->open_time);
+        $salonClose = $this->toMinutes($salonHours->close_time);
+
+        if ($salonOpen === null || $salonClose === null || $salonClose <= $salonOpen) {
+            return ['closed' => true, 'reason' => 'This salon is closed on the selected day.'];
+        }
+
+        $isClosureDay = DB::table('salon_closures')
+            ->where('salon_id', $salonId)
+            ->whereDate('closed_date', $date)
+            ->whereNull('reopened_at')
+            ->exists();
+
+        if ($isClosureDay) {
+            return ['closed' => true, 'reason' => 'This salon is closed on the selected day.'];
+        }
+
+        return ['closed' => false, 'reason' => null];
+    }
+
+    /**
      * Build the 30-minute grid for a date, marking each block available or not.
      *
      * @param  string[]  $providerIds  Candidates. One entry = a specific provider,
      *                                 many entries = "Any Available" (a block is
      *                                 open if at least one of them is free).
-     * @return array{closed: bool, reason: ?string, slots: array<int, array>}
+     * @return array{closed: bool, reason: ?string, slots: array<int, array>, has_available_slots?: bool, unavailable_reason?: ?string}
      */
     public function generateSlots(
         string $salonId,
@@ -198,34 +239,20 @@ class AvailabilityService
     ): array {
         $day = Carbon::parse($date)->dayOfWeek; // 0 = Sunday ... 6 = Saturday
 
+        $closure = $this->salonClosureStatus($salonId, $date);
+        if ($closure['closed']) {
+            return $this->closed($closure['reason'] ?? 'This salon is closed on the selected day.');
+        }
+
         $salonHours = SalonWorkingHour::where('salon_id', $salonId)
             ->where('day_of_week', $day)
             ->first();
 
-        if (! $salonHours || $salonHours->is_closed) {
-            return $this->closed('The salon is closed on this day.');
-        }
-
         $salonOpen = $this->toMinutes($salonHours->open_time);
         $salonClose = $this->toMinutes($salonHours->close_time);
 
-        if ($salonOpen === null || $salonClose === null || $salonClose <= $salonOpen) {
-            return $this->closed('The salon has not published hours for this day.');
-        }
-
-        // A re-opened closure no longer blocks the day.
-        $isClosureDay = DB::table('salon_closures')
-            ->where('salon_id', $salonId)
-            ->whereDate('closed_date', $date)
-            ->whereNull('reopened_at')
-            ->exists();
-
-        if ($isClosureDay) {
-            return $this->closed('The salon is closed on this date.');
-        }
-
         if (empty($providerIds)) {
-            return $this->closed('No service provider can perform all the selected services.');
+            return $this->closed('No service provider is available for the selected date or time.');
         }
 
         $schedules = [];
@@ -239,6 +266,9 @@ class AvailabilityService
             : -1;
 
         $slots = [];
+        $allReasons = [];
+        $hasAnyAvailable = false;
+
         for ($start = $salonOpen; $start + self::SLOT_MINUTES <= $salonClose; $start += self::SLOT_MINUTES) {
             $end = $start + $durationMinutes;
 
@@ -264,6 +294,12 @@ class AvailabilityService
                 }
             }
 
+            if ($reason !== null) {
+                $allReasons[] = $reason;
+            } else {
+                $hasAnyAvailable = true;
+            }
+
             $slots[] = [
                 'time' => $this->toClock($start),
                 'end_time' => $this->toClock(min($end, 24 * 60)),
@@ -273,7 +309,42 @@ class AvailabilityService
             ];
         }
 
-        return ['closed' => false, 'reason' => null, 'slots' => $slots];
+        $unavailableReason = null;
+        if (! $hasAnyAvailable && ! empty($slots)) {
+            $counts = array_count_values($allReasons);
+            if (count($providerIds) === 1 && isset($schedules[$providerIds[0]])) {
+                $singleSchedule = $schedules[$providerIds[0]];
+                if ($singleSchedule['off']) {
+                    if ($singleSchedule['reason'] === 'provider_off') {
+                        $unavailableReason = 'This service provider is not working on the selected day. Please choose another date or provider.';
+                    } elseif ($singleSchedule['reason'] === 'on_leave') {
+                        $unavailableReason = 'This service provider is on leave on the selected date. Please choose another date or provider.';
+                    }
+                }
+            }
+
+            if ($unavailableReason === null) {
+                if (isset($counts['past']) && $counts['past'] === count($slots)) {
+                    $unavailableReason = 'All time slots for today have already passed. Please choose another date.';
+                } elseif (isset($counts['booked']) && $counts['booked'] > 0 && ! isset($counts['outside_shift']) && ! isset($counts['provider_off']) && ! isset($counts['on_leave'])) {
+                    $unavailableReason = 'All appointments for this service provider are fully booked on this date. Please choose another date or provider.';
+                } elseif (isset($counts['outside_shift']) && $counts['outside_shift'] === count($slots)) {
+                    $unavailableReason = 'This service provider has no scheduled shift on the selected day. Please choose another date or provider.';
+                } elseif (isset($counts['salon_closing']) && $counts['salon_closing'] === count($slots)) {
+                    $unavailableReason = 'Not enough time before the salon closes for the selected service duration.';
+                } else {
+                    $unavailableReason = 'No service provider is available for the selected date or time. Please choose another date or provider.';
+                }
+            }
+        }
+
+        return [
+            'closed' => false,
+            'reason' => null,
+            'slots' => $slots,
+            'has_available_slots' => $hasAnyAvailable,
+            'unavailable_reason' => $unavailableReason,
+        ];
     }
 
     /**
