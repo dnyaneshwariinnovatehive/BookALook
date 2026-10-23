@@ -71,6 +71,9 @@ class SalonInsights {
   final List<ServiceStat> services;
   final CampaignStats campaigns;
 
+  final BasicAnalytics? basicAnalytics;
+  final RetentionFunnel? retentionFunnel;
+
   final RepeatCustomers? repeatCustomers;
   final PeakHours? peakHours;
   final List<AreaStat> areas;
@@ -86,6 +89,8 @@ class SalonInsights {
     required this.campaigns,
     required this.advanced,
     this.planName,
+    this.basicAnalytics,
+    this.retentionFunnel,
     this.repeatCustomers,
     this.peakHours,
     this.areas = const [],
@@ -101,21 +106,38 @@ class SalonInsights {
     return SalonInsights(
       planName: d['plan_name'],
       advanced: d['advanced'] == true,
-      overview: Overview.fromJson(d['overview'] ?? {}),
-      services: ((d['services'] ?? []) as List).map((r) => ServiceStat.fromJson(r)).toList(),
-      campaigns: CampaignStats.fromJson(d['campaigns'] ?? {}),
-      repeatCustomers:
-          d['repeat_customers'] == null ? null : RepeatCustomers.fromJson(d['repeat_customers']),
-      peakHours: d['peak_hours'] == null ? null : PeakHours.fromJson(d['peak_hours']),
+      overview: Overview.fromJson(Map<String, dynamic>.from((d['overview'] ?? {}) as Map)),
+      services: ((d['services'] ?? []) as List)
+          .map((r) => ServiceStat.fromJson(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+      campaigns: CampaignStats.fromJson(Map<String, dynamic>.from((d['campaigns'] ?? {}) as Map)),
+      basicAnalytics: d['basic_analytics'] == null
+          ? null
+          : BasicAnalytics.fromJson(Map<String, dynamic>.from(d['basic_analytics'] as Map)),
+      retentionFunnel: d['retention_funnel'] == null
+          ? null
+          : RetentionFunnel.fromJson(Map<String, dynamic>.from(d['retention_funnel'] as Map)),
+      repeatCustomers: d['repeat_customers'] == null
+          ? null
+          : RepeatCustomers.fromJson(Map<String, dynamic>.from(d['repeat_customers'] as Map)),
+      peakHours: d['peak_hours'] == null
+          ? null
+          : PeakHours.fromJson(Map<String, dynamic>.from(d['peak_hours'] as Map)),
       areas: (((d['areas'] ?? {})['areas'] ?? []) as List)
-          .map((r) => AreaStat.fromJson(r))
+          .map((r) => AreaStat.fromJson(Map<String, dynamic>.from(r as Map)))
           .toList(),
       recommendedCombos: ((d['recommended_combos'] ?? []) as List)
-          .map((r) => ComboSuggestion.fromJson(r))
+          .map((r) => ComboSuggestion.fromJson(Map<String, dynamic>.from(r as Map)))
           .toList(),
-      upsell: ((d['upsell'] ?? []) as List).map((r) => UpsellTip.fromJson(r)).toList(),
-      crossSell: ((d['cross_sell'] ?? []) as List).map((r) => PairStat.fromJson(r)).toList(),
-      locked: ((json['locked'] ?? []) as List).map((r) => LockedSection.fromJson(r)).toList(),
+      upsell: ((d['upsell'] ?? []) as List)
+          .map((r) => UpsellTip.fromJson(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+      crossSell: ((d['cross_sell'] ?? []) as List)
+          .map((r) => PairStat.fromJson(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+      locked: ((json['locked'] ?? []) as List)
+          .map((r) => LockedSection.fromJson(Map<String, dynamic>.from(r as Map)))
+          .toList(),
     );
   }
 }
@@ -363,3 +385,132 @@ class LockedSection {
         reason: json['reason'] ?? '',
       );
 }
+
+class BasicAnalytics {
+  final RevenueTrend revenueTrend;
+  final List<StaffPerformanceStat> staffPerformance;
+
+  BasicAnalytics({
+    required this.revenueTrend,
+    required this.staffPerformance,
+  });
+
+  factory BasicAnalytics.fromJson(Map<String, dynamic> json) => BasicAnalytics(
+        revenueTrend: RevenueTrend.fromJson(
+            Map<String, dynamic>.from((json['revenue_trend'] ?? {}) as Map)),
+        staffPerformance: ((json['staff_performance'] ?? []) as List)
+            .map((r) => StaffPerformanceStat.fromJson(
+                Map<String, dynamic>.from(r as Map)))
+            .toList(),
+      );
+}
+
+class RevenueTrend {
+  final double totalRevenue;
+  final int totalBookings;
+  final List<WeeklyRevenue> weeks;
+
+  RevenueTrend({
+    required this.totalRevenue,
+    required this.totalBookings,
+    required this.weeks,
+  });
+
+  factory RevenueTrend.fromJson(Map<String, dynamic> json) => RevenueTrend(
+        totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
+        totalBookings: (json['total_bookings'] as num?)?.toInt() ?? 0,
+        weeks: ((json['weeks'] ?? []) as List)
+            .map((w) => WeeklyRevenue.fromJson(
+                Map<String, dynamic>.from(w as Map)))
+            .toList(),
+      );
+}
+
+class WeeklyRevenue {
+  final String label;
+  final String period;
+  final double revenue;
+  final int bookings;
+
+  WeeklyRevenue({
+    required this.label,
+    required this.period,
+    required this.revenue,
+    required this.bookings,
+  });
+
+  factory WeeklyRevenue.fromJson(Map<String, dynamic> json) => WeeklyRevenue(
+        label: (json['label'] ?? '').toString(),
+        period: (json['period'] ?? '').toString(),
+        revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
+        bookings: (json['bookings'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class StaffPerformanceStat {
+  final String id;
+  final String name;
+  final int bookings;
+  final double revenue;
+
+  StaffPerformanceStat({
+    required this.id,
+    required this.name,
+    required this.bookings,
+    required this.revenue,
+  });
+
+  factory StaffPerformanceStat.fromJson(Map<String, dynamic> json) => StaffPerformanceStat(
+        id: (json['id'] ?? '').toString(),
+        name: (json['name'] ?? 'Staff').toString(),
+        bookings: (json['bookings'] as num?)?.toInt() ?? 0,
+        revenue: (json['revenue'] as num?)?.toDouble() ?? 0.0,
+      );
+}
+
+class RetentionFunnel {
+  final int totalCustomers;
+  final RetentionFunnelStep firstVisits;
+  final RetentionFunnelStep secondVisits;
+  final RetentionFunnelStep thirdVisits;
+  final RetentionFunnelStep regularVisits;
+  final String benchmarkMessage;
+  final bool benchmarkIsGood;
+
+  RetentionFunnel({
+    required this.totalCustomers,
+    required this.firstVisits,
+    required this.secondVisits,
+    required this.thirdVisits,
+    required this.regularVisits,
+    required this.benchmarkMessage,
+    required this.benchmarkIsGood,
+  });
+
+  factory RetentionFunnel.fromJson(Map<String, dynamic> json) => RetentionFunnel(
+        totalCustomers: (json['total_customers'] as num?)?.toInt() ?? 0,
+        firstVisits: RetentionFunnelStep.fromJson(
+            Map<String, dynamic>.from((json['first_visits'] ?? {}) as Map)),
+        secondVisits: RetentionFunnelStep.fromJson(
+            Map<String, dynamic>.from((json['second_visits'] ?? {}) as Map)),
+        thirdVisits: RetentionFunnelStep.fromJson(
+            Map<String, dynamic>.from((json['third_visits'] ?? {}) as Map)),
+        regularVisits: RetentionFunnelStep.fromJson(
+            Map<String, dynamic>.from((json['regular_visits'] ?? {}) as Map)),
+        benchmarkMessage: (json['benchmark_message'] ?? '').toString(),
+        benchmarkIsGood: json['benchmark_is_good'] == true,
+      );
+}
+
+class RetentionFunnelStep {
+  final int count;
+  final double rate;
+
+  RetentionFunnelStep({required this.count, required this.rate});
+
+  factory RetentionFunnelStep.fromJson(Map<String, dynamic> json) => RetentionFunnelStep(
+        count: (json['count'] as num?)?.toInt() ?? 0,
+        rate: (json['rate'] as num?)?.toDouble() ?? 0.0,
+      );
+}
+

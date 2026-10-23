@@ -356,6 +356,7 @@ Route::prefix('partner')->group(function () {
         // What the salon's own bookings say about it. How much of the answer
         // comes back depends on the plan.
         Route::get('/salons/{salon_id}/insights', [\App\Http\Controllers\Api\Partner\InsightsController::class, 'show']);
+        Route::get('/salons/{salon_id}/walk-in/history', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'history']);
 
         Route::get('/salons/{salon_id}/wallet', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'getWallet']);
         Route::post('/salons/{salon_id}/wallet/quote', [\App\Http\Controllers\Api\Partner\PartnerWalletController::class, 'quote']);
@@ -468,7 +469,6 @@ Route::prefix('partner')->group(function () {
         Route::get('/salons/{salon_id}/walk-in/options', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'options']);
         Route::post('/salons/{salon_id}/walk-in/preview', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'preview']);
         Route::post('/salons/{salon_id}/appointments/walk-in', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'store']);
-        Route::get('/salons/{salon_id}/walk-in/history', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'history']);
         // Dynamic bill adjustment while an appointment is in progress
         Route::post('/salons/{salon_id}/appointments/{id}/add-service', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'addService']);
         Route::delete('/salons/{salon_id}/appointments/{id}/additions/{addition_id}', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'removeService']);

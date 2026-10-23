@@ -5,6 +5,7 @@ import '../../../../services/appointment_service.dart'; // Ensure correct path
 import '../../../../utils/time_fmt.dart';
 import '../../appointment_details_screen.dart'; // Fixed relative path
 import '../../walk_in_screen.dart';
+import '../../walk_in_history_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../widgets/wallet_coin_pill.dart';
@@ -157,6 +158,15 @@ class AppointmentsTabState extends State<AppointmentsTab> {
     if (added == true) _loadAppointments();
   }
 
+  Future<void> _openWalkInHistory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WalkInHistoryScreen(salonId: widget.salonId),
+      ),
+    );
+    if (mounted) _loadAppointments();
+  }
+
   Future<void> _openCloseDay() async {
     final closed = await CloseDaySheet.show(
       context,
@@ -264,9 +274,15 @@ class AppointmentsTabState extends State<AppointmentsTab> {
         return false;
       }
 
-      if (_selectedSource != _kAllSources &&
-          '${apt['booking_source']}'.toLowerCase() != _kSourceValues[_selectedSource]) {
-        return false;
+      if (_selectedSource != _kAllSources) {
+        final expected = _kSourceValues[_selectedSource];
+        final actual = '${apt['booking_source']}'.toLowerCase();
+        if (expected == 'walk_in') {
+          final isWalkIn = actual == 'walk_in' || actual == 'offline' || apt['walk_in_customer_name'] != null;
+          if (!isWalkIn) return false;
+        } else if (actual != expected) {
+          return false;
+        }
       }
 
       return true;
@@ -471,7 +487,7 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                 onTap: _openWalkIn,
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: wBg,
                     borderRadius: BorderRadius.circular(20),
@@ -493,7 +509,37 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: _openWalkInHistory,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.history, size: 15, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'History',
+                        style: GoogleFonts.outfit(
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               InkWell(
                 onTap: _openCloseDay,
                 borderRadius: BorderRadius.circular(20),
@@ -772,7 +818,9 @@ class AppointmentsTabState extends State<AppointmentsTab> {
   }
 
   Widget _buildDynamicAppointmentCard(Map<String, dynamic> apt, bool isDark) {
-    bool isWalkIn = apt['booking_source'] == 'walk_in';
+    bool isWalkIn = apt['booking_source'] == 'walk_in' ||
+        apt['booking_source'] == 'offline' ||
+        apt['walk_in_customer_name'] != null;
     String customerName = isWalkIn 
         ? (apt['walk_in_customer_name'] ?? 'Walk-In Customer') 
         : (apt['customer'] != null ? apt['customer']['name'] : 'Unknown Customer');

@@ -23,6 +23,7 @@ import 'package:partner_app/screens/dashboard/more/upgrade_plan_screen.dart';
 import 'package:partner_app/screens/dashboard/more/marketing_screen.dart';
 import 'package:partner_app/screens/dashboard/more/create_edit_salon_offer_screen.dart';
 import 'package:partner_app/screens/dashboard/tabs/settings/salon_timings_screen.dart';
+import 'package:partner_app/screens/walk_in_history_screen.dart';
 import 'package:partner_app/legal/legal_document_screen.dart';
 import 'package:partner_app/services/wallet_balance.dart';
 import 'package:partner_app/services/push_notification_service.dart';
@@ -297,6 +298,36 @@ class MoreMenuCatalog {
                 MaterialPageRoute(
                   builder: (_) =>
                       SalonOffersScreen(salonId: salonData['id'].toString()),
+                ),
+              );
+            },
+          ),
+          MoreMenuItem(
+            id: 'walk_in_history',
+            title: 'Walk-in History',
+            category: 'Salon management',
+            subtitle: 'Offline bookings, walk-in customer records & revenue receipts',
+            icon: Icons.history_edu_outlined,
+            iconColor: const Color(0xFF0284C7),
+            keywords: const [
+              'walk in',
+              'walk-in',
+              'walk in history',
+              'offline customers',
+              'counter booking',
+              'walk-in clients',
+              'offline history',
+              'receipts',
+              'walk in report',
+            ],
+            onSelect: (ctx, salonData, _) async {
+              await Navigator.push(
+                ctx,
+                MaterialPageRoute(
+                  builder: (_) => WalkInHistoryScreen(
+                    salonId: salonData['id'].toString(),
+                    salonName: salonData['name']?.toString(),
+                  ),
                 ),
               );
             },

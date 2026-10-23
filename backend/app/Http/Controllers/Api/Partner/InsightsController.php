@@ -32,20 +32,32 @@ class InsightsController extends Controller
 
     public function show(Request $request, string $salonId)
     {
-        $salon = Salon::where('admin_id', $request->user()->id)->findOrFail($salonId);
+        $user = $request->user();
+        if ($user->role === 'superadmin') {
+            $salon = Salon::findOrFail($salonId);
+        } else {
+            $salon = Salon::where('admin_id', $user->id)->findOrFail($salonId);
+        }
+
         $plan = $this->entitlements->activeSubscription($salon)?->plan;
 
-        $advanced = (bool) ($plan->has_advanced_insights ?? false);
-        $upsellLevel = $plan->has_upsell_recommendations ?? 'none';
-        $crossSellLevel = $plan->has_cross_sell_recommendations ?? 'none';
+        $isAdmin = in_array($user->role, ['admin', 'superadmin']);
+        $advanced = $isAdmin || (bool) ($plan->has_advanced_insights ?? false);
+        $upsellLevel = $isAdmin ? 'advanced' : ($plan->has_upsell_recommendations ?? 'none');
+        $crossSellLevel = $isAdmin ? 'advanced' : ($plan->has_cross_sell_recommendations ?? 'none');
 
         $payload = [
-            'plan_name' => $plan->name ?? null,
+            'plan_name' => $plan->name ?? ($isAdmin ? 'Admin Full Access' : null),
             'advanced' => $advanced,
 
-            // Always available to a paying salon.
+            // Always available to a paying salon or when logged in as admin.
             'overview' => $this->insights->overview($salon),
             'services' => $this->insights->services($salon),
+            'basic_analytics' => [
+                'revenue_trend' => $this->insights->revenueTrend($salon, 30),
+                'staff_performance' => $this->insights->staffPerformance($salon, 30),
+            ],
+            'retention_funnel' => $this->insights->retentionFunnel($salon),
         ];
 
         // Null when marketing is not deployed here. Omitted rather than sent as
@@ -92,7 +104,7 @@ class InsightsController extends Controller
         return response()->json([
             'success' => true,
             'data' => $payload,
-            'locked' => $this->lockedSections($advanced, $upsellLevel, $crossSellLevel),
+            'locked' => $isAdmin ? [] : $this->lockedSections($advanced, $upsellLevel, $crossSellLevel),
         ]);
     }
 

@@ -220,7 +220,7 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         'gender_focus': _genderFocus,
         if (_latitude != null) 'latitude': _latitude,
         if (_longitude != null) 'longitude': _longitude,
-        'preferred_plan_id': _selectedPlanId,
+        'preferred_plan_id': _commercialModel == 'subscription' ? _selectedPlanId : null,
         'preferred_commercial_model': _commercialModel,
         if (_commercialModel == 'commission' && reqRate != null) 'requested_commission_percentage': reqRate,
         'photo_paths': _photoPaths,
@@ -751,7 +751,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => _commercialModel = 'subscription'),
+                onTap: () => setState(() {
+                  _commercialModel = 'subscription';
+                  _commissionController.clear();
+                }),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
@@ -774,7 +777,10 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
             const SizedBox(width: 8),
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => _commercialModel = 'commission'),
+                onTap: () => setState(() {
+                  _commercialModel = 'commission';
+                  _selectedPlanId = null;
+                }),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
@@ -798,39 +804,41 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
         ),
         const SizedBox(height: 16),
 
-        _buildLabel('Preferred Subscription Plan (Optional)'),
-        DropdownButtonFormField<String>(
-          value: _selectedPlanId,
-          isExpanded: true,
-          decoration: InputDecoration(
-            hintText: 'Select preferred plan',
-            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
-            prefixIcon: Icon(Icons.card_membership_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
-          ),
-          items: [
-            const DropdownMenuItem<String>(
-              value: null,
-              child: Text('Not sure yet (Choose after approval)'),
+        if (_commercialModel == 'subscription') ...[
+          _buildLabel('Preferred Subscription Plan (Optional)'),
+          DropdownButtonFormField<String>(
+            value: _selectedPlanId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              hintText: 'Select preferred plan',
+              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26)),
+              prefixIcon: Icon(Icons.card_membership_outlined, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.38), size: 20),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surface,
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.lightBorder)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.accentColor)),
             ),
-            ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
-                  value: p['id'].toString(),
-                  child: Text('${p['name']} (₹${p['price']} / ${p['validity_days'] ?? p['duration_days'] ?? 30} days)'),
-                )),
-          ],
-          onChanged: (val) => setState(() => _selectedPlanId = val),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Preference only — your actual subscription purchase happens after SuperAdmin approval.',
-          style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody),
-        ),
-        const SizedBox(height: 16),
+            items: [
+              const DropdownMenuItem<String>(
+                value: null,
+                child: Text('Not sure yet (Choose after approval)'),
+              ),
+              ..._subscriptionPlans.map((p) => DropdownMenuItem<String>(
+                    value: p['id'].toString(),
+                    child: Text('${p['name']} (₹${p['price']} / ${p['validity_days'] ?? p['duration_days'] ?? 30} days)'),
+                  )),
+            ],
+            onChanged: (val) => setState(() => _selectedPlanId = val),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Preference only — your actual subscription purchase happens after SuperAdmin approval.',
+            style: TextStyle(fontSize: 11, color: AppTheme.lightTextBody),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         if (_commercialModel == 'commission') ...[
           _buildLabel('Requested Commission Rate (%) *'),

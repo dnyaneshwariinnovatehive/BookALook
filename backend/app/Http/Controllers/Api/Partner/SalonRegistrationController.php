@@ -151,7 +151,7 @@ class SalonRegistrationController extends Controller
                     'longitude' => $request->longitude,
                     'location_source' => $request->filled(['latitude', 'longitude']) ? 'owner' : $salon->location_source,
                     'gender_focus' => $request->gender_focus ?? 'Unisex',
-                    'preferred_plan_id' => $request->preferred_plan_id,
+                    'preferred_plan_id' => ($preferredModel === 'subscription') ? $request->preferred_plan_id : null,
                     'preferred_commercial_model' => $preferredModel,
                     'requested_commission_percentage' => $requestedComm,
                     'status' => 'pending_approval',
@@ -187,7 +187,7 @@ class SalonRegistrationController extends Controller
                     'advance_refundable' => false,
                     'advance_percentage_default' => 25.00,
                     'gender_focus' => $request->gender_focus ?? 'Unisex',
-                    'preferred_plan_id' => $request->preferred_plan_id,
+                    'preferred_plan_id' => ($preferredModel === 'subscription') ? $request->preferred_plan_id : null,
                     'preferred_commercial_model' => $preferredModel,
                     'requested_commission_percentage' => $requestedComm,
                 ]);

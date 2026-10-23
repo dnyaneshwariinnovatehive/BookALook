@@ -154,11 +154,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
       ],
 
       _heading('Basic Analytics (Last 30 Days)', 'Standard revenue charts & staff performance'),
-      _basicAnalyticsCard(dark),
+      _basicAnalyticsCard(insights, dark),
 
-      if (insights.advanced) ...[
+      if (insights.advanced && insights.retentionFunnel != null) ...[
         _heading('Retention Funnel', 'Exactly what percentage of first-timers come back'),
-        _retentionFunnelCard(dark),
+        _retentionFunnelCard(insights.retentionFunnel!, dark),
       ],
 
       if (insights.repeatCustomers != null) ...[
@@ -1017,44 +1017,181 @@ class _InsightsScreenState extends State<InsightsScreen> {
         ),
       );
 
-  Widget _basicAnalyticsCard(bool dark) {
+  Widget _basicAnalyticsCard(SalonInsights insights, bool dark) {
+    final analytics = insights.basicAnalytics;
+    final trend = analytics?.revenueTrend;
+    final weeks = trend?.weeks ?? [];
+    final staff = analytics?.staffPerformance ?? [];
+
+    final maxRevenue = weeks.fold<double>(
+      1.0,
+      (max, w) => w.revenue > max ? w.revenue : max,
+    );
+
     return _card(
       dark,
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('30-Day Revenue Trend', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          // Mocking a bar chart for revenue
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(7, (index) {
-              final heights = [40.0, 60.0, 30.0, 80.0, 50.0, 90.0, 70.0];
-              final labels = ['W1', 'W2', 'W3', 'W4', 'W1', 'W2', 'W3'];
-              return Column(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('30-Day Revenue Trend',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14.5, fontWeight: FontWeight.bold)),
+              if (trend != null)
+                Text(
+                  '₹${_inr(trend.totalRevenue)} · ${trend.totalBookings} booked',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.accentColor,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (weeks.isEmpty || (trend != null && trend.totalBookings == 0)) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: dark ? AppTheme.darkBg : AppTheme.lightBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
                 children: [
-                  Container(
-                    width: 24,
-                    height: heights[index],
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withValues(alpha: 0.8),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  Icon(Icons.bar_chart, size: 28, color: AppTheme.lightTextLight),
+                  const SizedBox(height: 6),
+                  Text('No completed bookings in the last 30 days',
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.lightTextBody)),
+                  const SizedBox(height: 2),
+                  Text('Revenue by week will be charted here automatically',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5, color: AppTheme.lightTextLight)),
+                ],
+              ),
+            ),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: weeks.map((w) {
+                final height = maxRevenue > 0
+                    ? ((w.revenue / maxRevenue) * 72.0).clamp(6.0, 72.0)
+                    : 6.0;
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          w.revenue > 0 ? '₹${_inr(w.revenue)}' : '₹0',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: w.revenue > 0
+                                ? (dark
+                                    ? AppTheme.darkTextHeading
+                                    : AppTheme.lightTextHeading)
+                                : AppTheme.lightTextLight,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: height,
+                          width: double.infinity,
+                          constraints: const BoxConstraints(maxWidth: 38),
+                          decoration: BoxDecoration(
+                            color: w.revenue > 0
+                                ? AppTheme.accentColor
+                                : (dark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(5)),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          w.label,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: dark
+                                ? AppTheme.darkTextHeading
+                                : AppTheme.lightTextHeading,
+                          ),
+                        ),
+                        Text(
+                          '${w.bookings} bks',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: AppTheme.lightTextLight,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(labels[index], style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                ],
-              );
-            }),
-          ),
+                );
+              }).toList(),
+            ),
+          ],
+
           const Divider(height: 32),
-          Text('Staff Performance (Bookings)', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold)),
+
+          Text('Staff Performance (Bookings)',
+              style: GoogleFonts.outfit(
+                  fontSize: 14.5, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          // Mock staff performance table
-          _staffRow('Alice', 124, 85000),
-          _staffRow('Bob', 98, 62000),
-          _staffRow('Charlie', 76, 45000),
+
+          if (staff.isEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: dark ? AppTheme.darkBg : AppTheme.lightBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.badge_outlined,
+                      size: 20, color: AppTheme.lightTextLight),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('No staff performance records yet',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Add staff in Staff Management and assign them to services to track individual bookings & earnings.',
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              color: AppTheme.lightTextLight,
+                              height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            ...staff.map((s) => _staffRow(s.name, s.bookings, s.revenue)),
+          ],
         ],
       ),
     );
@@ -1074,28 +1211,72 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _retentionFunnelCard(bool dark) {
+  Widget _retentionFunnelCard(RetentionFunnel funnel, bool dark) {
     return _card(
       dark,
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _funnelStep(100, 'First-time visitors', AppTheme.accentColor.withValues(alpha: 1.0)),
-          const SizedBox(height: 4),
-          _funnelStep(42, 'Returned for a 2nd visit', AppTheme.accentColor.withValues(alpha: 0.8)),
-          const SizedBox(height: 4),
-          _funnelStep(28, 'Returned for a 3rd visit', AppTheme.accentColor.withValues(alpha: 0.6)),
-          const SizedBox(height: 4),
-          _funnelStep(15, 'Became regulars (4+ visits)', AppTheme.accentColor.withValues(alpha: 0.4)),
+          _funnelStep(
+            funnel.firstVisits.rate,
+            '${funnel.firstVisits.count} First-time visitors',
+            AppTheme.accentColor.withValues(alpha: 1.0),
+          ),
+          const SizedBox(height: 6),
+          _funnelStep(
+            funnel.secondVisits.rate,
+            '${funnel.secondVisits.count} Returned for a 2nd visit',
+            AppTheme.accentColor.withValues(alpha: 0.8),
+          ),
+          const SizedBox(height: 6),
+          _funnelStep(
+            funnel.thirdVisits.rate,
+            '${funnel.thirdVisits.count} Returned for a 3rd visit',
+            AppTheme.accentColor.withValues(alpha: 0.6),
+          ),
+          const SizedBox(height: 6),
+          _funnelStep(
+            funnel.regularVisits.rate,
+            '${funnel.regularVisits.count} Became regulars (4+ visits)',
+            AppTheme.accentColor.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: funnel.benchmarkIsGood
+                  ? (dark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4))
+                  : (dark ? const Color(0xFF78350F).withValues(alpha: 0.25) : const Color(0xFFFFFBEB)),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: funnel.benchmarkIsGood
+                    ? const Color(0xFF86EFAC).withValues(alpha: 0.5)
+                    : const Color(0xFFFDE68A).withValues(alpha: 0.5),
+              ),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.insights, color: Color(0xFF16A34A), size: 16),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Your 42% 2nd-visit rate is above the 35% industry average.', style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF15803D)))),
+                Icon(
+                  funnel.benchmarkIsGood ? Icons.insights : Icons.lightbulb_outline,
+                  color: funnel.benchmarkIsGood
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFD97706),
+                  size: 18,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    funnel.benchmarkMessage,
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: funnel.benchmarkIsGood
+                          ? (dark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))
+                          : (dark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
               ],
             ),
           )
@@ -1104,25 +1285,28 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _funnelStep(int percentage, String label, Color color) {
+  Widget _funnelStep(double percentage, String label, Color color) {
     return Row(
       children: [
         Container(
-          width: 45,
+          width: 50,
           alignment: Alignment.centerRight,
-          child: Text('$percentage%', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+          child: Text(
+            '${percentage.toStringAsFixed(percentage.truncateToDouble() == percentage ? 0 : 1)}%',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: GoogleFonts.outfit(fontSize: 12)),
+              Text(label, style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w500)),
               const SizedBox(height: 4),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: percentage / 100.0,
+                  value: (percentage / 100.0).clamp(0.0, 1.0),
                   minHeight: 8,
                   backgroundColor: Colors.grey.withValues(alpha: 0.2),
                   valueColor: AlwaysStoppedAnimation(color),
@@ -1134,6 +1318,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       ],
     );
   }
+
 
   /// Indian digit grouping: ₹1,45,950 rather than ₹145,950.
   ///

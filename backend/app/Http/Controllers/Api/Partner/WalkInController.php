@@ -219,7 +219,10 @@ class WalkInController extends Controller
         $currentProviderId = $this->currentProviderId($request, $salonId);
 
         $baseQuery = Appointment::where('salon_id', $salonId)
-            ->where('booking_source', 'walk_in');
+            ->where(function ($q) {
+                $q->whereIn('booking_source', ['walk_in', 'offline'])
+                  ->orWhereNotNull('walk_in_customer_name');
+            });
 
         // Overall salon summary metrics for walk-ins
         $summaryQuery = clone $baseQuery;
@@ -313,11 +316,11 @@ class WalkInController extends Controller
                 return [
                     'id' => $s->id,
                     'service_id' => $s->service_id,
-                    'name' => $s->service->template->name ?? 'Service',
-                    'category' => $s->service->template->category->name ?? 'General',
+                    'name' => $s->service?->template?->name ?? 'Service',
+                    'category' => $s->service?->template?->category?->name ?? 'General',
                     'price' => (float) $s->price_at_booking,
                     'duration_minutes' => (int) $s->duration_minutes_at_booking,
-                    'serving_provider_name' => $s->servingProvider->user->name ?? null,
+                    'serving_provider_name' => $s->servingProvider?->user?->name ?? null,
                     'line_status' => $s->line_status,
                 ];
             })->values()->all();
@@ -326,11 +329,11 @@ class WalkInController extends Controller
                 return [
                     'id' => $add->id,
                     'service_id' => $add->service_id,
-                    'name' => $add->service->template->name ?? 'Additional Service',
+                    'name' => $add->service?->template?->name ?? 'Additional Service',
                     'price' => (float) $add->price_at_addition,
                     'duration_minutes' => (int) $add->duration_minutes_at_addition,
-                    'provider_name' => $add->provider->user->name ?? null,
-                    'added_by_name' => $add->addedBy->name ?? null,
+                    'provider_name' => $add->provider?->user?->name ?? null,
+                    'added_by_name' => $add->addedBy?->name ?? null,
                     'status' => $add->status,
                     'added_at' => $add->added_at ? Carbon::parse($add->added_at)->toIso8601String() : null,
                 ];
@@ -350,13 +353,13 @@ class WalkInController extends Controller
                 'customer_gender' => $a->walk_in_customer_gender,
                 'appointed_provider' => $a->appointedProvider ? [
                     'id' => $a->appointedProvider->id,
-                    'name' => $a->appointedProvider->user->name ?? 'Staff',
-                    'phone' => $a->appointedProvider->user->phone ?? null,
+                    'name' => $a->appointedProvider->user?->name ?? 'Staff',
+                    'phone' => $a->appointedProvider->user?->phone ?? null,
                 ] : null,
                 'serving_provider' => $a->servingProvider ? [
                     'id' => $a->servingProvider->id,
-                    'name' => $a->servingProvider->user->name ?? 'Staff',
-                    'phone' => $a->servingProvider->user->phone ?? null,
+                    'name' => $a->servingProvider->user?->name ?? 'Staff',
+                    'phone' => $a->servingProvider->user?->phone ?? null,
                 ] : null,
                 'services' => $services,
                 'service_additions' => $additions,
@@ -366,11 +369,11 @@ class WalkInController extends Controller
                 'final_billed_amount' => $a->final_billed_amount !== null ? (float) $a->final_billed_amount : null,
                 'payment_mode' => $a->payment_mode,
                 'payment_collected_at' => $a->payment_collected_at ? Carbon::parse($a->payment_collected_at)->toIso8601String() : null,
-                'payment_collected_by_name' => $a->paymentCollector->name ?? null,
+                'payment_collected_by_name' => $a->paymentCollector?->name ?? null,
                 'verification_method' => $a->verification_method,
                 'manual_check_in_reason' => $a->manual_check_in_reason,
-                'invoice_id' => $a->invoice->id ?? null,
-                'invoice_number' => $a->invoice->invoice_number ?? null,
+                'invoice_id' => $a->invoice?->id ?? null,
+                'invoice_number' => $a->invoice?->invoice_number ?? null,
             ];
         });
 

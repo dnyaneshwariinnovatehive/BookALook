@@ -321,9 +321,9 @@ class WalkInHistoryResponse {
       walkIns: ((json['walk_ins'] as List?) ?? [])
           .map((e) => WalkInHistoryItem.fromJson(e as Map<String, dynamic>))
           .toList(),
-      currentPage: pag['current_page'] ?? 1,
-      lastPage: pag['last_page'] ?? 1,
-      total: pag['total'] ?? 0,
+      currentPage: int.tryParse('${pag['current_page']}') ?? 1,
+      lastPage: int.tryParse('${pag['last_page']}') ?? 1,
+      total: int.tryParse('${pag['total']}') ?? 0,
       viewerRole: viewer['role']?.toString(),
       viewerProviderId: viewer['provider_id']?.toString(),
     );
@@ -346,10 +346,10 @@ class WalkInHistorySummary {
   });
 
   factory WalkInHistorySummary.fromJson(Map<String, dynamic> json) => WalkInHistorySummary(
-        totalWalkIns: json['total_walk_ins'] ?? 0,
-        todayWalkIns: json['today_walk_ins'] ?? 0,
-        inProgress: json['in_progress'] ?? 0,
-        completed: json['completed'] ?? 0,
+        totalWalkIns: int.tryParse('${json['total_walk_ins']}') ?? 0,
+        todayWalkIns: int.tryParse('${json['today_walk_ins']}') ?? 0,
+        inProgress: int.tryParse('${json['in_progress']}') ?? 0,
+        completed: int.tryParse('${json['completed']}') ?? 0,
         totalRevenue: double.tryParse('${json['total_revenue'] ?? 0}') ?? 0.0,
       );
 }
@@ -481,7 +481,7 @@ class WalkInHistoryServiceLine {
         name: json['name']?.toString() ?? 'Service',
         category: json['category']?.toString() ?? 'General',
         price: double.tryParse('${json['price'] ?? 0}') ?? 0.0,
-        durationMinutes: json['duration_minutes'] ?? 0,
+        durationMinutes: int.tryParse('${json['duration_minutes']}') ?? 0,
         servingProviderName: json['serving_provider_name']?.toString(),
         lineStatus: json['line_status']?.toString(),
       );
@@ -513,7 +513,7 @@ class WalkInHistoryAdditionLine {
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? 'Additional Service',
         price: double.tryParse('${json['price'] ?? 0}') ?? 0.0,
-        durationMinutes: json['duration_minutes'] ?? 0,
+        durationMinutes: int.tryParse('${json['duration_minutes']}') ?? 0,
         providerName: json['provider_name']?.toString(),
         addedByName: json['added_by_name']?.toString(),
         status: json['status']?.toString() ?? 'active',

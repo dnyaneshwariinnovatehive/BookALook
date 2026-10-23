@@ -60,6 +60,161 @@ class SalonInsightsService
     }
 
     /**
+     * Real 30-day revenue trend broken down into 4 weekly periods.
+     */
+    public function revenueTrend(Salon $salon, int $days = 30): array
+    {
+        $since = now()->subDays($days)->toDateString();
+
+        $totalStats = DB::table('appointments')
+            ->where('salon_id', $salon->id)
+            ->where('status', 'completed')
+            ->whereDate('appointment_date', '>=', $since)
+            ->selectRaw('COUNT(*) as bookings, COALESCE(SUM(COALESCE(final_billed_amount, total_amount)), 0) as revenue')
+            ->first();
+
+        // 4 weekly buckets covering the last ~28-30 days
+        $intervals = [
+            [
+                'label' => 'W1',
+                'start' => now()->subDays(28)->toDateString(),
+                'end' => now()->subDays(22)->toDateString(),
+                'period' => now()->subDays(28)->format('d M') . ' - ' . now()->subDays(22)->format('d M'),
+            ],
+            [
+                'label' => 'W2',
+                'start' => now()->subDays(21)->toDateString(),
+                'end' => now()->subDays(15)->toDateString(),
+                'period' => now()->subDays(21)->format('d M') . ' - ' . now()->subDays(15)->format('d M'),
+            ],
+            [
+                'label' => 'W3',
+                'start' => now()->subDays(14)->toDateString(),
+                'end' => now()->subDays(8)->toDateString(),
+                'period' => now()->subDays(14)->format('d M') . ' - ' . now()->subDays(8)->format('d M'),
+            ],
+            [
+                'label' => 'W4',
+                'start' => now()->subDays(7)->toDateString(),
+                'end' => now()->toDateString(),
+                'period' => now()->subDays(7)->format('d M') . ' - ' . now()->format('d M'),
+            ],
+        ];
+
+        $weeks = [];
+        foreach ($intervals as $interval) {
+            $stats = DB::table('appointments')
+                ->where('salon_id', $salon->id)
+                ->where('status', 'completed')
+                ->whereDate('appointment_date', '>=', $interval['start'])
+                ->whereDate('appointment_date', '<=', $interval['end'])
+                ->selectRaw('COUNT(*) as bookings, COALESCE(SUM(COALESCE(final_billed_amount, total_amount)), 0) as revenue')
+                ->first();
+
+            $weeks[] = [
+                'label' => $interval['label'],
+                'period' => $interval['period'],
+                'revenue' => round((float) ($stats->revenue ?? 0), 2),
+                'bookings' => (int) ($stats->bookings ?? 0),
+            ];
+        }
+
+        return [
+            'total_revenue' => round((float) ($totalStats->revenue ?? 0), 2),
+            'total_bookings' => (int) ($totalStats->bookings ?? 0),
+            'weeks' => $weeks,
+        ];
+    }
+
+    /**
+     * Real staff performance measured by completed bookings and revenue over the last 30 days.
+     */
+    public function staffPerformance(Salon $salon, int $days = 30): array
+    {
+        $since = now()->subDays($days)->toDateString();
+
+        $providers = DB::table('service_providers as sp')
+            ->join('users as u', 'u.id', '=', 'sp.user_id')
+            ->where('sp.salon_id', $salon->id)
+            ->whereNull('sp.deleted_at')
+            ->select('sp.id', 'u.name')
+            ->get();
+
+        $staff = [];
+        foreach ($providers as $p) {
+            $stats = DB::table('appointments as a')
+                ->where('a.salon_id', $salon->id)
+                ->where('a.status', 'completed')
+                ->whereDate('a.appointment_date', '>=', $since)
+                ->where(function ($q) use ($p) {
+                    $q->where('a.serving_provider_id', $p->id)
+                      ->orWhere(function ($sub) use ($p) {
+                          $sub->whereNull('a.serving_provider_id')
+                              ->where('a.appointed_provider_id', $p->id);
+                      });
+                })
+                ->selectRaw('COUNT(*) as bookings, COALESCE(SUM(COALESCE(a.final_billed_amount, a.total_amount)), 0) as revenue')
+                ->first();
+
+            $staff[] = [
+                'id' => (string) $p->id,
+                'name' => $p->name ?? 'Staff',
+                'bookings' => (int) ($stats->bookings ?? 0),
+                'revenue' => round((float) ($stats->revenue ?? 0), 2),
+            ];
+        }
+
+        usort($staff, function ($a, $b) {
+            if ($b['revenue'] != $a['revenue']) {
+                return $b['revenue'] <=> $a['revenue'];
+            }
+            return $b['bookings'] <=> $a['bookings'];
+        });
+
+        return $staff;
+    }
+
+    /**
+     * Real retention funnel calculated from customer visit history.
+     */
+    public function retentionFunnel(Salon $salon, int $days = self::WINDOW_DAYS): array
+    {
+        $rows = $this->customerRows($salon, now()->subDays($days)->toDateString());
+        $total = $rows->count();
+
+        $v1 = $total;
+        $v2 = $rows->filter(fn ($r) => (int) $r->visits >= 2)->count();
+        $v3 = $rows->filter(fn ($r) => (int) $r->visits >= 3)->count();
+        $v4 = $rows->filter(fn ($r) => (int) $r->visits >= 4)->count();
+
+        $rate1 = $total > 0 ? 100.0 : 0.0;
+        $rate2 = $total > 0 ? round($v2 / $total * 100, 1) : 0.0;
+        $rate3 = $total > 0 ? round($v3 / $total * 100, 1) : 0.0;
+        $rate4 = $total > 0 ? round($v4 / $total * 100, 1) : 0.0;
+
+        if ($total === 0) {
+            $benchmarkMessage = 'No customer visits recorded yet. As appointments are completed, return visit rates will appear here.';
+            $benchmarkIsGood = false;
+        } elseif ($rate2 >= 35.0) {
+            $benchmarkMessage = "Your {$rate2}% 2nd-visit rate is above the 35% industry average.";
+            $benchmarkIsGood = true;
+        } else {
+            $benchmarkMessage = "Your {$rate2}% 2nd-visit rate is below the 35% industry average. Sending a quick follow-up offer can turn first-timers into regulars.";
+            $benchmarkIsGood = false;
+        }
+
+        return [
+            'total_customers' => $total,
+            'first_visits' => ['count' => $v1, 'rate' => $rate1],
+            'second_visits' => ['count' => $v2, 'rate' => $rate2],
+            'third_visits' => ['count' => $v3, 'rate' => $rate3],
+            'regular_visits' => ['count' => $v4, 'rate' => $rate4],
+            'benchmark_message' => $benchmarkMessage,
+            'benchmark_is_good' => $benchmarkIsGood,
+        ];
+    }
+
+    /**
      * How the customer base splits by loyalty, and who is slipping away.
      *
      * "At risk" is the segment that pays for itself: customers who came often
@@ -433,10 +588,15 @@ class SalonInsightsService
             ->where('a.salon_id', $salon->id)
             ->where('a.status', 'completed')
             ->whereDate('a.appointment_date', '>=', $since)
-            ->whereNotNull(DB::raw('COALESCE(u.phone, a.walk_in_customer_phone)'))
-            ->groupBy(DB::raw('COALESCE(u.phone, a.walk_in_customer_phone)'))
+            ->where(function ($q) {
+                $q->whereNotNull('u.phone')
+                  ->orWhereNotNull('a.walk_in_customer_phone')
+                  ->orWhereNotNull('a.walk_in_customer_name')
+                  ->orWhereNotNull('a.customer_id');
+            })
+            ->groupBy(DB::raw("COALESCE(u.phone, a.walk_in_customer_phone, a.walk_in_customer_name, CAST(a.id AS VARCHAR))"))
             ->selectRaw(
-                'MAX(COALESCE(u.name, a.walk_in_customer_name)) as name, '
+                'MAX(COALESCE(u.name, a.walk_in_customer_name, \'Walk-in Customer\')) as name, '
                 .'COUNT(*) as visits, '
                 .'COALESCE(SUM(COALESCE(a.final_billed_amount, a.total_amount)), 0) as spend, '
                 .'MAX(a.appointment_date) as last_visit'
