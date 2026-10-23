@@ -871,6 +871,11 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
                 _selectedServiceBySalon[id] = service['id'].toString();
               });
             },
+            onServiceDeselected: (service) {
+              setState(() {
+                _selectedServiceBySalon.remove(id);
+              });
+            },
             onToggleFavourite: () => _toggleFavourite(id),
           );
         },

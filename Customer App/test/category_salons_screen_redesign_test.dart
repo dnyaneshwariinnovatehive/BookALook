@@ -78,6 +78,48 @@ void main() {
       expect(selectedService!['name'], "Men's Haircut");
     });
 
+    testWidgets('DiscoverySalonCard deselects service when tapped again', (tester) async {
+      final sampleSalon = {
+        'id': 'salon-1',
+        'name': 'Glow Up Studio',
+        'address': 'Koregaon Park, Pune',
+        'category_services': [
+          {'id': 'svc-1', 'name': "Men's Haircut", 'price': 350},
+        ],
+      };
+
+      Map<String, dynamic>? selectedService;
+      Map<String, dynamic>? deselectedService;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DiscoverySalonCard(
+              salon: sampleSalon,
+              categoryId: 'cat-hair',
+              categoryName: 'Hair',
+              onToggleFavourite: () {},
+              onServiceSelected: (svc) => selectedService = svc,
+              onServiceDeselected: (svc) => deselectedService = svc,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Tap once to select
+      await tester.tap(find.text("Men's Haircut"));
+      await tester.pump();
+      expect(selectedService?['id'], 'svc-1');
+      expect(deselectedService, isNull);
+
+      // Tap again to deselect
+      await tester.tap(find.text("Men's Haircut"));
+      await tester.pump();
+      expect(deselectedService?['id'], 'svc-1');
+    });
+
     testWidgets('CategorySalonsScreen renders header, search, and category pills', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

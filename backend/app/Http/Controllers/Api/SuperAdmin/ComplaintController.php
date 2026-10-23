@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Appointment;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\Review;
 use App\Models\Salon;
 use App\Services\AuditLogger;
 use App\Services\ReviewService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -118,10 +120,23 @@ class ComplaintController extends Controller
     public function show(string $id)
     {
         $complaint = Complaint::with([
-            'salon:id,name,status,admin_id,suspended_reason',
-            'salon.admin:id,name,phone,email',
-            'customer:id,name,phone',
-            'appointment:id,appointment_date,start_time,total_amount',
+            'salon' => function ($q) {
+                $q->with(['city', 'subArea', 'admin']);
+            },
+            'customer',
+            'appointment' => function ($q) {
+                $q->with([
+                    'services.service.template.category',
+                    'services.servingProvider.user',
+                    'serviceAdditions.service.template',
+                    'serviceAdditions.provider.user',
+                    'serviceAdditions.addedBy',
+                    'appointedProvider.user',
+                    'servingProvider.user',
+                    'paymentCollector',
+                    'invoice',
+                ]);
+            },
             'resolver:id,name',
         ])->find($id);
 
@@ -130,21 +145,115 @@ class ComplaintController extends Controller
         }
 
         $salonId = $complaint->salon_id;
+        $customer = $complaint->customer;
+        $salon = $complaint->salon;
+        $appointment = $complaint->appointment;
+
+        $customerDetails = $customer ? [
+            'id' => $customer->id,
+            'name' => $customer->name ?? 'Customer',
+            'phone' => $customer->phone ?? null,
+            'email' => $customer->email ?? null,
+            'created_at' => $customer->created_at ? Carbon::parse($customer->created_at)->format('d M Y') : null,
+            'total_platform_bookings' => Appointment::where('customer_id', $customer->id)->count(),
+            'salon_visits_count' => Appointment::where('customer_id', $customer->id)->where('salon_id', $salonId)->count(),
+            'past_complaints_count' => Complaint::where('customer_id', $customer->id)->where('id', '!=', $complaint->id)->count(),
+        ] : null;
+
+        $salonDetails = $salon ? [
+            'id' => $salon->id,
+            'name' => $salon->name,
+            'status' => $salon->status,
+            'suspended_reason' => $salon->suspended_reason,
+            'contact_phone' => $salon->admin?->phone,
+            'contact_email' => $salon->admin?->email,
+            'street_address' => $salon->address,
+            'address' => $salon->address,
+            'city_name' => $salon->city?->name ?? $salon->city_name ?? '—',
+            'sub_area_name' => $salon->subArea?->name ?? '—',
+            'pincode' => $salon->pincode,
+            'gender_focus' => $salon->gender_focus ?? 'Unisex',
+            'commercial_model' => $salon->commission_opt_in ? 'commission' : ($salon->preferred_commercial_model ?? 'subscription'),
+            'commission_percentage' => $salon->commission_percentage !== null ? (float) $salon->commission_percentage : ($salon->requested_commission_percentage !== null ? (float) $salon->requested_commission_percentage : null),
+            'owner_name' => $salon->admin?->name,
+            'owner_phone' => $salon->admin?->phone,
+            'owner_email' => $salon->admin?->email,
+            'created_at' => $salon->created_at ? Carbon::parse($salon->created_at)->format('d M Y') : null,
+        ] : null;
+
+        $appointmentDetails = null;
+        if ($appointment) {
+            $services = $appointment->services->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'name' => $s->service?->template?->name ?? 'Service',
+                    'category' => $s->service?->template?->category?->name ?? 'General',
+                    'price' => (float) $s->price_at_booking,
+                    'duration_minutes' => (int) $s->duration_minutes_at_booking,
+                    'serving_provider_name' => $s->servingProvider?->user?->name ?? null,
+                    'line_status' => $s->line_status,
+                ];
+            })->values()->all();
+
+            $additions = $appointment->serviceAdditions->map(function ($add) {
+                return [
+                    'id' => $add->id,
+                    'name' => $add->service?->template?->name ?? 'Additional Service',
+                    'price' => (float) $add->price_at_addition,
+                    'duration_minutes' => (int) $add->duration_minutes_at_addition,
+                    'provider_name' => $add->provider?->user?->name ?? null,
+                    'added_by_name' => $add->addedBy?->name ?? null,
+                    'status' => $add->status,
+                    'added_at' => $add->added_at ? Carbon::parse($add->added_at)->format('d M Y, h:i A') : null,
+                ];
+            })->values()->all();
+
+            $appointmentDetails = [
+                'id' => $appointment->id,
+                'appointment_date' => $appointment->appointment_date ? Carbon::parse($appointment->appointment_date)->format('d M Y') : null,
+                'start_time' => $appointment->start_time,
+                'end_time' => $appointment->end_time,
+                'status' => $appointment->status,
+                'payment_status' => $appointment->payment_status ?? ($appointment->balance_amount <= 0 && in_array($appointment->status, ['completed', 'checked_in']) ? 'paid' : ($appointment->advance_amount > 0 ? 'advance_paid' : 'pending')),
+                'payment_mode' => $appointment->payment_mode,
+                'booking_source' => $appointment->booking_source,
+                'total_amount' => $appointment->total_amount !== null ? (float) $appointment->total_amount : null,
+                'advance_paid_amount' => $appointment->advance_amount !== null ? (float) $appointment->advance_amount : ($appointment->advance_paid_amount !== null ? (float) $appointment->advance_paid_amount : null),
+                'balance_amount' => $appointment->balance_amount !== null ? (float) $appointment->balance_amount : null,
+                'final_billed_amount' => $appointment->final_billed_amount !== null ? (float) $appointment->final_billed_amount : null,
+                'first_time_discount_amount' => $appointment->first_time_discount_amount !== null ? (float) $appointment->first_time_discount_amount : null,
+                'appointed_provider_name' => $appointment->appointedProvider?->user?->name,
+                'appointed_provider_phone' => $appointment->appointedProvider?->user?->phone,
+                'serving_provider_name' => $appointment->servingProvider?->user?->name,
+                'serving_provider_phone' => $appointment->servingProvider?->user?->phone,
+                'payment_collected_by' => $appointment->paymentCollector?->name,
+                'invoice_id' => $appointment->invoice?->id,
+                'invoice_number' => $appointment->invoice?->invoice_number,
+                'verification_method' => $appointment->verification_method,
+                'checked_in_at' => $appointment->checked_in_at ? Carbon::parse($appointment->checked_in_at)->format('d M Y, h:i A') : null,
+                'completed_at' => $appointment->completed_at ? Carbon::parse($appointment->completed_at)->format('d M Y, h:i A') : null,
+                'cancelled_at' => $appointment->cancelled_at ? Carbon::parse($appointment->cancelled_at)->format('d M Y, h:i A') : null,
+                'cancellation_reason' => $appointment->cancellation_reason,
+                'customer_notes' => $appointment->customer_notes,
+                'services' => $services,
+                'service_additions' => $additions,
+            ];
+        }
 
         return response()->json([
             'success' => true,
             'data' => $this->present($complaint) + [
                 'description' => $complaint->description,
             ],
+            'customer_details' => $customerDetails,
+            'salon_details' => $salonDetails,
+            'appointment_details' => $appointmentDetails,
             'salon_context' => [
                 'rating' => $this->reviews->summaryFor($salonId),
                 'complaints_total' => Complaint::where('salon_id', $salonId)->count(),
                 'complaints_outstanding' => Complaint::where('salon_id', $salonId)->outstanding()->count(),
                 'warnings_sent' => Complaint::where('salon_id', $salonId)
                     ->where('action_taken', Complaint::ACTION_WARNING)->count(),
-                // What the customer publicly said about this same visit, if
-                // anything. A five-star review beside an angry complaint is
-                // worth knowing about.
                 'review_for_this_visit' => $this->reviewForVisit($complaint),
             ],
         ]);

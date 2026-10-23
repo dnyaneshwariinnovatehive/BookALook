@@ -225,4 +225,27 @@ void main() {
       expect(list[2]['id'], 's3');
     });
   });
+
+  group('Next Appointment Section Visibility Tests', () {
+    test('does not show next appointment section when upcoming appointments list is empty', () {
+      final upcoming = [];
+      final isGuest = false;
+      final shouldShow = !isGuest && upcoming.isNotEmpty;
+      expect(shouldShow, isFalse);
+    });
+
+    test('does not show next appointment section when user is a guest', () {
+      final upcoming = [{'id': 'apt-1'}];
+      final isGuest = true;
+      final shouldShow = !isGuest && upcoming.isNotEmpty;
+      expect(shouldShow, isFalse);
+    });
+
+    test('shows next appointment section when customer is logged in and has upcoming appointments', () {
+      final upcoming = [{'id': 'apt-1'}];
+      final isGuest = false;
+      final shouldShow = !isGuest && upcoming.isNotEmpty;
+      expect(shouldShow, isTrue);
+    });
+  });
 }

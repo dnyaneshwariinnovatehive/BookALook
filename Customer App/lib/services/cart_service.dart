@@ -161,6 +161,35 @@ class CartService {
     await getGlobalCart();
   }
 
+  /// Find the cart item ID for a given service ID in the active global cart.
+  static String? findCartItemIdForService(String serviceId) {
+    final cart = globalCartNotifier.value;
+    if (cart == null) return null;
+    final items = (cart['items'] as List?) ?? const [];
+    for (final item in items) {
+      if (item is Map) {
+        final sId = item['service_id'] ?? item['service']?['id'];
+        if (sId != null && sId.toString() == serviceId.toString()) {
+          final itemId = item['id'];
+          if (itemId != null) return itemId.toString();
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Removes a service from the active cart using its service ID.
+  Future<void> removeService(String serviceId) async {
+    String? itemId = findCartItemIdForService(serviceId);
+    if (itemId == null) {
+      await getGlobalCart();
+      itemId = findCartItemIdForService(serviceId);
+    }
+    if (itemId != null) {
+      await removeItem(itemId);
+    }
+  }
+
   /// Updates quantity of an item in the cart.
   /// If newQuantity is 0 or less, removes the item.
   /// Otherwise updates the item quantity atomically.

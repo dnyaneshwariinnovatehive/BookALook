@@ -518,10 +518,11 @@ class _HomeTabState extends State<HomeTab> {
             // 5. Categories
             _buildCategoriesSection(),
 
-            const SizedBox(height: 15),
-
-            // 6. Next appointment
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildNextAppointmentSection()),
+            // 6. Next appointment (only shown if there is an upcoming appointment)
+            if (!widget.isGuest && _upcoming.isNotEmpty) ...[
+              const SizedBox(height: 15),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: _buildNextAppointmentSection()),
+            ],
 
             if (!widget.isGuest && _deduplicatedBookAgainList.isNotEmpty) ...[
               const SizedBox(height: 15),
@@ -1020,124 +1021,11 @@ class _HomeTabState extends State<HomeTab> {
   // NEXT APPOINTMENT SECTION
   // ---------------------------------------------------------------------------
   Widget _buildNextAppointmentSection() {
-    // isDark picks the hero card's own decorative palette (gradient stops,
-    // accent tints, the muted label). Those are a one-off illustration, not
-    // theme roles; the shared shadow and glow come from the theme tokens.
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (_upcoming.isNotEmpty && !widget.isGuest) {
-      return _buildNextAppointmentCard(_upcoming.first);
+    if (_upcoming.isEmpty || widget.isGuest) {
+      return const SizedBox.shrink();
     }
 
-    // Empty state
-    return Container(
-      width: double.infinity,
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: isDark 
-            ? [
-                const Color(0xFF3B2A56),
-                const Color(0xFF382650),
-                const Color(0xFF332047),
-              ]
-            : [
-                const Color(0xFFEDE4FF),
-                const Color(0xFFE9DDFD),
-                const Color(0xFFE3D3FB),
-              ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.black.withValues(alpha: 0.2) : AppTheme.accentColor.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    context.colors.cardGlow,
-                    context.colors.cardGlow.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.accentColor.withValues(alpha: 0.15) : AppTheme.accentColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(100),
-                    border: Border.all(
-                      color: isDark ? AppTheme.accentColor.withValues(alpha: 0.3) : AppTheme.accentColor.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_month_rounded, size: 12, color: AppTheme.accentColor),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'YOUR NEXT APPOINTMENT',
-                        style: TextStyle(
-                            color: AppTheme.accentColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      children: [
-                        Icon(Icons.calendar_today_outlined,
-                            size: 40,
-                            color: isDark ? AppTheme.accentColor.withValues(alpha: 0.4) : AppTheme.accentColor.withValues(alpha: 0.25)),
-                        const SizedBox(height: 12),
-                        Text(
-                          widget.isGuest
-                              ? 'Sign in to see your appointments'
-                              : 'No upcoming appointments ? Book Now',
-                          style: TextStyle(
-                              color: isDark ? Colors.white70 : const Color(0xFF756A8F),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return _buildNextAppointmentCard(_upcoming.first);
   }
 
   Widget _buildNextAppointmentCard(Map<String, dynamic> booking) {

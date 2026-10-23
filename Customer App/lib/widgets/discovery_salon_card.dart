@@ -21,6 +21,7 @@ class DiscoverySalonCard extends StatefulWidget {
   final String? serviceId;
   final String? selectedServiceId;
   final ValueChanged<Map<String, dynamic>>? onServiceSelected;
+  final ValueChanged<Map<String, dynamic>>? onServiceDeselected;
 
   const DiscoverySalonCard({
     super.key,
@@ -33,6 +34,7 @@ class DiscoverySalonCard extends StatefulWidget {
     this.serviceId,
     this.selectedServiceId,
     this.onServiceSelected,
+    this.onServiceDeselected,
   });
 
   @override
@@ -54,8 +56,7 @@ class _DiscoverySalonCardState extends State<DiscoverySalonCard> {
   @override
   void didUpdateWidget(covariant DiscoverySalonCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedServiceId != null &&
-        widget.selectedServiceId != _selectedServiceId) {
+    if (widget.selectedServiceId != _selectedServiceId) {
       _selectedServiceId = widget.selectedServiceId;
     }
   }
@@ -102,6 +103,37 @@ class _DiscoverySalonCardState extends State<DiscoverySalonCard> {
     final salonId = widget.salon['id'].toString();
     AppHaptics.selectionClick();
 
+    final bool isCurrentlySelected =
+        (_selectedServiceId == sId) || CartService.isServiceInCart(sId);
+
+    if (isCurrentlySelected) {
+      // Toggle OFF: deselect and remove from cart
+      setState(() {
+        if (_selectedServiceId == sId) {
+          _selectedServiceId = null;
+        }
+        _addingServiceIds.add(sId);
+      });
+
+      widget.onServiceDeselected?.call(service);
+
+      try {
+        await _cartService.removeService(sId);
+        if (!mounted) return;
+        AppHaptics.lightImpact();
+        setState(() {});
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {});
+      } finally {
+        if (mounted) {
+          setState(() => _addingServiceIds.remove(sId));
+        }
+      }
+      return;
+    }
+
+    // Toggle ON: select and add to cart
     setState(() {
       _selectedServiceId = sId;
     });
