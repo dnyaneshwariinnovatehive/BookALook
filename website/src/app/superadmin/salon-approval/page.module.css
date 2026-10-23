@@ -266,6 +266,175 @@
   font-weight: 500;
 }
 
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-heading);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sectionCount {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.55rem 2rem 0.55rem 2.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--surface-2);
+  color: var(--text-heading);
+  outline: none;
+  transition: all 0.2s;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-color);
+  background: var(--surface-color);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.clearSearchBtn {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+}
+
+.clearSearchBtn:hover {
+  color: var(--text-heading);
+}
+
+.filterSelect {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  background: var(--surface-2);
+  color: var(--text-heading);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+  flex: 0 1 auto;
+}
+
+.filterSelect:focus {
+  border-color: var(--accent-color);
+  background: var(--surface-color);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.filterSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filterActive {
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.clearFiltersBtn {
+  padding: 0.55rem 0.9rem;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.clearFiltersBtn:hover {
+  background: var(--surface-3);
+  color: var(--text-heading);
+  border-color: var(--border-color);
+}
+
+.assignedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+
+.unassignedBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
 .statusPill {
   display: inline-block;
   padding: 4px 8px;
@@ -278,6 +447,31 @@
 }
 
 .statusPill[data-status='new'] {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.statusPill[data-status='assigned'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.statusPill[data-status='onboarded'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statusPill[data-status='rejected'] {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.statusPill[data-status='needs_correction'] {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.statusPill[data-status='pending_approval'] {
   background: var(--color-warning-bg);
   color: var(--color-warning);
 }

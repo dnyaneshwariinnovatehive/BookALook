@@ -21,6 +21,10 @@ class SuperAdminEnquiryController extends Controller
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:5|max:100',
             'search' => 'nullable|string|max:100',
+            'city_id' => 'nullable|string|max:36',
+            'sub_area_id' => 'nullable|string|max:36',
+            'status' => 'nullable|string|max:30',
+            'collaborator_id' => 'nullable|string|max:36',
             'column' => 'nullable|in:created_at,salon_name,owner_name,city,status',
             'direction' => 'nullable|in:asc,desc',
         ]);
@@ -39,6 +43,31 @@ class SuperAdminEnquiryController extends Controller
                   ->orWhere('city', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
             });
+        }
+
+        if ($request->filled('city_id')) {
+            $cityId = $request->input('city_id');
+            $query->where(function ($q) use ($cityId) {
+                $q->where('city_id', $cityId)
+                  ->orWhereHas('cityRecord', fn ($qc) => $qc->where('id', $cityId));
+            });
+        }
+
+        if ($request->filled('sub_area_id')) {
+            $query->where('sub_area_id', $request->input('sub_area_id'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('collaborator_id')) {
+            $colId = $request->input('collaborator_id');
+            if ($colId === 'unassigned') {
+                $query->whereNull('assigned_collaborator_id');
+            } else {
+                $query->where('assigned_collaborator_id', $colId);
+            }
         }
 
         $column = $request->input('column');

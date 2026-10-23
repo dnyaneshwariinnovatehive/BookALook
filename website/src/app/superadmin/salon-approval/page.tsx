@@ -2,8 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Icon from '@/components/admin/Icon';
 import { Pagination, SortHeader, useConfirm, useDebounced, type SortDir } from '@/components/admin/ui';
 import styles from './page.module.css';
+
+interface City {
+  id: string;
+  name: string;
+  state?: string;
+}
+
+interface SubArea {
+  id: string;
+  name: string;
+}
 
 interface Salon {
   id: string;
@@ -11,8 +23,12 @@ interface Salon {
   status?: string;
   created_at: string;
   resubmitted_at?: string;
-  city?: { name: string };
-  admin?: { name: string };
+  city?: { id?: string; name: string };
+  sub_area?: { id?: string; name: string };
+  subArea?: { id?: string; name: string };
+  admin?: { id?: string; name: string; phone?: string; email?: string };
+  assigned_collaborator?: { id: string; name: string } | null;
+  assignedCollaborator?: { id: string; name: string } | null;
 }
 
 interface Enquiry {
@@ -176,6 +192,7 @@ export default function SalonApprovalQueue() {
   const [salons, setSalons] = useState<Salon[]>([]);
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
 
   const [error, setError] = useState('');
 
@@ -184,14 +201,25 @@ export default function SalonApprovalQueue() {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [justAssignedIds, setJustAssignedIds] = useState<string[]>([]);
 
-  // Both lists are server-paginated now, so each keeps its own page and sort.
+  // Enquiries state & filters
   const [searchEnquiries, setSearchEnquiries] = useState('');
+  const [enquiriesCityId, setEnquiriesCityId] = useState('');
+  const [enquiriesSubAreaId, setEnquiriesSubAreaId] = useState('');
+  const [enquiriesSubAreas, setEnquiriesSubAreas] = useState<SubArea[]>([]);
+  const [enquiriesStatus, setEnquiriesStatus] = useState('');
+  const [enquiriesCollaboratorId, setEnquiriesCollaboratorId] = useState('');
   const [enquiriesPage, setEnquiriesPage] = useState(1);
   const [enquiriesPerPage, setEnquiriesPerPage] = useState(20);
   const [enquiriesSort, setEnquiriesSort] = useState<{ key: string; dir: SortDir } | null>(null);
   const [enquiriesMeta, setEnquiriesMeta] = useState<PageMeta>(EMPTY_META);
 
+  // Salons state & filters
   const [searchSalons, setSearchSalons] = useState('');
+  const [salonsCityId, setSalonsCityId] = useState('');
+  const [salonsSubAreaId, setSalonsSubAreaId] = useState('');
+  const [salonsSubAreas, setSalonsSubAreas] = useState<SubArea[]>([]);
+  const [salonsStatus, setSalonsStatus] = useState('');
+  const [salonsCollaboratorId, setSalonsCollaboratorId] = useState('');
   const [salonsPage, setSalonsPage] = useState(1);
   const [salonsPerPage, setSalonsPerPage] = useState(20);
   const [salonsSort, setSalonsSort] = useState<{ key: string; dir: SortDir } | null>(null);
@@ -207,10 +235,13 @@ export default function SalonApprovalQueue() {
   const enquiriesSeq = useRef(0);
   const salonsSeq = useRef(0);
 
-  // Loading is derived from "have we rendered the current query yet?" so nothing
-  // needs a synchronous setState inside the effect body.
+  // Loading derived from query keys
   const enquiriesKey = [
     debouncedEnquiries,
+    enquiriesCityId,
+    enquiriesSubAreaId,
+    enquiriesStatus,
+    enquiriesCollaboratorId,
     enquiriesPage,
     enquiriesPerPage,
     enquiriesSort?.key ?? '',
@@ -221,6 +252,10 @@ export default function SalonApprovalQueue() {
 
   const salonsKey = [
     debouncedSalons,
+    salonsCityId,
+    salonsSubAreaId,
+    salonsStatus,
+    salonsCollaboratorId,
     salonsPage,
     salonsPerPage,
     salonsSort?.key ?? '',
@@ -229,6 +264,7 @@ export default function SalonApprovalQueue() {
   const [salonsLoadedKey, setSalonsLoadedKey] = useState<string | null>(null);
   const salonsLoading = salonsLoadedKey !== salonsKey;
 
+  // Load collaborators on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -238,7 +274,7 @@ export default function SalonApprovalQueue() {
         const json = await res.json();
         if (!cancelled) setCollaborators(json.data || []);
       } catch {
-        // The picker falls back to "Select collaborator"; not worth an alert.
+        // Picker falls back to "Select collaborator"
       }
     })();
     return () => {
@@ -246,6 +282,77 @@ export default function SalonApprovalQueue() {
     };
   }, []);
 
+  // Load cities on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/cities');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setCities(data);
+        }
+      } catch {
+        // City filter dropdown fallback
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load sub-areas for enquiries when enquiriesCityId changes
+  useEffect(() => {
+    if (!enquiriesCityId) {
+      setEnquiriesSubAreas([]);
+      setEnquiriesSubAreaId('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/cities/${enquiriesCityId}/sub-areas`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data?.sub_areas)) {
+          setEnquiriesSubAreas(data.sub_areas);
+        }
+      } catch {
+        setEnquiriesSubAreas([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enquiriesCityId]);
+
+  // Load sub-areas for salons when salonsCityId changes
+  useEffect(() => {
+    if (!salonsCityId) {
+      setSalonsSubAreas([]);
+      setSalonsSubAreaId('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/cities/${salonsCityId}/sub-areas`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data?.sub_areas)) {
+          setSalonsSubAreas(data.sub_areas);
+        }
+      } catch {
+        setSalonsSubAreas([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [salonsCityId]);
+
+  // Fetch enquiries with all active filters
   useEffect(() => {
     const seq = ++enquiriesSeq.current;
     (async () => {
@@ -255,6 +362,10 @@ export default function SalonApprovalQueue() {
           per_page: String(enquiriesPerPage),
         });
         if (debouncedEnquiries) params.set('search', debouncedEnquiries);
+        if (enquiriesCityId) params.set('city_id', enquiriesCityId);
+        if (enquiriesSubAreaId) params.set('sub_area_id', enquiriesSubAreaId);
+        if (enquiriesStatus) params.set('status', enquiriesStatus);
+        if (enquiriesCollaboratorId) params.set('collaborator_id', enquiriesCollaboratorId);
         if (enquiriesSort) {
           params.set('column', enquiriesSort.key);
           params.set('direction', enquiriesSort.dir);
@@ -277,11 +388,21 @@ export default function SalonApprovalQueue() {
     })();
 
     return () => {
-      // Marks this run stale so its result is discarded.
       enquiriesSeq.current += 1;
     };
-  }, [debouncedEnquiries, enquiriesPage, enquiriesPerPage, enquiriesSort, enquiriesKey]);
+  }, [
+    debouncedEnquiries,
+    enquiriesCityId,
+    enquiriesSubAreaId,
+    enquiriesStatus,
+    enquiriesCollaboratorId,
+    enquiriesPage,
+    enquiriesPerPage,
+    enquiriesSort,
+    enquiriesKey,
+  ]);
 
+  // Fetch pending salons with all active filters
   useEffect(() => {
     const seq = ++salonsSeq.current;
     (async () => {
@@ -291,6 +412,10 @@ export default function SalonApprovalQueue() {
           per_page: String(salonsPerPage),
         });
         if (debouncedSalons) params.set('search', debouncedSalons);
+        if (salonsCityId) params.set('city_id', salonsCityId);
+        if (salonsSubAreaId) params.set('sub_area_id', salonsSubAreaId);
+        if (salonsStatus) params.set('status', salonsStatus);
+        if (salonsCollaboratorId) params.set('collaborator_id', salonsCollaboratorId);
         if (salonsSort) {
           params.set('column', salonsSort.key);
           params.set('direction', salonsSort.dir);
@@ -313,7 +438,17 @@ export default function SalonApprovalQueue() {
     return () => {
       salonsSeq.current += 1;
     };
-  }, [debouncedSalons, salonsPage, salonsPerPage, salonsSort, salonsKey]);
+  }, [
+    debouncedSalons,
+    salonsCityId,
+    salonsSubAreaId,
+    salonsStatus,
+    salonsCollaboratorId,
+    salonsPage,
+    salonsPerPage,
+    salonsSort,
+    salonsKey,
+  ]);
 
   /** asc -> desc -> unsorted, and always back to page 1. */
   const onSortEnquiries = (key: string) => {
@@ -375,6 +510,30 @@ export default function SalonApprovalQueue() {
     }
   };
 
+  const hasEnquiriesFilters = Boolean(
+    searchEnquiries || enquiriesCityId || enquiriesSubAreaId || enquiriesStatus || enquiriesCollaboratorId
+  );
+  const clearEnquiriesFilters = () => {
+    setSearchEnquiries('');
+    setEnquiriesCityId('');
+    setEnquiriesSubAreaId('');
+    setEnquiriesStatus('');
+    setEnquiriesCollaboratorId('');
+    setEnquiriesPage(1);
+  };
+
+  const hasSalonsFilters = Boolean(
+    searchSalons || salonsCityId || salonsSubAreaId || salonsStatus || salonsCollaboratorId
+  );
+  const clearSalonsFilters = () => {
+    setSearchSalons('');
+    setSalonsCityId('');
+    setSalonsSubAreaId('');
+    setSalonsStatus('');
+    setSalonsCollaboratorId('');
+    setSalonsPage(1);
+  };
+
   const sortProps = (key: string, sort: { key: string; dir: SortDir } | null) => ({
     active: sort?.key === key,
     dir: sort?.key === key ? sort.dir : null,
@@ -394,17 +553,122 @@ export default function SalonApprovalQueue() {
 
       {/* New Enquiries Section */}
       <div style={{ marginBottom: '4rem' }}>
-        <div className={styles.controlsRow}>
-          <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: 0 }}>New Salon Enquiries</h2>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search enquiries by name or city..."
-            value={searchEnquiries}
-            onChange={(e) => { setSearchEnquiries(e.target.value); setEnquiriesPage(1); }}
-            aria-label="Search enquiries"
-          />
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            New Salon Enquiries
+            {enquiriesMeta.total > 0 && (
+              <span className={styles.sectionCount}>{enquiriesMeta.total}</span>
+            )}
+          </h2>
         </div>
+
+        {/* Filter Bar */}
+        <div className={styles.filterBar}>
+          <div className={styles.searchWrap}>
+            <Icon name="search" size={15} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search enquiries by salon, owner, phone..."
+              value={searchEnquiries}
+              onChange={(e) => { setSearchEnquiries(e.target.value); setEnquiriesPage(1); }}
+              aria-label="Search enquiries"
+            />
+            {searchEnquiries && (
+              <button
+                type="button"
+                className={styles.clearSearchBtn}
+                onClick={() => { setSearchEnquiries(''); setEnquiriesPage(1); }}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          <select
+            className={`${styles.filterSelect} ${enquiriesCityId ? styles.filterActive : ''}`}
+            value={enquiriesCityId}
+            onChange={(e) => {
+              setEnquiriesCityId(e.target.value);
+              setEnquiriesSubAreaId('');
+              setEnquiriesPage(1);
+            }}
+            aria-label="Filter enquiries by city"
+          >
+            <option value="">All Cities</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${enquiriesSubAreaId ? styles.filterActive : ''}`}
+            value={enquiriesSubAreaId}
+            disabled={!enquiriesCityId || enquiriesSubAreas.length === 0}
+            onChange={(e) => {
+              setEnquiriesSubAreaId(e.target.value);
+              setEnquiriesPage(1);
+            }}
+            aria-label="Filter enquiries by sub-area"
+          >
+            <option value="">
+              {!enquiriesCityId
+                ? 'Select City First'
+                : enquiriesSubAreas.length === 0
+                ? 'No Sub-Areas'
+                : 'All Sub-Areas'}
+            </option>
+            {enquiriesSubAreas.map((sa) => (
+              <option key={sa.id} value={sa.id}>{sa.name}</option>
+            ))}
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${enquiriesStatus ? styles.filterActive : ''}`}
+            value={enquiriesStatus}
+            onChange={(e) => {
+              setEnquiriesStatus(e.target.value);
+              setEnquiriesPage(1);
+            }}
+            aria-label="Filter enquiries by status"
+          >
+            <option value="">All Statuses</option>
+            <option value="new">New</option>
+            <option value="assigned">Assigned</option>
+            <option value="onboarded">Onboarded</option>
+            <option value="rejected">Rejected</option>
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${enquiriesCollaboratorId ? styles.filterActive : ''}`}
+            value={enquiriesCollaboratorId}
+            onChange={(e) => {
+              setEnquiriesCollaboratorId(e.target.value);
+              setEnquiriesPage(1);
+            }}
+            aria-label="Filter enquiries by collaborator"
+          >
+            <option value="">All Collaborators</option>
+            <option value="unassigned">Only Unassigned</option>
+            {collaborators.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {hasEnquiriesFilters && (
+            <button
+              type="button"
+              className={styles.clearFiltersBtn}
+              onClick={clearEnquiriesFilters}
+              title="Reset all enquiry filters"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
@@ -421,9 +685,13 @@ export default function SalonApprovalQueue() {
               {loading && enquiries.length === 0 ? (
                 <tr><td colSpan={6} className={styles.emptyState}>Loading enquiries...</td></tr>
               ) : error ? (
-                <tr><td colSpan={6} className={styles.emptyState} style={{ color: 'red' }}>{error}</td></tr>
+                <tr><td colSpan={6} className={styles.emptyState} style={{ color: 'var(--color-danger)' }}>{error}</td></tr>
               ) : enquiries.length === 0 ? (
-                <tr><td colSpan={6} className={styles.emptyState}>No enquiries found.</td></tr>
+                <tr>
+                  <td colSpan={6} className={styles.emptyState}>
+                    {hasEnquiriesFilters ? 'No enquiries match your active filters.' : 'No enquiries found.'}
+                  </td>
+                </tr>
               ) : (
                 enquiries.map((enq) => (
                   <tr key={enq.id} className={`${styles.tr} ${justAssignedIds.includes(enq.id) ? styles.rowSuccess : ''}`}>
@@ -433,7 +701,7 @@ export default function SalonApprovalQueue() {
                           <img
                             src={enq.photo_url}
                             alt=""
-                            style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border)' }}
+                            style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--border-color)' }}
                           />
                         ) : null}
                         <div>
@@ -503,46 +771,182 @@ export default function SalonApprovalQueue() {
 
       {/* Existing Salon Approval Queue */}
       <div>
-        <div className={styles.controlsRow}>
-          <h2 className={styles.title} style={{ fontSize: '1.5rem', marginBottom: 0 }}>Pending Onboarding (Salon Approval Queue)</h2>
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search salons by name or city..."
-            value={searchSalons}
-            onChange={(e) => { setSearchSalons(e.target.value); setSalonsPage(1); }}
-            aria-label="Search pending salons"
-          />
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Pending Onboarding (Salon Approval Queue)
+            {salonsMeta.total > 0 && (
+              <span className={styles.sectionCount}>{salonsMeta.total}</span>
+            )}
+          </h2>
         </div>
+
+        {/* Filter Bar */}
+        <div className={styles.filterBar}>
+          <div className={styles.searchWrap}>
+            <Icon name="search" size={15} className={styles.searchIcon} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search salons by name, city, owner, sub-area..."
+              value={searchSalons}
+              onChange={(e) => { setSearchSalons(e.target.value); setSalonsPage(1); }}
+              aria-label="Search pending salons"
+            />
+            {searchSalons && (
+              <button
+                type="button"
+                className={styles.clearSearchBtn}
+                onClick={() => { setSearchSalons(''); setSalonsPage(1); }}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          <select
+            className={`${styles.filterSelect} ${salonsCityId ? styles.filterActive : ''}`}
+            value={salonsCityId}
+            onChange={(e) => {
+              setSalonsCityId(e.target.value);
+              setSalonsSubAreaId('');
+              setSalonsPage(1);
+            }}
+            aria-label="Filter salons by city"
+          >
+            <option value="">All Cities</option>
+            {cities.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${salonsSubAreaId ? styles.filterActive : ''}`}
+            value={salonsSubAreaId}
+            disabled={!salonsCityId || salonsSubAreas.length === 0}
+            onChange={(e) => {
+              setSalonsSubAreaId(e.target.value);
+              setSalonsPage(1);
+            }}
+            aria-label="Filter salons by sub-area"
+          >
+            <option value="">
+              {!salonsCityId
+                ? 'Select City First'
+                : salonsSubAreas.length === 0
+                ? 'No Sub-Areas'
+                : 'All Sub-Areas'}
+            </option>
+            {salonsSubAreas.map((sa) => (
+              <option key={sa.id} value={sa.id}>{sa.name}</option>
+            ))}
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${salonsStatus ? styles.filterActive : ''}`}
+            value={salonsStatus}
+            onChange={(e) => {
+              setSalonsStatus(e.target.value);
+              setSalonsPage(1);
+            }}
+            aria-label="Filter salons by status"
+          >
+            <option value="">All Pending Statuses</option>
+            <option value="pending_approval">Pending Approval</option>
+            <option value="needs_correction">Needs Correction</option>
+          </select>
+
+          <select
+            className={`${styles.filterSelect} ${salonsCollaboratorId ? styles.filterActive : ''}`}
+            value={salonsCollaboratorId}
+            onChange={(e) => {
+              setSalonsCollaboratorId(e.target.value);
+              setSalonsPage(1);
+            }}
+            aria-label="Filter salons by collaborator"
+          >
+            <option value="">All Collaborators</option>
+            <option value="unassigned">Only Unassigned</option>
+            {collaborators.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {hasSalonsFilters && (
+            <button
+              type="button"
+              className={styles.clearFiltersBtn}
+              onClick={clearSalonsFilters}
+              title="Reset all salon filters"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
         <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
               <tr>
                 <SortHeader label="Salon Name" {...sortProps('name', salonsSort)} onClick={() => onSortSalons('name')} />
-                <SortHeader label="City" {...sortProps('city', salonsSort)} onClick={() => onSortSalons('city')} />
-                <th className={styles.th}>Owner/Admin</th>
+                <SortHeader label="Area" {...sortProps('city', salonsSort)} onClick={() => onSortSalons('city')} />
+                <th className={styles.th}>Owner / Admin</th>
+                <th className={styles.th}>Assigned Collaborator</th>
+                <SortHeader label="Status" {...sortProps('status', salonsSort)} onClick={() => onSortSalons('status')} />
                 <SortHeader label="Submitted At" {...sortProps('created_at', salonsSort)} onClick={() => onSortSalons('created_at')} />
                 <th className={styles.th} style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {salonsLoading && salons.length === 0 ? (
-                <tr><td colSpan={5} className={styles.emptyState}>Loading salons...</td></tr>
+                <tr><td colSpan={7} className={styles.emptyState}>Loading salons...</td></tr>
               ) : salons.length === 0 ? (
-                <tr><td colSpan={5} className={styles.emptyState}>No pending salons.</td></tr>
+                <tr>
+                  <td colSpan={7} className={styles.emptyState}>
+                    {hasSalonsFilters ? 'No pending salons match your active filters.' : 'No pending salons.'}
+                  </td>
+                </tr>
               ) : (
                 salons.map((salon) => (
                   <tr key={salon.id} className={styles.tr}>
                     <td className={`${styles.td} ${styles.salonName}`}>
-                      {salon.name}
-                      {salon.status === 'needs_correction' && (
-                        <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.75rem', borderRadius: 9999, background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', fontWeight: 600 }}>
-                          Needs Correction
+                      <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{salon.name}</div>
+                    </td>
+                    <td className={styles.td}>
+                      {(salon.sub_area?.name || salon.subArea?.name) ? (
+                        <>
+                          <div className={styles.areaName}>{salon.sub_area?.name || salon.subArea?.name}</div>
+                          <div className={styles.areaCity}>{salon.city?.name || 'N/A'}</div>
+                        </>
+                      ) : (
+                        <div className={styles.areaCity}>{salon.city?.name || 'N/A'}</div>
+                      )}
+                    </td>
+                    <td className={styles.td}>
+                      <div style={{ fontWeight: 500, color: 'var(--text-heading)' }}>{salon.admin?.name || '—'}</div>
+                      {salon.admin?.phone && (
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{salon.admin.phone}</div>
+                      )}
+                    </td>
+                    <td className={styles.td}>
+                      {(salon.assigned_collaborator?.name || salon.assignedCollaborator?.name) ? (
+                        <span className={styles.assignedBadge}>
+                          👤 {salon.assigned_collaborator?.name || salon.assignedCollaborator?.name}
+                        </span>
+                      ) : (
+                        <span className={styles.unassignedBadge}>
+                          Unassigned
                         </span>
                       )}
                     </td>
-                    <td className={styles.td}>{salon.city?.name || 'N/A'}</td>
-                    <td className={styles.td}>{salon.admin?.name || 'N/A'}</td>
+                    <td className={styles.td}>
+                      <span className={styles.statusPill} data-status={salon.status}>
+                        {salon.status === 'needs_correction'
+                          ? 'NEEDS CORRECTION'
+                          : (salon.status || 'PENDING').toUpperCase().replace(/_/g, ' ')}
+                      </span>
+                    </td>
                     <td className={styles.td}>{formatDateTime(salon.created_at)}</td>
                     <td className={styles.td} style={{ textAlign: 'right' }}>
                       <Link href={`/superadmin/salon-approval/${salon.id}`} className={styles.actionButton}>
