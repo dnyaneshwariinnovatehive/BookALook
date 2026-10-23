@@ -807,23 +807,23 @@
 }
 
 .iconSuccess {
-  background: rgba(34, 197, 94, 0.12) !important;
-  color: #16a34a !important;
+  background: var(--color-success-bg) !important;
+  color: var(--color-success) !important;
 }
 
 .iconInfo {
-  background: rgba(59, 130, 246, 0.12) !important;
-  color: #2563eb !important;
+  background: var(--color-info-bg) !important;
+  color: var(--color-info) !important;
 }
 
 .iconAccent {
-  background: rgba(147, 51, 234, 0.12) !important;
-  color: #9333ea !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-text) !important;
 }
 
 .iconDanger {
-  background: rgba(239, 68, 68, 0.12) !important;
-  color: #dc2626 !important;
+  background: var(--color-danger-bg) !important;
+  color: var(--color-danger) !important;
 }
 
 .statTileLabel {
@@ -1110,7 +1110,7 @@
 }
 
 .advanceCol {
-  color: #16a34a;
+  color: var(--color-success);
   font-weight: 600;
 }
 

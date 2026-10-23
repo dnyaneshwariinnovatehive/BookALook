@@ -341,11 +341,11 @@ export default function NotificationsPage() {
         </div>
         <div className={styles.card}>
           <div className={styles.cardTitle}>Active</div>
-          <div className={styles.cardValue} style={{ color: '#16a34a' }}>{activeCount}</div>
+          <div className={styles.cardValue} style={{ color: 'var(--color-success)' }}>{activeCount}</div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardTitle}>Disabled</div>
-          <div className={styles.cardValue} style={{ color: '#dc2626' }}>{disabledCount}</div>
+          <div className={styles.cardValue} style={{ color: 'var(--color-danger)' }}>{disabledCount}</div>
         </div>
       </div>
 
@@ -393,10 +393,10 @@ export default function NotificationsPage() {
           {filteredTemplates.map(t => (
             <tr key={t.id}>
               <td>
-                <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 4, fontSize: 15 }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4, fontSize: 15 }}>
                   {t.name || t.title || t.default_title}
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   {t.description || t.key}
                 </div>
                 {t.category && <span className={styles.categoryPill}>{t.category}</span>}
@@ -443,12 +443,12 @@ export default function NotificationsPage() {
               
               <div className={styles.editorSection}>
                 {/* Audience Info */}
-                <div className={styles.sectionBox} style={{ backgroundColor: '#f8fafc', marginBottom: '24px' }}>
+                <div className={styles.sectionBox} style={{ backgroundColor: 'var(--surface-2)', marginBottom: '24px' }}>
                   <h3 style={{ marginBottom: 4 }}>Who receives this?</h3>
-                  <div style={{ fontWeight: 600, fontSize: 16, color: '#0f172a', marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, fontSize: 16, color: 'var(--text-heading)', marginBottom: 4 }}>
                     👤 {editingTemplate.audience.label}
                   </div>
-                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
                     {(() => {
                       switch (editingTemplate.audience.key) {
                         case 'customer': return 'Person who books and receives salon services.';
@@ -463,11 +463,11 @@ export default function NotificationsPage() {
                 </div>
 
                 {/* General */}
-                <div className={styles.sectionBox} style={{ borderLeft: '4px solid #10b981' }}>
+                <div className={styles.sectionBox} style={{ borderLeft: '4px solid var(--color-success)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <h3 style={{ marginBottom: 4 }}>Notification Status</h3>
-                      <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Turn this automatic notification on or off.</p>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Turn this automatic notification on or off.</p>
                     </div>
                     <label className={styles.toggleSwitch}>
                       <input 
@@ -663,9 +663,9 @@ export default function NotificationsPage() {
 
                 {/* WhatsApp Note */}
                 {editingTemplate.channels?.includes('whatsapp') && (
-                  <div className={styles.sectionBox} style={{ borderLeft: '4px solid #128c7e', background: '#f0fdf4' }}>
-                    <h3 style={{ color: '#128c7e' }}>WhatsApp Template</h3>
-                    <p style={{ margin: 0, fontSize: 13, color: '#334155' }}>
+                  <div className={styles.sectionBox} style={{ borderLeft: '4px solid var(--accent-color)', background: 'var(--accent-soft)' }}>
+                    <h3 style={{ color: 'var(--accent-text)' }}>WhatsApp Template</h3>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-body)' }}>
                       This event also triggers a WhatsApp message. WhatsApp messages require Meta approval and are managed in a separate system. Changes made here will only affect In-App and Push.
                     </p>
                   </div>
@@ -706,7 +706,7 @@ export default function NotificationsPage() {
                       <div className={styles.previewMessage}>
                         {renderPreview(editForm.message)}
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8, textAlign: 'right' }}>2m ago</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, textAlign: 'right' }}>2m ago</div>
                     </div>
                   </div>
 
@@ -725,7 +725,7 @@ export default function NotificationsPage() {
                 </button>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
-                <button className={styles.resetBtn} style={{ color: '#475569', borderColor: '#cbd5e1' }} onClick={() => setEditingTemplate(null)}>
+                <button className={styles.resetBtn} style={{ color: 'var(--text-muted)', borderColor: 'var(--border-strong)' }} onClick={() => setEditingTemplate(null)}>
                   Cancel
                 </button>
                 <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>

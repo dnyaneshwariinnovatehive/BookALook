@@ -451,7 +451,7 @@ export default function ComplaintsPage() {
                   <span className={styles.reviewStars}>
                     ★ {context.review_for_this_visit.rating} / 5
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-warning)', fontWeight: 600 }}>
                     Public review for this visit
                   </span>
                 </div>

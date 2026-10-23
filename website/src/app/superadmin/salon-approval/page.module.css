@@ -273,13 +273,13 @@
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  background: #d1e7dd;
-  color: #0f5132;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .statusPill[data-status='new'] {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .actionRow {
