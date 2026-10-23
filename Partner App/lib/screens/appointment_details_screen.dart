@@ -5,6 +5,7 @@ import '../services/insights_api.dart';
 import '../utils/time_fmt.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
+import 'add_extra_service_sheet.dart';
 import 'qr_scanner_screen.dart';
 
 class AppointmentDetailsScreen extends StatefulWidget {
@@ -26,11 +27,13 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
   String get salonId => widget.salonId;
   bool _isBusy = false;
   SalonInsights? _insights;
+  List<BillLine> _extraLines = [];
 
   @override
   void initState() {
     super.initState();
     _loadInsights();
+    _refresh();
   }
 
   Future<void> _loadInsights() async {
@@ -51,9 +54,27 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
         appointment['total_amount'] = target.appointment.totalAmount;
         appointment['balance_amount'] = target.appointment.balanceAmount;
         appointment['payment_mode'] = target.appointment.paymentMode;
+        _extraLines = target.bill.lines.where((l) => l.addedMidAppointment).toList();
       });
     } catch (_) {
       // The screen stays usable on a refresh failure.
+    }
+  }
+
+  Future<void> _addExtraServices() async {
+    final updated = await AddExtraServiceSheet.show(
+      context,
+      salonId: salonId,
+      appointmentId: appointment['id'].toString(),
+      servingProviderId: appointment['serving_provider_id']?.toString() ?? appointment['appointed_provider_id']?.toString(),
+      servingProviderName: appointment['appointed_provider']?['user']?['name'] ?? appointment['appointed_provider']?['name'],
+    );
+    if (updated != null && mounted) {
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Added to the bill.')),
+      );
     }
   }
 
@@ -284,6 +305,45 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   )
                 else
                   Text(serviceNames, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
+                if (_extraLines.isNotEmpty) ...[
+                  const Divider(height: 20),
+                  Text('Extra Services Added', style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF9850F1), fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  ..._extraLines.map((extra) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(extra.name, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                              if (extra.providerName != null)
+                                Text('By ${extra.providerName}', style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                        Text('+₹${extra.price.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF9850F1))),
+                      ],
+                    ),
+                  )),
+                ],
+                if (isInProgress) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _isBusy ? null : _addExtraServices,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: Text('Add extra services',
+                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF9850F1),
+                      side: BorderSide(color: const Color(0xFF9850F1).withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      minimumSize: const Size(double.infinity, 38),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),

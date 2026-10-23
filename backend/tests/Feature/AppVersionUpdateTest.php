@@ -25,8 +25,10 @@ class AppVersionUpdateTest extends TestCase
         parent::setUp();
 
         $this->superadmin = $this->createUser('superadmin');
-        $this->customer = $this->createUser('customer');
+        $this->customer = $this->customer = $this->createUser('customer');
         Cache::flush();
+        AppUpdatePolicy::query()->delete();
+        AppRelease::query()->delete();
     }
 
     /* ── 1. Semantic Version Comparator Unit / Logic ─────────── */

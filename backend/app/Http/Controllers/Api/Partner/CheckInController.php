@@ -160,7 +160,9 @@ class CheckInController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'service_id' => 'required|string|exists:services,id',
+            'service_id' => 'required_without:service_ids|string|exists:services,id',
+            'service_ids' => 'required_without:service_id|array|min:1',
+            'service_ids.*' => 'string|exists:services,id',
             'provider_id' => 'nullable|exists:service_providers,id',
         ]);
 
@@ -178,14 +180,19 @@ class CheckInController extends Controller
             ], 422);
         }
 
-        // The service has to be this salon's, or another salon's price would
-        // land on this bill.
-        $service = Service::with('template')
-            ->where('salon_id', $salonId)
-            ->find($request->service_id);
+        // Determine list of unique service IDs to add
+        $rawIds = $request->input('service_ids') ?: [$request->input('service_id')];
+        $serviceIds = array_values(array_unique(array_filter($rawIds)));
 
-        if (! $service) {
-            return response()->json(['message' => 'That service is not offered by this salon.'], 422);
+        // The services have to belong to this salon, or another salon's price would
+        // land on this bill.
+        $services = Service::with('template')
+            ->where('salon_id', $salonId)
+            ->whereIn('id', $serviceIds)
+            ->get();
+
+        if ($services->count() !== count($serviceIds)) {
+            return response()->json(['message' => 'One or more services are not offered by this salon.'], 422);
         }
 
         $providerId = $request->input('provider_id')
@@ -196,12 +203,16 @@ class CheckInController extends Controller
             return response()->json(['message' => 'That staff member does not work at this salon.'], 422);
         }
 
-        $this->checkIn->addExtraService($appointment, $service, $providerId, $request->user());
+        $this->checkIn->addExtraServices($appointment, $services->all(), $providerId, $request->user());
 
         $appointment = $appointment->fresh($this->checkIn->relations());
 
+        $message = $services->count() === 1
+            ? "{$services[0]->template->name} added to the bill."
+            : "{$services->count()} services added to the bill.";
+
         return response()->json([
-            'message' => "{$service->template->name} added to the bill.",
+            'message' => $message,
             'appointment' => $this->present($appointment),
             'bill' => $this->checkIn->bill($appointment),
         ], 201);

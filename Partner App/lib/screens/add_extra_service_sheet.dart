@@ -4,13 +4,14 @@ import '../services/check_in_api.dart';
 import '../services/walk_in_api.dart';
 import '../theme/app_theme.dart';
 
-/// Put an extra service on a bill while the customer is still in the chair.
+/// Put extra services on a bill while the customer is still in the chair.
 ///
 /// The customer agreed verbally, so nothing here waits on their phone. What it
-/// does insist on is recording who delivered the extra: it defaults to whoever
+/// does insist on is recording who delivered the extras: it defaults to whoever
 /// is serving the appointment, but a second staff member stepping in is the
 /// case this exists for, and their commission depends on getting it right.
 ///
+/// Supports selecting multiple services at once.
 /// Returns the refreshed bill when something was added.
 class AddExtraServiceSheet extends StatefulWidget {
   final String salonId;
@@ -60,7 +61,7 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
   bool _isSubmitting = false;
   String? _error;
 
-  String? _serviceId;
+  final Set<String> _selectedServiceIds = {};
   String? _providerId;
   String _search = '';
 
@@ -100,18 +101,27 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
     }
   }
 
-  WalkInService? get _selectedService =>
-      _options?.services.where((s) => s.id == _serviceId).firstOrNull;
+  List<WalkInService> get _selectedServices =>
+      _options?.services.where((s) => _selectedServiceIds.contains(s.id)).toList() ?? [];
 
   WalkInProvider? get _selectedProvider =>
       _options?.providers.where((p) => p.id == _providerId).firstOrNull;
 
-  bool get _providerIsUntrained {
+  double get _totalPrice =>
+      _selectedServices.fold(0.0, (sum, s) => sum + s.price);
+
+  int get _totalDuration =>
+      _selectedServices.fold(0, (sum, s) => sum + s.durationMinutes);
+
+  List<WalkInService> get _untrainedServices {
     final provider = _selectedProvider;
-    final service = _selectedService;
-    if (provider == null || service == null) return false;
-    return !provider.serviceIds.contains(service.id);
+    if (provider == null) return [];
+    return _selectedServices
+        .where((s) => !provider.serviceIds.contains(s.id))
+        .toList();
   }
+
+  bool get _providerIsUntrained => _untrainedServices.isNotEmpty;
 
   Map<String, List<WalkInService>> get _visible {
     final grouped = <String, List<WalkInService>>{};
@@ -127,7 +137,20 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
     return grouped;
   }
 
+  void _toggleService(WalkInService service) {
+    if (_isSubmitting) return;
+    setState(() {
+      if (_selectedServiceIds.contains(service.id)) {
+        _selectedServiceIds.remove(service.id);
+      } else {
+        _selectedServiceIds.add(service.id);
+      }
+    });
+  }
+
   Future<void> _add() async {
+    if (_selectedServiceIds.isEmpty) return;
+
     setState(() {
       _isSubmitting = true;
       _error = null;
@@ -137,7 +160,7 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
       final target = await CheckInApi.addExtraService(
         widget.salonId,
         widget.appointmentId,
-        serviceId: _serviceId!,
+        serviceIds: _selectedServiceIds.toList(),
         providerId: _providerId,
       );
 
@@ -207,14 +230,16 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(
-          'Added as its own line — the original booking is left as it is.',
+          'Added as separate lines — the original booking is left as it is.',
           style: GoogleFonts.outfit(fontSize: 12.5, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 18),
 
         _buildProviderPicker(),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        if (_selectedServices.isNotEmpty) _buildSelectedServicesSummary(),
+
         TextField(
           controller: _searchController,
           enabled: !_isSubmitting,
@@ -269,6 +294,81 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
     );
   }
 
+  Widget _buildSelectedServicesSummary() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: AppTheme.accentColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_selectedServices.length} ${_selectedServices.length == 1 ? "service" : "services"} selected (₹${_totalPrice.toStringAsFixed(0)})',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentColor,
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: _isSubmitting ? null : () => setState(() => _selectedServiceIds.clear()),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Text('Clear all',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      )),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _selectedServices.map((s) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${s.name} • ₹${s.price.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: _isSubmitting ? null : () => setState(() => _selectedServiceIds.remove(s.id)),
+                    child: const Icon(Icons.close, size: 14, color: Colors.grey),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProviderPicker() {
     final providers = _options!.providers;
 
@@ -320,8 +420,8 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
         if (_providerIsUntrained) ...[
           const SizedBox(height: 10),
           _notice(
-            '${_selectedProvider!.name} is not assigned to ${_selectedService!.name}. '
-            'You can still go ahead — the line is credited to them.',
+            '${_selectedProvider!.name} is not assigned to ${_untrainedServices.map((s) => s.name).join(', ')}. '
+            'You can still go ahead — the commission follows them.',
             AppTheme.lightWarning,
           ),
         ],
@@ -330,13 +430,13 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
   }
 
   Widget _buildServiceTile(WalkInService service) {
-    final selected = _serviceId == service.id;
+    final selected = _selectedServiceIds.contains(service.id);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: _isSubmitting ? null : () => setState(() => _serviceId = service.id),
+        onTap: _isSubmitting ? null : () => _toggleService(service),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
@@ -349,10 +449,20 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
           ),
           child: Row(
             children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 22,
-                color: selected ? AppTheme.accentColor : Colors.grey.shade400,
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: selected ? AppTheme.accentColor : Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: selected ? AppTheme.accentColor : Colors.grey.shade400,
+                    width: 1.5,
+                  ),
+                ),
+                child: selected
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -397,8 +507,8 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
       );
 
   Widget _buildFooter() {
-    final service = _selectedService;
-    final canAdd = service != null && _providerId != null && !_isSubmitting;
+    final count = _selectedServiceIds.length;
+    final canAdd = count > 0 && _providerId != null && !_isSubmitting;
 
     return SafeArea(
       top: false,
@@ -406,19 +516,23 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
         child: Row(
           children: [
-            if (service != null)
+            if (count > 0)
               Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('+ ₹${service.price.toStringAsFixed(0)}',
+                  Text('+ ₹${_totalPrice.toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(service.name,
-                      style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(
+                    count == 1
+                        ? _selectedServices.first.name
+                        : '$count services • $_totalDuration min',
+                    style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                 ],
               )
             else
-              Text('Pick a service',
+              Text('Select services to add',
                   style: GoogleFonts.outfit(fontSize: 15, color: Colors.grey.shade600)),
             const Spacer(),
             SizedBox(
@@ -428,7 +542,7 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: _isSubmitting
@@ -436,7 +550,8 @@ class _AddExtraServiceSheetState extends State<AddExtraServiceSheet> {
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text('Add to bill',
+                    : Text(
+                        count <= 1 ? 'Add to bill' : 'Add $count to bill',
                         style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),

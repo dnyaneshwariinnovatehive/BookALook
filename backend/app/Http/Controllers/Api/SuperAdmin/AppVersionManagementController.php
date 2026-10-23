@@ -21,6 +21,10 @@ class AppVersionManagementController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if (! app()->environment('testing') && AppRelease::count() === 0) {
+            (new \Database\Seeders\AppReleaseSeeder())->run();
+        }
+
         $appFilter = $request->query('app');
 
         $releasesQuery = AppRelease::with(['creator:id,name', 'updater:id,name'])
@@ -97,6 +101,8 @@ class AppVersionManagementController extends Controller
      */
     public function storeRelease(Request $request): JsonResponse
     {
+        $this->normalizeStoreUrls($request);
+
         $validated = $request->validate([
             'app' => ['required', 'string', Rule::in(AppRelease::APPS)],
             'version' => ['required', 'string', 'max:50'],
@@ -157,6 +163,8 @@ class AppVersionManagementController extends Controller
     public function updateRelease(Request $request, string $id): JsonResponse
     {
         $release = AppRelease::findOrFail($id);
+
+        $this->normalizeStoreUrls($request);
 
         $validated = $request->validate([
             'version' => ['sometimes', 'required', 'string', 'max:50'],
@@ -257,6 +265,8 @@ class AppVersionManagementController extends Controller
                 'message' => "Invalid app identifier '{$app}'. Supported apps are: " . implode(', ', AppRelease::APPS),
             ], 404);
         }
+
+        $this->normalizeStoreUrls($request);
 
         $validated = $request->validate([
             'latest_release_id' => ['required', 'uuid', 'exists:app_releases,id'],
@@ -364,5 +374,24 @@ class AppVersionManagementController extends Controller
             'policy' => $policy->load(['latestRelease', 'minimumRelease', 'updater:id,name']),
             'warnings' => $warnings,
         ]);
+    }
+
+    /**
+     * Normalize store URLs by prepending https:// if scheme is missing.
+     */
+    protected function normalizeStoreUrls(Request $request): void
+    {
+        $updates = [];
+        foreach (['android_store_url', 'ios_store_url'] as $field) {
+            if ($request->has($field) && is_string($request->input($field))) {
+                $val = trim($request->input($field));
+                if ($val !== '' && !preg_match('~^[a-zA-Z][a-zA-Z0-9+\-.]*://~', $val)) {
+                    $updates[$field] = 'https://' . $val;
+                }
+            }
+        }
+        if (!empty($updates)) {
+            $request->merge($updates);
+        }
     }
 }

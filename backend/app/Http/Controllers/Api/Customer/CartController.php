@@ -179,6 +179,26 @@ class CartController extends Controller
         );
 
         if ($request->service_id) {
+            // Check if this service is already included in an existing combo in the cart
+            $existingComboWithService = CartItem::where('cart_id', $cart->id)
+                ->whereNotNull('combo_id')
+                ->whereHas('combo.services', function ($q) use ($request) {
+                    $q->where('services.id', $request->service_id);
+                })
+                ->with('combo')
+                ->first();
+
+            if ($existingComboWithService) {
+                $comboName = $existingComboWithService->combo?->name ?? 'a combo';
+                $cart->load(['items.service.template', 'items.combo.services.template']);
+                return response()->json([
+                    'message' => "This service is already included in '{$comboName}' in your cart.",
+                    'already_in_combo' => true,
+                    'combo_name' => $comboName,
+                    'cart' => $this->withSummary($cart),
+                ], 200);
+            }
+
             $existingItem = CartItem::where('cart_id', $cart->id)
                 ->where('service_id', $request->service_id)
                 ->first();
@@ -225,6 +245,41 @@ class CartController extends Controller
             }
         } else {
             // Direct combo packages
+            $combo = Combo::with('services.template')->find($request->combo_id);
+            if (!$combo) {
+                return response()->json(['message' => 'Combo not found.'], 404);
+            }
+
+            // Check if cart already has individual services that are part of this combo
+            $comboServiceIds = $combo->services->pluck('id')->all();
+
+            $overlappingItems = CartItem::with('service.template')
+                ->where('cart_id', $cart->id)
+                ->whereIn('service_id', $comboServiceIds)
+                ->get();
+
+            $replacedServices = [];
+            $totalListPriceOfReplaced = 0.0;
+            if ($overlappingItems->isNotEmpty()) {
+                foreach ($overlappingItems as $item) {
+                    $serviceName = $item->service?->template?->name ?? 'Service';
+                    $servicePrice = (float) ($item->service?->price ?? 0.0);
+                    $totalListPriceOfReplaced += $servicePrice * max(1, (int) $item->quantity);
+                    $replacedServices[] = [
+                        'id' => $item->service_id,
+                        'name' => $serviceName,
+                        'price' => $servicePrice,
+                    ];
+                    $item->delete(); // Automatically delete the loose service line
+                }
+            }
+
+            // Calculate savings:
+            $comboListTotal = (float) $combo->original_price;
+            $comboPrice = (float) $combo->price;
+            $comboSaving = max(0.0, round($comboListTotal - $comboPrice, 2));
+            $savedAmount = $comboSaving > 0 ? $comboSaving : $totalListPriceOfReplaced;
+
             $existingItem = CartItem::where('cart_id', $cart->id)
                 ->where('combo_id', $request->combo_id)
                 ->whereNull('service_id')
@@ -245,6 +300,14 @@ class CartController extends Controller
                     'quantity' => $request->get('quantity', 1)
                 ]);
             }
+
+            $message = 'Item added to cart';
+            if (!empty($replacedServices)) {
+                $serviceNames = implode(', ', array_unique(array_column($replacedServices, 'name')));
+                $message = $savedAmount > 0
+                    ? "You saved ₹" . number_format($savedAmount, 0) . "! Replaced {$serviceNames} with {$combo->name}."
+                    : "Replaced {$serviceNames} with {$combo->name}.";
+            }
         }
 
         // The enriched cart comes straight back so the app can show what this
@@ -253,7 +316,10 @@ class CartController extends Controller
         $cart->load(['items.service.template', 'items.combo.services.template']);
 
         return response()->json([
-            'message' => 'Item added to cart',
+            'message' => $message ?? 'Item added to cart',
+            'replaced_services' => $replacedServices ?? [],
+            'saved_amount' => $savedAmount ?? 0,
+            'combo_name' => isset($combo) ? $combo->name : null,
             'cart' => $this->withSummary($cart),
         ]);
     }

@@ -147,6 +147,36 @@ void main() {
       expect(insights.retentionFunnel!.totalCustomers, equals(0));
       expect(insights.retentionFunnel!.benchmarkIsGood, isFalse);
     });
+
+    test('SalonInsights parses recommended combos cleanly for Do this next', () {
+      final json = {
+        'data': {
+          'advanced': true,
+          'overview': {
+            'customers': 50,
+            'returning_customers': 20,
+            'repeat_rate': 40.0,
+            'total_visits': 80,
+            'revenue': 50000.0,
+            'average_bill': 625.0,
+            'average_visits_per_customer': 1.6,
+          },
+          'recommended_combos': [
+            {
+              'services': ['Haircut', 'Beard Trim'],
+              'service_ids': ['s1', 's2'],
+              'suggestion': 'Package Haircut and Beard Trim together',
+              'combo_name': 'Haircut + Beard Trim',
+              'is_actionable': true,
+            }
+          ],
+        },
+      };
+      final insights = SalonInsights.fromJson(json);
+      expect(insights.recommendedCombos.length, equals(1));
+      expect(insights.recommendedCombos.first.comboName, equals('Haircut + Beard Trim'));
+      expect(insights.recommendedCombos.first.isActionable, isTrue);
+    });
   });
 
   group('InsightsScreen Widget Rendering Tests', () {

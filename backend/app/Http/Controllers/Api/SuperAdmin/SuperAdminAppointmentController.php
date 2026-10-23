@@ -172,7 +172,9 @@ class SuperAdminAppointmentController extends Controller
     public function addServiceMidAppointment(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'service_id' => 'required|exists:services,id',
+            'service_id' => 'required_without:service_ids|exists:services,id',
+            'service_ids' => 'required_without:service_id|array|min:1',
+            'service_ids.*' => 'string|exists:services,id',
             'provider_id' => 'required|exists:service_providers,id',
         ]);
 
@@ -186,38 +188,46 @@ class SuperAdminAppointmentController extends Controller
             return response()->json(['message' => 'Can only add services to in-progress appointments.'], 400);
         }
 
-        $service = Service::findOrFail($request->service_id);
+        $rawIds = $request->input('service_ids') ?: [$request->input('service_id')];
+        $serviceIds = array_values(array_unique(array_filter($rawIds)));
+
+        $services = Service::whereIn('id', $serviceIds)->get();
+
+        if ($services->count() !== count($serviceIds)) {
+            return response()->json(['message' => 'One or more services not found.'], 404);
+        }
 
         DB::beginTransaction();
         try {
-            // Add service addition record
-            $addition = new AppointmentServiceAddition([
-                'appointment_id' => $appointment->id,
-                'service_id' => $service->id,
-                'provider_id' => $request->provider_id,
-                'added_by' => $request->user()->id,
-                'price_at_addition' => $service->price,
-                'duration_minutes_at_addition' => $service->duration_minutes,
-                'status' => 'active'
-            ]);
-            $addition->save();
+            foreach ($services as $service) {
+                $addition = new AppointmentServiceAddition([
+                    'appointment_id' => $appointment->id,
+                    'service_id' => $service->id,
+                    'provider_id' => $request->provider_id,
+                    'added_by' => $request->user()->id,
+                    'price_at_addition' => $service->price,
+                    'duration_minutes_at_addition' => $service->duration_minutes,
+                    'status' => 'active'
+                ]);
+                $addition->save();
+            }
 
             // Recalculate total billed amount
-            // existing total_amount + sum of additions
             $baseAmount = $appointment->services()->where('line_status', '!=', 'cancelled')->sum('price_at_booking');
             $additionsAmount = $appointment->serviceAdditions()->live()->sum('price_at_addition');
             
             $appointment->total_amount = $baseAmount + $additionsAmount;
-            
-            // Advance amount remains the same, balance changes
             $appointment->balance_amount = $appointment->total_amount - $appointment->advance_amount;
-            
             $appointment->save();
 
             DB::commit();
 
+            $message = $services->count() === 1
+                ? 'Service added successfully.'
+                : "{$services->count()} services added successfully.";
+
             return response()->json([
-                'message' => 'Service added successfully.',
+                'message' => $message,
                 'appointment' => $appointment->load('services', 'serviceAdditions.service', 'serviceAdditions.provider.user')
             ]);
         } catch (\Exception $e) {

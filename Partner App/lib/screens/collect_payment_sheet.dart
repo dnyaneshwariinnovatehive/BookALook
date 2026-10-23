@@ -299,7 +299,7 @@ class _CollectPaymentSheetState extends State<CollectPaymentSheet> {
           OutlinedButton.icon(
             onPressed: _isSubmitting || apt.status != 'in_progress' ? null : _addExtra,
             icon: const Icon(Icons.add, size: 18),
-            label: Text('Add extra service',
+            label: Text('Add extra services',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.accentColor,

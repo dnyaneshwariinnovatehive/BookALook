@@ -102,16 +102,23 @@ class CheckInApi {
   static Future<CheckInTarget> addExtraService(
     String salonId,
     String appointmentId, {
-    required String serviceId,
+    String? serviceId,
+    List<String>? serviceIds,
     String? providerId,
   }) async {
+    final Map<String, dynamic> body = {
+      if (providerId != null) 'provider_id': providerId,
+    };
+    if (serviceIds != null && serviceIds.isNotEmpty) {
+      body['service_ids'] = serviceIds;
+    } else if (serviceId != null) {
+      body['service_id'] = serviceId;
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/salons/$salonId/appointments/$appointmentId/add-service'),
       headers: await _headers(),
-      body: jsonEncode({
-        'service_id': serviceId,
-        if (providerId != null) 'provider_id': providerId,
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {

@@ -11,12 +11,29 @@ class CartConflictException implements Exception {
   CartConflictException(this.message, this.otherSalonName);
 }
 
+class ComboReplacedNotice {
+  final String message;
+  final double savedAmount;
+  final List replacedServices;
+  final String? comboName;
+
+  ComboReplacedNotice({
+    required this.message,
+    required this.savedAmount,
+    required this.replacedServices,
+    this.comboName,
+  });
+}
+
 class CartService {
   final String baseUrl =
       (dotenv.isInitialized ? dotenv.env['API_BASE_URL'] : null) ??
       'http://127.0.0.1:8000/api';
 
   static final ValueNotifier<Map<String, dynamic>?> globalCartNotifier =
+      ValueNotifier(null);
+
+  static final ValueNotifier<ComboReplacedNotice?> comboReplacedNoticeNotifier =
       ValueNotifier(null);
 
   Future<Map<String, dynamic>?> getGlobalCart() async {
@@ -75,7 +92,8 @@ class CartService {
     }
   }
 
-  /// Checks whether an individual service is already in the global active cart.
+  /// Checks whether an individual service is already in the global active cart,
+  /// either as an individual line or bundled inside an active combo item.
   static bool isServiceInCart(String serviceId) {
     final cart = globalCartNotifier.value;
     if (cart == null) return false;
@@ -85,6 +103,15 @@ class CartService {
         final sId = item['service_id'] ?? item['service']?['id'];
         if (sId != null && sId.toString() == serviceId.toString()) {
           return true;
+        }
+        final comboServices = (item['combo']?['services'] as List?) ?? const [];
+        for (final cs in comboServices) {
+          if (cs is Map) {
+            final csId = cs['id'] ?? cs['service_id'];
+            if (csId != null && csId.toString() == serviceId.toString()) {
+              return true;
+            }
+          }
         }
       }
     }
@@ -141,8 +168,41 @@ class CartService {
       throw Exception('Failed to add item to cart');
     }
 
-    final cart = jsonDecode(response.body)['cart'] as Map<String, dynamic>?;
+    final resJson = jsonDecode(response.body) as Map<String, dynamic>;
+    final cart = resJson['cart'] as Map<String, dynamic>?;
+
+    if (cart != null) {
+      if (resJson.containsKey('message')) {
+        cart['_message'] = resJson['message'];
+      }
+      if (resJson.containsKey('replaced_services')) {
+        cart['_replaced_services'] = resJson['replaced_services'];
+      }
+      if (resJson.containsKey('saved_amount')) {
+        cart['_saved_amount'] = resJson['saved_amount'];
+      }
+      if (resJson.containsKey('combo_name')) {
+        cart['_combo_name'] = resJson['combo_name'];
+      }
+      if (resJson.containsKey('already_in_combo')) {
+        cart['_already_in_combo'] = resJson['already_in_combo'];
+      }
+    }
+
     globalCartNotifier.value = cart;
+
+    final replaced = resJson['replaced_services'] as List?;
+    if (replaced != null && replaced.isNotEmpty) {
+      final msg = resJson['message'] as String? ?? 'Replaced service with combo.';
+      final saved = (num.tryParse('${resJson['saved_amount']}') ?? 0).toDouble();
+      comboReplacedNoticeNotifier.value = ComboReplacedNotice(
+        message: msg,
+        savedAmount: saved,
+        replacedServices: replaced,
+        comboName: resJson['combo_name'] as String?,
+      );
+    }
+
     return cart;
   }
 

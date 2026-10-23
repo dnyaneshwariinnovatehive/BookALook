@@ -5,6 +5,7 @@ import '../utils/time_fmt.dart';
 import '../widgets/initials_avatar.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
+import 'add_extra_service_sheet.dart';
 import 'qr_scanner_screen.dart';
 
 class ProviderAppointmentDetailsScreen extends StatefulWidget {
@@ -24,8 +25,15 @@ class ProviderAppointmentDetailsScreen extends StatefulWidget {
 class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDetailsScreen> {
   late Map<String, dynamic> _apt = Map<String, dynamic>.from(widget.appointment);
   bool _isProcessing = false;
+  List<BillLine> _extraLines = [];
 
   String get _appointmentId => _apt['id'].toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
 
   Future<void> _refresh() async {
     try {
@@ -36,9 +44,28 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
         _apt['total_amount'] = target.appointment.totalAmount;
         _apt['balance_amount'] = target.appointment.balanceAmount;
         _apt['payment_mode'] = target.appointment.paymentMode;
+        _extraLines = target.bill.lines.where((l) => l.addedMidAppointment).toList();
       });
     } catch (_) {
       // Leave the screen usable if the refresh fails.
+    }
+  }
+
+  Future<void> _addExtraServices() async {
+    final updated = await AddExtraServiceSheet.show(
+      context,
+      salonId: widget.salonId,
+      appointmentId: _appointmentId,
+      servingProviderId: _apt['serving_provider_id']?.toString() ?? _apt['appointed_provider_id']?.toString(),
+      servingProviderName: _apt['appointed_provider']?['user']?['name'] ?? _apt['appointed_provider']?['name'],
+    );
+
+    if (updated != null && mounted) {
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Added to the bill.')),
+      );
     }
   }
 
@@ -202,7 +229,8 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                 Container(
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
                   child: Column(
-                    children: services.map((s) {
+                    children: [
+                      ...services.map((s) {
                       final srv = s['service'] ?? {};
                       final priceAtBooking = s['price_at_booking'] ?? s['price'];
                       final origPrice = s['original_service_price'] ?? priceAtBooking;
@@ -248,8 +276,73 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                         ),
                       );
                     }).toList(),
-                  ),
+                    if (_extraLines.isNotEmpty) ...[
+                      const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'EXTRA SERVICES ADDED',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF9850F1),
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      ..._extraLines.map((extra) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(extra.name, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: const Color(0xFF1F2937))),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    extra.providerName != null
+                                        ? '${extra.durationMinutes} mins • By ${extra.providerName}'
+                                        : '${extra.durationMinutes} mins',
+                                    style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF9CA3AF)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '+₹${extra.price.toStringAsFixed(0)}',
+                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF9850F1)),
+                            ),
+                          ],
+                        ),
+                      )),
+                      const SizedBox(height: 8),
+                    ],
+                    if (isInProgress) ...[
+                      const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: OutlinedButton.icon(
+                          onPressed: _isProcessing ? null : _addExtraServices,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: Text('Add extra services',
+                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF9850F1),
+                            side: BorderSide(color: const Color(0xFF9850F1).withValues(alpha: 0.5)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            minimumSize: const Size(double.infinity, 40),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
                 const SizedBox(height: 16),
 
                 // Financial Details Card

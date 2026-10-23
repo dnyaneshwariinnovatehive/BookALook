@@ -55,9 +55,36 @@ class _ComboDiscoveryCardState extends State<ComboDiscoveryCard> {
     final salonId = widget.salon['id'].toString();
 
     try {
-      await _cartService.addCombo(salonId, comboId);
+      final cart = await _cartService.addCombo(salonId, comboId);
       if (!mounted) return;
       AppHaptics.lightImpact();
+
+      final replaced = cart?['_replaced_services'] as List?;
+      if (replaced != null && replaced.isNotEmpty) {
+        final msg = cart?['_message'] as String? ?? 'Replaced individual services with combo!';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      msg,
+                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF16A34A),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+      }
     } on CartConflictException catch (e) {
       if (!mounted) return;
       AppHaptics.error();

@@ -76,6 +76,41 @@ class DynamicBillAdjustmentTest extends TestCase
         $this->assertEquals($expected - 300.0, $response['bill']['balance_due']);
     }
 
+    public function test_multiple_extras_can_be_added_at_once_and_total_recalculates(): void
+    {
+        [$salon, $admin, $provider] = $this->fixture(minServices: 3);
+        $booked = $provider->services->first();
+        $extras = $provider->services->skip(1)->take(2);
+
+        $appointment = $this->givenInProgress($salon, $provider, $booked);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/partner/salons/{$salon->id}/appointments/{$appointment->id}/add-service", [
+                'service_ids' => $extras->pluck('id')->all(),
+            ])
+            ->assertStatus(201)
+            ->json();
+
+        $this->assertSame('2 services added to the bill.', $response['message']);
+
+        // 2 additions created
+        $additions = AppointmentServiceAddition::where('appointment_id', $appointment->id)->get();
+        $this->assertCount(2, $additions);
+
+        // Bill has 1 booked line + 2 extra lines = 3
+        $lines = collect($response['bill']['lines']);
+        $this->assertCount(3, $lines);
+        $this->assertCount(2, $lines->where('added_mid_appointment', true));
+
+        // Totals recalculate with sum of both extras
+        $appointment->refresh();
+        $expectedTotal = round(1000.0 + (float) $extras->sum('price'), 2);
+        $this->assertEquals($expectedTotal, (float) $appointment->total_amount);
+        $this->assertEquals(300.0, (float) $appointment->advance_amount);
+        $this->assertEquals(round($expectedTotal - 300.0, 2), (float) $appointment->balance_amount);
+        $this->assertEquals(round($expectedTotal - 300.0, 2), $response['bill']['balance_due']);
+    }
+
     public function test_an_extra_can_be_credited_to_a_different_provider(): void
     {
         [$salon, $admin, $provider, $other] = $this->fixture(minServices: 2, needsSecondProvider: true);

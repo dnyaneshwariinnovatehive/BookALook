@@ -68,7 +68,32 @@ class _CartScreenState extends State<CartScreen> {
 
     try {
       AppHaptics.lightImpact();
-      await _cartService.addItem(salonId, serviceId);
+      final resCart = await _cartService.addItem(salonId, serviceId);
+      if (resCart?['_already_in_combo'] == true && mounted) {
+        final msg = resCart!['_message'] as String;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      msg,
+                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF2563EB),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+      }
       await _loadCart();
       if (mounted) setState(() => _actionError = null);
     } catch (e) {
@@ -433,7 +458,33 @@ class _CartScreenState extends State<CartScreen> {
     try {
       AppHaptics.lightImpact();
       if (comboId != null) {
-        await _cartService.addCombo(salonId, comboId, quantity: 1);
+        final resCart = await _cartService.addCombo(salonId, comboId, quantity: 1);
+        final replaced = resCart?['_replaced_services'] as List?;
+        if (replaced != null && replaced.isNotEmpty && mounted) {
+          final msg = resCart?['_message'] as String? ?? 'Replaced individual services with combo!';
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        msg,
+                        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
+                      ),
+                    ),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF16A34A),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+        }
       }
       await _loadCart();
       if (mounted) setState(() => _actionError = null);

@@ -147,12 +147,35 @@ export default function AppVersionsPage() {
     fetchData();
   }, [fetchData]);
 
+  // Releases filtered by active app
+  const appReleases = useMemo(() => {
+    return releases.filter((r) => r.app === currentApp);
+  }, [releases, currentApp]);
+
+  // Only published releases can be selected in active update policies
+  const publishedReleases = useMemo(() => {
+    return appReleases
+      .filter((r) => r.status === 'published')
+      .sort((a, b) => compareReleases(b.version, b.build_number, a.version, a.build_number));
+  }, [appReleases]);
+
   // Sync form with current app's policy
   useEffect(() => {
     const policy = policies[currentApp];
+    const defaultLatestId = publishedReleases[0]?.id || '';
+    const defaultMinimumId = policy?.minimum_release_id || defaultLatestId;
+
     if (policy) {
-      setFormLatestId(policy.latest_release_id || '');
-      setFormMinimumId(policy.minimum_release_id || '');
+      const validLatest = publishedReleases.some((r) => r.id === policy.latest_release_id)
+        ? (policy.latest_release_id || '')
+        : defaultLatestId;
+
+      const validMinimum = publishedReleases.some((r) => r.id === policy.minimum_release_id)
+        ? (policy.minimum_release_id || '')
+        : (validLatest || defaultMinimumId);
+
+      setFormLatestId(validLatest);
+      setFormMinimumId(validMinimum);
       setFormUpdateMode(policy.update_mode || 'optional');
       setFormIsEnforced(Boolean(policy.is_enforced));
       // Format ISO datetime to YYYY-MM-DDTHH:mm for datetime-local input
@@ -171,8 +194,8 @@ export default function AppVersionsPage() {
       setFormAndroidUrl(policy.android_store_url || '');
       setFormIosUrl(policy.ios_store_url || '');
     } else {
-      setFormLatestId('');
-      setFormMinimumId('');
+      setFormLatestId(defaultLatestId);
+      setFormMinimumId(defaultLatestId);
       setFormUpdateMode('optional');
       setFormIsEnforced(false);
       setFormEnforceAt('');
@@ -180,19 +203,7 @@ export default function AppVersionsPage() {
       setFormAndroidUrl('');
       setFormIosUrl('');
     }
-  }, [currentApp, policies]);
-
-  // Releases filtered by active app
-  const appReleases = useMemo(() => {
-    return releases.filter((r) => r.app === currentApp);
-  }, [releases, currentApp]);
-
-  // Only published releases can be selected in active update policies
-  const publishedReleases = useMemo(() => {
-    return appReleases
-      .filter((r) => r.status === 'published')
-      .sort((a, b) => compareReleases(b.version, b.build_number, a.version, a.build_number));
-  }, [appReleases]);
+  }, [currentApp, policies, publishedReleases]);
 
   const selectedLatest = useMemo(() => {
     return publishedReleases.find((r) => r.id === formLatestId) || null;
@@ -263,6 +274,15 @@ export default function AppVersionsPage() {
     formIosUrl,
   ]);
 
+  const cleanStoreUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
   const handleSavePolicy = async () => {
     if (!formLatestId || !formMinimumId) {
       setFeedback({ tone: 'error', message: 'Please select both Latest and Minimum Supported releases.' });
@@ -296,8 +316,8 @@ export default function AppVersionsPage() {
         is_enforced: formIsEnforced,
         enforce_at: formEnforceAt ? new Date(formEnforceAt).toISOString() : null,
         update_message: formUpdateMessage.trim() || null,
-        android_store_url: formAndroidUrl.trim() || null,
-        ios_store_url: formIosUrl.trim() || null,
+        android_store_url: cleanStoreUrl(formAndroidUrl),
+        ios_store_url: cleanStoreUrl(formIosUrl),
       };
 
       const res = await fetch(`/api/proxy/superadmin/app-versions/policies/${currentApp}`, {
@@ -360,12 +380,12 @@ export default function AppVersionsPage() {
 
       const payload = {
         app: currentApp,
-        version: modalVersion.trim(),
+        version: modalVersion.trim().replace(/^v/i, ''),
         build_number: parseInt(modalBuildNumber, 10),
         released_at: modalReleasedAt ? new Date(modalReleasedAt).toISOString() : null,
         status: modalStatus,
-        android_store_url: modalAndroidUrl.trim() || null,
-        ios_store_url: modalIosUrl.trim() || null,
+        android_store_url: cleanStoreUrl(modalAndroidUrl),
+        ios_store_url: cleanStoreUrl(modalIosUrl),
         release_notes: modalNotes.trim() || null,
       };
 
@@ -447,6 +467,11 @@ export default function AppVersionsPage() {
           <Card
             title={`Active Update Policy — ${currentApp === 'customer' ? 'Customer App' : 'Partner App'}`}
             subtitle="Define minimum supported version, update mode, and automated server-side enforcement."
+            actions={
+              <Button variant="ghost" size="sm" icon="plus" onClick={openCreateReleaseModal}>
+                Register Release
+              </Button>
+            }
             padded
           >
             <div className={styles.policyCard}>
@@ -481,6 +506,31 @@ export default function AppVersionsPage() {
 
               {/* Version Selectors */}
               <div className={styles.formGrid}>
+                {publishedReleases.length === 0 && (
+                  <div className={styles.fullCol}>
+                    <Alert tone="warning">
+                      No published releases found for {currentApp === 'customer' ? 'Customer App' : 'Partner App'}.{' '}
+                      <button
+                        type="button"
+                        onClick={openCreateReleaseModal}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--accent-color, #7c3aed)',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          padding: 0,
+                          font: 'inherit',
+                        }}
+                      >
+                        Click here to register a release
+                      </button>{' '}
+                      to enable version selection and update enforcement.
+                    </Alert>
+                  </div>
+                )}
+
                 <Field
                   label="Latest Published Release"
                   hint="The most recent release available to end users."
@@ -490,10 +540,14 @@ export default function AppVersionsPage() {
                     value={formLatestId}
                     onChange={(e) => setFormLatestId(e.target.value)}
                   >
-                    <option value="">— Select Latest Release —</option>
-                    {publishedReleases.map((r) => (
+                    <option value="">
+                      {publishedReleases.length === 0
+                        ? '— No published releases registered —'
+                        : '— Select Latest Release —'}
+                    </option>
+                    {publishedReleases.map((r, idx) => (
                       <option key={r.id} value={r.id}>
-                        v{r.version} (Build #{r.build_number}) — {r.released_at ? r.released_at.slice(0, 10) : 'No date'}
+                        v{r.version} (Build #{r.build_number}) {idx === 0 ? '— Newest' : ''} ({r.released_at ? r.released_at.slice(0, 10) : 'Active'})
                       </option>
                     ))}
                   </select>
@@ -508,10 +562,14 @@ export default function AppVersionsPage() {
                     value={formMinimumId}
                     onChange={(e) => setFormMinimumId(e.target.value)}
                   >
-                    <option value="">— Select Minimum Release —</option>
-                    {publishedReleases.map((r) => (
+                    <option value="">
+                      {publishedReleases.length === 0
+                        ? '— No published releases registered —'
+                        : '— Select Minimum Release —'}
+                    </option>
+                    {publishedReleases.map((r, idx) => (
                       <option key={r.id} value={r.id}>
-                        v{r.version} (Build #{r.build_number}) — {r.released_at ? r.released_at.slice(0, 10) : 'No date'}
+                        v{r.version} (Build #{r.build_number}) {idx === 0 ? '— Newest' : ''} ({r.released_at ? r.released_at.slice(0, 10) : 'Active'})
                       </option>
                     ))}
                   </select>

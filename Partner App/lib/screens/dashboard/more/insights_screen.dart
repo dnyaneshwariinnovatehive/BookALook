@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../services/insights_api.dart';
 import '../../../theme/app_theme.dart';
 import '../services/add_combo_screen.dart';
-import 'marketing_screen.dart';
 
 /// What the salon's own bookings say about it.
 ///
@@ -83,11 +82,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
       });
     }
   }
-
-  void _openMarketing() => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => MarketingScreen(salonId: widget.salonId)),
-      );
 
   /// Open the combo form with the suggested pair already ticked.
   ///
@@ -304,23 +298,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
   /// Findings turned into things to do, most valuable first.
   List<_Action> _actionsFor(SalonInsights insights) {
     final actions = <_Action>[];
-    final repeat = insights.repeatCustomers;
 
-    // Lapsed regulars first: people who already liked the place enough to come
-    // back repeatedly are the cheapest customers to recover.
-    if (repeat != null && repeat.atRisk > 0) {
-      actions.add(_Action(
-        icon: Icons.person_search_outlined,
-        colour: AppTheme.lightWarning,
-        title: 'Win back ${repeat.atRisk} regular${repeat.atRisk == 1 ? '' : 's'}',
-        detail:
-            'They used to come in often but have not visited in over ${repeat.atRiskAfterDays} days. '
-            'A short WhatsApp offer is usually enough to bring them back.',
-        cta: 'Send a win-back offer',
-        onTap: _openMarketing,
-      ));
-    }
-
+    // MVP Note: WhatsApp marketing actions (win back regulars, quiet days offer,
+    // and one-time visitor reminders) as well as upsell tips are hidden for MVP,
+    // as individual salons are not given direct WhatsApp marketing rights under their salon name.
+    // Only catalog combo recommendations are kept in "Do this next".
     if (insights.recommendedCombos.isNotEmpty) {
       final combo = insights.recommendedCombos.first;
 
@@ -337,56 +319,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
         onTap: combo.isActionable
             ? () => _openNewCombo(serviceIds: combo.serviceIds, name: combo.comboName)
             : null,
-      ));
-    }
-
-    // Defended on both sides: the server now excludes closing days, and this
-    // refuses to advise an offer for a day with no bookings even if one
-    // reaches here.
-    final quietDay = insights.peakHours?.quietestDay;
-    final quietDayBookings = insights.peakHours?.byDay
-        .where((d) => d.day == quietDay)
-        .fold<int>(0, (sum, d) => sum + d.bookings);
-
-    if (quietDay != null && (quietDayBookings ?? 0) > 0) {
-      actions.add(_Action(
-        icon: Icons.event_available_outlined,
-        colour: const Color(0xFF00897B),
-        title: 'Fill up your quiet ${quietDay}s',
-        detail:
-            '$quietDay is your slowest day. An offer just for that day fills chairs that '
-            'would otherwise sit empty.',
-        cta: 'Send an offer',
-        onTap: _openMarketing,
-      ));
-    }
-
-    if (insights.upsell.isNotEmpty) {
-      final tip = insights.upsell.first;
-      actions.add(_Action(
-        icon: Icons.trending_up,
-        colour: AppTheme.lightSuccess,
-        title: 'Suggest ${tip.to} to ${tip.from} customers',
-        detail:
-            'Customers who book ${tip.from} often take ${tip.to} too — it has happened '
-            '${tip.evidence} times. That is ₹${_inr(tip.uplift)} more on the bill each time.',
-      ));
-    }
-
-    // Only worth raising when first-timers are actually a large share.
-    final once = repeat?.buckets
-        .where((b) => b.label.toLowerCase().contains('once'))
-        .fold<int>(0, (sum, b) => sum + b.count);
-
-    if (once != null && once > 0 && once >= insights.overview.customers * 0.3) {
-      actions.add(_Action(
-        icon: Icons.waving_hand_outlined,
-        colour: const Color(0xFF5E35B1),
-        title: '$once customers came only once',
-        detail:
-            'A reminder a few weeks after a first visit is what turns a one-off into a regular.',
-        cta: 'Send a reminder',
-        onTap: _openMarketing,
       ));
     }
 

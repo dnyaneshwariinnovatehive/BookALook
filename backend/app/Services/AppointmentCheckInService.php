@@ -303,30 +303,49 @@ class AppointmentCheckInService
      *
      * Nothing in the original booking is touched.
      */
+    /**
+     * Put multiple extra services on a bill at once.
+     *
+     * @param Service[] $services
+     * @return AppointmentServiceAddition[]
+     */
+    public function addExtraServices(
+        Appointment $appointment,
+        array $services,
+        string $providerId,
+        User $actor
+    ): array {
+        return DB::transaction(function () use ($appointment, $services, $providerId, $actor) {
+            $additions = [];
+            foreach ($services as $service) {
+                $additions[] = AppointmentServiceAddition::create([
+                    'appointment_id' => $appointment->id,
+                    'service_id' => $service->id,
+                    'provider_id' => $providerId,
+                    'added_by' => $actor->id,
+                    // Snapshotted: a later price change must not rewrite this bill.
+                    'price_at_addition' => $service->price,
+                    'duration_minutes_at_addition' => $service->template->estimated_duration_minutes
+                        ?? self::SLOT_FALLBACK_MINUTES,
+                    'status' => AppointmentServiceAddition::STATUS_ACTIVE,
+                    'added_at' => now(),
+                ]);
+            }
+
+            $this->recalculateTotals($appointment);
+
+            return $additions;
+        });
+    }
+
     public function addExtraService(
         Appointment $appointment,
         Service $service,
         string $providerId,
         User $actor
     ): AppointmentServiceAddition {
-        return DB::transaction(function () use ($appointment, $service, $providerId, $actor) {
-            $addition = AppointmentServiceAddition::create([
-                'appointment_id' => $appointment->id,
-                'service_id' => $service->id,
-                'provider_id' => $providerId,
-                'added_by' => $actor->id,
-                // Snapshotted: a later price change must not rewrite this bill.
-                'price_at_addition' => $service->price,
-                'duration_minutes_at_addition' => $service->template->estimated_duration_minutes
-                    ?? self::SLOT_FALLBACK_MINUTES,
-                'status' => AppointmentServiceAddition::STATUS_ACTIVE,
-                'added_at' => now(),
-            ]);
-
-            $this->recalculateTotals($appointment);
-
-            return $addition;
-        });
+        $additions = $this->addExtraServices($appointment, [$service], $providerId, $actor);
+        return $additions[0];
     }
 
     /**
