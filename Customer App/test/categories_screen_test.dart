@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:customer_app/screens/categories_screen.dart';
+import 'package:customer_app/services/app_version_service.dart';
 import 'package:customer_app/services/http_client.dart' as api;
 import 'package:customer_app/theme/app_theme.dart';
 import 'package:customer_app/widgets/feedback_states.dart';
@@ -27,16 +28,28 @@ void main() {
     gate = Completer<void>()..complete();
     body = _catalogue;
     dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
-    api.debugSetClient(MockClient((_) async {
+    AppVersionService.instance.debugVersion = '1.5.0';
+    AppVersionService.instance.debugBuildNumber = 10;
+    api.debugSetClient(MockClient((request) async {
       requests++;
       await gate.future;
       return http.Response(body, 200);
     }));
   });
 
-  Future<void> open(WidgetTester tester) => tester.pumpWidget(
-        MaterialApp(theme: AppTheme.lightTheme, home: const CategoriesScreen()),
-      );
+  tearDown(() {
+    AppVersionService.instance.debugVersion = null;
+    AppVersionService.instance.debugBuildNumber = null;
+  });
+
+  Future<void> open(WidgetTester tester) {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    return tester.pumpWidget(
+      MaterialApp(theme: AppTheme.lightTheme, home: const CategoriesScreen()),
+    );
+  }
 
   testWidgets('shows tile skeletons, then the categories', (tester) async {
     gate = Completer<void>();
@@ -56,7 +69,10 @@ void main() {
   });
 
   testWidgets('pulling down fetches the categories again', (tester) async {
+    gate = Completer<void>();
     await open(tester);
+    await tester.pump();
+    gate.complete();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(requests, 1);
@@ -71,7 +87,10 @@ void main() {
 
   testWidgets('an empty catalogue explains itself and retries', (tester) async {
     body = '{"categories":[]}';
+    gate = Completer<void>();
     await open(tester);
+    await tester.pump();
+    gate.complete();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -79,7 +98,10 @@ void main() {
     expect(find.byType(InlineStatus), findsOneWidget);
 
     body = _catalogue;
+    gate = Completer<void>();
     await tester.tap(find.byKey(InlineStatus.retryKey));
+    await tester.pump();
+    gate.complete();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 

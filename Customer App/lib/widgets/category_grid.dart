@@ -228,6 +228,9 @@ class _CategoryTile extends StatelessWidget {
                       ? foreground.withValues(alpha: 0.16)
                       : background,
                   borderRadius: BorderRadius.circular(14),
+                  border: isDark
+                      ? Border.all(color: context.colors.border, width: 1)
+                      : null,
                 ),
                 child: hasIcon
                     ? Center(
@@ -973,6 +976,9 @@ class _ViewMoreTile extends StatelessWidget {
                       ? accent.withValues(alpha: 0.16)
                       : context.colors.accentSoft,
                   borderRadius: BorderRadius.circular(14),
+                  border: isDark
+                      ? Border.all(color: context.colors.border, width: 1)
+                      : null,
                 ),
                 child: Center(
                   child: FractionallySizedBox(

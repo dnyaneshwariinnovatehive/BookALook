@@ -5,6 +5,7 @@ import '../services/review_service.dart';
 import '../services/explore_request_bus.dart';
 import '../services/cart_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
 import '../widgets/review_prompt_sheet.dart';
 import '../widgets/tab_navigator.dart';
 import '../widgets/persistent_cart_cta.dart';
@@ -368,7 +369,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget _buildShell(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      extendBody: true,
+      extendBody: false,
       body: ValueListenableBuilder<Map<String, dynamic>?>(
         valueListenable: CartService.globalCartNotifier,
         builder: (context, cart, _) {
@@ -467,7 +468,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: const Color(0xFFECEAF2), width: 1),
+            border: Border.all(color: context.colors.border, width: 1),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF9850F1).withValues(alpha: 0.08),
@@ -524,7 +525,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     required String label,
   }) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? AppTheme.accentColor : const Color(0xFF7C758D);
+    final color = isSelected ? AppTheme.accentColor : context.colors.navIdle;
 
     return Expanded(
       child: Material(
@@ -674,7 +675,7 @@ class _AnimatedTabIconState extends State<_AnimatedTabIcon>
                   size: 22,
                   color: widget.isSelected
                       ? AppTheme.accentColor
-                      : const Color(0xFF7C758D),
+                      : context.colors.navIdle,
                 ),
               ),
             ),

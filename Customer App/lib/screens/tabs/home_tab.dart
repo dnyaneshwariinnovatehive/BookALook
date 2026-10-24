@@ -327,8 +327,11 @@ class _HomeTabState extends State<HomeTab> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
+              backgroundColor: context.colors.surface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24)),
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: context.colors.border, width: 1),
+              ),
               title: Text('Filter Salons',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
@@ -342,11 +345,12 @@ class _HomeTabState extends State<HomeTab> {
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                           color: context.colors.textSecondary)),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(
                       color: context.colors.accentSoft.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.colors.border, width: 1),
                     ),
                     padding: EdgeInsets.all(4),
                     child: Row(
@@ -788,6 +792,7 @@ class _HomeTabState extends State<HomeTab> {
             decoration: BoxDecoration(
               color: surfaceColor,
               borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: context.colors.border, width: 1),
               boxShadow: [
                 BoxShadow(
                   color: context.colors.dropShadow,
@@ -853,7 +858,7 @@ class _HomeTabState extends State<HomeTab> {
             borderRadius: BorderRadius.circular(26),
             border: _selectedGender != 'All'
                 ? Border.all(color: AppTheme.accentColor, width: 1.5)
-                : Border.all(color: Colors.transparent, width: 1.5),
+                : Border.all(color: context.colors.border, width: 1.0),
             boxShadow: [
               BoxShadow(
                 color: context.colors.dropShadow,

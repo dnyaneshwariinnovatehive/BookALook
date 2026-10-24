@@ -49,6 +49,7 @@ void main() {
     late AppColors dark;
 
     Widget probe(ThemeData theme, void Function(AppColors) sink) => MaterialApp(
+          key: UniqueKey(),
           theme: theme,
           home: Builder(builder: (context) {
             sink(context.colors);
@@ -69,12 +70,14 @@ void main() {
     late AppColors dark;
 
     await tester.pumpWidget(MaterialApp(
+      key: UniqueKey(),
       home: Builder(builder: (context) {
         light = context.colors;
         return const SizedBox();
       }),
     ));
     await tester.pumpWidget(MaterialApp(
+      key: UniqueKey(),
       theme: ThemeData(brightness: Brightness.dark),
       home: Builder(builder: (context) {
         dark = context.colors;

@@ -131,6 +131,9 @@ class _ComplaintBottomSheetState extends State<ComplaintBottomSheet> {
         decoration: BoxDecoration(
           color: context.colors.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          border: Theme.of(context).brightness == Brightness.dark
+              ? Border.all(color: context.colors.border, width: 1)
+              : null,
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),

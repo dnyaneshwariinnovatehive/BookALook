@@ -378,6 +378,7 @@ class ExploreTabState extends State<ExploreTab> {
         decoration: BoxDecoration(
           color: surfaceColor,
           borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: context.colors.border, width: 1),
           boxShadow: [
             BoxShadow(
               color: context.colors.dropShadow,
@@ -444,6 +445,7 @@ class ExploreTabState extends State<ExploreTab> {
               decoration: BoxDecoration(
                 color: surfaceColor,
                 borderRadius: BorderRadius.circular(100),
+                border: Border.all(color: context.colors.border, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: context.colors.dropShadow,

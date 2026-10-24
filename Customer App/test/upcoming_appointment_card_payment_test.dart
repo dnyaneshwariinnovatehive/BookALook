@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:customer_app/screens/my_bookings_screen.dart';
+import 'package:customer_app/services/app_version_service.dart';
 import 'package:customer_app/services/http_client.dart' as api;
 import 'package:customer_app/theme/app_theme.dart';
 
@@ -14,6 +15,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({'auth_token': 'dummy_token'});
     dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
+    AppVersionService.instance.debugVersion = '1.0.0';
+    AppVersionService.instance.debugBuildNumber = 1;
   });
 
   final upcomingBooking = {

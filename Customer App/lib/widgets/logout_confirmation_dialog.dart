@@ -73,7 +73,10 @@ class LogoutConfirmationDialog extends StatelessWidget {
     final hasAccountInfo = trimmedName.isNotEmpty || trimmedPhone.isNotEmpty;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: colors.border, width: 1),
+      ),
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
       titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),

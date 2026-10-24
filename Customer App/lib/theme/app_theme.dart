@@ -22,14 +22,14 @@ class AppTheme {
   static const Color lightCardBg = Color(0xFFFFFFFF);
 
   // Dark Mode Colors
-  static const Color darkBg = Color(0xFF13111A);
-  static const Color darkSurface = Color(0xFF1D1A26);
-  static const Color darkAccentSoft = Color(0xFF2C223C);
-  static const Color darkAccentSoftHover = Color(0xFF3B2D50);
-  static const Color darkTextHeading = Color(0xFFF3F0FA);
+  static const Color darkBg = Color(0xFF121018);
+  static const Color darkSurface = Color(0xFF1C1824);
+  static const Color darkAccentSoft = Color(0xFF24202D);
+  static const Color darkAccentSoftHover = Color(0xFF332B40);
+  static const Color darkTextHeading = Color(0xFFEEE3FD);
   static const Color darkTextBody = Color(0xFFA7A1B8);
-  static const Color darkTextLight = Color(0xFF676275);
-  static const Color darkBorder = Color(0xFF2B2738);
+  static const Color darkTextLight = Color(0xFF756E85);
+  static const Color darkBorder = Color(0xFF3A3048);
 
   // Semantic Colors (Light)
   static const Color lightSuccess = Color(0xFF2E7D32);
@@ -43,15 +43,15 @@ class AppTheme {
   static const Color lightNotesBg = Color(0xFFFFF8E1);
 
   // Semantic Colors (Dark)
-  static const Color darkSuccess = Color(0xFF81C784);
-  static const Color darkSuccessBg = Color(0xFF1B3F22);
-  static const Color darkWarning = Color(0xFFFFB74D);
-  static const Color darkWarningBg = Color(0xFF3E2712);
-  static const Color darkDanger = Color(0xFFE57373);
-  static const Color darkDangerBg = Color(0xFF4A1C1C);
-  static const Color darkInfo = Color(0xFF64B5F6);
-  static const Color darkInfoBg = Color(0xFF0D2744);
-  static const Color darkNotesBg = Color(0xFF3E2712);
+  static const Color darkSuccess = Color(0xFF4ADE80);
+  static const Color darkSuccessBg = Color(0xFF142E1F);
+  static const Color darkWarning = Color(0xFFFBBF24);
+  static const Color darkWarningBg = Color(0xFF33200D);
+  static const Color darkDanger = Color(0xFFF87171);
+  static const Color darkDangerBg = Color(0xFF381519);
+  static const Color darkInfo = Color(0xFF9850F1);
+  static const Color darkInfoBg = Color(0xFF28183B);
+  static const Color darkNotesBg = Color(0xFF33200D);
 
   // Secondary Warm Brown Palette
   static const Color brownDark = Color(0xFF2A2320);
@@ -198,7 +198,7 @@ class AppTheme {
         textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
-        side: BorderSide.none,
+        side: const BorderSide(color: darkBorder, width: 1),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -249,6 +249,29 @@ class AppTheme {
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: darkSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: darkBorder, width: 1),
+      ),
+      titleTextStyle: GoogleFonts.outfit(
+        color: darkTextHeading,
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+      ),
+      contentTextStyle: GoogleFonts.outfit(
+        color: darkTextBody,
+        fontSize: 14,
+      ),
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: darkSurface,
+      modalBackgroundColor: darkSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
     ),
   );
 }
