@@ -12,9 +12,9 @@ class BookingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isGuest) {
-      return GuestRestrictedView(
-        title: 'Sign In Required',
-        message: 'Please sign in to view and manage your salon bookings.',
+      return const GuestRestrictedView(
+        title: 'Login or Sign Up',
+        message: 'Please login or sign up to view and manage your salon bookings.',
         tabIndex: 2,
         icon: Icons.calendar_month,
       );

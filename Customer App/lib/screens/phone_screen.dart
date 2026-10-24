@@ -319,7 +319,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
                   const SizedBox(height: 20),
 
                   // Register Link (shown only in Login mode)
-                  if (_isLogin)
+                  if (_isLogin) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -342,15 +342,13 @@ class _PhoneScreenState extends State<PhoneScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 14),
+                  ],
 
-                  const SizedBox(height: 28),
-                  Divider(color: theme.dividerColor),
-                  const SizedBox(height: 18),
-
-                  // Explore as Guest
+                  // Explore as Guest (directly below Register link)
                   Center(
-                    child: TextButton.icon(
-                      onPressed: () {
+                    child: GestureDetector(
+                      onTap: () {
                         AppHaptics.lightImpact();
                         if (widget.isModal) {
                           Navigator.pop(context, false);
@@ -366,19 +364,26 @@ class _PhoneScreenState extends State<PhoneScreen> {
                           );
                         }
                       },
-                      icon: Icon(Icons.visibility,
-                          color: theme.colorScheme.primary, size: 20),
-                      label: Text(
-                        'Explore as Guest',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 6.0, horizontal: 12.0),
+                        child: Text(
+                          'Explore as Guest',
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            decoration: TextDecoration.underline,
+                            decorationColor: theme.colorScheme.primary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+
+                  const SizedBox(height: 24),
+                  Divider(color: theme.dividerColor),
+                  const SizedBox(height: 18),
 
                   // Register Your Salon (Outline Button)
                   OutlinedButton.icon(

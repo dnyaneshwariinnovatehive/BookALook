@@ -326,9 +326,9 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     if (widget.isGuest) {
-      return GuestRestrictedView(
-        title: 'Sign In Required',
-        message: 'Please sign in to access your profile settings and history.',
+      return const GuestRestrictedView(
+        title: 'Login or Sign Up',
+        message: 'Please login or sign up to access your profile settings and history.',
         // Favourites left the footer, so Profile is the last tab.
         tabIndex: 3,
         icon: Icons.person_outline,

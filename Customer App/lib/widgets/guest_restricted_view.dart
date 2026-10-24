@@ -60,9 +60,9 @@ class GuestRestrictedView extends StatelessWidget {
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
-              child: Text(
-                'Login / Sign Up',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              child: const Text(
+                'Login or Sign Up',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
