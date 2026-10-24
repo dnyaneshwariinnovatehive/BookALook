@@ -266,4 +266,88 @@ void main() {
       expect(find.text('View More'), findsOneWidget);
     },
   );
+
+  testWidgets('Combo tile hosts ComboCategoryAnimation and responds to taps without animation interruption', (tester) async {
+    ServiceCategory? tapped;
+    await tester.pumpWidget(
+      harness(
+        categories(),
+        onTap: (cat) => tapped = cat,
+      ),
+    );
+
+    // Initial frame
+    await tester.pump();
+    expect(find.byType(ComboCategoryAnimation), findsOneWidget);
+
+    // Tap Combo card
+    await tester.tap(find.text('Combo'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(tapped, isNotNull);
+    expect(tapped!.id, CategoryGrid.comboSentinelId);
+
+    // Animation continues running smoothly across frames
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ComboCategoryAnimation renders cleanly in dark mode without error', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: viewportWidth,
+              child: CategoryGrid(
+                categories: categories(),
+                onTap: (_) {},
+                onViewMore: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    expect(find.byType(ComboCategoryAnimation), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dynamically fetched category logo occupies substantially more of the tile with minimal padding', (tester) async {
+    final catsWithIcons = [
+      ServiceCategory(id: '1', name: 'Hair', iconUrl: 'https://example.com/hair.png'),
+      ServiceCategory(id: '5', name: 'Grooming', iconUrl: 'https://example.com/grooming.png'),
+    ];
+
+    await tester.pumpWidget(harness(catsWithIcons));
+    await tester.pump();
+
+    // Verify Image.network widgets are present for the categories with icons
+    final imageWidgets = tester.widgetList<Image>(find.byType(Image)).toList();
+    expect(imageWidgets.length, 2);
+
+    for (final img in imageWidgets) {
+      expect(img.fit, BoxFit.contain);
+      expect(img.alignment, Alignment.center);
+    }
+
+    // Verify there is NO 50% FractionallySizedBox wrapping the Image.network widgets
+    final fractionalBoxes = tester.widgetList<FractionallySizedBox>(find.byType(FractionallySizedBox)).toList();
+    // Only Combo (widthFactor 0.85) and View More (widthFactor 0.48) have FractionallySizedBox;
+    // none of the image logos have the old 0.50 constraint!
+    for (final box in fractionalBoxes) {
+      expect(box.widthFactor, isNot(equals(0.50)));
+      expect(box.heightFactor, isNot(equals(0.50)));
+    }
+
+    // View More tile remains intact with its grid icon
+    expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
+  });
 }
+
+

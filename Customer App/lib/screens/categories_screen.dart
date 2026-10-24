@@ -10,6 +10,7 @@ import 'category_salons_screen.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 import '../utils/bottom_clearance.dart';
+import '../widgets/combo_category_animation.dart';
 
 /// Every category the platform has, presented in a modern, elegant,
 /// mobile-first two-column grid.
@@ -36,12 +37,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   static const Color _primaryPurple = Color(0xFF9850F1);
   static const Color _secondaryLavender = Color(0xFFEEE3FD);
 
-  // Two-column responsive grid delegate
+  // Two-column responsive grid delegate: childAspectRatio 1.01 provides an ~8.9%
+  // card height reduction for a more compact, balanced presentation.
   static const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
     crossAxisCount: 2,
     crossAxisSpacing: 14,
     mainAxisSpacing: 14,
-    childAspectRatio: 0.92,
+    childAspectRatio: 1.01,
   );
 
   @override
@@ -264,7 +266,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             ? _buildEmptyState()
                             : GridView.builder(
                                 physics: const AlwaysScrollableScrollPhysics(),
-                                padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context, gap: 24)),
+                                padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context, gap: 32)),
                                 gridDelegate: _gridDelegate,
                                 itemCount: filteredItems.length,
                                 itemBuilder: (context, index) {
@@ -290,7 +292,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     return Skeleton(
       child: GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context, gap: 24)),
+        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomClearance(context, gap: 32)),
         gridDelegate: _gridDelegate,
         itemCount: 6,
         itemBuilder: (_, _) => const _CategoryCardSkeleton(),
@@ -516,8 +518,8 @@ class _CategoryCard extends StatelessWidget {
             children: [
               // Subtle circular arrow indicator near top-right
               Positioned(
-                top: 12,
-                right: 12,
+                top: 10,
+                right: 10,
                 child: Container(
                   width: 28,
                   height: 28,
@@ -545,7 +547,7 @@ class _CategoryCard extends StatelessWidget {
 
               // Main card layout: prominent hero logo + category name near bottom-left
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -554,23 +556,23 @@ class _CategoryCard extends StatelessWidget {
                     Expanded(
                       child: Center(
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 8, bottom: 4),
-                          child: _buildCategoryIcon(category),
+                          padding: const EdgeInsets.only(top: 6, bottom: 2),
+                          child: _buildCategoryIcon(context, category),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     // Bold, clearly readable category name near bottom-left
                     Text(
                       category.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
-                        fontSize: 16,
+                        fontSize: 15.5,
                         fontWeight: FontWeight.w700,
                         color: context.colors.textPrimary,
                         letterSpacing: -0.2,
-                        height: 1.2,
+                        height: 1.15,
                       ),
                     ),
                   ],
@@ -583,22 +585,23 @@ class _CategoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryIcon(ServiceCategory category) {
+  Widget _buildCategoryIcon(BuildContext context, ServiceCategory category) {
     final hasIcon = category.iconUrl != null && category.iconUrl!.isNotEmpty;
     final isCombo = category.name.toLowerCase().contains('combo');
 
-    // Combo default asset fallback if no remote icon provided
-    if (isCombo && !hasIcon) {
-      return Image.asset(
-        'assets/images/combo_icon.jpg',
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        color: style.background,
-        colorBlendMode: BlendMode.multiply,
-        errorBuilder: (context, error, stackTrace) => const Icon(
-          Icons.card_giftcard_rounded,
-          color: Color(0xFF9850F1),
-          size: 64,
+    // Combo animated presentation: 10-stage repeating animation bringing Hair, Skin, Nails & Spa together
+    if (isCombo) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Center(
+        child: FractionallySizedBox(
+          widthFactor: 0.85,
+          heightFactor: 0.85,
+          child: ComboCategoryAnimation(
+            primaryColor: const Color(0xFF9850F1),
+            backgroundColor: isDark
+                ? const Color(0xFF9850F1).withValues(alpha: 0.16)
+                : style.background,
+          ),
         ),
       );
     }
@@ -652,12 +655,12 @@ class _CategoryCardSkeleton extends StatelessWidget {
       child: const Stack(
         children: [
           Positioned(
-            top: 12,
-            right: 12,
+            top: 10,
+            right: 10,
             child: SkeletonBox(width: 28, height: 28, radius: 14),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: EdgeInsets.fromLTRB(14, 10, 14, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -666,7 +669,7 @@ class _CategoryCardSkeleton extends StatelessWidget {
                     child: SkeletonBox(width: 68, height: 68, radius: 16),
                   ),
                 ),
-                SizedBox(height: 10),
+                SizedBox(height: 6),
                 SkeletonLine(widthFactor: 0.65, height: 16),
               ],
             ),
