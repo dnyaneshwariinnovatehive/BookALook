@@ -81,6 +81,26 @@ class AppointmentController extends Controller
             return $denied;
         }
 
+        // Only a booking that is still waiting can be missed, and only once its
+        // time has come. Without this a salon could mark a 6 pm booking a
+        // no-show at 10 am — or a completed or cancelled one — and keep the
+        // advance.
+        if ($appointment->status !== 'scheduled') {
+            return response()->json([
+                'message' => 'Only a booking that has not started can be marked as a no-show.',
+            ], 422);
+        }
+
+        $startsAt = \Carbon\Carbon::parse(
+            \Carbon\Carbon::parse($appointment->appointment_date)->format('Y-m-d') . ' ' . $appointment->start_time
+        );
+
+        if (now()->lessThan($startsAt)) {
+            return response()->json([
+                'message' => 'This booking has not started yet. It can be marked as a no-show from ' . $startsAt->format('h:i A') . '.',
+            ], 422);
+        }
+
         $appointment->status = 'no_show';
         $appointment->no_show_at = now();
         $appointment->save();
@@ -108,6 +128,16 @@ class AppointmentController extends Controller
 
         if ($appointment->status === 'completed') {
             return response()->json(['message' => 'This appointment is already settled.'], 422);
+        }
+
+        // Same rule as the check-in screen: only a session that was started —
+        // the customer actually checked in — can be finished and billed. This
+        // used to complete anything, including cancelled-and-refunded,
+        // no-show and unpaid bookings.
+        if ($appointment->status !== 'in_progress') {
+            return response()->json([
+                'message' => 'Start the appointment before completing it.',
+            ], 422);
         }
 
         $request->validate([

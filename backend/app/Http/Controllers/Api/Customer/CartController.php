@@ -213,6 +213,16 @@ class CartController extends Controller
             return response()->json(['message' => 'Either service_id or combo_id is required.'], 400);
         }
 
+        // A salon that cannot serve bookings right now (plan lapsed, commission
+        // unsettled, suspended) should not fill a basket the customer can never
+        // check out.
+        if (! app(\App\Services\SalonAccessService::class)->isActive($salon_id)) {
+            return response()->json([
+                'message' => 'This salon is not taking bookings right now. Please choose another salon.',
+                'salon_unavailable' => true,
+            ], 409);
+        }
+
         // For individual services, enforce quantity 1
         if ($request->filled('service_id') && $request->has('quantity') && (int) $request->quantity > 1) {
             return response()->json([

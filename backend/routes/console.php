@@ -29,6 +29,11 @@ Schedule::command('app:generate-payouts')->dailyAt('04:00')->withoutOverlapping(
 // day into a no-show state.
 Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();
 
+// A visit staff started but never completed is closed a day later, balance
+// recorded as cash, so it is invoiced and reaches the payout. Hourly so each
+// one closes about a day after it began.
+Schedule::command('app:close-stale-sessions')->hourly()->withoutOverlapping();
+
 // Appointment reminders. Every fifteen minutes, not once an hour: the command
 // recomputes its own window from the data on each pass, so it does not care
 // when it runs, and running it often is what makes a missed tick cost nothing.

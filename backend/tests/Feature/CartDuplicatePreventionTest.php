@@ -20,6 +20,7 @@ use Tests\TestCase;
 class CartDuplicatePreventionTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\ActivatesSalons;
 
     private User $customer;
     private Salon $salon;
@@ -60,6 +61,7 @@ class CartDuplicatePreventionTest extends TestCase
             'submitted_by' => $admin->id,
             'status' => 'active',
         ]);
+        $this->activateSalon($this->salon);
 
         $category = ServiceCategory::firstOrCreate(
             ['name' => 'Hair Care'],

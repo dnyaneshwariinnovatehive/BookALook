@@ -90,6 +90,10 @@ class AppointmentController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($closed = $this->notTakingBookings($salon_id)) {
+            return $closed;
+        }
+
         $cart = $this->activeCart($request, $salon_id);
 
         if (!$cart || $cart->items->isEmpty()) {
@@ -161,6 +165,10 @@ class AppointmentController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($closed = $this->notTakingBookings($salon_id)) {
+            return $closed;
+        }
+
         $user = $request->user();
         $cart = $this->activeCart($request, $salon_id);
 
@@ -228,6 +236,8 @@ class AppointmentController extends Controller
 
         DB::beginTransaction();
         try {
+            $this->lockProviders($candidates);
+
             // Re-check the slot inside the transaction so a slot taken while the
             // customer was choosing cannot be double-booked.
             $appointedProviderId = $this->availability->resolveProviderForSlot(
@@ -653,6 +663,45 @@ class AppointmentController extends Controller
     }
 
     /**
+     * Refuse a new booking (or a move) at a salon that cannot serve it: one
+     * suspended, not yet approved, whose plan has lapsed or whose commission
+     * month is unsettled. Its staff are locked out of the partner app, so a
+     * customer who booked and paid would arrive to nobody able to check them
+     * in. The salon list already greys these out; this stops the API taking
+     * the booking anyway.
+     */
+    private function notTakingBookings(string $salonId): ?\Illuminate\Http\JsonResponse
+    {
+        $status = app(\App\Services\SalonAccessService::class)->statusForId($salonId);
+
+        if ($status['is_active']) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'This salon is not taking bookings right now. Please choose another salon.',
+            'salon_unavailable' => true,
+        ], 409);
+    }
+
+    /**
+     * Serialise bookings for the same staff. Two customers who pressed Book on
+     * the same slot at the same moment both passed the availability re-check,
+     * because neither could see the other's uncommitted row. Holding the
+     * provider rows until commit makes the second one wait, then re-check and
+     * find the slot taken.
+     *
+     * @param  string[]  $providerIds
+     */
+    private function lockProviders(array $providerIds): void
+    {
+        \App\Models\ServiceProvider::whereIn('id', $providerIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
+    }
+
+    /**
      * Who the booking is for, as appointment columns. A booking for oneself
      * stores no recipient at all, so "null" keeps meaning "the account holder"
      * for every booking made before this existed.
@@ -951,6 +1000,10 @@ class AppointmentController extends Controller
             return response()->json(['message' => $window['reason']], 422);
         }
 
+        if ($closed = $this->notTakingBookings($appointment->salon_id)) {
+            return $closed;
+        }
+
         $requirements = $this->availability->summariseAppointment($appointment);
         $providers = $this->availability->providersForSalon($appointment->salon_id, $requirements['service_ids']);
 
@@ -1024,6 +1077,10 @@ class AppointmentController extends Controller
             return response()->json(['message' => $window['reason']], 422);
         }
 
+        if ($closed = $this->notTakingBookings($appointment->salon_id)) {
+            return $closed;
+        }
+
         $requirements = $this->availability->summariseAppointment($appointment);
         $candidates = $this->candidateProviders(
             $appointment->salon_id,
@@ -1039,6 +1096,8 @@ class AppointmentController extends Controller
 
         DB::beginTransaction();
         try {
+            $this->lockProviders($candidates);
+
             $providerId = $this->availability->resolveProviderForSlot(
                 $appointment->salon_id,
                 $request->date,
@@ -1074,6 +1133,15 @@ class AppointmentController extends Controller
                 'advance_amount' => $appointment->advance_amount,
                 'balance_amount' => $appointment->balance_amount,
                 'rescheduled_from_id' => $appointment->id,
+                // Who sits in the chair and the first-time offer belong to the
+                // booking, not the slot, so they move with it.
+                'booked_for' => $appointment->booked_for,
+                'recipient_name' => $appointment->recipient_name,
+                'recipient_gender' => $appointment->recipient_gender,
+                'recipient_phone' => $appointment->recipient_phone,
+                'first_time_offer_id' => $appointment->first_time_offer_id,
+                'first_time_discount_amount' => $appointment->first_time_discount_amount,
+                'customer_phone_hash' => $appointment->customer_phone_hash,
                 'reschedule_reason' => $request->input(
                     'reason',
                     $window['free_reschedule'] ? 'Salon closed on the original date' : null
@@ -1474,6 +1542,18 @@ class AppointmentController extends Controller
             ->where('appointment_id', $from->id)
             ->where('status', 'success')
             ->get();
+
+        // The payment itself moves to the new booking. Refunds, the counter
+        // bill and the salon's payout all look payments up by appointment, so
+        // a payment left on the old row was invisible to them: cancelling a
+        // rescheduled booking refunded nothing, and a no-show forfeited nothing
+        // to the salon. The allocation rows below stay as the audit trail.
+        DB::table('payments')
+            ->whereIn('id', $payments->pluck('id'))
+            ->update(['appointment_id' => $to->id, 'updated_at' => now()]);
+
+        \App\Models\FirstTimeOfferRedemption::where('appointment_id', $from->id)
+            ->update(['appointment_id' => $to->id]);
 
         foreach ($payments as $payment) {
             DB::table('payment_allocations')->insert([

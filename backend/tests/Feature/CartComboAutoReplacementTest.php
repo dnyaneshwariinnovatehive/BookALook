@@ -16,6 +16,7 @@ use Tests\TestCase;
 class CartComboAutoReplacementTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\ActivatesSalons;
 
     private User $customer;
     private Salon $salon;
@@ -57,6 +58,7 @@ class CartComboAutoReplacementTest extends TestCase
             'submitted_by' => $admin->id,
             'status' => 'active',
         ]);
+        $this->activateSalon($this->salon);
 
         $category = ServiceCategory::firstOrCreate(
             ['name' => 'Hair Care'],

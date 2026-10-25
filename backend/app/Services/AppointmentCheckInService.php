@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Appointment;
+use App\Models\AppointmentService;
 use App\Models\AppointmentServiceAddition;
 use App\Models\PlatformPolicySetting;
 use App\Models\Service;
@@ -236,7 +237,7 @@ class AppointmentCheckInService
                 continue;
             }
 
-            $price = (float) $line->price_at_booking;
+            $price = $this->chargedPrice($line);
             $total += $price;
 
             $lines[] = [
@@ -244,6 +245,7 @@ class AppointmentCheckInService
                 'name' => $line->service->template->name ?? 'Service',
                 'kind' => $line->combo_id ? 'package' : 'service',
                 'price' => $price,
+                'first_time_discount' => round((float) ($line->first_time_discount_amount ?? 0), 2),
                 'duration_minutes' => (int) $line->duration_minutes_at_booking,
                 'provider_name' => $line->servingProvider->user->name
                     ?? $appointment->servingProvider->user->name
@@ -373,7 +375,8 @@ class AppointmentCheckInService
     {
         $booked = (float) $appointment->services()
             ->where('line_status', '!=', 'cancelled')
-            ->sum('price_at_booking');
+            ->get()
+            ->sum(fn (AppointmentService $line) => $this->chargedPrice($line));
 
         $added = (float) $appointment->serviceAdditions()
             ->live()
@@ -527,13 +530,31 @@ class AppointmentCheckInService
         ];
     }
 
+    /**
+     * What was already taken at the counter. Online payments are left out: they
+     * are the advance (or the whole amount paid upfront), which the bill already
+     * subtracts as advance_paid. Counting a full upfront payment here as well
+     * subtracted it twice, so an extra added in the chair came out free.
+     */
     private function collectedSoFar(Appointment $appointment): float
     {
         return (float) DB::table('payments')
             ->where('appointment_id', $appointment->id)
             ->where('status', 'success')
+            ->whereNull('gateway')
             ->whereIn('payment_type', ['balance', 'full'])
             ->sum('amount');
+    }
+
+    /**
+     * A booked line at the price the customer was actually quoted: its price
+     * less any first-time discount. The discount is stored beside the price
+     * rather than in it, and the bill used to ignore it, so the customer was
+     * asked for the undiscounted amount at the counter.
+     */
+    private function chargedPrice(AppointmentService $line): float
+    {
+        return round(max((float) $line->price_at_booking - (float) ($line->first_time_discount_amount ?? 0), 0), 2);
     }
 
     private function startsAt(Appointment $appointment): Carbon

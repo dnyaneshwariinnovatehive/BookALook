@@ -21,6 +21,7 @@ use Tests\TestCase;
 class SuperAdminCatalogDeletionTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Feature\Concerns\ActivatesSalons;
 
     private User $superAdmin;
     private User $regularCustomer;
@@ -451,6 +452,10 @@ class SuperAdminCatalogDeletionTest extends TestCase
 
         $svcRetired = $this->createService($this->salon, $tplRetired, 800.00);
         $svcActive = $this->createService($this->salon, $tplActive, 400.00);
+
+        // Only a live salon (active, on an in-date plan) takes bookings.
+        $this->salon->update(['status' => 'active']);
+        $this->activateSalon($this->salon);
 
         // 1. Customer adds both to cart
         $cart = Cart::create([

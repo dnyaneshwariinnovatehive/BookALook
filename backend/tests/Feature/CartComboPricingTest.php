@@ -26,6 +26,7 @@ use Tests\TestCase;
 class CartComboPricingTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\ActivatesSalons;
 
     public function test_a_cart_holding_a_whole_package_is_priced_as_that_package(): void
     {
@@ -346,19 +347,7 @@ class CartComboPricingTest extends TestCase
             'status' => 'active',
         ]);
 
-        $plan = SubscriptionPlan::first();
-
-        if ($plan) {
-            SalonSubscription::create([
-                'salon_id' => $salon->id,
-                'plan_id' => $plan->id,
-                'billing_type' => \App\Support\BillingModel::SUBSCRIPTION,
-                'plan_price_snapshot' => $plan->price,
-                'start_date' => Carbon::today()->subDay(),
-                'end_date' => Carbon::today()->addDays(30),
-                'status' => 'active',
-            ]);
-        }
+        $this->activateSalon($salon);
 
         // Distinct templates so each service has its own name.
         $templates = ServiceTemplate::limit(3)->get();

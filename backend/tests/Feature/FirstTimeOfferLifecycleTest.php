@@ -28,6 +28,7 @@ use Tests\TestCase;
 class FirstTimeOfferLifecycleTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Feature\Concerns\ActivatesSalons;
 
     private User $admin;
 
@@ -1662,7 +1663,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
     {
         $slug = Str::slug($name).'-'.Str::random(5);
 
-        return Salon::create([
+        return $this->activateSalon(Salon::create([
             'id' => (string) Str::uuid(),
             'admin_id' => $admin->id,
             'name' => $name,
@@ -1670,7 +1671,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
             'address' => '123 Test St',
             'submitted_by' => $admin->id,
             'status' => 'active',
-        ]);
+        ]));
     }
 
     private function createOffer(array $attributes = [], array $templateIds = [], array $salonIds = []): FirstTimeOffer
