@@ -22,12 +22,27 @@ interface Template {
   category_id: string;
   name: string;
   estimated_duration_minutes: number;
+  gender_focus: GenderFocus;
+  // How live salon copies are tagged right now, and what the name hints at
+  // when the template is still Unisex. Both are computed by the API.
+  salon_gender_counts?: Record<GenderFocus, number>;
+  suggested_gender_focus?: GenderFocus | null;
   is_custom: boolean;
   created_by_salon_id: string | null;
   promoted_to_standard_at: string | null;
   promoted_by: string | null;
   is_active: boolean;
 }
+
+type GenderFocus = 'Unisex' | 'Men Only' | 'Women Only';
+const GENDERS: GenderFocus[] = ['Unisex', 'Men Only', 'Women Only'];
+
+/** Salon copies that a change to `gender` would rewrite. Unisex rewrites none. */
+const servicesToSwitch = (tpl: Template, gender: GenderFocus): number => {
+  if (gender === 'Unisex' || !tpl.salon_gender_counts) return 0;
+  return GENDERS.filter(g => g !== gender)
+    .reduce((sum, g) => sum + (tpl.salon_gender_counts?.[g] ?? 0), 0);
+};
 
 interface Category {
   id: string;
@@ -70,6 +85,7 @@ export default function CatalogPage() {
   const [tplName, setTplName] = useState('');
   const [tplDuration, setTplDuration] = useState('30');
   const [tplIsActive, setTplIsActive] = useState(true);
+  const [tplGender, setTplGender] = useState<GenderFocus>('Unisex');
 
   useEffect(() => {
     fetchCatalog();
@@ -207,10 +223,15 @@ export default function CatalogPage() {
     const bodyData: any = {
       name: tplName,
       estimated_duration_minutes: parseInt(tplDuration),
+      gender_focus: tplGender,
       is_active: tplIsActive
     };
     if (!isEdit) {
       bodyData.category_id = selectedCatId;
+    }
+
+    if (isEdit && tplGender !== editingTemplate.gender_focus && !(await confirmGenderChange(editingTemplate, tplGender))) {
+      return;
     }
 
     try {
@@ -223,17 +244,68 @@ export default function CatalogPage() {
         body: JSON.stringify(bodyData)
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         setTplName('');
         setTplDuration('30');
         setTplIsActive(true);
+        setTplGender('Unisex');
         setEditingTemplate(null);
         setShowTplModal(false);
+        reportGenderChange(data);
         fetchCatalog();
       } else {
         alert(`Failed to ${isEdit ? 'edit' : 'add'} template`);
       }
     } catch (err) {
       alert(`Error ${isEdit ? 'editing' : 'adding'} template`);
+    }
+  };
+
+  // A gendered template is that gender in every salon, so say how many salon
+  // copies will be rewritten before doing it.
+  const confirmGenderChange = async (tpl: Template, gender: GenderFocus): Promise<boolean> => {
+    const affected = servicesToSwitch(tpl, gender);
+    return confirm({
+      title: `Make “${tpl.name}” ${gender}?`,
+      body: gender === 'Unisex'
+        ? 'Salons keep whatever they set. Each can still narrow it to men or women.'
+        : affected > 0
+          ? `${affected} salon service${affected === 1 ? '' : 's'} tagged differently will switch to ${gender}. Customers will only see it under ${gender === 'Men Only' ? 'men' : 'women'}.`
+          : `Every salon offering it already lists it this way. Customers will only see it under ${gender === 'Men Only' ? 'men' : 'women'}.`,
+      confirmLabel: `Make ${gender}`,
+    });
+  };
+
+  const reportGenderChange = (data: { services_updated?: number; salon_conflicts?: number }) => {
+    const parts: string[] = [];
+    if (data.services_updated) parts.push(`${data.services_updated} salon service${data.services_updated === 1 ? '' : 's'} switched`);
+    if (data.salon_conflicts) parts.push(`${data.salon_conflicts} sit in a salon of the other gender and need the owner's attention`);
+    if (parts.length) setNotice(`Gender saved: ${parts.join('; ')}.`);
+  };
+
+  const applySuggestedGender = async (tpl: Template) => {
+    const gender = tpl.suggested_gender_focus;
+    if (!gender || !(await confirmGenderChange(tpl, gender))) return;
+    setNotice('');
+    try {
+      const res = await fetch(`/api/proxy/superadmin/catalog/templates/${tpl.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          name: tpl.name,
+          estimated_duration_minutes: tpl.estimated_duration_minutes,
+          gender_focus: gender,
+          is_active: tpl.is_active,
+        }),
+      });
+      if (res.ok) {
+        reportGenderChange(await res.json().catch(() => ({})));
+        fetchCatalog();
+      } else {
+        setNotice('Failed to update the template’s gender');
+      }
+    } catch (err) {
+      setNotice('Network error while updating the template’s gender');
     }
   };
 
@@ -354,6 +426,7 @@ export default function CatalogPage() {
     setTplName('');
     setTplDuration('30');
     setTplIsActive(true);
+    setTplGender('Unisex');
     setShowTplModal(true);
   };
 
@@ -363,6 +436,7 @@ export default function CatalogPage() {
     setTplName(tpl.name);
     setTplDuration(tpl.estimated_duration_minutes.toString());
     setTplIsActive(tpl.is_active);
+    setTplGender(tpl.gender_focus ?? 'Unisex');
     setShowTplModal(true);
   };
 
@@ -509,6 +583,20 @@ export default function CatalogPage() {
                         <span className={`${styles.badge} ${tpl.is_custom ? styles.badgeCustom : styles.badgeStandard}`}>
                           {tpl.is_custom ? 'Custom' : 'Standard'}
                         </span>
+                        <span className={styles.badge} title="Who this service is for, in every salon">
+                          {tpl.gender_focus ?? 'Unisex'}
+                        </span>
+                        {tpl.suggested_gender_focus && (
+                          <button
+                            type="button"
+                            className={styles.badge}
+                            style={{ cursor: 'pointer', border: '1px dashed currentColor', background: 'transparent' }}
+                            title="The name suggests this is not for everyone"
+                            onClick={() => applySuggestedGender(tpl)}
+                          >
+                            Looks {tpl.suggested_gender_focus} — set it
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className={styles.templateActions}>
@@ -631,10 +719,21 @@ export default function CatalogPage() {
                   required
                 />
               </div>
+              <div className={styles.formGroup}>
+                <label>Who is it for?</label>
+                <select value={tplGender} onChange={(e) => setTplGender(e.target.value as GenderFocus)}>
+                  {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <small style={{ color: 'var(--text-body)' }}>
+                  {tplGender === 'Unisex'
+                    ? 'Every salon can offer it, and may narrow it to men or women.'
+                    : `Locked to ${tplGender} in every salon. ${tplGender === 'Men Only' ? 'Women Only' : 'Men Only'} salons cannot add it.`}
+                </small>
+              </div>
               <label className={styles.checkboxGroup}>
-                <input 
-                  type="checkbox" 
-                  checked={tplIsActive} 
+                <input
+                  type="checkbox"
+                  checked={tplIsActive}
                   onChange={(e) => setTplIsActive(e.target.checked)}
                 />
                 <span>Is Active (Visible to users)</span>

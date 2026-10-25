@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
 import '../utils/time_fmt.dart';
+import '../utils/booked_for.dart';
 import '../widgets/initials_avatar.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
@@ -195,6 +196,8 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(customerName, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+                                if (bookedForLabel(apt) != null)
+                                  Text(bookedForLabel(apt)!, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF6366F1))),
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [

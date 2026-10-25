@@ -30,6 +30,25 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   ServiceTemplate? _selectedTemplate;
   bool _isCustom = false;
 
+  // What this salon may offer. The salon's own focus caps everything; a
+  // gendered template is locked to its gender.
+  String _salonGenderFocus = 'Unisex';
+  List<String> _customAllowedGenders = ServiceTemplate.genders;
+
+  List<String> get _allowedGenders {
+    if (_isCustom || _selectedTemplate == null) return _customAllowedGenders;
+    return _selectedTemplate!.allowedGenders;
+  }
+
+  /// Keep the picked gender one this service may actually be. Called after
+  /// anything that changes which template (or custom) is selected.
+  void _syncGender() {
+    final allowed = _allowedGenders;
+    if (allowed.isNotEmpty && !allowed.contains(_genderFocus)) {
+      _genderFocus = allowed.first;
+    }
+  }
+
   // Controllers for custom and pricing
   final _customCategoryController = TextEditingController();
   final _customTemplateController = TextEditingController();
@@ -175,13 +194,16 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       } else {
         final futures = await Future.wait([
           widget.initialCategories != null
-              ? Future.value(widget.initialCategories!)
-              : ServiceManagementApi.getMasterCatalog(widget.salonId),
+              ? Future.value(MasterCatalog(categories: widget.initialCategories!))
+              : ServiceManagementApi.getMasterCatalogDetailed(widget.salonId),
           widget.initialSalonServices != null
               ? Future.value(<Map<String, dynamic>>[])
               : ServiceManagementApi.getSalonServices(widget.salonId),
         ]);
-        categories = widget.initialCategories ?? (futures[0] as List<ServiceCategory>);
+        final catalog = futures[0] as MasterCatalog;
+        categories = catalog.categories;
+        _salonGenderFocus = catalog.salonGenderFocus;
+        _customAllowedGenders = catalog.customAllowedGenderFocus;
 
         if (widget.initialSalonServices != null) {
           flatServices = widget.initialSalonServices!;
@@ -227,6 +249,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
             _isCustom = true;
           }
         }
+        _syncGender();
         _isLoading = false;
       });
     } catch (e) {
@@ -357,6 +380,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                       _selectedTemplate = null;
                       _isCustom = true;
                     }
+                    _syncGender();
                   });
                 },
               ),
@@ -391,6 +415,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
                           _isCustom = false;
                           _selectedTemplate = val;
                         }
+                        _syncGender();
                       });
                     },
                   ),
@@ -499,22 +524,52 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           // Category dropdown was moved up
           
           _buildLabel('Gender Focus'),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _genderFocus,
-                items: ['Unisex', 'Men Only', 'Women Only'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                onChanged: (val) {
-                  setState(() => _genderFocus = val!);
-                },
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final allowed = _allowedGenders;
+              final locked = allowed.length <= 1;
+              final value = allowed.contains(_genderFocus)
+                  ? _genderFocus
+                  : (allowed.isNotEmpty ? allowed.first : null);
+
+              // Why there is no choice, so a locked picker never looks broken.
+              String? reason;
+              if (locked && !_isCustom && (_selectedTemplate?.genderFocus ?? 'Unisex') != 'Unisex') {
+                reason = 'Set by BookALook for every salon.';
+              } else if (locked && _salonGenderFocus != 'Unisex') {
+                reason = 'Your salon is $_salonGenderFocus.';
+              }
+
+              return Column(
+                key: const ValueKey('gender-focus-picker'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(locked ? 0.3 : 0.6)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: value,
+                        items: allowed.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                        onChanged: locked ? null : (val) => setState(() => _genderFocus = val!),
+                      ),
+                    ),
+                  ),
+                  if (reason != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
+                      child: Text(
+                        reason,
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           

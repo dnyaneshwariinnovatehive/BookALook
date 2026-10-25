@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
+import '../services/audience_service.dart';
 import '../utils/app_haptics.dart';
 import 'qr_code_screen.dart';
 import '../utils/check_in_window.dart';
@@ -463,6 +464,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                   ],
                 ),
               ),
+
+              if (_booking['booked_for'] == 'other' &&
+                  (_booking['recipient_name'] ?? '').toString().isNotEmpty)
+                _buildSection(
+                  title: 'Booked for',
+                  headingColor: headingColor,
+                  child: Text(
+                    [
+                      _booking['recipient_name'].toString(),
+                      if (_booking['recipient_gender'] != null)
+                        AudienceService.genderLabel(_booking['recipient_gender']?.toString()),
+                      if ((_booking['recipient_phone'] ?? '').toString().isNotEmpty)
+                        _booking['recipient_phone'].toString(),
+                    ].join(' · '),
+                    style: GoogleFonts.outfit(fontSize: 14, color: headingColor),
+                  ),
+                ),
 
               // 3. Location
               if (_booking['salon']['address'] != null)

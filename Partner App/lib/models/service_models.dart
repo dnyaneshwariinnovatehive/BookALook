@@ -34,6 +34,14 @@ class ServiceTemplate {
   final bool isCustom;
   final ServiceCategory? category;
 
+  /// Who the superadmin says this service is for, in every salon.
+  final String genderFocus;
+
+  /// What this salon may offer it as. A gendered template is locked to its
+  /// gender; a Unisex one may be narrowed. Null when the server did not say,
+  /// in which case [allowedGenders] works it out from [genderFocus].
+  final List<String>? allowedGenderFocus;
+
   ServiceTemplate({
     required this.id,
     required this.categoryId,
@@ -41,7 +49,14 @@ class ServiceTemplate {
     required this.estimatedDurationMinutes,
     this.isCustom = false,
     this.category,
+    this.genderFocus = 'Unisex',
+    this.allowedGenderFocus,
   });
+
+  static const genders = ['Unisex', 'Men Only', 'Women Only'];
+
+  List<String> get allowedGenders =>
+      allowedGenderFocus ?? (genderFocus == 'Unisex' ? genders : [genderFocus]);
 
   factory ServiceTemplate.fromJson(Map<String, dynamic> json) {
     return ServiceTemplate(
@@ -51,8 +66,25 @@ class ServiceTemplate {
       estimatedDurationMinutes: json['estimated_duration_minutes'] ?? 30,
       isCustom: json['is_custom'] == 1 || json['is_custom'] == true,
       category: json['category'] != null ? ServiceCategory.fromJson(json['category']) : null,
+      genderFocus: json['gender_focus']?.toString() ?? 'Unisex',
+      allowedGenderFocus: (json['allowed_gender_focus'] as List?)?.map((g) => g.toString()).toList(),
     );
   }
+}
+
+/// The master catalogue as one salon may use it.
+class MasterCatalog {
+  final List<ServiceCategory> categories;
+  final String salonGenderFocus;
+
+  /// What a brand-new custom service may be at this salon.
+  final List<String> customAllowedGenderFocus;
+
+  MasterCatalog({
+    required this.categories,
+    this.salonGenderFocus = 'Unisex',
+    this.customAllowedGenderFocus = ServiceTemplate.genders,
+  });
 }
 
 class SalonService {

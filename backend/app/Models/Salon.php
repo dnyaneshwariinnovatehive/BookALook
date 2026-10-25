@@ -119,7 +119,12 @@ class Salon extends Model
      * Also accepts the combo sentinel, which is not a catalogue category at all
      * but means "offers a package", so it is answered from the combos instead.
      */
-    public function scopeProvidingCategory($query, string $categoryId)
+    /**
+     * Salons offering this category — to one audience when given one, so a
+     * woman browsing Hair is not shown a salon whose only hair service there
+     * is a beard trim.
+     */
+    public function scopeProvidingCategory($query, string $categoryId, ?string $audience = null)
     {
         if (strtolower($categoryId) === Combo::CATEGORY_SENTINEL) {
             return $query->whereHas('combos', function ($combos) {
@@ -127,8 +132,9 @@ class Salon extends Model
             });
         }
 
-        return $query->whereHas('services', function ($services) use ($categoryId) {
+        return $query->whereHas('services', function ($services) use ($categoryId, $audience) {
             $services->where('is_active', true)
+                ->when($audience, fn ($q) => $q->whereIn('gender_focus', \App\Support\GenderFocus::visibleTo($audience)))
                 ->whereHas('template', function ($template) use ($categoryId) {
                     $template->where('category_id', $categoryId);
                 });

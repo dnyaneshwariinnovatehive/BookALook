@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\Combo;
 use App\Models\Service;
 use App\Models\ServiceCategory;
+use App\Support\GenderFocus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,10 @@ class DiscoveryController extends Controller
 
         $city = $this->resolveCity($request);
 
+        // Who the customer is browsing for: a woman looking at Hair is not
+        // shown Beard Trim. Without a gender the catalogue is everyone's.
+        $audience = GenderFocus::fromAudience($request->input('gender'));
+
         $rows = DB::table('services as sv')
             ->join('service_templates as t', 't.id', '=', 'sv.template_id')
             ->join('salons as s', 's.id', '=', 'sv.salon_id')
@@ -53,6 +58,9 @@ class DiscoveryController extends Controller
             ->where('s.status', 'active')
             ->whereNull('s.deleted_at')
             ->when($city, fn ($q) => $q->where('s.city_id', $city->id))
+            ->when($audience, fn ($q) => $q
+                ->whereIn('sv.gender_focus', GenderFocus::visibleTo($audience))
+                ->whereIn('s.gender_focus', GenderFocus::visibleTo($audience)))
             ->selectRaw('sv.id as offer_id')
             ->selectRaw('sv.template_id as service_id')
             ->selectRaw('t.name')
@@ -65,7 +73,7 @@ class DiscoveryController extends Controller
             // Highest-rated host first (unrated salons last), cheapest price a
             // tie-breaker, then a stable id so "top" is deterministic.
             ->orderBy('sv.template_id')
-            ->orderByRaw('ISNULL(s.avg_rating), s.avg_rating DESC, sv.price ASC, sv.id ASC')
+            ->orderByRaw('CASE WHEN s.avg_rating IS NULL THEN 1 ELSE 0 END, s.avg_rating DESC, sv.price ASC, sv.id ASC')
             ->get();
 
         $services = $rows

@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\Combo;
 use App\Services\AvailabilityService;
 use App\Services\CartPricingService;
+use App\Support\GenderFocus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -107,9 +108,30 @@ class CartController extends Controller
 
         $payload = $cart->toArray();
 
+        // Who each line is for once the salon's focus applies, so checkout can
+        // warn when someone books a Men Only service for a woman. A combo
+        // mixing both is 'Mixed' and never warns.
+        $salonFocus = \App\Models\Salon::whereKey($cart->salon_id)->value('gender_focus');
+        $audienceOf = function (array $services) use ($salonFocus): string {
+            $audiences = collect($services)
+                ->map(fn ($s) => GenderFocus::effective($s['gender_focus'] ?? null, $salonFocus))
+                ->reject(fn ($a) => $a === GenderFocus::UNISEX)
+                ->unique()
+                ->values();
+
+            return match ($audiences->count()) {
+                0 => GenderFocus::effective(null, $salonFocus),
+                1 => $audiences->first(),
+                default => 'Mixed',
+            };
+        };
+
         if (!empty($payload['items'])) {
             foreach ($payload['items'] as &$item) {
                 $qty = max(1, (int) ($item['quantity'] ?? 1));
+                $item['audience'] = !empty($item['combo'])
+                    ? $audienceOf($item['combo']['services'] ?? [])
+                    : $audienceOf(!empty($item['service']) ? [$item['service']] : []);
                 if (!empty($item['combo'])) {
                     $itemPrice = (float) ($item['combo']['price'] ?? 0);
                     if ($itemPrice <= 0 && !empty($item['combo']['services'])) {

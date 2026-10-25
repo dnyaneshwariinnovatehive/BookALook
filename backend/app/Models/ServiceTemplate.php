@@ -16,6 +16,7 @@ class ServiceTemplate extends Model
         'category_id',
         'name',
         'estimated_duration_minutes',
+        'gender_focus',
         'is_custom',
         'created_by_salon_id',
         'promoted_to_standard_at',

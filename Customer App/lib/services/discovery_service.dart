@@ -11,9 +11,12 @@ class DiscoveryService {
   /// The distinct catalogue services a category genuinely offers, scoped to
   /// the customer's city. Backed by real active offerings only — never a
   /// templated guess.
-  Future<List<DiscoveryServiceItem>> fetchCategoryServices(String categoryId) async {
+  /// [gender] (`men`/`women`) narrows it to services meant for that audience;
+  /// null is everyone's catalogue.
+  Future<List<DiscoveryServiceItem>> fetchCategoryServices(String categoryId, {String? gender}) async {
     final queryParams = <String, dynamic>{
       'city_id': LocationService.instance.city?.id,
+      'gender': gender,
     }..removeWhere((k, v) => v == null || v.isEmpty);
 
     final location = LocationService.instance;

@@ -35,7 +35,7 @@ class SalonSettingsController extends Controller
             'description' => 'nullable|string',
             'address' => 'nullable|string',
             'pincode' => 'nullable|string|max:10',
-            'gender_focus' => 'nullable|string',
+            'gender_focus' => 'nullable|string|'.\App\Support\GenderFocus::rule(),
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'map_url' => 'nullable|string|url|max:500',
             'advance_required' => 'nullable|boolean',
@@ -47,6 +47,36 @@ class SalonSettingsController extends Controller
                 \Illuminate\Support\Facades\Log::error('Upload error: ' . $request->file('cover_image')->getError() . ' - ' . $request->file('cover_image')->getErrorMessage());
             }
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Becoming single-gender while still offering services for the other
+        // gender would leave customers shown services nobody can book. The
+        // owner retires those first; nothing is removed on their behalf.
+        $newFocus = $request->input('gender_focus');
+        if ($request->has('gender_focus') && in_array($newFocus, [\App\Support\GenderFocus::MEN, \App\Support\GenderFocus::WOMEN], true)) {
+            $other = $newFocus === \App\Support\GenderFocus::MEN
+                ? \App\Support\GenderFocus::WOMEN
+                : \App\Support\GenderFocus::MEN;
+
+            $conflicting = \App\Models\Service::with('template:id,name')
+                ->where('salon_id', $salon->id)
+                ->where('is_active', true)
+                ->where('gender_focus', $other)
+                ->get()
+                ->map(fn ($s) => $s->template->name ?? 'Service')
+                ->values()
+                ->all();
+
+            if ($conflicting !== []) {
+                $message = "Your salon still offers {$other} services: ".implode(', ', $conflicting)
+                    .". Remove them before switching to {$newFocus}.";
+
+                return response()->json([
+                    'message' => $message,
+                    'errors' => ['gender_focus' => [$message]],
+                    'conflicting_services' => $conflicting,
+                ], 422);
+            }
         }
 
         $salon->name = $request->name;

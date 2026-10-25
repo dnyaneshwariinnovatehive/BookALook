@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/appointment_service.dart'; // Ensure correct path
 import '../../../../utils/time_fmt.dart';
+import '../../../../utils/booked_for.dart';
 import '../../appointment_details_screen.dart'; // Fixed relative path
 import '../../walk_in_screen.dart';
 import '../../walk_in_history_screen.dart';
@@ -924,6 +925,8 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(customerName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTextColor)),
+                      if (bookedForLabel(apt) != null)
+                        Text(bookedForLabel(apt)!, style: GoogleFonts.outfit(fontSize: 12, color: AppTheme.accentColor, fontWeight: FontWeight.w700)),
                       if (customerPhone.isNotEmpty)
                         Text(customerPhone, style: GoogleFonts.outfit(fontSize: 12, color: secondaryTextColor, fontWeight: FontWeight.w500)),
                     ],

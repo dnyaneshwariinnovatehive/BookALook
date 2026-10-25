@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'location_service.dart';
+import 'audience_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'push_notification_service.dart';
 import 'http_client.dart' as http;
@@ -128,6 +129,7 @@ class AuthService {
         final data = jsonDecode(response.body);
         if (data.containsKey('access_token')) {
           await _saveToken(data['access_token']);
+          await AudienceService.remember(gender);
           PushNotificationService().registerDevice();
           return true;
         }
@@ -157,6 +159,9 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
+        if (data.containsKey('gender')) {
+          await AudienceService.remember(data['gender']?.toString());
+        }
         return true;
       }
       debugPrint('Update Profile failed: ${response.body}');
@@ -191,12 +196,15 @@ class AuthService {
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
+    // A new session may be a different person; their gender is fetched fresh.
+    await AudienceService.forget();
     markSessionAuthenticated();
   }
 
   Future<void> _removeToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await AudienceService.forget();
   }
 
   static Future<String?> getToken() async {

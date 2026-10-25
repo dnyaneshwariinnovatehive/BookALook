@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Salon;
 use App\Models\ServiceProvider;
+use App\Support\GenderFocus;
 use Illuminate\Support\Str;
 
 class ServiceManagementController extends Controller
@@ -41,8 +42,32 @@ class ServiceManagementController extends Controller
               ->orWhere('created_by_salon_id', $salonId);
         });
 
+        $categories = $query->get();
+
+        // Each template says which genders this salon may offer it as, so the
+        // app can lock the picker. One this salon cannot offer at all — a Men
+        // Only template in a Women Only salon — is left out entirely.
+        foreach ($categories as $category) {
+            $offerable = $category->templates
+                ->filter(function (ServiceTemplate $template) use ($salon) {
+                    $allowed = GenderFocus::allowedFor($template->gender_focus, $salon->gender_focus);
+
+                    $template->setAttribute('allowed_gender_focus', $allowed);
+                    $template->setAttribute('default_gender_focus', $allowed[0] ?? null);
+
+                    return $allowed !== [];
+                })
+                ->values();
+
+            $category->setRelation('templates', $offerable);
+        }
+
         return response()->json([
-            'categories' => $query->get()
+            'categories' => $categories,
+            'salon_gender_focus' => GenderFocus::normalise($salon->gender_focus),
+            // What a brand-new custom service may be, which is everything a
+            // Unisex template could be narrowed to here.
+            'custom_allowed_gender_focus' => GenderFocus::allowedFor(GenderFocus::UNISEX, $salon->gender_focus),
         ]);
     }
 
@@ -113,7 +138,7 @@ class ServiceManagementController extends Controller
             'custom_template_name' => 'required_if:is_custom,true|string|max:150',
             'estimated_duration_minutes' => 'required_if:is_custom,true|integer|multiple_of:30|min:30',
             'advance_percentage' => 'nullable|numeric|min:0|max:100',
-            'gender_focus' => 'nullable|string|in:Unisex,Men Only,Women Only',
+            'gender_focus' => 'nullable|string|'.GenderFocus::rule(),
             'will_refund_advance_if_cancelled' => 'nullable|boolean',
         ]);
 
@@ -137,6 +162,10 @@ class ServiceManagementController extends Controller
             : false;
 
         $templateId = $request->template_id;
+
+        // A custom template is born here, so it has no gender of its own yet:
+        // it may be anything a Unisex template could be narrowed to.
+        $templateGender = GenderFocus::UNISEX;
 
         if ($request->is_custom) {
             $customName = trim($request->custom_template_name ?? '');
@@ -172,6 +201,7 @@ class ServiceManagementController extends Controller
             if (! $template || ! $this->templateAvailableTo($template, $salon_id)) {
                 return response()->json(['message' => 'Service template not found'], 404);
             }
+            $templateGender = $template->gender_focus;
             $normalizedTemplateName = mb_strtolower(trim($template->name));
 
             // Check if active service with this template ID or identical template name exists
@@ -190,11 +220,17 @@ class ServiceManagementController extends Controller
             }
         }
 
+        $gender = $request->gender_focus ?? GenderFocus::defaultFor($templateGender, $salon->gender_focus);
+
+        if ($problem = $this->genderProblem($templateGender, $salon, $gender)) {
+            return $problem;
+        }
+
         $details = [
             'price' => $request->price,
             'description' => $request->description,
             'advance_percentage' => $advancePercentage,
-            'gender_focus' => $request->gender_focus ?? 'Unisex',
+            'gender_focus' => $gender,
             'will_refund_advance_if_cancelled' => $willRefund,
         ];
 
@@ -216,6 +252,7 @@ class ServiceManagementController extends Controller
                     'category_id' => $categoryId,
                     'name' => $request->custom_template_name,
                     'estimated_duration_minutes' => $request->estimated_duration_minutes,
+                    'gender_focus' => $details['gender_focus'],
                     'is_custom' => true,
                     'created_by_salon_id' => $salon_id,
                 ])->id;
@@ -290,6 +327,35 @@ class ServiceManagementController extends Controller
         return $category && ! $category->trashed() && $category->is_active;
     }
 
+    /**
+     * Why this salon may not offer a service of this template as this gender,
+     * as the response to send back; null when it may.
+     */
+    private function genderProblem(?string $templateGender, Salon $salon, ?string $gender)
+    {
+        $allowed = GenderFocus::allowedFor($templateGender, $salon->gender_focus);
+
+        if ($allowed === []) {
+            $message = sprintf(
+                'This is a %s service and your salon is %s.',
+                GenderFocus::normalise($templateGender),
+                GenderFocus::normalise($salon->gender_focus)
+            );
+        } elseif (! in_array($gender, $allowed, true)) {
+            $message = count($allowed) === 1
+                ? "This service can only be offered as {$allowed[0]}."
+                : 'This service can only be offered as '.implode(', ', $allowed).'.';
+        } else {
+            return null;
+        }
+
+        return response()->json([
+            'message' => $message,
+            'errors' => ['gender_focus' => [$message]],
+            'allowed_gender_focus' => $allowed,
+        ], 422);
+    }
+
     public function updateService($salon_id, $service_id, Request $request)
     {
         $salon = Salon::findOrFail($salon_id);
@@ -302,15 +368,36 @@ class ServiceManagementController extends Controller
         $validator = Validator::make($request->all(), [
             'price' => 'sometimes|numeric|min:0',
             'description' => 'nullable|string',
+            'gender_focus' => 'sometimes|string|'.GenderFocus::rule(),
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($request->has('gender_focus')) {
+            $templateGender = $service->template->gender_focus ?? GenderFocus::UNISEX;
+
+            // A salon's own custom template follows its one service, so its
+            // gender is the owner's to change, within the salon's own focus.
+            if ($service->template && $service->template->is_custom) {
+                $templateGender = GenderFocus::UNISEX;
+            }
+
+            if ($problem = $this->genderProblem($templateGender, $salon, $request->gender_focus)) {
+                return $problem;
+            }
+
+            $service->gender_focus = $request->gender_focus;
+
+            if ($service->template && $service->template->is_custom && $service->template->created_by_salon_id === $salon->id) {
+                $service->template->update(['gender_focus' => $request->gender_focus]);
+            }
+        }
+
         if ($request->has('price')) $service->price = $request->price;
         if ($request->has('description')) $service->description = $request->description;
-        
+
         $service->save();
 
         return response()->json([

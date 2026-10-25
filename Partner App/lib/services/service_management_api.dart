@@ -29,13 +29,26 @@ class ServiceManagementApi {
 
   // Fetch Master Catalog (Categories and Templates)
   static Future<List<ServiceCategory>> getMasterCatalog(String salonId) async {
+    return (await getMasterCatalogDetailed(salonId)).categories;
+  }
+
+  // The catalogue plus what genders this salon may offer, so the add-service
+  // form can lock or narrow its gender picker.
+  static Future<MasterCatalog> getMasterCatalogDetailed(String salonId) async {
     final uri = Uri.parse('$baseUrl/salons/$salonId/master-catalog');
-    
+
     final response = await http.get(uri, headers: await _getHeaders());
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
       final categoriesJson = jsonResponse['categories'] as List;
-      return categoriesJson.map((json) => ServiceCategory.fromJson(json)).toList();
+      final customAllowed = (jsonResponse['custom_allowed_gender_focus'] as List?)
+          ?.map((g) => g.toString())
+          .toList();
+      return MasterCatalog(
+        categories: categoriesJson.map((json) => ServiceCategory.fromJson(json)).toList(),
+        salonGenderFocus: jsonResponse['salon_gender_focus']?.toString() ?? 'Unisex',
+        customAllowedGenderFocus: customAllowed ?? ServiceTemplate.genders,
+      );
     } else {
       throw Exception('Failed to fetch master catalog: ${response.body}');
     }

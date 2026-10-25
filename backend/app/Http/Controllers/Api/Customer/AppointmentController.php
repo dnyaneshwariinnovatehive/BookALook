@@ -148,7 +148,13 @@ class AppointmentController extends Controller
         $validator = Validator::make($request->all(), [
             'date' => 'required|date|after_or_equal:today',
             'time' => 'required|date_format:H:i',
-            'provider_id' => 'nullable|exists:service_providers,id' // required; enforced in candidateProviders()
+            'provider_id' => 'nullable|exists:service_providers,id', // required; enforced in candidateProviders()
+            // Who sits in the chair. The account holder still owns and pays
+            // for the booking either way; this is only who the salon expects.
+            'booked_for' => 'nullable|in:self,other',
+            'recipient_name' => 'required_if:booked_for,other|nullable|string|max:150',
+            'recipient_gender' => 'nullable|in:male,female,other',
+            'recipient_phone' => ['nullable', 'string', 'max:15', 'regex:/^\+?[0-9 ]{7,15}$/'],
         ]);
 
         if ($validator->fails()) {
@@ -265,7 +271,7 @@ class AppointmentController extends Controller
                 'total_amount' => $requirements['total'],
                 'advance_amount' => $payableNow,
                 'balance_amount' => $requirements['total'] - $payableNow,
-            ]);
+            ] + $this->recipient($request));
             $appointment->save();
 
             // Snapshot every line at the price actually charged. A combo the
@@ -644,6 +650,32 @@ class AppointmentController extends Controller
             ->where('status', 'pending_payment')
             ->get()
             ->each(fn (Appointment $a) => $this->payments->release($a, 'Replaced by a newer booking attempt.'));
+    }
+
+    /**
+     * Who the booking is for, as appointment columns. A booking for oneself
+     * stores no recipient at all, so "null" keeps meaning "the account holder"
+     * for every booking made before this existed.
+     */
+    private function recipient(Request $request): array
+    {
+        if ($request->input('booked_for') !== 'other') {
+            return [
+                'booked_for' => 'self',
+                'recipient_name' => null,
+                'recipient_gender' => null,
+                'recipient_phone' => null,
+            ];
+        }
+
+        return [
+            'booked_for' => 'other',
+            'recipient_name' => trim((string) $request->input('recipient_name')),
+            'recipient_gender' => $request->input('recipient_gender'),
+            'recipient_phone' => $request->filled('recipient_phone')
+                ? preg_replace('/\s+/', '', (string) $request->input('recipient_phone'))
+                : null,
+        ];
     }
 
     /**
@@ -1264,6 +1296,10 @@ class AppointmentController extends Controller
             ],
             'provider_name' => $appointment->appointedProvider->user->name ?? 'Any available staff',
             'provider_phone' => $providerPhone,
+            'booked_for' => $appointment->booked_for ?? 'self',
+            'recipient_name' => $appointment->recipient_name,
+            'recipient_gender' => $appointment->recipient_gender,
+            'recipient_phone' => $appointment->recipient_phone,
             'appointment_date' => $date,
             'start_time' => substr($appointment->start_time, 0, 5),
             'end_time' => substr($appointment->end_time, 0, 5),

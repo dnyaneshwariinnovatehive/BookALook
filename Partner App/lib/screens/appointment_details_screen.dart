@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
 import '../services/insights_api.dart';
 import '../utils/time_fmt.dart';
+import '../utils/booked_for.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'add_extra_service_sheet.dart';
@@ -246,6 +247,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
               children: [
                 _buildInfoRow('Name', customerName),
                 _buildInfoRow('Phone', customerPhone),
+                if (bookedForLabel(appointment) != null) ...[
+                  _buildInfoRow('Booked for', bookedForLabel(appointment)!.replaceFirst('For ', '')),
+                  if ((appointment['recipient_phone'] ?? '').toString().isNotEmpty)
+                    _buildInfoRow('Their phone', appointment['recipient_phone'].toString()),
+                ],
                 _buildInfoRow('Source', isWalkIn ? 'Walk-in' : 'App Booking'),
               ],
             ),

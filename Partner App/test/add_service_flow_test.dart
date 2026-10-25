@@ -240,5 +240,48 @@ void main() {
       expect(find.text('This service already exists in this salon'), findsOneWidget);
     });
   });
-}
+  group('AddServiceFlow - Gender focus', () {
+    testWidgets('a gendered template locks the picker to its gender', (tester) async {
+      final menOnly = ServiceCategory(
+        id: 'cat-g',
+        name: 'Grooming',
+        templates: [
+          ServiceTemplate(
+            id: 't-beard',
+            categoryId: 'cat-g',
+            name: 'Beard Sculpt',
+            estimatedDurationMinutes: 30,
+            genderFocus: 'Men Only',
+          ),
+        ],
+      );
 
+      await tester.pumpWidget(createWidget(categories: [menOnly], existingServices: const []));
+      await tester.pumpAndSettle();
+
+      final picker = find.descendant(
+        of: find.byKey(const ValueKey('gender-focus-picker')),
+        matching: find.byType(DropdownButton<String>),
+      );
+      final dropdown = tester.widget<DropdownButton<String>>(picker);
+
+      expect(dropdown.value, 'Men Only');
+      expect(dropdown.onChanged, isNull);
+      expect(find.text('Set by BookALook for every salon.'), findsOneWidget);
+    });
+
+    testWidgets('a Unisex template can be narrowed', (tester) async {
+      await tester.pumpWidget(createWidget(categories: [sampleCategorySpa], existingServices: const []));
+      await tester.pumpAndSettle();
+
+      final dropdown = tester.widget<DropdownButton<String>>(find.descendant(
+        of: find.byKey(const ValueKey('gender-focus-picker')),
+        matching: find.byType(DropdownButton<String>),
+      ));
+
+      expect(dropdown.value, 'Unisex');
+      expect(dropdown.onChanged, isNotNull);
+      expect(dropdown.items!.map((i) => i.value), ['Unisex', 'Men Only', 'Women Only']);
+    });
+  });
+}

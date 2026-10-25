@@ -9,6 +9,7 @@ use App\Models\Salon;
 use App\Models\SalonWorkingHour;
 use App\Models\Service;
 use App\Models\ServiceProvider;
+use App\Support\GenderFocus;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ class SalonController extends Controller
 
         $user = $request->user('sanctum') ?: $request->user() ?: auth('sanctum')->user() ?: auth()->user();
 
-        $services = $this->services($salon->id, $user);
+        $services = $this->services($salon->id, $user, $salon->gender_focus);
         $availability = $this->availabilityToday($salon);
         $bookable = $this->bookability($salon, $services);
 
@@ -125,7 +126,7 @@ class SalonController extends Controller
      * Active, bookable services with their template detail and how many staff
      * can actually perform each one.
      */
-    private function services(string $salonId, ?\App\Models\User $user = null): array
+    private function services(string $salonId, ?\App\Models\User $user = null, ?string $salonFocus = null): array
     {
         $rows = Service::with('template.category:id,name,icon_url')
             ->where('salon_id', $salonId)
@@ -160,7 +161,7 @@ class SalonController extends Controller
             ? app(\App\Services\CustomerOfferEligibilityService::class)
             : null;
 
-        $services = $rows->map(function (Service $service) use ($providerCounts, $bookingStats, $salonId, $user, $eligibilityService) {
+        $services = $rows->map(function (Service $service) use ($providerCounts, $bookingStats, $salonId, $user, $eligibilityService, $salonFocus) {
             $discountInfo = null;
             $discountedPrice = (float) $service->price;
 
@@ -198,6 +199,10 @@ class SalonController extends Controller
                 'category_id' => $service->template->category_id ?? null,
                 'category_name' => $service->template->category->name ?? 'Other',
                 'gender_focus' => $service->gender_focus,
+                // Who it is really for once the salon's own focus applies: a
+                // Unisex service at a Women Only salon is for women. The app
+                // sorts the customer's own services first by this.
+                'audience' => GenderFocus::effective($service->gender_focus, $salonFocus),
                 'advance_percentage' => $service->advance_percentage !== null
                     ? (float) $service->advance_percentage
                     : null,
@@ -497,17 +502,18 @@ class SalonController extends Controller
             $query->where('city_id', $city->id);
         }
 
-        if ($request->filled('gender')) {
-            $gender = strtolower($request->gender);
-            if ($gender === 'men') {
-                $query->whereIn('gender_focus', ['Unisex', 'Men Only']);
-            } elseif ($gender === 'women') {
-                $query->whereIn('gender_focus', ['Unisex', 'Women Only']);
-            }
+        // Who the customer is browsing for. Null means everyone, and the list
+        // is exactly what it was before gender existed.
+        $audience = GenderFocus::fromAudience($request->input('gender'));
+
+        if ($audience) {
+            $query->whereIn('gender_focus', GenderFocus::visibleTo($audience));
         }
 
         if ($request->filled('category_id')) {
-            $query->providingCategory($request->category_id);
+            // A salon only counts as offering the category to her if one of
+            // its services there is actually for her.
+            $query->providingCategory($request->category_id, $audience);
         }
 
         // The discovery drill-down narrows to one exact offering: `service_id`
@@ -515,9 +521,10 @@ class SalonController extends Controller
         // off the same relationships the category filter uses, so the salon
         // list always matches the horizontal scroller above it.
         if ($request->filled('service_id')) {
-            $query->whereHas('services', function ($q) use ($request) {
+            $query->whereHas('services', function ($q) use ($request, $audience) {
                 $q->where('template_id', $request->service_id)
-                    ->where('is_active', true);
+                    ->where('is_active', true)
+                    ->when($audience, fn ($q) => $q->whereIn('gender_focus', GenderFocus::visibleTo($audience)));
             });
         }
 
@@ -554,6 +561,7 @@ class SalonController extends Controller
                 $servicesBySalon = $this->categoryServices(
                     $salons->pluck('id')->all(),
                     (string) $request->category_id,
+                    audience: $audience,
                 );
             } else {
                 $combosBySalon = $this->combosBySalon($salons->pluck('id')->all());
@@ -693,7 +701,7 @@ class SalonController extends Controller
      * @param  array<int, string>  $salonIds
      * @return array<string, array<int, array>>
      */
-    private function categoryServices(array $salonIds, string $categoryId, int $limit = 8): array
+    private function categoryServices(array $salonIds, string $categoryId, int $limit = 8, ?string $audience = null): array
     {
         if (empty($salonIds)) {
             return [];
@@ -703,6 +711,7 @@ class SalonController extends Controller
             ->whereIn('salon_id', $salonIds)
             ->where('is_active', true)
             ->whereHas('template', fn ($q) => $q->where('category_id', $categoryId))
+            ->when($audience, fn ($q) => $q->whereIn('gender_focus', GenderFocus::visibleTo($audience)))
             ->orderBy('salon_id')
             ->orderBy('display_order')
             ->get();

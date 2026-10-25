@@ -564,6 +564,12 @@ class AppointmentCheckInService
             'customer_phone' => $isWalkIn
                 ? $appointment->walk_in_customer_phone
                 : ($appointment->customer->phone ?? null),
+            // Who is actually in the chair when the account holder booked for
+            // someone else. customer_* stays the person who booked and paid.
+            'booked_for' => $appointment->booked_for ?? 'self',
+            'recipient_name' => $appointment->recipient_name,
+            'recipient_gender' => $appointment->recipient_gender,
+            'recipient_phone' => $appointment->recipient_phone,
             'booked_provider_id' => $appointment->appointed_provider_id,
             'booked_provider_name' => $appointment->appointedProvider->user->name ?? 'Any staff',
             'serving_provider_id' => $appointment->serving_provider_id,

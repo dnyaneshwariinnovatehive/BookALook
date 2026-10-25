@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
+use App\Support\GenderFocus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,34 @@ class CatalogController extends Controller
         }])->orderBy('is_custom', 'asc') // Standard first
           ->orderBy('name', 'asc')
           ->get();
+
+        // How salons have actually tagged each template, so the dashboard can
+        // show what a gender change would touch and flag templates whose name
+        // says one thing while the catalogue says Unisex.
+        $counts = DB::table('services')
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
+            ->groupBy('template_id', 'gender_focus')
+            ->selectRaw('template_id, gender_focus, COUNT(*) as total')
+            ->get()
+            ->groupBy('template_id');
+
+        foreach ($categories as $category) {
+            foreach ($category->templates as $template) {
+                $byGender = array_fill_keys(GenderFocus::ALL, 0);
+
+                foreach ($counts->get($template->id, collect()) as $row) {
+                    $byGender[GenderFocus::normalise($row->gender_focus)] += (int) $row->total;
+                }
+
+                $suggested = $template->gender_focus === GenderFocus::UNISEX
+                    ? GenderFocus::suggestFromName($template->name)
+                    : null;
+
+                $template->setAttribute('salon_gender_counts', $byGender);
+                $template->setAttribute('suggested_gender_focus', $suggested);
+            }
+        }
 
         return response()->json([
             'categories' => $categories
@@ -157,6 +186,7 @@ class CatalogController extends Controller
             ],
             'name' => 'required|string|max:150',
             'estimated_duration_minutes' => 'required|integer|min:30|multiple_of:30',
+            'gender_focus' => 'nullable|'.GenderFocus::rule(),
             'is_active' => 'boolean',
         ]);
 
@@ -168,6 +198,7 @@ class CatalogController extends Controller
             'category_id' => $request->category_id,
             'name' => $request->name,
             'estimated_duration_minutes' => $request->estimated_duration_minutes,
+            'gender_focus' => $request->input('gender_focus') ?? GenderFocus::UNISEX,
             'is_custom' => false,
             'is_active' => $request->input('is_active', true),
         ]);
@@ -311,6 +342,7 @@ class CatalogController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:150',
             'estimated_duration_minutes' => 'required|integer|min:30|multiple_of:30',
+            'gender_focus' => 'nullable|'.GenderFocus::rule(),
             'is_active' => 'boolean',
         ]);
 
@@ -318,15 +350,47 @@ class CatalogController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $template->update([
-            'name' => $request->name,
-            'estimated_duration_minutes' => $request->estimated_duration_minutes,
-            'is_active' => $request->input('is_active', $template->is_active),
-        ]);
+        $gender = $request->input('gender_focus') ?? $template->gender_focus;
+        $servicesUpdated = 0;
+        $salonConflicts = 0;
+
+        DB::transaction(function () use ($template, $request, $gender, &$servicesUpdated, &$salonConflicts) {
+            $template->update([
+                'name' => $request->name,
+                'estimated_duration_minutes' => $request->estimated_duration_minutes,
+                'gender_focus' => $gender,
+                'is_active' => $request->input('is_active', $template->is_active),
+            ]);
+
+            // A gendered template is that gender in every salon. Salon copies
+            // that said otherwise follow it, deleted ones too, so a restore
+            // never brings back a contradiction. Going back to Unisex leaves
+            // salons' own narrowing alone.
+            if ($gender === GenderFocus::UNISEX) {
+                return;
+            }
+
+            $servicesUpdated = Service::withTrashed()
+                ->where('template_id', $template->id)
+                ->where('gender_focus', '!=', $gender)
+                ->update(['gender_focus' => $gender]);
+
+            // A single-gender salon of the other gender now holds a service it
+            // cannot serve. That is the owner's call to resolve, not ours to
+            // delete, so it is only counted and reported.
+            $salonConflicts = Service::where('services.template_id', $template->id)
+                ->where('services.is_active', true)
+                ->join('salons', 'salons.id', '=', 'services.salon_id')
+                ->whereIn('salons.gender_focus', [GenderFocus::MEN, GenderFocus::WOMEN])
+                ->where('salons.gender_focus', '!=', $gender)
+                ->count();
+        });
 
         return response()->json([
             'message' => 'Template updated successfully',
-            'template' => $template
+            'template' => $template->fresh(),
+            'services_updated' => $servicesUpdated,
+            'salon_conflicts' => $salonConflicts,
         ]);
     }
 

@@ -64,7 +64,18 @@ class AppointmentService {
     }
   }
 
-  Future<Map<String, dynamic>> bookAppointment(String salonId, String date, String time, {String? providerId}) async {
+  /// [bookedFor] is `self` or `other`; for `other`, [recipientName] is
+  /// required and the salon sees it alongside the account holder's name.
+  Future<Map<String, dynamic>> bookAppointment(
+    String salonId,
+    String date,
+    String time, {
+    String? providerId,
+    String bookedFor = 'self',
+    String? recipientName,
+    String? recipientGender,
+    String? recipientPhone,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
@@ -79,6 +90,10 @@ class AppointmentService {
         'date': date,
         'time': time,
         if (providerId != null) 'provider_id': providerId,
+        'booked_for': bookedFor,
+        if (recipientName != null) 'recipient_name': recipientName,
+        if (recipientGender != null) 'recipient_gender': recipientGender,
+        if (recipientPhone != null) 'recipient_phone': recipientPhone,
       }),
     );
 

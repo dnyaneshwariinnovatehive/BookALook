@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/category.dart';
+import '../services/audience_service.dart';
 import '../services/auth_service.dart';
 import '../services/discovery_service.dart';
 import '../services/location_service.dart';
@@ -57,8 +58,17 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   void initState() {
     super.initState();
     LocationService.instance.addListener(_onCityChanged);
-    _loadSalons();
+    _loadForProfileAudience();
     _loadFavourites();
+  }
+
+  /// Start out showing what is meant for the customer — a woman sees Unisex
+  /// and Women Only — with a chip that says so and lets her see everything.
+  Future<void> _loadForProfileAudience() async {
+    final gender = await AudienceService.profileGender();
+    if (!mounted) return;
+    setState(() => _selectedGender = AudienceService.focusFilterFor(gender));
+    await _loadSalons();
   }
 
   @override
@@ -81,11 +91,12 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
     });
 
     try {
+      final audience = AudienceService.apiParam(_selectedGender);
       final futures = await Future.wait([
-        _salonService.fetchSalons(categoryId: widget.category.id),
+        _salonService.fetchSalons(categoryId: widget.category.id, gender: audience),
         if (!_isCombo)
           _discoveryService
-              .fetchCategoryServices(widget.category.id)
+              .fetchCategoryServices(widget.category.id, gender: audience)
               .catchError((_) => <DiscoveryServiceItem>[])
         else
           Future.value(<DiscoveryServiceItem>[]),
@@ -489,11 +500,16 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
                         ),
                       ),
                       onPressed: () {
+                        final audienceChanged = AudienceService.apiParam(tempGender) !=
+                            AudienceService.apiParam(_selectedGender);
                         setState(() {
                           _selectedSort = tempSort;
                           _selectedGender = tempGender;
                         });
                         Navigator.pop(ctx);
+                        // The server decides which services are for whom, so
+                        // a different audience is a fresh fetch.
+                        if (audienceChanged) _loadSalons();
                       },
                       child: Text(
                         'Apply Filters',
@@ -525,10 +541,46 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
             _buildHeader(),
             _buildSearchBarAndFilter(),
             _buildCategoryPills(),
+            _buildAudienceChip(),
             const SizedBox(height: 8),
             Expanded(child: _buildBody()),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Says out loud that the list is narrowed to one audience, so a filter
+  /// that came from the profile is never a silent one.
+  Widget _buildAudienceChip() {
+    final audience = AudienceService.apiParam(_selectedGender);
+    if (audience == null) return const SizedBox.shrink();
+
+    return Padding(
+      key: const ValueKey('audience-chip'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Icon(Icons.person_outline, size: 16, color: AppTheme.accentColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Showing services for $audience',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: context.colors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _selectedGender = 'All');
+              _loadSalons();
+            },
+            child: Text('Show all', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }

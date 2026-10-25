@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
+import '../services/audience_service.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
 import '../services/review_service.dart';
@@ -73,6 +74,12 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   bool _hoursExpanded = false;
   bool _isServicesExpanded = false;
 
+  /// The viewer's profile gender. Their own services come first; the rest
+  /// stay one tap away under "Other services", never hidden, because they
+  /// may be booking for someone else.
+  String? _viewerGender;
+  bool _showOtherAudience = false;
+
   /// The exact template a discovery sub-service pick points at, so its card (if
   /// this salon offers it) can be visibly highlighted. Matched against the
   /// real `template_id` on each service row — never by name.
@@ -90,6 +97,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    AudienceService.profileGender().then((gender) {
+      if (mounted && gender != _viewerGender) setState(() => _viewerGender = gender);
+    });
     final shouldScrollToServices = widget.initialScrollToServices ||
         (widget.categoryId != null && widget.categoryId!.isNotEmpty) ||
         (widget.categoryName != null && widget.categoryName!.isNotEmpty);
@@ -1857,23 +1867,94 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       );
     }
 
-    final bool hasToggle = services.length > 5;
-    final int displayedCount =
-        (_isServicesExpanded || !hasToggle) ? services.length : 5;
-    final int totalCount = displayedCount + (hasToggle ? 1 : 0);
+    // Services meant for the viewer first. When everything here is for
+    // someone else (a woman opening a men's salon) nothing is folded away —
+    // she is plainly browsing on someone's behalf.
+    String? audienceOf(dynamic s) => (s['audience'] ?? s['gender_focus'])?.toString();
+    final mine = services.where((s) => AudienceService.serves(audienceOf(s), _viewerGender)).toList();
+    final others = services.where((s) => !AudienceService.serves(audienceOf(s), _viewerGender)).toList();
+    final split = mine.isNotEmpty && others.isNotEmpty;
+    final primary = split ? mine : services;
+    // Never fold away the service she was sent here for, or one already in
+    // her cart.
+    final showOthers = _showOtherAudience ||
+        others.any((s) =>
+            (_highlightServiceId != null && s['template_id']?.toString() == _highlightServiceId) ||
+            _getServiceQuantity(s['id'].toString()) > 0);
 
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index < displayedCount) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _serviceCard(services[index]),
-            );
-          }
-          return _buildExploreServicesButton();
+    final bool hasToggle = primary.length > 5;
+    final int displayedCount =
+        (_isServicesExpanded || !hasToggle) ? primary.length : 5;
+
+    Widget card(dynamic service) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: _serviceCard(service),
+        );
+
+    final children = <Widget>[
+      for (final s in primary.take(displayedCount)) card(s),
+      if (hasToggle) _buildExploreServicesButton(),
+      if (split) ...[
+        _buildOtherAudienceToggle(others.length, showOthers),
+        if (showOthers)
+          for (final s in others) card(s),
+      ],
+    ];
+
+    return SliverList(delegate: SliverChildListDelegate(children));
+  }
+
+  Widget _buildOtherAudienceToggle(int count, bool expanded) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: InkWell(
+        key: const ValueKey('other_audience_services_toggle'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          AppHaptics.lightImpact();
+          setState(() => _showOtherAudience = !expanded);
         },
-        childCount: totalCount,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: context.colors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: context.colors.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Other services ($count)',
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Meant for others — handy when booking for someone else',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: context.colors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                expanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                color: context.colors.textSecondary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

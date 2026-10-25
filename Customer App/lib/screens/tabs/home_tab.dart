@@ -15,6 +15,7 @@ import '../../services/notification_service.dart';
 import '../notifications_screen.dart';
 import '../reschedule_screen.dart';
 import '../../services/salon_service.dart';
+import '../../services/audience_service.dart';
 import '../salon_list_screen.dart';
 import '../salon_detail_screen.dart';
 import '../my_bookings_screen.dart';
@@ -137,8 +138,11 @@ class _HomeTabState extends State<HomeTab> {
   /// moment later in front of the customer.
   Future<void> _bootstrap() async {
     await LocationService.instance.restore();
+    // Browse for themselves by default. The filter button then reads
+    // "Women", and one tap on All shows everything.
+    final gender = await AudienceService.profileGender();
     if (!mounted) return;
-    setState(() {});
+    setState(() => _selectedGender = AudienceService.homeFilterFor(gender));
     _fetchBanners();
     _fetchRecommendedSalons();
   }
@@ -172,7 +176,9 @@ class _HomeTabState extends State<HomeTab> {
   /// and selected city, deduplicating results by salon ID.
   Future<void> _fetchRecommendedSalons() async {
     try {
-      final response = await SalonService().fetchSalons();
+      final response = await SalonService().fetchSalons(
+        gender: AudienceService.apiParam(_selectedGender),
+      );
       if (!mounted) return;
       final rawSalons = (response['salons'] as List?) ?? [];
       final suggested = (response['suggested_salons'] as List?) ?? [];
@@ -406,10 +412,13 @@ class _HomeTabState extends State<HomeTab> {
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    final changed = tempGender != _selectedGender;
                     setState(() {
                       _selectedGender = tempGender;
+                      if (changed) _isLoadingRecommended = true;
                     });
                     Navigator.pop(context);
+                    if (changed) _fetchRecommendedSalons();
                   },
                   style: ElevatedButton.styleFrom(
                     shape: RoundedRectangleBorder(

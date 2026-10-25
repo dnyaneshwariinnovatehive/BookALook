@@ -5,6 +5,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../services/cart_service.dart';
+import '../services/audience_service.dart';
 import '../utils/app_haptics.dart';
 import '../widgets/initials_avatar.dart';
 import '../theme/app_colors.dart';
@@ -62,9 +63,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _pendingPaymentAppointmentId;
   late Razorpay _razorpay;
 
+  /// Who sits in the chair. The account holder always owns and pays for the
+  /// booking; this only tells the salon who to expect.
+  String _bookedFor = 'self';
+  final TextEditingController _recipientNameController = TextEditingController();
+  final TextEditingController _recipientPhoneController = TextEditingController();
+  String? _recipientGender;
+  String? _viewerGender;
+
   @override
   void initState() {
     super.initState();
+    AudienceService.profileGender().then((gender) {
+      if (mounted) setState(() => _viewerGender = gender);
+    });
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
@@ -100,6 +112,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void dispose() {
     _razorpay.clear();
     _scrollController.dispose();
+    _recipientNameController.dispose();
+    _recipientPhoneController.dispose();
     super.dispose();
   }
 
@@ -388,8 +402,60 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  /// Cart lines whose audience does not match the person being booked for,
+  /// as "Beard Trim (Men Only)". Empty when everything fits, or when we do
+  /// not know who it is for.
+  List<String> _genderMismatches() {
+    final gender = _bookedFor == 'self' ? _viewerGender : _recipientGender;
+    final items = (_cart?['items'] as List?) ?? const [];
+    return [
+      for (final raw in items)
+        if (raw is Map && !AudienceService.serves(raw['audience']?.toString(), gender))
+          '${raw['service']?['template']?['name'] ?? raw['combo']?['name'] ?? 'A service'} (${raw['audience']})',
+    ];
+  }
+
+  /// A soft check, never a block: a mismatch is often a mistake, but can be
+  /// a perfectly good booking.
+  Future<bool> _confirmGenderMismatch() async {
+    final mismatches = _genderMismatches();
+    if (mismatches.isEmpty) return true;
+
+    final who = _bookedFor == 'self'
+        ? 'yourself'
+        : '${_recipientNameController.text.trim()} (${AudienceService.genderLabel(_recipientGender)})';
+
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const ValueKey('gender_mismatch_dialog'),
+        title: Text('Check who this is for', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(
+          '${mismatches.join(', ')} ${mismatches.length == 1 ? 'is' : 'are'} usually for someone else, '
+          'and you are booking for $who.\n\nBooking for another person? Choose "Someone else" so the salon knows who to expect.',
+          style: GoogleFonts.outfit(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Change')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Book anyway')),
+        ],
+      ),
+    );
+    return proceed == true;
+  }
+
   Future<void> _bookAppointment() async {
     if (_selectedTime == null || _selectedProviderKey == null) return;
+
+    if (_bookedFor == 'other' && _recipientNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add the name of the person you are booking for.')),
+      );
+      return;
+    }
+
+    if (!await _confirmGenderMismatch()) return;
+    if (!mounted) return;
 
     setState(() {
       _isBooking = true;
@@ -398,11 +464,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final forOther = _bookedFor == 'other';
       final response = await _appointmentService.bookAppointment(
         widget.salonId,
         dateStr,
         _selectedTime!,
         providerId: _selectedProviderKey,
+        bookedFor: _bookedFor,
+        recipientName: forOther ? _recipientNameController.text.trim() : null,
+        recipientGender: forOther ? _recipientGender : null,
+        recipientPhone: forOther && _recipientPhoneController.text.trim().isNotEmpty
+            ? _recipientPhoneController.text.trim()
+            : null,
       );
 
       setState(() => _isBooking = false);
@@ -714,7 +787,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               const SizedBox(height: 32),
 
-              _sectionTitle('4. Booking Summary'),
+              _sectionTitle('4. Who is this booking for?'),
+              const SizedBox(height: 12),
+              _buildBookedFor(),
+
+              const SizedBox(height: 32),
+
+              _sectionTitle('5. Booking Summary'),
               const SizedBox(height: 12),
               _buildBookingSummary(),
 
@@ -723,6 +802,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
         bottomNavigationBar: _buildBottomBar(),
+      ),
+    );
+  }
+
+  Widget _buildBookedFor() {
+    Widget choice(String value, String label) => ChoiceChip(
+          key: ValueKey('booked_for_$value'),
+          label: Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          selected: _bookedFor == value,
+          onSelected: (_) => setState(() => _bookedFor = value),
+          selectedColor: context.colors.chipSelected,
+        );
+
+    Widget genderChip(String value) => ChoiceChip(
+          key: ValueKey('recipient_gender_$value'),
+          label: Text(AudienceService.genderLabel(value), style: GoogleFonts.outfit()),
+          selected: _recipientGender == value,
+          onSelected: (sel) => setState(() => _recipientGender = sel ? value : null),
+          selectedColor: context.colors.chipSelected,
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(spacing: 8, children: [choice('self', 'Myself'), choice('other', 'Someone else')]),
+          if (_bookedFor == 'other') ...[
+            const SizedBox(height: 16),
+            TextField(
+              key: const ValueKey('recipient_name_field'),
+              controller: _recipientNameController,
+              textCapitalization: TextCapitalization.words,
+              maxLength: 150,
+              decoration: const InputDecoration(labelText: 'Their name', counterText: ''),
+            ),
+            const SizedBox(height: 12),
+            Text('Their gender', style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [genderChip('male'), genderChip('female'), genderChip('other')]),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('recipient_phone_field'),
+              controller: _recipientPhoneController,
+              keyboardType: TextInputType.phone,
+              maxLength: 15,
+              decoration: const InputDecoration(
+                labelText: 'Their phone (optional)',
+                helperText: 'You still get the booking updates and pay for it.',
+                counterText: '',
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
