@@ -62,11 +62,13 @@
         .num { font-size: 17px; font-weight: 650; margin-top: 3px; }
         .meta .when { color: #6b655d; font-size: 13px; margin-top: 3px; }
         .grid { display: flex; gap: 28px; flex-wrap: wrap; padding: 22px 0; }
-        .col { flex: 1 1 210px; min-width: 0; }
+        .col { flex: 1 1 210px; min-width: 0; overflow-wrap: anywhere; }
         .label { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase;
                  color: #8a837a; margin-bottom: 5px; }
         .col p { margin: 0; }
         .col .muted { color: #6b655d; font-size: 13.5px; }
+        .col .muted + .muted { margin-top: 2px; }
+        .col .muted b { color: #8a837a; font-weight: 500; }
         table { width: 100%; border-collapse: collapse; margin-top: 6px; }
         thead th {
             text-align: left; font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase;
@@ -153,18 +155,16 @@
             <div class="label">Settled with</div>
             <p class="name">{{ $invoice->salon_name ?: 'Salon' }}</p>
             @if ($invoice->salon_address)<p class="muted">{{ $invoice->salon_address }}</p>@endif
-            @if ($invoice->salon_phone)<p class="muted">{{ $invoice->salon_phone }}</p>@endif
-            @if ($invoice->owner_name)<p class="muted">{{ $invoice->owner_name }}</p>@endif
+            @if ($invoice->owner_name)<p class="muted"><b>Owner</b> {{ $invoice->owner_name }}</p>@endif
+            @if ($invoice->salon_phone)<p class="muted"><b>Phone</b> {{ $invoice->salon_phone }}</p>@endif
         </div>
         <div class="col">
             <div class="label">Period</div>
-            <p class="name">{{ $invoice->cycle_label }}</p>
-            <p class="muted">
-                {{ $invoice->cycle_start_date->format('d M Y') }} &ndash; {{ $invoice->cycle_end_date->format('d M Y') }}
-            </p>
+            <p class="name">{{ $invoice->cycle_start_date->format('d M Y') }} &ndash; {{ $invoice->cycle_end_date->format('d M Y') }}</p>
             <p class="muted">
                 {{ \App\Support\BillingModel::label($invoice->billing_type) }}
-                <span class="tag">{{ ucfirst($invoice->cycle_type) }}ly settled</span>
+                {{-- cycle_type is already "weekly" / "monthly". --}}
+                <span class="tag">{{ ucfirst($invoice->cycle_type) }} settlement</span>
             </p>
             @if ($settings['settlement_invoice_show_appointments_count'] && $invoice->appointments_count)
                 <p class="muted">{{ $invoice->appointments_count }} completed appointment{{ $invoice->appointments_count === 1 ? '' : 's' }}</p>
@@ -184,7 +184,9 @@
                 <tr>
                     <td>
                         <span class="name">{{ $line['name'] }}</span>
-                        @if (! empty($line['detail']))
+                        {{-- The period is already in the header; repeating it under
+                             a line says nothing new. --}}
+                        @if (! empty($line['detail']) && $line['detail'] !== $invoice->cycle_label)
                             <div class="sub">{{ $line['detail'] }}</div>
                         @endif
                     </td>
@@ -196,7 +198,9 @@
 
     <div class="totals">
         <table>
-            @if ($settings['settlement_invoice_show_billed_revenue'])
+            {{-- Billed revenue only explains anything when commission was
+                 charged on it; on a Subscription Plan it just repeats a figure. --}}
+            @if ($settings['settlement_invoice_show_billed_revenue'] && $invoice->commission_deducted > 0)
                 <tr>
                     <td>Total billed by you</td>
                     <td class="right">{{ $currency($invoice->appointment_revenue) }}</td>

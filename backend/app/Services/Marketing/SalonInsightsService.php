@@ -575,6 +575,395 @@ class SalonInsightsService
     }
 
     /**
+     * This period against the one before it: revenue, visits, customers and
+     * the average bill, each with how far it moved.
+     */
+    public function periodComparison(Salon $salon, int $days): array
+    {
+        $end = now()->toDateString();
+        $start = now()->subDays($days - 1)->toDateString();
+        $previousEnd = now()->subDays($days)->toDateString();
+        $previousStart = now()->subDays($days * 2 - 1)->toDateString();
+
+        $current = $this->periodTotals($salon, $start, $end);
+        $previous = $this->periodTotals($salon, $previousStart, $previousEnd);
+
+        $metrics = [];
+        foreach (['revenue', 'visits', 'customers', 'average_bill'] as $key) {
+            $metrics[$key] = [
+                'current' => $current[$key],
+                'previous' => $previous[$key],
+                // Null rather than "+100%" when there was nothing before:
+                // growth from zero is not a percentage.
+                'change_percent' => $previous[$key] > 0
+                    ? round(($current[$key] - $previous[$key]) / $previous[$key] * 100, 1)
+                    : null,
+            ];
+        }
+
+        return [
+            'days' => $days,
+            'from' => $start,
+            'to' => $end,
+            'previous_from' => $previousStart,
+            'previous_to' => $previousEnd,
+            'metrics' => $metrics,
+        ];
+    }
+
+    /** @return array{revenue: float, visits: int, customers: int, average_bill: float} */
+    private function periodTotals(Salon $salon, string $from, string $to): array
+    {
+        $row = DB::table('appointments as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->where('a.salon_id', $salon->id)
+            ->where('a.status', 'completed')
+            ->whereDate('a.appointment_date', '>=', $from)
+            ->whereDate('a.appointment_date', '<=', $to)
+            ->selectRaw(
+                'COUNT(*) as visits, '
+                .'COALESCE(SUM(COALESCE(a.final_billed_amount, a.total_amount)), 0) as revenue, '
+                .'COUNT(DISTINCT COALESCE(u.phone, a.walk_in_customer_phone, a.walk_in_customer_name, CAST(a.id AS VARCHAR))) as customers'
+            )
+            ->first();
+
+        $visits = (int) ($row->visits ?? 0);
+        $revenue = round((float) ($row->revenue ?? 0), 2);
+
+        return [
+            'revenue' => $revenue,
+            'visits' => $visits,
+            'customers' => (int) ($row->customers ?? 0),
+            'average_bill' => $visits > 0 ? round($revenue / $visits, 2) : 0.0,
+        ];
+    }
+
+    /**
+     * Who each service is booked for: men, women, or not recorded.
+     *
+     * The person in the chair, not the account holder — a booking made for
+     * someone else counts under the recipient's gender.
+     */
+    public function genderMix(Salon $salon, int $limit = 10): array
+    {
+        $gender = "LOWER(COALESCE(a.recipient_gender, a.walk_in_customer_gender, u.gender, 'unspecified'))";
+
+        $rows = DB::table('appointment_services as asv')
+            ->join('appointments as a', 'a.id', '=', 'asv.appointment_id')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->join('services as s', 's.id', '=', 'asv.service_id')
+            ->leftJoin('service_templates as t', 't.id', '=', 's.template_id')
+            ->where('a.salon_id', $salon->id)
+            ->where('a.status', 'completed')
+            ->whereDate('a.appointment_date', '>=', now()->subDays(self::WINDOW_DAYS)->toDateString())
+            ->selectRaw("s.id as service_id, COALESCE(t.name, 'Custom service') as name, {$gender} as gender, COUNT(*) as bookings")
+            ->groupBy('s.id', 't.name', DB::raw($gender))
+            ->get();
+
+        $bucketOf = fn (?string $gender) => match ($gender) {
+            'male', 'men' => 'male',
+            'female', 'women' => 'female',
+            default => 'unknown',
+        };
+
+        $services = [];
+        foreach ($rows as $row) {
+            $bucket = $bucketOf($row->gender);
+            $services[$row->service_id] ??= ['service_id' => $row->service_id, 'name' => $row->name, 'male' => 0, 'female' => 0, 'unknown' => 0, 'total' => 0];
+            $services[$row->service_id][$bucket] += (int) $row->bookings;
+            $services[$row->service_id]['total'] += (int) $row->bookings;
+        }
+
+        // The overall split counts visits, not service lines, so a customer
+        // who had three services is still one person in the chair.
+        $totals = ['male' => 0, 'female' => 0, 'unknown' => 0];
+        DB::table('appointments as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->where('a.salon_id', $salon->id)
+            ->where('a.status', 'completed')
+            ->whereDate('a.appointment_date', '>=', now()->subDays(self::WINDOW_DAYS)->toDateString())
+            ->selectRaw("{$gender} as gender, COUNT(*) as visits")
+            ->groupBy(DB::raw($gender))
+            ->get()
+            ->each(function ($row) use (&$totals, $bucketOf) {
+                $totals[$bucketOf($row->gender)] += (int) $row->visits;
+            });
+
+        return [
+            'overall' => $totals,
+            'services' => collect($services)->sortByDesc('total')->take($limit)->values()->all(),
+        ];
+    }
+
+    /**
+     * How much a visit is worth and how long customers leave between visits.
+     *
+     * The gap is measured only over customers who came back at least once; a
+     * one-off visitor has no gap, and counting them as "never" would make
+     * every salon look like nobody returns.
+     */
+    public function visitGap(Salon $salon): array
+    {
+        $since = now()->subDays(self::WINDOW_DAYS)->toDateString();
+
+        $visits = DB::table('appointments as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->where('a.salon_id', $salon->id)
+            ->where('a.status', 'completed')
+            ->whereDate('a.appointment_date', '>=', $since)
+            ->selectRaw("COALESCE(u.phone, a.walk_in_customer_phone, a.walk_in_customer_name, CAST(a.id AS VARCHAR)) as customer, a.appointment_date, COALESCE(a.final_billed_amount, a.total_amount) as bill")
+            ->orderBy('a.appointment_date')
+            ->get();
+
+        $gaps = [];
+        foreach ($visits->groupBy('customer') as $customerVisits) {
+            $dates = $customerVisits->pluck('appointment_date')->map(fn ($d) => Carbon::parse($d)->startOfDay())->unique()->values();
+            for ($i = 1; $i < $dates->count(); $i++) {
+                $gaps[] = (int) abs($dates[$i - 1]->diffInDays($dates[$i]));
+            }
+        }
+
+        $bills = $visits->pluck('bill')->map(fn ($b) => (float) $b);
+        sort($gaps);
+
+        return [
+            'average_bill' => $bills->count() > 0 ? round($bills->avg(), 2) : 0.0,
+            'highest_bill' => $bills->count() > 0 ? round($bills->max(), 2) : 0.0,
+            'average_gap_days' => count($gaps) > 0 ? (int) round(array_sum($gaps) / count($gaps)) : null,
+            'median_gap_days' => count($gaps) > 0 ? (int) $gaps[intdiv(count($gaps), 2)] : null,
+            'returning_visits_measured' => count($gaps),
+        ];
+    }
+
+    /**
+     * Each provider in more depth than the basic table: average bill, how many
+     * of their customers came back to them, and how many bookings were lost to
+     * no-shows.
+     */
+    public function staffDeepDive(Salon $salon, int $days = 90): array
+    {
+        $since = now()->subDays($days)->toDateString();
+
+        $rows = DB::table('appointments as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->join('service_providers as sp', 'sp.id', '=', DB::raw('COALESCE(a.serving_provider_id, a.appointed_provider_id)'))
+            ->join('users as su', 'su.id', '=', 'sp.user_id')
+            ->where('a.salon_id', $salon->id)
+            ->whereIn('a.status', ['completed', 'no_show'])
+            ->whereDate('a.appointment_date', '>=', $since)
+            ->whereNull('sp.deleted_at')
+            ->selectRaw("sp.id as provider_id, su.name as provider, a.status, COALESCE(u.phone, a.walk_in_customer_phone, a.walk_in_customer_name, CAST(a.id AS VARCHAR)) as customer, COALESCE(a.final_billed_amount, a.total_amount) as bill")
+            ->get();
+
+        return $rows->groupBy('provider_id')->map(function ($bookings) {
+            $done = $bookings->where('status', 'completed');
+            $customers = $done->groupBy('customer');
+            $returning = $customers->filter(fn ($visits) => $visits->count() > 1)->count();
+            $revenue = $done->sum(fn ($b) => (float) $b->bill);
+
+            return [
+                'id' => (string) $bookings->first()->provider_id,
+                'name' => $bookings->first()->provider ?? 'Staff',
+                'completed' => $done->count(),
+                'revenue' => round($revenue, 2),
+                'average_bill' => $done->count() > 0 ? round($revenue / $done->count(), 2) : 0.0,
+                'customers' => $customers->count(),
+                'repeat_rate' => $customers->count() > 0 ? round($returning / $customers->count() * 100, 1) : 0.0,
+                'no_shows' => $bookings->where('status', 'no_show')->count(),
+            ];
+        })->sortByDesc('revenue')->values()->all();
+    }
+
+    /**
+     * How often each upsell the salon set up is actually taken: of the
+     * completed bookings that had the main service, how many also had the
+     * suggested one.
+     */
+    public function upsellLinkPerformance(Salon $salon): array
+    {
+        if (! Schema::hasTable('service_upsells')) {
+            return [];
+        }
+
+        $since = now()->subDays(self::WINDOW_DAYS)->toDateString();
+
+        $links = DB::table('service_upsells as su')
+            ->join('services as s', 's.id', '=', 'su.service_id')
+            ->join('services as us', 'us.id', '=', 'su.upsell_service_id')
+            ->leftJoin('service_templates as t', 't.id', '=', 's.template_id')
+            ->leftJoin('service_templates as ut', 'ut.id', '=', 'us.template_id')
+            ->where('s.salon_id', $salon->id)
+            ->whereNull('s.deleted_at')
+            ->whereNull('us.deleted_at')
+            ->selectRaw("su.service_id, su.upsell_service_id, COALESCE(t.name, 'Custom service') as service, COALESCE(ut.name, 'Custom service') as upsell, us.price as upsell_price")
+            ->get();
+
+        return $links->map(function ($link) use ($salon, $since) {
+            $withMain = DB::table('appointment_services as asv')
+                ->join('appointments as a', 'a.id', '=', 'asv.appointment_id')
+                ->where('a.salon_id', $salon->id)
+                ->where('a.status', 'completed')
+                ->whereDate('a.appointment_date', '>=', $since)
+                ->where('asv.service_id', $link->service_id)
+                ->distinct()
+                ->pluck('a.id');
+
+            $taken = $withMain->isEmpty() ? 0 : DB::table('appointment_services')
+                ->whereIn('appointment_id', $withMain)
+                ->where('service_id', $link->upsell_service_id)
+                ->distinct()
+                ->count('appointment_id');
+
+            return [
+                'service' => $link->service,
+                'upsell' => $link->upsell,
+                'bookings' => $withMain->count(),
+                'taken' => $taken,
+                'take_rate' => $withMain->count() > 0 ? round($taken / $withMain->count() * 100, 1) : null,
+                'extra_revenue' => round($taken * (float) $link->upsell_price, 2),
+            ];
+        })->sortByDesc('bookings')->values()->all();
+    }
+
+    /**
+     * The emptiest day-and-hour slots the salon trades in, each with an offer
+     * idea built on a service customers already like.
+     */
+    public function quietHourOffers(Salon $salon, int $limit = 3): array
+    {
+        $since = now()->subDays(self::WINDOW_DAYS)->toDateString();
+
+        $bookings = DB::table('appointments')
+            ->where('salon_id', $salon->id)
+            ->where('status', 'completed')
+            ->whereDate('appointment_date', '>=', $since)
+            ->get(['appointment_date', 'start_time']);
+
+        if ($bookings->count() < 10) {
+            return [];
+        }
+
+        $grid = [];
+        foreach ($bookings as $booking) {
+            $day = (int) Carbon::parse($booking->appointment_date)->dayOfWeek;
+            $hour = (int) substr((string) $booking->start_time, 0, 2);
+            $grid[$day][$hour] = ($grid[$day][$hour] ?? 0) + 1;
+        }
+
+        // Only days and hours the salon is seen trading in. An hour with no
+        // bookings on any day is most likely before opening or after closing.
+        $tradingHours = collect($grid)->flatMap(fn ($hours) => array_keys($hours))->unique()->sort()->values();
+        $busiest = collect($grid)->flatMap(fn ($hours) => array_values($hours))->max();
+        $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        $slots = [];
+        foreach (array_keys($grid) as $day) {
+            foreach ($tradingHours as $hour) {
+                $slots[] = ['day' => $day, 'hour' => $hour, 'bookings' => $grid[$day][$hour] ?? 0];
+            }
+        }
+
+        $popular = $this->services($salon, 1)[0]['name'] ?? null;
+
+        return collect($slots)
+            ->sortBy('bookings')
+            ->take($limit)
+            ->map(function (array $slot) use ($dayNames, $busiest, $popular) {
+                $label = $dayNames[$slot['day']].' '.$this->hourLabel($slot['hour']).'–'.$this->hourLabel(($slot['hour'] + 1) % 24);
+
+                return [
+                    'day' => $dayNames[$slot['day']],
+                    'hour' => $slot['hour'],
+                    'label' => $label,
+                    'bookings' => $slot['bookings'],
+                    'busiest_slot_bookings' => (int) $busiest,
+                    'suggestion' => $popular
+                        ? "{$label} is one of your emptiest hours. Try a small discount on {$popular} for this slot to fill the chairs."
+                        : "{$label} is one of your emptiest hours. A slot-only offer could fill the chairs.",
+                ];
+            })->values()->all();
+    }
+
+    /**
+     * Services losing bookings: the last 30 days against the 30 before, and
+     * services nobody has booked for two months.
+     */
+    public function slowServices(Salon $salon): array
+    {
+        $counts = fn (string $from, string $to) => DB::table('appointment_services as asv')
+            ->join('appointments as a', 'a.id', '=', 'asv.appointment_id')
+            ->where('a.salon_id', $salon->id)
+            ->where('a.status', 'completed')
+            ->whereDate('a.appointment_date', '>=', $from)
+            ->whereDate('a.appointment_date', '<=', $to)
+            ->groupBy('asv.service_id')
+            ->selectRaw('asv.service_id, COUNT(*) as bookings')
+            ->pluck('bookings', 'asv.service_id');
+
+        $recent = $counts(now()->subDays(29)->toDateString(), now()->toDateString());
+        $before = $counts(now()->subDays(59)->toDateString(), now()->subDays(30)->toDateString());
+
+        $services = DB::table('services as s')
+            ->leftJoin('service_templates as t', 't.id', '=', 's.template_id')
+            ->where('s.salon_id', $salon->id)
+            ->whereNull('s.deleted_at')
+            ->where('s.created_at', '<=', now()->subDays(60))
+            ->selectRaw("s.id, COALESCE(t.name, 'Custom service') as name")
+            ->get();
+
+        $alerts = [];
+        foreach ($services as $service) {
+            $now = (int) ($recent[$service->id] ?? 0);
+            $then = (int) ($before[$service->id] ?? 0);
+
+            if ($now === 0 && $then === 0) {
+                $alerts[] = [
+                    'service_id' => $service->id, 'name' => $service->name,
+                    'last_30_days' => 0, 'previous_30_days' => 0, 'change_percent' => null,
+                    'kind' => 'unbooked',
+                    'suggestion' => "No one has booked {$service->name} in 60 days. Put it in a combo with a popular service, review the price, or remove it.",
+                ];
+            } elseif ($then >= 3 && $now <= $then * 0.7) {
+                $change = round(($now - $then) / $then * 100, 1);
+                $alerts[] = [
+                    'service_id' => $service->id, 'name' => $service->name,
+                    'last_30_days' => $now, 'previous_30_days' => $then, 'change_percent' => $change,
+                    'kind' => 'falling',
+                    'suggestion' => "{$service->name} bookings fell from {$then} to {$now}. A short offer or adding it as an upsell could bring it back.",
+                ];
+            }
+        }
+
+        return collect($alerts)->sortBy(fn ($a) => $a['kind'] === 'falling' ? 0 : 1)->take(8)->values()->all();
+    }
+
+    /**
+     * Regulars who have stopped coming, with the number to call them on.
+     * Highest spenders first: they are the ones worth a phone call.
+     */
+    public function winBack(Salon $salon, int $limit = 25): array
+    {
+        $inactiveAfter = $this->settings->inactiveDays();
+        $cutoff = now()->subDays($inactiveAfter);
+
+        return $this->customerRows($salon, now()->subDays(365)->toDateString())
+            ->filter(fn ($row) => (int) $row->visits >= 2
+                && $row->phone
+                && $row->last_visit
+                && Carbon::parse($row->last_visit)->lt($cutoff))
+            ->sortByDesc(fn ($row) => (float) $row->spend)
+            ->take($limit)
+            ->map(fn ($row) => [
+                'name' => $row->name ?: 'Customer',
+                'phone' => $row->phone,
+                'visits' => (int) $row->visits,
+                'spend' => round((float) $row->spend, 2),
+                'last_visit' => $row->last_visit,
+                'days_since' => (int) Carbon::parse($row->last_visit)->startOfDay()->diffInDays(now()->startOfDay()),
+            ])->values()->all();
+    }
+
+    /**
      * One row per customer of this salon, aggregated over their visits.
      *
      * The same COALESCE shape as the audience builder, and for the same reason:
@@ -599,7 +988,8 @@ class SalonInsightsService
                 'MAX(COALESCE(u.name, a.walk_in_customer_name, \'Walk-in Customer\')) as name, '
                 .'COUNT(*) as visits, '
                 .'COALESCE(SUM(COALESCE(a.final_billed_amount, a.total_amount)), 0) as spend, '
-                .'MAX(a.appointment_date) as last_visit'
+                .'MAX(a.appointment_date) as last_visit, '
+                .'MAX(COALESCE(u.phone, a.walk_in_customer_phone)) as phone'
             )
             ->get();
     }

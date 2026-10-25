@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../services/insights_api.dart';
 import '../../../theme/app_theme.dart';
 import '../services/add_combo_screen.dart';
+import 'upgrade_plan_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// What the salon's own bookings say about it.
 ///
@@ -25,7 +27,11 @@ import '../services/add_combo_screen.dart';
 class InsightsScreen extends StatefulWidget {
   final String salonId;
 
-  const InsightsScreen({super.key, required this.salonId});
+  /// Loads the insights for a history window; defaults to the API.
+  /// Injectable for tests.
+  final Future<SalonInsights> Function(int days)? load;
+
+  const InsightsScreen({super.key, required this.salonId, this.load});
 
   @override
   State<InsightsScreen> createState() => _InsightsScreenState();
@@ -55,6 +61,9 @@ class _InsightsScreenState extends State<InsightsScreen> {
   bool _loading = true;
   String? _error;
 
+  /// History window for the period comparison. Only Growth can change it.
+  int _days = 30;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +74,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
     setState(() => _loading = true);
 
     try {
-      final insights = await InsightsApi.fetch(widget.salonId);
+      final insights = await (widget.load ?? (days) => InsightsApi.fetch(widget.salonId, days: days))(_days);
       if (!mounted) return;
       setState(() {
         _insights = insights;
@@ -147,22 +156,20 @@ class _InsightsScreenState extends State<InsightsScreen> {
         const SizedBox(height: 10),
       ],
 
-      _heading('Basic Analytics (Last 30 Days)', 'Standard revenue charts & staff performance'),
+      // Growth: this period against the one before.
+      _heading('This period vs the last', 'Revenue, visits and customers compared'),
+      if (insights.period != null)
+        _periodCard(insights, insights.period!, dark)
+      else if (insights.isLocked('period'))
+        _lockedTile(insights, 'period', dark),
+
+      // ------------------------------------------------ know your salon
+      _heading('Last 30 days', 'Revenue by week and how each provider did'),
       _basicAnalyticsCard(insights, dark),
 
-      if (insights.advanced && insights.retentionFunnel != null) ...[
-        _heading('Retention Funnel', 'Exactly what percentage of first-timers come back'),
+      if (insights.retentionFunnel != null) ...[
+        _heading('Do customers come back?', 'What share of first-timers return'),
         _retentionFunnelCard(insights.retentionFunnel!, dark),
-      ],
-
-      if (insights.repeatCustomers != null) ...[
-        _heading('Your customers', 'Who comes back, and who has drifted away'),
-        _customersCard(insights.repeatCustomers!, dark),
-      ],
-
-      if (insights.peakHours != null) ...[
-        _heading('When you are busy', 'Your quiet times are where the easy wins are'),
-        _busyCard(insights.peakHours!, dark),
       ],
 
       if (insights.services.isNotEmpty) ...[
@@ -170,26 +177,71 @@ class _InsightsScreenState extends State<InsightsScreen> {
         _servicesCard(insights.services, dark),
       ],
 
+      if (insights.upsell.isNotEmpty) ...[
+        _heading('Upsell tips', 'Trade-ups your customers already make'),
+        _upsellCard(insights.upsell, dark),
+      ],
+      if (insights.isLocked('upsell_advanced')) _lockedTile(insights, 'upsell_advanced', dark),
+
       if (insights.crossSell.isNotEmpty) ...[
         _heading('Often booked together', 'Pairs your customers already choose themselves'),
         _pairsCard(insights.crossSell, dark),
       ],
+      if (insights.isLocked('cross_sell_advanced')) _lockedTile(insights, 'cross_sell_advanced', dark),
 
-      if (insights.areas.isNotEmpty) ...[
-        _heading('Where your customers live', 'Useful when you want to reach one neighbourhood'),
-        _areasCard(insights.areas, dark),
-      ],
-
-      if (insights.campaigns.campaigns > 0) ...[
-        _heading('Your WhatsApp campaigns', 'How your messages have performed'),
-        _marketingCard(insights.campaigns, dark),
-      ],
+      // ------------------------------------------------ grow your revenue
+      ..._growthSection(insights, dark, 'peak_hours', 'When you are busy', 'Your quiet times are where the easy wins are',
+          insights.peakHours == null ? null : _busyCard(insights.peakHours!, dark)),
+      ..._growthSection(insights, dark, 'repeat_customers', 'Your customers', 'Who comes back, and who has drifted away',
+          insights.repeatCustomers == null ? null : _customersCard(insights.repeatCustomers!, dark)),
+      ..._growthSection(insights, dark, 'win_back', 'Win them back', 'Regulars who stopped coming. A quick call often brings them back',
+          insights.winBack.isEmpty ? null : _winBackCard(insights.winBack, dark)),
+      ..._growthSection(insights, dark, 'visit_gap', 'Average bill & visit gap', 'What a visit is worth and how often customers return',
+          insights.visitGap == null ? null : _visitGapCard(insights.visitGap!, dark)),
+      ..._growthSection(insights, dark, 'gender_mix', 'Customer mix', 'Who each service is booked for',
+          insights.genderMix == null || insights.genderMix!.overall.total == 0 ? null : _genderCard(insights.genderMix!, dark)),
+      ..._growthSection(insights, dark, 'staff_deep_dive', 'Staff deep-dive', 'Last 90 days, per provider',
+          insights.staffDeepDive.isEmpty ? null : _staffDeepCard(insights.staffDeepDive, dark)),
+      ..._growthSection(insights, dark, 'areas', 'Where your customers live', 'Useful when you want to reach one neighbourhood',
+          insights.areas.isEmpty ? null : _areasCard(insights.areas, dark)),
+      ..._growthSection(insights, dark, 'upsell_links', 'Your upsell links', 'How often the add-ons you set up are actually taken',
+          insights.upsellLinks.isEmpty ? null : _upsellLinksCard(insights.upsellLinks, dark)),
+      ..._growthSection(insights, dark, 'slow_services', 'Services losing bookings', 'Last 30 days against the 30 before',
+          insights.slowServices.isEmpty ? null : _slowServicesCard(insights.slowServices, dark)),
+      // Quiet-hour ideas and combos already sit in "Do this next"; here they
+      // only show as locked, so Starter sees what Growth adds.
+      if (insights.isLocked('quiet_hour_offers')) _lockedTile(insights, 'quiet_hour_offers', dark),
+      if (insights.isLocked('recommended_combos')) _lockedTile(insights, 'recommended_combos', dark),
 
       if (insights.locked.isNotEmpty) ...[
         const SizedBox(height: 4),
         _lockedCard(insights.locked, dark),
       ],
     ];
+  }
+
+  /// A Growth section: its card when the plan includes it and there is data,
+  /// a locked tile when the plan does not, and nothing when there is simply
+  /// nothing to show yet.
+  List<Widget> _growthSection(
+    SalonInsights insights,
+    bool dark,
+    String key,
+    String title,
+    String subtitle,
+    Widget? card,
+  ) {
+    if (card != null) return [_heading(title, subtitle), card];
+    if (insights.isLocked(key)) return [_lockedTile(insights, key, dark)];
+    return const [];
+  }
+
+  Future<void> _openUpgrade() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UpgradePlanScreen(salonId: widget.salonId)),
+    );
+    if (mounted) _load();
   }
 
   // ---------------------------------------------------------------- headline
@@ -299,10 +351,40 @@ class _InsightsScreenState extends State<InsightsScreen> {
   List<_Action> _actionsFor(SalonInsights insights) {
     final actions = <_Action>[];
 
-    // MVP Note: WhatsApp marketing actions (win back regulars, quiet days offer,
-    // and one-time visitor reminders) as well as upsell tips are hidden for MVP,
-    // as individual salons are not given direct WhatsApp marketing rights under their salon name.
-    // Only catalog combo recommendations are kept in "Do this next".
+    // Salons do not send WhatsApp marketing themselves, so every action here is
+    // something the owner does in the app or on the phone.
+    if (insights.slowServices.isNotEmpty) {
+      final slow = insights.slowServices.first;
+      actions.add(_Action(
+        icon: Icons.trending_down_rounded,
+        colour: AppTheme.lightWarning,
+        title: slow.kind == 'unbooked'
+            ? '${slow.name} is not being booked'
+            : '${slow.name} is losing bookings',
+        detail: slow.suggestion,
+      ));
+    }
+
+    if (insights.winBack.isNotEmpty) {
+      final count = insights.winBack.length;
+      actions.add(_Action(
+        icon: Icons.phone_callback_outlined,
+        colour: AppTheme.lightSuccess,
+        title: '$count regular${count == 1 ? ' has' : 's have'} stopped coming',
+        detail: 'They are listed under "Win them back" with their numbers. A friendly call is often all it takes.',
+      ));
+    }
+
+    if (insights.quietHourOffers.isNotEmpty) {
+      final quiet = insights.quietHourOffers.first;
+      actions.add(_Action(
+        icon: Icons.lightbulb_outline_rounded,
+        colour: AppTheme.accentColor,
+        title: 'Fill ${quiet.label}',
+        detail: quiet.suggestion,
+      ));
+    }
+
     if (insights.recommendedCombos.isNotEmpty) {
       final combo = insights.recommendedCombos.first;
 
@@ -791,34 +873,349 @@ class _InsightsScreenState extends State<InsightsScreen> {
     );
   }
 
-  Widget _marketingCard(CampaignStats stats, bool dark) => _card(
+  // ------------------------------------------------------------- growth cards
+
+  /// This period against the one before, with the window picker.
+  Widget _periodCard(SalonInsights insights, PeriodComparison period, bool dark) => _card(
+        dark,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              children: insights.periods.map((days) {
+                final selected = days == _days;
+                return ChoiceChip(
+                  key: ValueKey('insights_period_$days'),
+                  label: Text(days == 365 ? '1 year' : '$days days'),
+                  selected: selected,
+                  onSelected: selected
+                      ? null
+                      : (_) {
+                          setState(() => _days = days);
+                          _load();
+                        },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _changeTile('Revenue', '₹${_inr(period.revenue.current)}', period.revenue),
+                _changeTile('Visits', '${period.visits.current.round()}', period.visits),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _changeTile('Customers', '${period.customers.current.round()}', period.customers),
+                _changeTile('Average bill', '₹${_inr(period.averageBill.current)}', period.averageBill),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _changeTile(String label, String value, PeriodMetric metric) {
+    final change = metric.changePercent;
+    final up = (change ?? 0) >= 0;
+    final colour = change == null
+        ? AppTheme.lightTextLight
+        : (up ? AppTheme.lightSuccess : AppTheme.lightDanger);
+
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody)),
+          Text(value, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700)),
+          Row(
+            children: [
+              if (change != null)
+                Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, size: 13, color: colour),
+              Flexible(
+                child: Text(
+                  change == null ? 'Nothing to compare yet' : '${change.abs().toStringAsFixed(0)}% vs before',
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: colour, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Upsell tips. The rupee figure is only there on the full version.
+  Widget _upsellCard(List<UpsellTip> tips, bool dark) => _card(
+        dark,
+        Column(
+          children: tips.map((t) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.trending_up_rounded, size: 18, color: AppTheme.accentColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${t.from}  →  ${t.to}',
+                              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          Text('${t.evidence} customers have booked both',
+                              style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody)),
+                        ],
+                      ),
+                    ),
+                    if (t.uplift > 0)
+                      Text('+₹${_inr(t.uplift)}',
+                          style: GoogleFonts.outfit(
+                              fontSize: 13.5, fontWeight: FontWeight.w700, color: AppTheme.lightSuccess)),
+                  ],
+                ),
+              )).toList(),
+        ),
+      );
+
+  Widget _winBackCard(List<WinBackCustomer> customers, bool dark) => _card(
+        dark,
+        Column(
+          children: customers.take(10).map((c) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(c.name,
+                              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis),
+                          Text('${c.visits} visits · ₹${_inr(c.spend)} · last came ${c.daysSince} days ago',
+                              style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Call ${c.name}',
+                      icon: const Icon(Icons.call_rounded, color: AppTheme.lightSuccess),
+                      onPressed: () => launchUrl(Uri(scheme: 'tel', path: c.phone)),
+                    ),
+                  ],
+                ),
+              )).toList(),
+        ),
+      );
+
+  Widget _visitGapCard(VisitGap gap, bool dark) => _card(
         dark,
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                _mini('${stats.campaigns}', 'Campaigns'),
-                _mini('${stats.sent}', 'Messages'),
-                _mini('${stats.delivered}', 'Delivered'),
-                _mini(stats.readRate == null
-                    ? '—'
-                    : '${stats.readRate!.toStringAsFixed(0)}%', 'Opened'),
+                _mini('₹${_inr(gap.averageBill)}', 'Average bill'),
+                _mini('₹${_inr(gap.highestBill)}', 'Highest bill'),
               ],
             ),
-            if (stats.readRate != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                stats.readRate! >= 60
-                    ? 'Most people are reading your messages — that is a good sign.'
-                    : 'Fewer than half are being opened. Shorter messages with a clear offer usually do better.',
-                style: GoogleFonts.outfit(
-                    fontSize: 12.5, color: AppTheme.lightTextBody, height: 1.45),
-              ),
-            ],
+            const SizedBox(height: 12),
+            Text(
+              gap.averageGapDays == null
+                  ? 'Not enough repeat visits yet to tell how often customers come back.'
+                  : 'Customers who return come back about every ${gap.averageGapDays} days '
+                      '(half of them within ${gap.medianGapDays}).',
+              style: GoogleFonts.outfit(fontSize: 12.5, color: AppTheme.lightTextBody, height: 1.45),
+            ),
           ],
         ),
       );
+
+  Widget _genderCard(GenderMix mix, bool dark) {
+    Widget bar(GenderSplit split) {
+      final total = split.total == 0 ? 1 : split.total;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(split.name, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Row(
+                children: [
+                  if (split.male > 0)
+                    Expanded(flex: split.male, child: Container(height: 8, color: const Color(0xFF3B82F6))),
+                  if (split.female > 0)
+                    Expanded(flex: split.female, child: Container(height: 8, color: const Color(0xFFEC4899))),
+                  if (split.unknown > 0)
+                    Expanded(flex: split.unknown, child: Container(height: 8, color: AppTheme.lightBorder)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Men ${(split.male / total * 100).round()}% · Women ${(split.female / total * 100).round()}%'
+              '${split.unknown > 0 ? ' · Not recorded ${(split.unknown / total * 100).round()}%' : ''}',
+              style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _card(
+      dark,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          bar(GenderSplit(name: 'All services', male: mix.overall.male, female: mix.overall.female, unknown: mix.overall.unknown)),
+          const Divider(height: 20),
+          ...mix.services.take(6).map(bar),
+        ],
+      ),
+    );
+  }
+
+  Widget _staffDeepCard(List<StaffDeepDive> staff, bool dark) => _card(
+        dark,
+        Column(
+          children: staff.map((s) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(s.name,
+                              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                        ),
+                        Text('₹${_inr(s.revenue)}',
+                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${s.completed} done · avg ₹${_inr(s.averageBill)} · '
+                      '${s.repeatRate.toStringAsFixed(0)}% came back · ${s.noShows} no-show${s.noShows == 1 ? '' : 's'}',
+                      style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody),
+                    ),
+                  ],
+                ),
+              )).toList(),
+        ),
+      );
+
+  Widget _upsellLinksCard(List<UpsellLinkStat> links, bool dark) => _card(
+        dark,
+        Column(
+          children: links.take(8).map((l) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${l.service}  +  ${l.upsell}',
+                              style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          Text(
+                            l.bookings == 0
+                                ? 'No bookings of ${l.service} yet'
+                                : 'Added ${l.taken} of ${l.bookings} times · ₹${_inr(l.extraRevenue)} extra',
+                            style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(l.takeRate == null ? '—' : '${l.takeRate!.toStringAsFixed(0)}%',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              )).toList(),
+        ),
+      );
+
+  Widget _slowServicesCard(List<SlowService> services, bool dark) => _card(
+        dark,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: services.map((s) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(s.kind == 'unbooked' ? Icons.block_rounded : Icons.trending_down_rounded,
+                        size: 18, color: AppTheme.lightWarning),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            s.kind == 'unbooked'
+                                ? '${s.name} · no bookings in 60 days'
+                                : '${s.name} · ${s.previous30Days} → ${s.last30Days} bookings',
+                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600),
+                          ),
+                          Text(s.suggestion,
+                              style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextBody, height: 1.4)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
+        ),
+      );
+
+  /// One Growth section the plan does not include, drawn greyed out with the
+  /// reason it is worth having.
+  Widget _lockedTile(SalonInsights insights, String key, bool dark) {
+    final section = insights.locked.firstWhere(
+      (l) => l.key == key,
+      orElse: () => LockedSection(key: key, name: 'Growth feature', reason: ''),
+    );
+
+    return InkWell(
+      key: ValueKey('locked_$key'),
+      onTap: _openUpgrade,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: dark ? AppTheme.darkSurface : AppTheme.lightSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: dark ? AppTheme.darkBorder : AppTheme.lightBorder),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 20, color: AppTheme.lightTextLight),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(section.name,
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5, fontWeight: FontWeight.w600, color: AppTheme.lightTextBody)),
+                  if (section.reason.isNotEmpty)
+                    Text(section.reason,
+                        style: GoogleFonts.outfit(fontSize: 11.5, color: AppTheme.lightTextLight, height: 1.4)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('Growth',
+                style: GoogleFonts.outfit(
+                    fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.accentColor)),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _mini(String value, String label) => Expanded(
         child: Column(
@@ -846,11 +1243,13 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 const Icon(Icons.workspace_premium_outlined,
                     size: 19, color: AppTheme.accentColor),
                 const SizedBox(width: 8),
-                Text('You are not seeing everything',
-                    style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.accentColor)),
+                Expanded(
+                  child: Text('You are not seeing everything',
+                      style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.accentColor)),
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -884,6 +1283,15 @@ class _InsightsScreenState extends State<InsightsScreen> {
                     ],
                   ),
                 )),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                key: const ValueKey('insights_upgrade'),
+                onPressed: _openUpgrade,
+                child: const Text('Upgrade to Growth'),
+              ),
+            ),
           ],
         ),
       );
@@ -970,9 +1378,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text('30-Day Revenue Trend',
-                  style: GoogleFonts.outfit(
-                      fontSize: 14.5, fontWeight: FontWeight.bold)),
+              Flexible(
+                child: Text('30-Day Revenue Trend',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14.5, fontWeight: FontWeight.bold)),
+              ),
               if (trend != null)
                 Text(
                   '₹${_inr(trend.totalRevenue)} · ${trend.totalBookings} booked',

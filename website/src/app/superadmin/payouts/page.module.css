@@ -1,5 +1,17 @@
 .container {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ---------------------------------------------------------- header */
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
 }
 
 .title {
@@ -7,333 +19,608 @@
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.2;
-  margin-bottom: 8px;
+  margin: 0 0 6px;
   color: var(--text-heading);
 }
 
-.section {
-  margin-bottom: 40px;
+.subtitle {
+  margin: 0;
+  max-width: 720px;
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.card {
-  background: var(--surface);
-  padding: 24px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  box-shadow: var(--card-shadow);
-  color: var(--foreground);
-}
-
-.button {
-  margin-top: 16px;
-  padding: 8px 16px;
-  background-color: var(--accent);
-  color: white;
+.primaryAction {
+  flex-shrink: 0;
+  padding: 10px 18px;
   border: none;
-  border-radius: var(--radius-pill, 4px);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--accent);
+  color: var(--text-on-accent, #fff);
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: var(--shadow-xs);
   transition: background-color 0.2s;
 }
 
-.button:hover {
-  background-color: var(--accent-hover);
-}
+.primaryAction:hover:not(:disabled) { background: var(--accent-hover); }
+.primaryAction:disabled { opacity: 0.6; cursor: progress; }
 
-.cancelButton {
-  margin-top: 16px;
-  padding: 8px 16px;
-  background-color: var(--background);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill, 4px);
-  cursor: pointer;
-}
+/* ---------------------------------------------------------- filters */
 
-.cancelButton:hover {
-  opacity: 0.8;
-}
-
-.modalOverlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
+.filterBar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modalContent {
-  background: var(--surface);
-  color: var(--foreground);
-  padding: 32px;
-  border-radius: var(--radius-lg, 12px);
-  width: 500px;
-  max-width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-}
-
-.formGroup {
-  margin-bottom: 16px;
-}
-
-.formGroup label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.formGroup input, .formGroup select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background-color: var(--background);
-  color: var(--foreground);
-}
-
-.formActions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.primaryButton {
-  flex: 1;
-  padding: 10px;
-  background-color: var(--accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-pill, 4px);
-  cursor: pointer;
-}
-
-.primaryButton:hover {
-  background-color: var(--accent-hover);
-}
-
-.tierRow {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
-  align-items: flex-end;
-}
-
-/* ---------------------------------------------------------- payout run */
-
-.toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  gap: 12px 16px;
+  padding: 12px 14px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.segment {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmentActive {
+  background: var(--surface-color);
+  color: var(--accent-text);
+  box-shadow: var(--shadow-xs);
 }
 
 .field {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 
 .field label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-body);
+  color: var(--text-muted, var(--text-body));
 }
 
-.field input,
 .field select {
-  padding: 8px 10px;
+  padding: 7px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-heading);
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  color: var(--text-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover { background: var(--surface-2); }
+
+.chipActive,
+.chipActive:hover {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.period {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--text-muted, var(--text-body));
+  white-space: nowrap;
+}
+
+.errorBanner {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
   font-size: 14px;
 }
 
+/* ---------------------------------------------------------- KPIs */
+
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
-  margin-bottom: 20px;
 }
 
 .summaryTile {
+  position: relative;
+  overflow: hidden;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: var(--radius-lg, 12px);
+  padding: 14px 16px 14px 18px;
 }
+
+/* A thin colour rail says what kind of money the tile is at a glance. */
+.summaryTile::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--border-strong);
+}
+
+.tone_info::before { background: var(--color-info); }
+.tone_success::before { background: var(--color-success); }
+.tone_warning::before { background: var(--color-warning); }
 
 .summaryLabel {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-body);
+  color: var(--text-muted, var(--text-body));
 }
 
 .summaryValue {
+  margin-top: 6px;
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 750;
+  letter-spacing: -0.01em;
   color: var(--text-heading);
-  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Scroll container for the payouts table.
- *
- * The table had no wrapper at all, so its ten columns — several of them money
- * columns with long headings — pushed the whole page into a sideways scroll
- * rather than scrolling inside the card. `overflow: hidden` had been set on the
- * <table> itself, which is not a scroll container and did nothing.
- *
- * The min-width is what gives this scroller something to do: at `width: 100%`
- * with no floor the table would just compress to the viewport. 980px is about
- * what these ten columns need before the figures stop being readable. */
+.tone_success .summaryValue { color: var(--color-success); }
+
+.summaryHint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted, var(--text-body));
+}
+
+/* ---------------------------------------------------------- table */
+
+.tableCard {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.tableHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tableSub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted, var(--text-body));
+}
+
+/* The columns need about 1000px before the figures stop being readable; below
+   that the table scrolls inside the card rather than pushing the page sideways. */
 .tableScroll {
   overflow-x: auto;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--surface-color);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
 }
 
-.tableScroll .table {
+.table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1000px;
   border-collapse: collapse;
-  background: var(--surface-color);
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
-.table th {
-  text-align: left;
-  padding: 12px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-body);
+.table thead th {
+  position: sticky;
+  top: 0;
+  padding: 10px 14px;
+  background: var(--surface-subtle, var(--surface-2));
   border-bottom: 1px solid var(--border-color);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-body));
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px 14px;
+  padding: 14px;
   border-bottom: 1px solid var(--border-color);
-  font-size: 14px;
   color: var(--text-heading);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
-.deduction {
-  color: var(--color-danger);
-  font-weight: 600;
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr:hover td { background: var(--surface-subtle, var(--surface-2)); }
+
+.rowAttention td { background: var(--color-warning-bg); }
+.rowAttention td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.earned {
-  color: var(--color-success);
-  font-weight: 600;
+.salonName {
+  font-weight: 650;
+  color: var(--text-heading);
 }
 
-.net {
-  font-weight: 700;
+.salonMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
+
+.cellSub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted, var(--text-body));
+}
+
+div.cellSub { margin-top: 2px; }
+
+.muted { color: var(--text-muted, var(--text-body)); }
+.deduction { color: var(--color-danger); font-weight: 600; }
+.earned { color: var(--color-success); font-weight: 600; }
+.net { font-weight: 700; }
+.owes { color: var(--color-danger); font-weight: 700; }
 
 .pill {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 650;
   white-space: nowrap;
+}
+
+.pillSubscription,
+.pillCommission { background: var(--accent-soft); color: var(--accent-text); }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .pillPending { background: var(--color-warning-bg); color: var(--color-warning); }
 .pillApproved { background: var(--color-info-bg); color: var(--color-info); }
 .pillDistributed { background: var(--color-success-bg); color: var(--color-success); }
-.pillSubscription { background: var(--accent-soft); color: var(--accent-text); }
-.pillCommission { background: var(--accent-soft); color: var(--accent-text); }
 
-.rowActions {
-  display: flex;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.smallButton {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-color);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.smallButton:hover:not(:disabled) { background: var(--surface-2); }
-.smallButton:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.payButton {
-  border-color: var(--color-success);
-  color: var(--color-success);
+.flagWarn,
+.flagMuted {
+  margin-top: 4px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
-/* The statement number under the salon name. Monospace and quiet: it is a
-   reference to be copied, not a call to action competing with the buttons in
-   the action column. */
+.flagWarn { color: var(--color-warning); }
+.flagMuted { color: var(--text-muted, var(--text-body)); }
+
 .statementLink {
-  display: inline-block;
-  margin-top: 2px;
-  color: var(--color-primary, var(--color-accent, #6366f1));
+  color: var(--accent-text);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 11.5px;
   letter-spacing: 0.02em;
   text-decoration: none;
 }
 
-.statementLink:hover {
-  text-decoration: underline;
+.statementLink:hover { text-decoration: underline; }
+
+.actionsCol { text-align: right; width: 1%; }
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 
+.doneMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12.5px;
+  color: var(--text-body);
+}
+
+/* ---------------------------------------------------------- buttons */
+
+.btnGhost,
+.btnPrimary,
+.btnSuccess,
+.btnSuccessSolid,
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btnGhost {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-color);
+  color: var(--text-strong);
+}
+
+.btnGhost:hover:not(:disabled) { background: var(--surface-2); }
+
+.btnPrimary {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.btnPrimary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btnSuccess {
+  border: 1px solid var(--color-success-border, var(--color-success));
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.btnSuccessSolid {
+  border: 1px solid transparent;
+  background: var(--color-success);
+  color: #fff;
+}
+
+.btnDanger {
+  border: 1px solid var(--color-danger-border, var(--color-danger));
+  background: var(--surface-color);
+  color: var(--color-danger);
+}
+
+.btnDanger:hover:not(:disabled) { background: var(--color-danger-bg); }
+
+.btnGhost:disabled,
+.btnPrimary:disabled,
+.btnSuccess:disabled,
+.btnSuccessSolid:disabled,
+.btnDanger:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------------------------------------------------------- states */
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+}
+
+.skeletonRow {
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow { animation: none; }
+}
+
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-body);
+  font-size: 14px;
+}
+
+.empty p { margin: 6px auto 0; max-width: 460px; line-height: 1.5; }
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
 
 /* `hidden` here clipped the page-number buttons on a phone: the shared
-   Pagination's number row does not wrap, so anything past the first few was
-   simply unreachable. */
+   Pagination's number row does not wrap. */
 .pager {
-  margin-top: 16px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg, 12px);
+  border-top: 1px solid var(--border-color);
   overflow-x: auto;
 }
 
-/* ---------- narrow screens ---------- */
+/* ---------------------------------------------------------- modals */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--surface-overlay, rgba(0, 0, 0, 0.5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modalContent {
+  width: 460px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--surface-color);
+  color: var(--text-heading);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-pop);
+}
+
+.modalWide { width: 540px; }
+
+.modalTitle {
+  margin: 0 0 14px;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modalAmount {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+.modalAmount strong {
+  font-size: 20px;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.modalText {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+
+.modalWarn {
+  margin: 8px 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.screenshot {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  margin-top: 12px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-2);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  margin: 14px 0 16px;
+  font-size: 13.5px;
+}
+
+.details dt { color: var(--text-muted, var(--text-body)); }
+.details dd { margin: 0; font-weight: 600; word-break: break-word; }
+
+.formGroup label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-heading);
+  font-size: 14px;
+}
+
+.formGroup input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ---------------------------------------------------------- narrow screens */
 
 @media (max-width: 720px) {
-  .toolbar {
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  /* The filter fields share the row until there isn't room, then each takes
-     the full width rather than being squeezed to an unusable size. */
-  .field {
-    flex: 1 1 45%;
-    min-width: 0;
-  }
-
-  .field select,
-  .field input {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .button {
-    flex: 1 1 100%;
-    margin-top: 4px;
-  }
-
-  .summaryGrid {
-    gap: 10px;
-    margin-bottom: 16px;
-  }
+  .pageHeader { flex-direction: column; gap: 12px; }
+  .primaryAction { width: 100%; }
+  .filterBar { align-items: stretch; }
+  .segmented { width: 100%; }
+  .segment { flex: 1; }
+  .field { width: 100%; }
+  .field select { flex: 1; min-width: 0; }
+  .period { margin-left: 0; }
+  .summaryGrid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .summaryValue { font-size: 18px; }
 }

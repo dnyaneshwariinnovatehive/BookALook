@@ -2,159 +2,111 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:partner_app/models/subscription_plan.dart';
 
 void main() {
+  const growthKeys = [
+    'period',
+    'peak_hours',
+    'repeat_customers',
+    'areas',
+    'gender_mix',
+    'visit_gap',
+    'staff_deep_dive',
+    'recommended_combos',
+    'upsell_links',
+    'quiet_hour_offers',
+    'slow_services',
+    'win_back',
+  ];
+
   group('SubscriptionPlan Model — Parsing and Feature Mapping', () {
-    test('1. Parses real Starter plan JSON correctly', () {
-      final starterJson = {
+    test('1. Parses a Starter plan: basic insights in, Growth features locked', () {
+      final plan = SubscriptionPlan.fromJson({
         'id': '9d02029a-245f-4d32-b7e1-87a718b52a12',
         'name': 'Starter',
         'price': '1999.00',
         'validity_days': 30,
-        'whatsapp_campaign_limit': 250,
-        'whatsapp_message_limit': 0,
-        'has_customer_segmentation': true,
-        'has_service_based_targeting': false,
-        'has_high_value_targeting': false,
         'has_advanced_insights': false,
         'has_upsell_recommendations': 'basic',
         'has_cross_sell_recommendations': 'none',
-        'has_priority_visibility': false,
         'is_active': true,
-        'is_commission_plan': false,
-      };
+      });
 
-      final plan = SubscriptionPlan.fromJson(starterJson);
-
-      expect(plan.id, '9d02029a-245f-4d32-b7e1-87a718b52a12');
       expect(plan.name, 'Starter');
       expect(plan.price, 1999.0);
-      expect(plan.validityDays, 30);
       expect(plan.formattedPrice, '₹1,999');
       expect(plan.formattedDuration, '30 days');
-      expect(plan.whatsappCampaignLimit, 250);
-      expect(plan.hasCustomerSegmentation, isTrue);
-      expect(plan.hasServiceBasedTargeting, isFalse);
-      expect(plan.hasHighValueTargeting, isFalse);
-      expect(plan.hasAdvancedInsights, isFalse);
-      expect(plan.hasUpsellRecommendations, 'basic');
-      expect(plan.hasCrossSellRecommendations, 'none');
-      expect(plan.hasPriorityVisibility, isFalse);
 
-      final included = plan.includedFeatures;
-      final includedKeys = included.map((f) => f.key).toList();
+      final includedKeys = plan.includedFeatures.map((f) => f.key).toList();
+      expect(includedKeys, containsAll(['overview', 'revenue_trend', 'service_performance', 'staff_performance', 'retention', 'upsell', 'cross_sell']));
+      for (final key in growthKeys) {
+        expect(includedKeys, isNot(contains(key)));
+      }
 
-      // Included: whatsapp_campaign_limit, has_customer_segmentation, has_upsell_recommendations
-      expect(includedKeys, contains('whatsapp_campaign_limit'));
-      expect(includedKeys, contains('has_customer_segmentation'));
-      expect(includedKeys, contains('has_upsell_recommendations'));
+      // Every feature is listed so plans can be compared, locked ones too.
+      expect(plan.allFeatures.map((f) => f.key), containsAll(growthKeys));
 
-      // Excluded: service_based, high_value, advanced_insights, cross_sell, priority_visibility
-      expect(includedKeys, isNot(contains('has_service_based_targeting')));
-      expect(includedKeys, isNot(contains('has_high_value_targeting')));
-      expect(includedKeys, isNot(contains('has_advanced_insights')));
-      expect(includedKeys, isNot(contains('has_cross_sell_recommendations')));
-      expect(includedKeys, isNot(contains('has_priority_visibility')));
-
-      // Campaign limit formatting
-      final campaignFeature = included.firstWhere((f) => f.key == 'whatsapp_campaign_limit');
-      expect(campaignFeature.formattedValue, '250 campaigns per cycle');
-      expect(campaignFeature.tierBadge, '250/cycle');
-
-      // Upsell tier formatting
-      final upsellFeature = included.firstWhere((f) => f.key == 'has_upsell_recommendations');
-      expect(upsellFeature.tierBadge, 'Basic');
+      expect(plan.allFeatures.firstWhere((f) => f.key == 'upsell').tierBadge, 'Basic');
+      // An older plan saying "none" still gets the basic tips.
+      expect(plan.allFeatures.firstWhere((f) => f.key == 'cross_sell').tierBadge, 'Basic');
     });
 
-    test('2. Parses real Growth plan JSON with all features enabled', () {
-      final growthJson = {
+    test('2. Parses a Growth plan with every feature included', () {
+      final plan = SubscriptionPlan.fromJson({
         'id': '9d02029a-245f-4d32-b7e1-87a718b52a13',
         'name': 'Growth',
         'price': 2999,
         'validity_days': 30,
-        'whatsapp_campaign_limit': 1000,
-        'whatsapp_message_limit': 0,
-        'has_customer_segmentation': true,
-        'has_service_based_targeting': true,
-        'has_high_value_targeting': true,
         'has_advanced_insights': true,
         'has_upsell_recommendations': 'advanced',
         'has_cross_sell_recommendations': 'advanced',
-        'has_priority_visibility': true,
-        'is_active': true,
-        'is_commission_plan': false,
-      };
+      });
 
-      final plan = SubscriptionPlan.fromJson(growthJson);
-
-      expect(plan.name, 'Growth');
-      expect(plan.price, 2999.0);
       expect(plan.formattedPrice, '₹2,999');
-
-      final included = plan.includedFeatures;
-      expect(included.length, 8); // All 8 features enabled
-
-      final campaignFeature = included.firstWhere((f) => f.key == 'whatsapp_campaign_limit');
-      expect(campaignFeature.formattedValue, '1,000 campaigns per cycle');
-
-      final upsellFeature = included.firstWhere((f) => f.key == 'has_upsell_recommendations');
-      expect(upsellFeature.tierBadge, 'Advanced');
-
-      final crossSellFeature = included.firstWhere((f) => f.key == 'has_cross_sell_recommendations');
-      expect(crossSellFeature.tierBadge, 'Advanced');
-
-      final priorityFeature = included.firstWhere((f) => f.key == 'has_priority_visibility');
-      expect(priorityFeature.tierBadge, 'Premium');
+      expect(plan.includedFeatures.length, plan.allFeatures.length);
+      expect(plan.allFeatures.firstWhere((f) => f.key == 'upsell').tierBadge, 'Full');
+      expect(plan.allFeatures.firstWhere((f) => f.key == 'cross_sell').tierBadge, 'Full');
     });
 
-    test('3. Handles zero campaign limit as Unlimited per backend semantics', () {
-      final json = {
-        'id': 'unlimited-plan',
-        'name': 'VIP Unlimited',
-        'price': 4999.00,
-        'validity_days': 30,
-        'whatsapp_campaign_limit': 0, // 0 in CampaignEntitlementService represents unlimited
-      };
+    test('3. No WhatsApp marketing or priority visibility is offered on any plan', () {
+      final plan = SubscriptionPlan.fromJson({
+        'name': 'Old Growth',
+        'whatsapp_campaign_limit': 1000,
+        'has_customer_segmentation': true,
+        'has_priority_visibility': true,
+        'has_advanced_insights': true,
+      });
 
-      final plan = SubscriptionPlan.fromJson(json);
-      final campaignFeature = plan.includedFeatures.firstWhere((f) => f.key == 'whatsapp_campaign_limit');
-
-      expect(campaignFeature.isIncluded, isTrue);
-      expect(campaignFeature.tierBadge, 'Unlimited');
-      expect(campaignFeature.formattedValue, 'Unlimited campaigns per cycle');
+      final keys = plan.allFeatures.map((f) => f.key);
+      expect(keys, isNot(contains('whatsapp_campaign_limit')));
+      expect(keys, isNot(contains('has_customer_segmentation')));
+      expect(keys, isNot(contains('has_priority_visibility')));
     });
 
     test('4. Gracefully handles null, missing, or malformed data without crashing', () {
-      final legacyEmptyJson = <String, dynamic>{};
-
-      final plan = SubscriptionPlan.fromJson(legacyEmptyJson);
+      final plan = SubscriptionPlan.fromJson(<String, dynamic>{});
 
       expect(plan.id, '');
       expect(plan.name, 'Plan');
       expect(plan.price, 0.0);
       expect(plan.validityDays, 30);
       expect(plan.formattedPrice, '₹0');
-      expect(plan.formattedDuration, '30 days');
-      expect(plan.whatsappCampaignLimit, isNull);
-      expect(plan.hasCustomerSegmentation, isFalse);
       expect(plan.hasUpsellRecommendations, 'none');
-      expect(plan.hasCrossSellRecommendations, 'none');
 
-      // No features included
-      expect(plan.includedFeatures, isEmpty);
+      // Only the basics every plan has.
+      expect(plan.includedFeatures.map((f) => f.key), isNot(contains('period')));
+      expect(plan.includedFeatures, isNotEmpty);
     });
 
     test('5. Safely handles unexpected tier strings', () {
-      final weirdJson = {
+      final plan = SubscriptionPlan.fromJson({
         'id': 'test-plan',
         'name': 'Custom Plan',
         'has_upsell_recommendations': 'EXPERIMENTAL_TIER',
         'has_cross_sell_recommendations': null,
-      };
-
-      final plan = SubscriptionPlan.fromJson(weirdJson);
+      });
 
       expect(plan.hasUpsellRecommendations, 'none');
       expect(plan.hasCrossSellRecommendations, 'none');
-      expect(plan.includedFeatures.any((f) => f.key == 'has_upsell_recommendations'), isFalse);
+      expect(plan.allFeatures.firstWhere((f) => f.key == 'upsell').tierBadge, 'Basic');
     });
   });
 }

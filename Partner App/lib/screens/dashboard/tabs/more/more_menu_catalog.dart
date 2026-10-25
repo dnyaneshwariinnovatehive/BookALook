@@ -19,10 +19,8 @@ import 'package:partner_app/screens/dashboard/more/insights_screen.dart';
 import 'package:partner_app/screens/dashboard/more/payroll_screen.dart';
 import 'package:partner_app/screens/dashboard/more/salon_payouts_screen.dart';
 import 'package:partner_app/screens/dashboard/more/edit_salon_profile_screen.dart';
-import 'package:partner_app/screens/dashboard/more/automated_messaging_screen.dart';
 import 'package:partner_app/screens/dashboard/more/salon_offers_screen.dart';
 import 'package:partner_app/screens/dashboard/more/upgrade_plan_screen.dart';
-import 'package:partner_app/screens/dashboard/more/marketing_screen.dart';
 import 'package:partner_app/screens/dashboard/more/create_edit_salon_offer_screen.dart';
 import 'package:partner_app/screens/dashboard/tabs/settings/salon_timings_screen.dart';
 import 'package:partner_app/screens/walk_in_history_screen.dart';
@@ -425,38 +423,6 @@ class MoreMenuCatalog {
               );
             },
           ),
-          MoreMenuItem(
-            id: 'automated_messaging',
-            title: 'Automated Messaging',
-            category: 'Insights & communication',
-            subtitle: 'WhatsApp 25-day reminders & birthday greetings',
-            icon: Icons.mark_chat_read,
-            iconColor: Colors.green,
-            keywords: const [
-              'automated messaging',
-              'whatsapp',
-              'messaging',
-              'reminder',
-              'birthday reminder',
-              '25 day reminder',
-              'auto message',
-              'retention',
-              'chat',
-              'sms',
-              'customer outreach',
-              'client follow up',
-            ],
-            onSelect: (ctx, salonData, _) async {
-              await Navigator.push(
-                ctx,
-                MaterialPageRoute(
-                  builder: (_) => AutomatedMessagingScreen(
-                    salonId: salonData['id'].toString(),
-                  ),
-                ),
-              );
-            },
-          ),
         ],
       ),
       MoreMenuSection(
@@ -810,37 +776,6 @@ class MoreMenuCatalog {
       ),
     );
 
-    // B. Marketing & Promotional Campaigns
-    results.add(
-      MoreMenuItem(
-        id: 'marketing_campaigns',
-        title: 'Marketing & Campaigns',
-        category: 'Insights & communication',
-        subtitle: 'Create promotional SMS & WhatsApp campaigns for clients',
-        icon: Icons.campaign_outlined,
-        iconColor: Colors.pinkAccent,
-        keywords: const [
-          'marketing',
-          'campaigns',
-          'marketing & campaigns',
-          'sms campaign',
-          'whatsapp campaign',
-          'broadcast',
-          'client blast',
-          'promotions',
-          'send message',
-        ],
-        onSelect: (ctx, salonData, _) async {
-          await Navigator.push(
-            ctx,
-            MaterialPageRoute(
-              builder: (_) =>
-                  MarketingScreen(salonId: salonData['id'].toString()),
-            ),
-          );
-        },
-      ),
-    );
 
     // C. Create New Offer / Coupon
     results.add(

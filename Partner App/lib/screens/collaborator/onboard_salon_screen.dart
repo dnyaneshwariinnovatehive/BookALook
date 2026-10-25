@@ -1941,17 +1941,10 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
     if (priceStr.isNotEmpty) details.add(priceStr);
     details.add('$days days');
 
-    final campaigns = p['whatsapp_campaign_limit'];
-    final parsedCampaigns = campaigns != null ? int.tryParse(campaigns.toString()) : null;
-    if (parsedCampaigns != null && parsedCampaigns > 0) {
-      details.add('$parsedCampaigns WA campaigns');
-    }
-
-    if (p['has_priority_visibility'] == true ||
-        p['has_priority_visibility'] == 1 ||
-        p['has_priority_visibility'] == '1') {
-      details.add('Priority visibility');
-    }
+    final advanced = p['has_advanced_insights'] == true ||
+        p['has_advanced_insights'] == 1 ||
+        p['has_advanced_insights'] == '1';
+    details.add(advanced ? 'Growth insights' : 'Basic insights');
 
     return '$name (${details.join(' · ')})';
   }

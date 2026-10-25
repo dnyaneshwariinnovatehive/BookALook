@@ -138,7 +138,7 @@ void main() {
       expect(find.text('Staff Payroll'), findsOneWidget);
     });
 
-    testWidgets('7. Searching "whatsapp" finds Automated Messaging', (
+    testWidgets('7. WhatsApp marketing is no longer in the menu', (
       tester,
     ) async {
       await tester.pumpWidget(createWidgetUnderTest());
@@ -147,7 +147,9 @@ void main() {
       await tester.enterText(find.byType(TextField), 'whatsapp');
       await tester.pump();
 
-      expect(find.text('Automated Messaging'), findsOneWidget);
+      // BookALook sends birthday and 25-day messages itself now.
+      expect(find.text('Automated Messaging'), findsNothing);
+      expect(find.text('Marketing & Campaigns'), findsNothing);
     });
 
     testWidgets(

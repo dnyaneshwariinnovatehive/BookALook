@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Appointment;
 use App\Models\City;
 use App\Models\Salon;
+use App\Models\SalonSubscription;
+use App\Models\SubscriptionPlan;
 use App\Models\ServiceProvider;
 use App\Models\SubArea;
 use App\Models\User;
@@ -58,6 +60,20 @@ class BusinessInsightsRealDataTest extends TestCase
             'user_id' => $this->providerUser->id,
             'salon_id' => $this->salon->id,
             'is_active' => true,
+        ]);
+
+        // A salon owner sees what their plan includes; these tests read the
+        // full Growth set.
+        $plan = SubscriptionPlan::create([
+            'name' => 'Growth', 'price' => 2999, 'validity_days' => 30,
+            'has_advanced_insights' => true,
+            'has_upsell_recommendations' => 'advanced',
+            'has_cross_sell_recommendations' => 'advanced',
+        ]);
+        SalonSubscription::create([
+            'salon_id' => $this->salon->id, 'plan_id' => $plan->id, 'billing_type' => 'subscription',
+            'start_date' => now()->subDays(5)->toDateString(), 'end_date' => now()->addDays(25)->toDateString(),
+            'status' => 'active',
         ]);
     }
 

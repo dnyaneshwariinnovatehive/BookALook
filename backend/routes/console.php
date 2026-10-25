@@ -45,7 +45,8 @@ Schedule::command('app:send-appointment-reminders')->everyFifteenMinutes()->with
 // decide to send the same message.
 Schedule::command('app:drain-whatsapp-outbox')->everyMinute()->withoutOverlapping();
 
-// Sends automated messages (25-day reminders and birthdays) for salons that have them enabled.
+// Sends the 25-day reminders and birthday messages. Whether each runs is
+// decided only by its switch in SuperAdmin's WhatsApp automations; salons have no say.
 Schedule::command('app:send-automated-messages')->dailyAt('09:00')->withoutOverlapping();
 
 // Old in-app notifications, customers' and partners' alike, so the table does

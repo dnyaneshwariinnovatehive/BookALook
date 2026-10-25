@@ -5,10 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SubscriptionPlan extends Model
 {
-    use HasFactory, HasUuids;
+    // Soft-deleted so the subscriptions and payment requests that were bought
+    // on a retired plan keep pointing at it.
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
         'name',

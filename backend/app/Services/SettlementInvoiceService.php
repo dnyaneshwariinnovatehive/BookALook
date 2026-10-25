@@ -218,7 +218,9 @@ class SettlementInvoiceService
 
         $parts = array_filter([
             $salon->address,
-            $salon->city,
+            // The relation's name, not the relation: casting the model to a
+            // string printed its whole JSON onto the statement.
+            $salon->city()->value('name'),
             $salon->pincode,
         ]);
 

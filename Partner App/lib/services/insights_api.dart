@@ -22,9 +22,11 @@ class InsightsApi {
     };
   }
 
-  static Future<SalonInsights> fetch(String salonId) async {
+  /// [days] picks the history window. Only Growth may change it; the server
+  /// falls back to 30 for any other plan.
+  static Future<SalonInsights> fetch(String salonId, {int days = 30}) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/salons/$salonId/insights'),
+      Uri.parse('$_baseUrl/salons/$salonId/insights?days=$days'),
       headers: await _headers(),
     );
 
@@ -81,7 +83,21 @@ class SalonInsights {
   final List<UpsellTip> upsell;
   final List<PairStat> crossSell;
 
+  /// History windows this plan may switch between; just [30] below Growth.
+  final List<int> periods;
+  final PeriodComparison? period;
+  final GenderMix? genderMix;
+  final VisitGap? visitGap;
+  final List<StaffDeepDive> staffDeepDive;
+  final List<UpsellLinkStat> upsellLinks;
+  final List<QuietHourOffer> quietHourOffers;
+  final List<SlowService> slowServices;
+  final List<WinBackCustomer> winBack;
+
   final List<LockedSection> locked;
+
+  /// Whether the plan hides [key], so the screen draws it as a locked card.
+  bool isLocked(String key) => locked.any((l) => l.key == key);
 
   SalonInsights({
     required this.overview,
@@ -97,6 +113,15 @@ class SalonInsights {
     this.recommendedCombos = const [],
     this.upsell = const [],
     this.crossSell = const [],
+    this.periods = const [30],
+    this.period,
+    this.genderMix,
+    this.visitGap,
+    this.staffDeepDive = const [],
+    this.upsellLinks = const [],
+    this.quietHourOffers = const [],
+    this.slowServices = const [],
+    this.winBack = const [],
     this.locked = const [],
   });
 
@@ -135,11 +160,242 @@ class SalonInsights {
       crossSell: ((d['cross_sell'] ?? []) as List)
           .map((r) => PairStat.fromJson(Map<String, dynamic>.from(r as Map)))
           .toList(),
+      periods: ((d['periods'] ?? [30]) as List).map((p) => (p as num).toInt()).toList(),
+      period: d['period'] == null
+          ? null
+          : PeriodComparison.fromJson(Map<String, dynamic>.from(d['period'] as Map)),
+      genderMix: d['gender_mix'] == null
+          ? null
+          : GenderMix.fromJson(Map<String, dynamic>.from(d['gender_mix'] as Map)),
+      visitGap: d['visit_gap'] == null
+          ? null
+          : VisitGap.fromJson(Map<String, dynamic>.from(d['visit_gap'] as Map)),
+      staffDeepDive: _list(d['staff_deep_dive'], StaffDeepDive.fromJson),
+      upsellLinks: _list(d['upsell_links'], UpsellLinkStat.fromJson),
+      quietHourOffers: _list(d['quiet_hour_offers'], QuietHourOffer.fromJson),
+      slowServices: _list(d['slow_services'], SlowService.fromJson),
+      winBack: _list(d['win_back'], WinBackCustomer.fromJson),
       locked: ((json['locked'] ?? []) as List)
           .map((r) => LockedSection.fromJson(Map<String, dynamic>.from(r as Map)))
           .toList(),
     );
   }
+}
+
+List<T> _list<T>(dynamic raw, T Function(Map<String, dynamic>) parse) =>
+    ((raw ?? []) as List).map((r) => parse(Map<String, dynamic>.from(r as Map))).toList();
+
+double _num(dynamic v) => (v as num?)?.toDouble() ?? 0;
+int _int(dynamic v) => (v as num?)?.toInt() ?? 0;
+
+/// One figure in this period against the same length of time before it.
+class PeriodMetric {
+  final double current;
+  final double previous;
+
+  /// Null when there was nothing before; growth from zero is not a percentage.
+  final double? changePercent;
+
+  PeriodMetric({required this.current, required this.previous, this.changePercent});
+
+  factory PeriodMetric.fromJson(Map<String, dynamic> json) => PeriodMetric(
+        current: _num(json['current']),
+        previous: _num(json['previous']),
+        changePercent: (json['change_percent'] as num?)?.toDouble(),
+      );
+}
+
+class PeriodComparison {
+  final int days;
+  final PeriodMetric revenue;
+  final PeriodMetric visits;
+  final PeriodMetric customers;
+  final PeriodMetric averageBill;
+
+  PeriodComparison({
+    required this.days,
+    required this.revenue,
+    required this.visits,
+    required this.customers,
+    required this.averageBill,
+  });
+
+  factory PeriodComparison.fromJson(Map<String, dynamic> json) {
+    final m = Map<String, dynamic>.from((json['metrics'] ?? {}) as Map);
+    PeriodMetric metric(String key) =>
+        PeriodMetric.fromJson(Map<String, dynamic>.from((m[key] ?? {}) as Map));
+    return PeriodComparison(
+      days: _int(json['days']),
+      revenue: metric('revenue'),
+      visits: metric('visits'),
+      customers: metric('customers'),
+      averageBill: metric('average_bill'),
+    );
+  }
+}
+
+class GenderSplit {
+  final String name;
+  final int male;
+  final int female;
+  final int unknown;
+
+  GenderSplit({required this.name, required this.male, required this.female, required this.unknown});
+
+  int get total => male + female + unknown;
+
+  factory GenderSplit.fromJson(Map<String, dynamic> json) => GenderSplit(
+        name: (json['name'] ?? 'All services').toString(),
+        male: _int(json['male']),
+        female: _int(json['female']),
+        unknown: _int(json['unknown']),
+      );
+}
+
+class GenderMix {
+  final GenderSplit overall;
+  final List<GenderSplit> services;
+
+  GenderMix({required this.overall, required this.services});
+
+  factory GenderMix.fromJson(Map<String, dynamic> json) => GenderMix(
+        overall: GenderSplit.fromJson(Map<String, dynamic>.from((json['overall'] ?? {}) as Map)),
+        services: _list(json['services'], GenderSplit.fromJson),
+      );
+}
+
+class VisitGap {
+  final double averageBill;
+  final double highestBill;
+  final int? averageGapDays;
+  final int? medianGapDays;
+
+  VisitGap({required this.averageBill, required this.highestBill, this.averageGapDays, this.medianGapDays});
+
+  factory VisitGap.fromJson(Map<String, dynamic> json) => VisitGap(
+        averageBill: _num(json['average_bill']),
+        highestBill: _num(json['highest_bill']),
+        averageGapDays: (json['average_gap_days'] as num?)?.toInt(),
+        medianGapDays: (json['median_gap_days'] as num?)?.toInt(),
+      );
+}
+
+class StaffDeepDive {
+  final String name;
+  final int completed;
+  final double revenue;
+  final double averageBill;
+  final double repeatRate;
+  final int noShows;
+
+  StaffDeepDive({
+    required this.name,
+    required this.completed,
+    required this.revenue,
+    required this.averageBill,
+    required this.repeatRate,
+    required this.noShows,
+  });
+
+  factory StaffDeepDive.fromJson(Map<String, dynamic> json) => StaffDeepDive(
+        name: (json['name'] ?? 'Staff').toString(),
+        completed: _int(json['completed']),
+        revenue: _num(json['revenue']),
+        averageBill: _num(json['average_bill']),
+        repeatRate: _num(json['repeat_rate']),
+        noShows: _int(json['no_shows']),
+      );
+}
+
+class UpsellLinkStat {
+  final String service;
+  final String upsell;
+  final int bookings;
+  final int taken;
+  final double? takeRate;
+  final double extraRevenue;
+
+  UpsellLinkStat({
+    required this.service,
+    required this.upsell,
+    required this.bookings,
+    required this.taken,
+    this.takeRate,
+    required this.extraRevenue,
+  });
+
+  factory UpsellLinkStat.fromJson(Map<String, dynamic> json) => UpsellLinkStat(
+        service: (json['service'] ?? '').toString(),
+        upsell: (json['upsell'] ?? '').toString(),
+        bookings: _int(json['bookings']),
+        taken: _int(json['taken']),
+        takeRate: (json['take_rate'] as num?)?.toDouble(),
+        extraRevenue: _num(json['extra_revenue']),
+      );
+}
+
+class QuietHourOffer {
+  final String label;
+  final int bookings;
+  final String suggestion;
+
+  QuietHourOffer({required this.label, required this.bookings, required this.suggestion});
+
+  factory QuietHourOffer.fromJson(Map<String, dynamic> json) => QuietHourOffer(
+        label: (json['label'] ?? '').toString(),
+        bookings: _int(json['bookings']),
+        suggestion: (json['suggestion'] ?? '').toString(),
+      );
+}
+
+class SlowService {
+  final String name;
+  final int last30Days;
+  final int previous30Days;
+
+  /// 'falling' or 'unbooked'.
+  final String kind;
+  final String suggestion;
+
+  SlowService({
+    required this.name,
+    required this.last30Days,
+    required this.previous30Days,
+    required this.kind,
+    required this.suggestion,
+  });
+
+  factory SlowService.fromJson(Map<String, dynamic> json) => SlowService(
+        name: (json['name'] ?? '').toString(),
+        last30Days: _int(json['last_30_days']),
+        previous30Days: _int(json['previous_30_days']),
+        kind: (json['kind'] ?? 'falling').toString(),
+        suggestion: (json['suggestion'] ?? '').toString(),
+      );
+}
+
+class WinBackCustomer {
+  final String name;
+  final String phone;
+  final int visits;
+  final double spend;
+  final int daysSince;
+
+  WinBackCustomer({
+    required this.name,
+    required this.phone,
+    required this.visits,
+    required this.spend,
+    required this.daysSince,
+  });
+
+  factory WinBackCustomer.fromJson(Map<String, dynamic> json) => WinBackCustomer(
+        name: (json['name'] ?? 'Customer').toString(),
+        phone: (json['phone'] ?? '').toString(),
+        visits: _int(json['visits']),
+        spend: _num(json['spend']),
+        daysSince: _int(json['days_since']),
+      );
 }
 
 class Overview {

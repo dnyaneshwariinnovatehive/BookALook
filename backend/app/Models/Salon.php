@@ -23,7 +23,7 @@ class Salon extends Model
 
     public function preferredPlan()
     {
-        return $this->belongsTo(SubscriptionPlan::class, 'preferred_plan_id');
+        return $this->belongsTo(SubscriptionPlan::class, 'preferred_plan_id')->withTrashed();
     }
 
     public function city()

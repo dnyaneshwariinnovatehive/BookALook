@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/floating_pill_nav_bar.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
@@ -253,50 +254,15 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard>
             TabNavigator(navigatorKey: _navigatorKeys[i], root: pages[i]),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          selectedItemColor: AppTheme.accentColor,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          selectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Schedule',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_add_alt_1_outlined),
-              activeIcon: Icon(Icons.person_add_alt_1),
-              label: 'Add Walk-in',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-        ),
+      bottomNavigationBar: FloatingPillNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onItemTapped,
+        items: const [
+          PillNavItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
+          PillNavItem(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_month_rounded, label: 'Schedule'),
+          PillNavItem(icon: Icons.person_add_alt_1_outlined, activeIcon: Icons.person_add_alt_1_rounded, label: 'Add Walk-in'),
+          PillNavItem(icon: Icons.person_outline, activeIcon: Icons.person_rounded, label: 'Profile'),
+        ],
       ),
     );
   }

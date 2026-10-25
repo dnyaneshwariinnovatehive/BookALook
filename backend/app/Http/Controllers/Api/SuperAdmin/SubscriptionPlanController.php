@@ -147,10 +147,27 @@ class SubscriptionPlanController extends Controller
             ], 422);
         }
 
-        if (SalonSubscription::where('plan_id', $id)->where('status', 'active')->exists()) {
+        // Only a subscription still running counts. A short plan's rows can
+        // keep saying "active" after their end date, because nothing flips them
+        // until the salon next renews, and that alone must not pin the plan.
+        $running = SalonSubscription::where('plan_id', $id)
+            ->where('status', 'active')
+            ->whereDate('end_date', '>=', now()->toDateString())
+            ->exists();
+
+        if ($running) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot delete plan because active salons are subscribed to it.',
+            ], 400);
+        }
+
+        // Approving one of these after the plan is gone would hand a salon a
+        // subscription to a plan nobody can see any more.
+        if (SubscriptionPaymentRequest::where('subscription_plan_id', $id)->where('status', 'pending')->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A salon has a payment for this plan waiting to be verified. Approve or reject it first.',
             ], 400);
         }
 
@@ -578,18 +595,13 @@ class SubscriptionPlanController extends Controller
             'name' => $must('string|max:50'),
             'price' => $must('numeric'),
             'validity_days' => $must('integer|min:1'),
-            // Campaigns per billing cycle, and messages per billing cycle.
-            // Zero on either takes that allowance out of use, so a plan can be
-            // capped by campaigns, by messages, by both or by neither.
-            'whatsapp_campaign_limit' => $must('integer|min:0'),
-            'whatsapp_message_limit' => 'sometimes|integer|min:0',
-            'has_customer_segmentation' => 'boolean',
-            'has_service_based_targeting' => 'boolean',
-            'has_high_value_targeting' => 'boolean',
+            // Salons no longer send WhatsApp marketing, so the campaign and
+            // targeting columns are left alone; they are not part of a plan.
+            // Plans differ only in insights: Growth's analytics and the
+            // basic-or-full level of upsell and cross-sell suggestions.
             'has_advanced_insights' => 'boolean',
-            'has_upsell_recommendations' => 'string|in:none,basic,advanced',
-            'has_cross_sell_recommendations' => 'string|in:none,basic,advanced',
-            'has_priority_visibility' => 'boolean',
+            'has_upsell_recommendations' => 'string|in:basic,advanced',
+            'has_cross_sell_recommendations' => 'string|in:basic,advanced',
             'is_active' => 'boolean',
         ];
     }

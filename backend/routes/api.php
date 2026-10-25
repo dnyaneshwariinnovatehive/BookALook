@@ -374,13 +374,9 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/payouts/{payout_id}/payment', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'submit'])->middleware('throttle:10,1');
         // Postpaid: no money changes hands here, so there is nothing to upload.
         Route::post('/salons/{salon_id}/subscription/commission-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'commissionRequest']);
-        // WhatsApp marketing. Inside auth but outside the salon.active gate for
-        // the same reason renewal is: a salon whose plan lapsed should be able
-        // to see what its campaigns did, even while it cannot start new ones.
-        Route::get('/salons/{salon_id}/campaigns/options', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'options']);
-        Route::post('/salons/{salon_id}/campaigns/preview', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'preview']);
+        // WhatsApp marketing is BookALook's own channel now; salons cannot start
+        // campaigns. They can still look at, or cancel, ones started before.
         Route::get('/salons/{salon_id}/campaigns', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'index']);
-        Route::post('/salons/{salon_id}/campaigns', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'store']);
         Route::get('/salons/{salon_id}/campaigns/{id}', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'show']);
         Route::post('/salons/{salon_id}/campaigns/{id}/cancel', [\App\Http\Controllers\Api\Partner\CampaignController::class, 'cancel']);
 
@@ -511,9 +507,6 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/appointments/{id}/collect-payment', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'collectPayment']);
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
-        // Automated Messaging
-        Route::get('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'getSettings']);
-        Route::put('/salons/{salon_id}/automated-messaging', [\App\Http\Controllers\Api\Partner\AutomatedMessagingController::class, 'updateSettings']);
 
         // Salon Offers & Discounts Management
         Route::get('/salons/{salon_id}/offers/options', [\App\Http\Controllers\Api\Partner\SalonOfferController::class, 'options']);

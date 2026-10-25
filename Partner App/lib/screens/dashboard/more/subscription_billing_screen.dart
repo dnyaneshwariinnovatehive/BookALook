@@ -1003,7 +1003,8 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
     ColorScheme colorScheme,
     bool isDark,
   ) {
-    final included = plan.includedFeatures;
+    // Locked features are listed too, so the owner sees what an upgrade adds.
+    final included = plan.allFeatures;
     final isExpired = _daysRemaining < 0;
 
     return Column(
@@ -1021,7 +1022,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Features included in this plan',
+                  'Features of this plan',
                   style: GoogleFonts.outfit(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -1090,7 +1091,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
         else ...[
           // When collapsed show top 2 features, when expanded show all features
           ...((_isPlanFeaturesExpanded ? included : included.take(2)).map(
-            (f) => PlanFeatureItem(feature: f, isCompact: true),
+            (f) => PlanFeatureItem(feature: f, isCompact: true, showExcludedState: true),
           )),
         ],
         const SizedBox(height: 10),
@@ -1103,7 +1104,7 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
           ),
           child: Text(
             isExpired
-                ? 'Features configured for this plan. Renewal is required to restore active access to campaigns, booking, and insights.'
+                ? 'Features configured for this plan. Renewal is required to restore active access to booking and insights.'
                 : 'Features configured for this plan. Active for your salon while this subscription is valid.',
             style: GoogleFonts.outfit(
               fontSize: 11.5,

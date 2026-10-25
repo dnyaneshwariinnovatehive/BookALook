@@ -34,29 +34,36 @@ const pct = (value: number | null) =>
 const EMPTY_PLAN = {
   name: '',
   price: '',
-  whatsapp_campaign_limit: '',
-  has_customer_segmentation: false,
-  has_service_based_targeting: false,
-  has_high_value_targeting: false,
   has_advanced_insights: false,
-  has_upsell_recommendations: 'none',
-  has_cross_sell_recommendations: 'none',
-  has_priority_visibility: false,
+  has_upsell_recommendations: 'basic',
+  has_cross_sell_recommendations: 'basic',
   is_active: true,
   validity_days: '30',
 };
 
 type PlanForm = typeof EMPTY_PLAN;
 
-const FEATURE_FLAGS: { key: keyof PlanForm; label: string }[] = [
-  { key: 'has_customer_segmentation', label: 'Customer segmentation' },
-  { key: 'has_service_based_targeting', label: 'Service-based targeting' },
-  { key: 'has_high_value_targeting', label: 'High-value targeting' },
-  { key: 'has_advanced_insights', label: 'Advanced insights' },
-  { key: 'has_priority_visibility', label: 'Priority visibility' },
+/** What every plan includes: Starter's "know your salon" insights. */
+const BASE_FEATURES = [
+  'Business overview & 30-day revenue trend',
+  'Service and staff performance',
+  'Retention summary',
 ];
 
-const LEVEL_LABEL: Record<string, string> = { none: 'None', basic: 'Basic', advanced: 'Advanced' };
+/** What Growth insights unlock, listed so plans can be compared. */
+const GROWTH_FEATURES = [
+  'Longer history (30 / 90 / 365 days) with comparison',
+  'Peak & quiet hours',
+  'Repeat customers & win-back list',
+  'Customer areas & customer mix',
+  'Average bill, visit gap & staff deep-dive',
+  'Recommended combos & upsell link performance',
+  'Quiet-hour offer ideas & slow-service alerts',
+];
+
+/** Older plans may still say "none"; every plan gets at least the basic tips. */
+const levelOf = (value?: string) => (value === 'advanced' ? 'advanced' : 'basic');
+const LEVEL_LABEL: Record<string, string> = { basic: 'Basic', advanced: 'Full' };
 
 /** Days from today until a Y-m-d date (negative once it has passed). */
 const daysUntil = (ymd?: string | null) => {
@@ -394,14 +401,9 @@ export default function SubscriptionsPage() {
     setPlanFormData({
       name: plan.name ?? '',
       price: String(plan.price ?? ''),
-      whatsapp_campaign_limit: String(plan.whatsapp_campaign_limit ?? ''),
-      has_customer_segmentation: !!plan.has_customer_segmentation,
-      has_service_based_targeting: !!plan.has_service_based_targeting,
-      has_high_value_targeting: !!plan.has_high_value_targeting,
       has_advanced_insights: !!plan.has_advanced_insights,
-      has_upsell_recommendations: plan.has_upsell_recommendations ?? 'none',
-      has_cross_sell_recommendations: plan.has_cross_sell_recommendations ?? 'none',
-      has_priority_visibility: !!plan.has_priority_visibility,
+      has_upsell_recommendations: levelOf(plan.has_upsell_recommendations),
+      has_cross_sell_recommendations: levelOf(plan.has_cross_sell_recommendations),
       is_active: !!plan.is_active,
       validity_days: String(plan.validity_days ?? '30'),
     });
@@ -969,24 +971,26 @@ export default function SubscriptionsPage() {
                   </p>
 
                   <ul className={styles.featureList}>
-                    <li className={styles.featureOn}>
-                      <Icon name="message" size={15} />
-                      {Number(plan.whatsapp_campaign_limit).toLocaleString('en-IN')} WhatsApp campaign{Number(plan.whatsapp_campaign_limit) === 1 ? '' : 's'}
-                    </li>
-                    {FEATURE_FLAGS.map((f) => (
-                      <li key={f.key} className={plan[f.key] ? styles.featureOn : styles.featureOff}>
-                        <Icon name={plan[f.key] ? 'check' : 'close'} size={15} strokeWidth={2.2} />
-                        {f.label}
+                    {BASE_FEATURES.map((label) => (
+                      <li key={label} className={styles.featureOn}>
+                        <Icon name="check" size={15} strokeWidth={2.2} />
+                        {label}
                       </li>
                     ))}
-                    <li className={plan.has_upsell_recommendations !== 'none' ? styles.featureOn : styles.featureOff}>
-                      <Icon name={plan.has_upsell_recommendations !== 'none' ? 'check' : 'close'} size={15} strokeWidth={2.2} />
-                      Upsell · {LEVEL_LABEL[plan.has_upsell_recommendations] ?? '—'}
+                    <li className={styles.featureOn}>
+                      <Icon name="check" size={15} strokeWidth={2.2} />
+                      Upsell tips · {LEVEL_LABEL[levelOf(plan.has_upsell_recommendations)]}
                     </li>
-                    <li className={plan.has_cross_sell_recommendations !== 'none' ? styles.featureOn : styles.featureOff}>
-                      <Icon name={plan.has_cross_sell_recommendations !== 'none' ? 'check' : 'close'} size={15} strokeWidth={2.2} />
-                      Cross-sell · {LEVEL_LABEL[plan.has_cross_sell_recommendations] ?? '—'}
+                    <li className={styles.featureOn}>
+                      <Icon name="check" size={15} strokeWidth={2.2} />
+                      Cross-sell pairs · {LEVEL_LABEL[levelOf(plan.has_cross_sell_recommendations)]}
                     </li>
+                    {GROWTH_FEATURES.map((label) => (
+                      <li key={label} className={plan.has_advanced_insights ? styles.featureOn : styles.featureOff}>
+                        <Icon name={plan.has_advanced_insights ? 'check' : 'close'} size={15} strokeWidth={2.2} />
+                        {label}
+                      </li>
+                    ))}
                   </ul>
 
                   {isCommissionPlan && (
@@ -1233,38 +1237,29 @@ export default function SubscriptionsPage() {
             <Field label="Validity (days)">
               <input className={ui.control} type="number" min="1" value={planFormData.validity_days} onChange={(e) => setPlanFormData({ ...planFormData, validity_days: e.target.value })} required />
             </Field>
-            <Field label="WhatsApp campaign limit" hint="Campaigns a salon can send per validity period." className={styles.span2}>
-              <input className={ui.control} type="number" min="0" value={planFormData.whatsapp_campaign_limit} onChange={(e) => setPlanFormData({ ...planFormData, whatsapp_campaign_limit: e.target.value })} required />
-            </Field>
           </div>
 
-          <h4 className={ui.sectionLabel}>Targeting &amp; insights</h4>
-          <div className={styles.checkGrid}>
-            {FEATURE_FLAGS.map((f) => {
-              const on = !!planFormData[f.key];
-              return (
-                <label key={f.key} className={cx(ui.check, on && ui.checkOn)}>
-                  <input type="checkbox" checked={on} onChange={(e) => setPlanFormData({ ...planFormData, [f.key]: e.target.checked })} />
-                  {f.label}
-                </label>
-              );
-            })}
-          </div>
+          <h4 className={ui.sectionLabel}>Insights</h4>
+          <label className={cx(ui.check, planFormData.has_advanced_insights && ui.checkOn, styles.activeToggle)}>
+            <input type="checkbox" checked={planFormData.has_advanced_insights} onChange={(e) => setPlanFormData({ ...planFormData, has_advanced_insights: e.target.checked })} />
+            <span>
+              <b>Growth insights</b>
+              <span className={styles.checkHint}>{GROWTH_FEATURES.join(' · ')}</span>
+            </span>
+          </label>
 
-          <h4 className={ui.sectionLabel}>Recommendations</h4>
+          <h4 className={ui.sectionLabel}>Revenue suggestions</h4>
           <div className={styles.formGrid}>
-            <Field label="Upsell recommendations">
+            <Field label="Upsell tips">
               <select className={ui.control} value={planFormData.has_upsell_recommendations} onChange={(e) => setPlanFormData({ ...planFormData, has_upsell_recommendations: e.target.value })}>
-                <option value="none">None</option>
-                <option value="basic">Basic</option>
-                <option value="advanced">Advanced</option>
+                <option value="basic">Basic (top few)</option>
+                <option value="advanced">Full (all, with rupee figures)</option>
               </select>
             </Field>
-            <Field label="Cross-sell recommendations">
+            <Field label="Cross-sell pairs">
               <select className={ui.control} value={planFormData.has_cross_sell_recommendations} onChange={(e) => setPlanFormData({ ...planFormData, has_cross_sell_recommendations: e.target.value })}>
-                <option value="none">None</option>
-                <option value="basic">Basic</option>
-                <option value="advanced">Advanced</option>
+                <option value="basic">Basic (top few)</option>
+                <option value="advanced">Full (all, with rupee figures)</option>
               </select>
             </Field>
           </div>

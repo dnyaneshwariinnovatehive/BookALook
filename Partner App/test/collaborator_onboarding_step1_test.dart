@@ -49,15 +49,14 @@ void main() {
             'name': 'Starter',
             'price': 1999,
             'validity_days': 30,
-            'whatsapp_campaign_limit': 250,
+            'has_advanced_insights': false,
           },
           {
             'id': 'plan_growth_2',
             'name': 'Growth',
             'price': 2999,
             'validity_days': 30,
-            'whatsapp_campaign_limit': 1000,
-            'has_priority_visibility': true,
+            'has_advanced_insights': true,
           },
         ],
       );
@@ -103,11 +102,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       // Check that plans with formatted details appear in dropdown menu
-      expect(find.text('Starter (₹1999 · 30 days · 250 WA campaigns)'), findsWidgets);
-      expect(find.text('Growth (₹2999 · 30 days · 1000 WA campaigns · Priority visibility)'), findsWidgets);
+      expect(find.text('Starter (₹1999 · 30 days · Basic insights)'), findsWidgets);
+      expect(find.text('Growth (₹2999 · 30 days · Growth insights)'), findsWidgets);
 
       // Select Growth plan
-      await tester.tap(find.text('Growth (₹2999 · 30 days · 1000 WA campaigns · Priority visibility)').last);
+      await tester.tap(find.text('Growth (₹2999 · 30 days · Growth insights)').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 

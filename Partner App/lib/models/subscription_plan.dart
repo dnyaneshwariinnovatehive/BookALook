@@ -131,146 +131,65 @@ class SubscriptionPlan {
     return '$validityDays days';
   }
 
-  /// All 8 configurable features in standardized order.
+  /// Every feature a plan can carry, in the same order for every plan, so two
+  /// plans can be compared line by line. Plans differ only in insights and
+  /// revenue suggestions; bookings, staff, payroll and payouts are the same on
+  /// all of them.
   List<PlanFeature> get allFeatures {
-    final features = <PlanFeature>[];
+    final upsellAdvanced = hasUpsellRecommendations == 'advanced';
+    final crossSellAdvanced = hasCrossSellRecommendations == 'advanced';
+    final growth = hasAdvancedInsights;
 
-    // 1. WhatsApp Campaigns (Campaign limit semantics from CampaignEntitlementService)
-    if (whatsappCampaignLimit != null) {
-      if (whatsappCampaignLimit! > 0) {
-        final formattedLimit = NumberFormat('#,##,###').format(whatsappCampaignLimit);
-        features.add(
-          PlanFeature(
-            key: 'whatsapp_campaign_limit',
-            label: 'WhatsApp Campaigns',
-            description: 'Promotional and automated campaign allowance',
-            icon: Icons.campaign_outlined,
-            isIncluded: true,
-            tierBadge: '$formattedLimit/cycle',
-            formattedValue: '$formattedLimit campaigns per cycle',
-          ),
-        );
-      } else {
-        // Limit is zero: in backend CampaignEntitlementService, 0 indicates unlimited allowance
-        features.add(
-          const PlanFeature(
-            key: 'whatsapp_campaign_limit',
-            label: 'WhatsApp Campaigns',
-            description: 'Uncapped promotional campaign allowance',
-            icon: Icons.campaign_outlined,
-            isIncluded: true,
-            tierBadge: 'Unlimited',
-            formattedValue: 'Unlimited campaigns per cycle',
-          ),
-        );
-      }
-    } else {
-      features.add(
-        const PlanFeature(
-          key: 'whatsapp_campaign_limit',
-          label: 'WhatsApp Campaigns',
-          description: 'Promotional campaigns not included in this tier',
-          icon: Icons.campaign_outlined,
-          isIncluded: false,
-          formattedValue: 'No campaign allowance',
-        ),
-      );
-    }
+    PlanFeature always(String key, String label, String description, IconData icon) =>
+        PlanFeature(key: key, label: label, description: description, icon: icon, isIncluded: true);
 
-    // 2. Client Segmentation
-    features.add(
+    PlanFeature growthOnly(String key, String label, String description, IconData icon) =>
+        PlanFeature(key: key, label: label, description: description, icon: icon, isIncluded: growth);
+
+    return [
+      // Know your salon: every plan.
+      always('overview', 'Business overview', 'Bookings, revenue, customers and repeat rate', Icons.dashboard_outlined),
+      always('revenue_trend', 'Revenue trend', 'The last 30 days, week by week', Icons.show_chart_rounded),
+      always('service_performance', 'Service performance', 'Bookings and revenue for each service', Icons.content_cut_rounded),
+      always('staff_performance', 'Staff performance', 'Bookings and revenue for each provider', Icons.groups_outlined),
+      always('retention', 'Retention summary', 'Who came once, came back, or became a regular', Icons.loop_rounded),
       PlanFeature(
-        key: 'has_customer_segmentation',
-        label: 'Client Segmentation',
-        description: 'Filter clients by visit frequency, spend, and activity',
-        icon: Icons.pie_chart_outline_rounded,
-        isIncluded: hasCustomerSegmentation,
-        formattedValue: hasCustomerSegmentation ? 'Targeted client filtering' : null,
-      ),
-    );
-
-    // 3. Service-Based Targeting
-    features.add(
-      PlanFeature(
-        key: 'has_service_based_targeting',
-        label: 'Service-Based Targeting',
-        description: 'Re-engage clients who booked specific salon treatments',
-        icon: Icons.content_cut_rounded,
-        isIncluded: hasServiceBasedTargeting,
-        formattedValue: hasServiceBasedTargeting ? 'Service-specific targeting' : null,
-      ),
-    );
-
-    // 4. High-Value Client Targeting
-    features.add(
-      PlanFeature(
-        key: 'has_high_value_targeting',
-        label: 'High-Value Client Targeting',
-        description: 'Exclusive offers tailored for top-spending clientele',
-        icon: Icons.auto_awesome_rounded,
-        isIncluded: hasHighValueTargeting,
-        formattedValue: hasHighValueTargeting ? 'VIP client targeting' : null,
-      ),
-    );
-
-    // 5. Advanced Business Insights
-    features.add(
-      PlanFeature(
-        key: 'has_advanced_insights',
-        label: 'Advanced Business Insights',
-        description: 'In-depth revenue trends, popularity, and client retention',
-        icon: Icons.insights_rounded,
-        isIncluded: hasAdvancedInsights,
-        formattedValue: hasAdvancedInsights ? 'Full analytics suite' : null,
-      ),
-    );
-
-    // 6. Upsell Recommendations
-    final hasUpsell = hasUpsellRecommendations != 'none';
-    features.add(
-      PlanFeature(
-        key: 'has_upsell_recommendations',
-        label: 'Upsell Recommendations',
-        description: 'Smart suggestions to upgrade service selections',
+        key: 'upsell',
+        label: 'Upsell tips',
+        description: upsellAdvanced
+            ? 'Every trade-up customers make, with the extra ₹ each brings'
+            : 'The top 2 trade-ups your customers make',
         icon: Icons.trending_up_rounded,
-        isIncluded: hasUpsell,
-        tierBadge: hasUpsell ? (hasUpsellRecommendations == 'advanced' ? 'Advanced' : 'Basic') : null,
-        formattedValue: hasUpsell
-            ? (hasUpsellRecommendations == 'advanced' ? 'Advanced AI upsell suggestions' : 'Basic upsell suggestions')
-            : null,
+        isIncluded: true,
+        tierBadge: upsellAdvanced ? 'Full' : 'Basic',
       ),
-    );
-
-    // 7. Cross-Sell Recommendations
-    final hasCrossSell = hasCrossSellRecommendations != 'none';
-    features.add(
       PlanFeature(
-        key: 'has_cross_sell_recommendations',
-        label: 'Cross-Sell Recommendations',
-        description: 'Recommend complementary services and products',
+        key: 'cross_sell',
+        label: 'Cross-sell pairs',
+        description: crossSellAdvanced
+            ? 'Every pair booked together, with the revenue behind it'
+            : 'The top 3 services booked together',
         icon: Icons.alt_route_rounded,
-        isIncluded: hasCrossSell,
-        tierBadge: hasCrossSell ? (hasCrossSellRecommendations == 'advanced' ? 'Advanced' : 'Basic') : null,
-        formattedValue: hasCrossSell
-            ? (hasCrossSellRecommendations == 'advanced' ? 'Advanced AI service pairings' : 'Basic service pairings')
-            : null,
+        isIncluded: true,
+        tierBadge: crossSellAdvanced ? 'Full' : 'Basic',
       ),
-    );
 
-    // 8. Priority Search Visibility
-    features.add(
-      PlanFeature(
-        key: 'has_priority_visibility',
-        label: 'Priority Search Visibility',
-        description: 'Higher placement in BookALook customer search listings',
-        icon: Icons.verified_rounded,
-        isIncluded: hasPriorityVisibility,
-        tierBadge: hasPriorityVisibility ? 'Premium' : null,
-        formattedValue: hasPriorityVisibility ? 'Boosted discovery ranking' : null,
-      ),
-    );
+      // Grow your revenue: analytics.
+      growthOnly('period', 'Longer history', '30, 90 and 365 days, compared with the period before', Icons.date_range_rounded),
+      growthOnly('peak_hours', 'Peak & quiet hours', 'Busy and empty hours by day of the week', Icons.schedule_rounded),
+      growthOnly('repeat_customers', 'Repeat customers', 'Your regulars, and who has stopped coming', Icons.favorite_border_rounded),
+      growthOnly('areas', 'Customer areas', 'Which neighbourhoods your customers come from', Icons.place_outlined),
+      growthOnly('gender_mix', 'Customer mix', 'Men and women split for each service', Icons.wc_rounded),
+      growthOnly('visit_gap', 'Average bill & visit gap', 'What a visit is worth and how often customers return', Icons.receipt_long_outlined),
+      growthOnly('staff_deep_dive', 'Staff deep-dive', 'Average bill, repeat rate and no-shows per provider', Icons.person_search_outlined),
 
-    return features;
+      // Grow your revenue: suggestions.
+      growthOnly('recommended_combos', 'Recommended combos', 'Ready-made combo ideas, created in one tap', Icons.auto_awesome_rounded),
+      growthOnly('upsell_links', 'Upsell link performance', 'How often your upsell links are added at booking', Icons.link_rounded),
+      growthOnly('quiet_hour_offers', 'Quiet-hour offer ideas', 'Offer ideas to fill your emptiest hours', Icons.lightbulb_outline_rounded),
+      growthOnly('slow_services', 'Slow-service alerts', 'Services losing bookings, with what to do', Icons.trending_down_rounded),
+      growthOnly('win_back', 'Win-back list', 'Regulars who stopped coming, with numbers to call', Icons.phone_callback_outlined),
+    ];
   }
 
   /// Returns only features that are enabled/included in this plan.

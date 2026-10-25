@@ -265,7 +265,16 @@ class SettlementInvoiceTest extends TestCase
         // "Statement", not "Invoice": the document records money already paid
         // to a salon owner, and calling that a bill invites someone to chase it
         // as though it were outstanding.
-        $this->get($url)->assertStatus(200)->assertSee('Settlement Statement', false);
+        $page = $this->get($url)->assertStatus(200)->assertSee('Settlement Statement', false);
+
+        // The city is printed by name, never as the city record's JSON, and the
+        // cycle reads "Monthly settlement", not "Monthlyly settled".
+        $page->assertDontSee('{&quot;id&quot;', false)->assertDontSee('{"id"', false)
+            ->assertDontSee('lyly', false)
+            ->assertSee('Monthly settlement', false);
+        if ($cityName = $salon->city()->value('name')) {
+            $page->assertSee($cityName, false);
+        }
 
         // Someone swapped the id out for another salon's.
         $this->get(str_replace('signature=', 'signature=' . str_repeat('0', 5), $url))
@@ -322,8 +331,11 @@ class SettlementInvoiceTest extends TestCase
             'is_active' => true,
         ]);
 
+        $city = \App\Models\City::create(['name' => "Aurangabad {$unique}", 'state' => 'Maharashtra', 'is_active' => true]);
+
         $salon = Salon::create([
             'admin_id' => $admin->id,
+            'city_id' => $city->id,
             'name' => "Settlement Salon {$unique}",
             'slug' => "settlement-salon-{$unique}",
             'address' => 'Test address',

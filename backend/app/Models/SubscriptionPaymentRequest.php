@@ -38,6 +38,6 @@ class SubscriptionPaymentRequest extends Model
 
     public function plan()
     {
-        return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
+        return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id')->withTrashed();
     }
 }

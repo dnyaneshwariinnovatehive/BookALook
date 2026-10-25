@@ -87,15 +87,15 @@ void main() {
       expect(find.text('Growth Plan'), findsOneWidget);
       expect(find.text('₹2,999'), findsOneWidget);
       expect(find.text(' / 30 days'), findsOneWidget);
-      expect(find.text('INCLUDED FEATURES'), findsOneWidget);
+      expect(find.text('FEATURES · 19 OF 19 INCLUDED'), findsOneWidget);
 
       // Top 3 features are shown initially
-      expect(find.text('WhatsApp Campaigns'), findsOneWidget);
-      expect(find.text('Client Segmentation'), findsOneWidget);
-      expect(find.text('Service-Based Targeting'), findsOneWidget);
+      expect(find.text('Business overview'), findsOneWidget);
+      expect(find.text('Revenue trend'), findsOneWidget);
+      expect(find.text('Service performance'), findsOneWidget);
 
-      // 4th feature is initially hidden under expand
-      expect(find.text('View all 8 features'), findsOneWidget);
+      // The rest are under expand
+      expect(find.text('View all 19 features'), findsOneWidget);
     });
 
     testWidgets('2. Tapping expand button reveals remaining features without invoking onSelect', (tester) async {
@@ -114,22 +114,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "View all 8 features"
-      await tester.tap(find.text('View all 8 features'));
+      await tester.tap(find.text('View all 19 features'));
       await tester.pumpAndSettle();
 
       // Expansion toggle MUST NOT trigger card onSelect
       expect(selectedCalled, isFalse);
 
-      // After expansion, remaining features like "Priority Search Visibility" are visible
-      expect(find.text('Priority Search Visibility'), findsOneWidget);
-      expect(find.text('Advanced Business Insights'), findsOneWidget);
+      // After expansion, the Growth features are visible
+      expect(find.text('Win-back list'), findsOneWidget);
+      expect(find.text('Peak & quiet hours'), findsOneWidget);
       expect(find.text('Show less'), findsOneWidget);
 
       // Collapse back
+      // The expanded list is long; bring the toggle on screen before tapping.
+      await tester.ensureVisible(find.text('Show less'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Show less'));
       await tester.pumpAndSettle();
-      expect(find.text('View all 8 features'), findsOneWidget);
+      expect(find.text('View all 19 features'), findsOneWidget);
       expect(selectedCalled, isFalse);
     });
 
@@ -172,7 +174,7 @@ void main() {
       expect(find.text('CURRENT PLAN'), findsOneWidget);
     });
 
-    testWidgets('5. Displays clean neutral message when plan has no optional features', (tester) async {
+    testWidgets('5. A plan without Growth lists the Growth features as locked', (tester) async {
       final emptyPlan = SubscriptionPlan.fromJson({
         'id': 'basic-empty-1',
         'name': 'Free Baseline',
@@ -193,11 +195,14 @@ void main() {
 
       expect(find.text('Free Baseline Plan'), findsOneWidget);
       expect(find.text('₹0'), findsOneWidget);
-      expect(
-        find.text('Standard salon booking, catalog, staff, and wallet features included.'),
-        findsOneWidget,
-      );
-      expect(find.text('View all features'), findsNothing);
+      expect(find.text('FEATURES · 7 OF 19 INCLUDED'), findsOneWidget);
+
+      await tester.tap(find.text('View all 19 features'));
+      await tester.pumpAndSettle();
+
+      // Locked features show, struck through, so the owner sees what Growth adds.
+      expect(find.text('Win-back list'), findsOneWidget);
+      expect(find.byIcon(Icons.remove_circle_outline_rounded), findsWidgets);
     });
   });
 }

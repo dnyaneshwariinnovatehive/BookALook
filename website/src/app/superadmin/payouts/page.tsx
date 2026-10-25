@@ -339,340 +339,318 @@ export default function PayoutsPage() {
         : status === 'approved'
           ? styles.pillApproved
           : styles.pillPending;
-    return <span className={`${styles.pill} ${cls}`}>{status}</span>;
+    return (
+      <span className={`${styles.status} ${cls}`}>
+        <span className={styles.dot} aria-hidden />
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
   };
+
+  const sortProps = (key: string) => ({
+    active: sort?.key === key,
+    dir: sort?.key === key ? sort.dir : null,
+    onClick: () => onSortColumn(key),
+  });
+
+  const switchCycle = (next: CycleType) => {
+    if (next === cycleType) return;
+    setCycleType(next);
+    // The same date sits in a different cycle depending on the rhythm, so the
+    // anchor moves with it.
+    setCycleStart(startOfCycle(next, new Date(cycleStart)));
+    setPage(1);
+  };
+
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const needsAction = payouts.filter(
+    (p) => p.status !== 'distributed' && (p.status === 'pending' || p.payment_submission?.status === 'pending'),
+  ).length;
+
+  const kpis = totals
+    ? [
+        { label: 'Salons in cycle', value: String(totals.salons), hint: needsAction ? `${needsAction} need action on this page` : 'Nothing waiting on this page', tone: 'neutral' },
+        { label: 'Billed by salons', value: money(totals.appointment_revenue), hint: 'Total of all bookings', tone: 'neutral' },
+        { label: 'Advances held', value: money(totals.advances_held), hint: 'Collected online by BookALook', tone: 'info' },
+        { label: 'Commission earned', value: money(totals.commission_deducted), hint: cycleType === 'monthly' ? 'On app bookings' : 'Not charged on plans', tone: 'success' },
+        { label: 'Still to settle', value: money(totals.net_to_distribute), hint: 'Pending + approved', tone: 'warning' },
+        { label: 'Settled', value: money(totals.distributed), hint: 'Distributed or collected', tone: 'success' },
+      ]
+    : [];
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Payouts &amp; distribution</h1>
-      <p style={{ color: 'var(--text-body)', fontSize: 14, marginTop: -8 }}>
-        {cycleType === 'monthly'
-          ? 'Monthly settlement for salons on the Commission Model, run on the 1st for the month just finished. Commission comes off inside this cycle, and settling extends the salon\u2019s access into the next month.'
-          : 'Weekly settlement for salons on a Subscription Plan. They have already paid for access, so this only hands back the advances the platform collected on their behalf.'}
-      </p>
+      <header className={styles.pageHeader}>
+        <div>
+          <h1 className={styles.title}>Payouts &amp; distribution</h1>
+          <p className={styles.subtitle}>
+            {cycleType === 'monthly'
+              ? 'Commission Model salons, settled on the 1st for the month just finished. Settling extends the salon’s access into the next month.'
+              : 'Subscription Plan salons, settled weekly. They have already paid for access, so this hands back the advances BookALook collected for them.'}
+          </p>
+        </div>
+        <button className={styles.primaryAction} onClick={confirmGenerate} disabled={busyId === 'generate'}>
+          {busyId === 'generate' ? 'Calculating…' : cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}
+        </button>
+      </header>
 
-      <div className={styles.toolbar}>
-        <div className={styles.field}>
-          <label htmlFor="cycle">Settlement run</label>
-          <select
-            id="cycle"
-            value={cycleType}
-            onChange={(e) => {
-              const next = e.target.value as CycleType;
-              setCycleType(next);
-              // The same date sits in a different cycle depending on the
-              // rhythm, so the anchor moves with it.
-              setCycleStart(startOfCycle(next, new Date(cycleStart)));
-              setPage(1);
-            }}
-          >
-            <option value="weekly">Weekly &middot; Subscription Plan</option>
-            <option value="monthly">Monthly &middot; Commission Model</option>
-          </select>
+      <div className={styles.filterBar}>
+        <div className={styles.segmented} role="tablist" aria-label="Settlement run">
+          {(['weekly', 'monthly'] as CycleType[]).map((c) => (
+            <button
+              key={c}
+              role="tab"
+              aria-selected={cycleType === c}
+              className={`${styles.segment} ${cycleType === c ? styles.segmentActive : ''}`}
+              onClick={() => switchCycle(c)}
+            >
+              {c === 'weekly' ? 'Weekly · Subscription' : 'Monthly · Commission'}
+            </button>
+          ))}
         </div>
 
         <div className={styles.field}>
-          <label htmlFor="cycle-start">
-            {cycleType === 'monthly' ? 'Month' : 'Week'}
-          </label>
-          <select
-            id="cycle-start"
-            value={cycleStart}
-            onChange={(e) => { setCycleStart(e.target.value); setPage(1); }}
-          >
-            {getCycleOptions(cycleType).map(opt => (
+          <label htmlFor="cycle-start">{cycleType === 'monthly' ? 'Month' : 'Week'}</label>
+          <select id="cycle-start" value={cycleStart} onChange={(e) => { setCycleStart(e.target.value); setPage(1); }}>
+            {getCycleOptions(cycleType).map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
 
-        <div className={styles.field}>
-          <label htmlFor="status">Status</label>
-          <select
-            id="status"
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          >
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="distributed">Distributed</option>
-          </select>
+        <div className={styles.chips} role="group" aria-label="Status">
+          {[
+            { v: '', l: 'All' },
+            { v: 'pending', l: 'Pending' },
+            { v: 'approved', l: 'Approved' },
+            { v: 'distributed', l: 'Distributed' },
+          ].map((s) => (
+            <button
+              key={s.v || 'all'}
+              className={`${styles.chip} ${statusFilter === s.v ? styles.chipActive : ''}`}
+              aria-pressed={statusFilter === s.v}
+              onClick={() => { setStatusFilter(s.v); setPage(1); }}
+            >
+              {s.l}
+            </button>
+          ))}
         </div>
 
-        <button className={styles.button} onClick={confirmGenerate} disabled={busyId === 'generate'}>
-          {busyId === 'generate'
-            ? 'Calculating…'
-            : cycleType === 'monthly'
-              ? 'Calculate this month'
-              : 'Calculate this week'}
-        </button>
+        {cycleEnd && (
+          <span className={styles.period}>
+            {fmtDate(cycleStart)} – {fmtDate(cycleEnd)}
+          </span>
+        )}
       </div>
 
-      {cycleEnd && (
-        <p style={{ color: 'var(--text-body)', fontSize: 13, marginTop: -8 }}>
-          {cycleLabel} · {cycleStart} → {cycleEnd}
-        </p>
-      )}
-
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
+      {error && <div className={styles.errorBanner} role="alert">{error}</div>}
 
       {totals && (
         <div className={styles.summaryGrid}>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Salons</div>
-            <div className={styles.summaryValue}>{totals.salons}</div>
-          </div>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Billed by salons</div>
-            <div className={styles.summaryValue}>{money(totals.appointment_revenue)}</div>
-          </div>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Advances held</div>
-            <div className={styles.summaryValue}>{money(totals.advances_held)}</div>
-          </div>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Commission earned</div>
-            <div className={styles.summaryValue} style={{ color: 'var(--color-success)' }}>
-              {money(totals.commission_deducted)}
+          {kpis.map((k) => (
+            <div key={k.label} className={`${styles.summaryTile} ${styles[`tone_${k.tone}`]}`}>
+              <div className={styles.summaryLabel}>{k.label}</div>
+              <div className={styles.summaryValue}>{k.value}</div>
+              <div className={styles.summaryHint}>{k.hint}</div>
             </div>
-          </div>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Still to distribute</div>
-            <div className={styles.summaryValue}>{money(totals.net_to_distribute)}</div>
-          </div>
-          <div className={styles.summaryTile}>
-            <div className={styles.summaryLabel}>Distributed</div>
-            <div className={styles.summaryValue} style={{ color: 'var(--color-success)' }}>
-              {money(totals.distributed)}
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : payouts.length === 0 ? (
-        <div className={styles.card}>
-          No {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts
-          for this cycle yet — built from completed appointments as soon as the
-          cycle has data.
+      <section className={styles.tableCard}>
+        <div className={styles.tableHead}>
+          <div>
+            <h2 className={styles.tableTitle}>Salon settlements</h2>
+            <p className={styles.tableSub}>{cycleLabel || selectedCycleLabel()} · {meta.total} payout{meta.total === 1 ? '' : 's'}</p>
+          </div>
         </div>
-      ) : (
-        <div className={styles.tableScroll}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <SortHeader label="Salon" active={sort?.key === 'salon'} dir={sort?.key === 'salon' ? sort.dir : null} onClick={() => onSortColumn('salon')} />
-              <th>Billing</th>
-              <SortHeader label="Appts" align="right" active={sort?.key === 'appointments_count'} dir={sort?.key === 'appointments_count' ? sort.dir : null} onClick={() => onSortColumn('appointments_count')} />
-              <SortHeader label="Billed" align="right" active={sort?.key === 'appointment_revenue'} dir={sort?.key === 'appointment_revenue' ? sort.dir : null} onClick={() => onSortColumn('appointment_revenue')} />
-              <SortHeader label="Advances held" align="right" active={sort?.key === 'gross_amount'} dir={sort?.key === 'gross_amount' ? sort.dir : null} onClick={() => onSortColumn('gross_amount')} />
-              <SortHeader label="Commission earned" align="right" active={sort?.key === 'commission_deducted'} dir={sort?.key === 'commission_deducted' ? sort.dir : null} onClick={() => onSortColumn('commission_deducted')} />
-              <th>Adjustments</th>
-              <SortHeader label="Net payable" align="right" active={sort?.key === 'net_amount'} dir={sort?.key === 'net_amount' ? sort.dir : null} onClick={() => onSortColumn('net_amount')} />
-              <SortHeader label="Status" active={sort?.key === 'status'} dir={sort?.key === 'status' ? sort.dir : null} onClick={() => onSortColumn('status')} />
-              <th style={{ textAlign: 'right' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payouts.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <strong>{p.salon_name ?? '—'}</strong>
-                  {p.distribution_reference && (
-                    <>
-                      <br />
-                      <small style={{ color: 'var(--text-body)' }}>ref {p.distribution_reference}</small>
-                    </>
-                  )}
-                  {/* The statement is the document the owner is given when the
-                      money lands, so it is surfaced here too — SuperAdmin is
-                      who answers when an owner queries the commission figure
-                      weeks later, and hunting for the number then is how a
-                      dispute goes unresolved. */}
-                  {p.settlement_invoice && (
-                    <>
-                      <br />
-                      <a
-                        className={styles.statementLink}
-                        href={p.settlement_invoice.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {p.settlement_invoice.number}
-                      </a>
-                    </>
-                  )}
-                </td>
-                <td>
-                  <span
-                    className={`${styles.pill} ${
-                      p.billing_type === 'commission' ? styles.pillCommission : styles.pillSubscription
-                    }`}
-                  >
-                    {p.billing_label}
-                  </span>
-                </td>
-                <td>{p.appointments_count}</td>
-                <td>{money(p.appointment_revenue)}</td>
-                <td>{money(p.gross_amount)}</td>
-                <td className={p.commission_deducted > 0 ? styles.earned : undefined}>
-                  {p.commission_deducted > 0 ? `+ ${money(p.commission_deducted)}` : '—'}
-                  {p.commission_percentage > 0 && (
-                    <>
-                      <br />
-                      <small style={{ color: 'var(--text-body)' }}>at {p.commission_percentage}%</small>
-                    </>
-                  )}
-                </td>
-                <td>
-                  {p.refund_adjustment > 0 && (
-                    <div className={styles.deduction}>− {money(p.refund_adjustment)} refunds</div>
-                  )}
-                  {p.wallet_redeemed_amount > 0 && (
-                    <div style={{ color: 'var(--color-success)' }}>
-                      + {money(p.wallet_redeemed_amount)} coins
-                    </div>
-                  )}
-                  {p.refund_adjustment === 0 && p.wallet_redeemed_amount === 0 && '—'}
-                </td>
-                <td className={styles.net}>
-                  {p.direction === 'salon_owes' ? (
-                    <span style={{ color: 'var(--color-danger)' }} title="Commission exceeded the advances held; the salon pays this by QR.">
-                      Salon owes {money(p.amount_due ?? Math.abs(p.net_amount))}
-                      {p.payment_submission?.status === 'pending' && p.status !== 'distributed' && (
-                        <small style={{ display: 'block', color: 'var(--color-warning, #b45309)' }}>Payment to verify</small>
-                      )}
-                      {p.payment_submission?.status === 'rejected' && p.status !== 'distributed' && (
-                        <small style={{ display: 'block', color: 'var(--text-body)' }}>Last payment declined</small>
-                      )}
-                    </span>
-                  ) : (
-                    money(p.net_amount)
-                  )}
-                </td>
-                <td>{statusPill(p.status)}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <div className={styles.rowActions} style={{ justifyContent: 'flex-end' }}>
-                    {p.status === 'pending' && (
-                      <button
-                        className={styles.smallButton}
-                        disabled={busyId === p.id}
-                        onClick={() => confirmApprove(p)}
-                      >
-                        Approve
-                      </button>
-                    )}
-                    {p.status !== 'distributed' && p.payment_submission?.status === 'pending' && (
-                      <button
-                        className={`${styles.smallButton} ${styles.payButton}`}
-                        disabled={busyId === p.id}
-                        onClick={() => { setReviewTarget(p); setRejectReason(''); }}
-                      >
-                        Review payment
-                      </button>
-                    )}
-                    {p.status !== 'distributed' && p.payment_submission?.status !== 'pending' && (
-                      <button
-                        className={`${styles.smallButton} ${styles.payButton}`}
-                        disabled={busyId === p.id}
-                        onClick={() => confirmDistribute(p)}
-                      >
-                        {p.direction === 'salon_owes' ? 'Mark collected' : 'Distribute'}
-                      </button>
-                    )}
-                    {p.status === 'distributed' && (
-                      <>
-                        <small style={{ color: 'var(--text-body)', display: 'block' }}>
-                          {p.distributed_at ? new Date(p.distributed_at).toLocaleDateString() : 'done'}
-                        </small>
-                        {p.settlement_invoice && (
-                          <a
-                            className={styles.smallButton}
-                            href={p.settlement_invoice.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ marginTop: 6 }}
-                          >
-                            Statement
-                          </a>
+
+        {isLoading ? (
+          <div className={styles.skeletonList}>
+            {[0, 1, 2, 3].map((i) => <div key={i} className={styles.skeletonRow} />)}
+          </div>
+        ) : payouts.length === 0 ? (
+          <div className={styles.empty}>
+            <div className={styles.emptyTitle}>No payouts for this cycle yet</div>
+            <p>
+              {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts appear here once the cycle has
+              bookings. Press “{cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}” to build them.
+            </p>
+          </div>
+        ) : (
+          <div className={styles.tableScroll}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <SortHeader label="Salon" {...sortProps('salon')} />
+                  <SortHeader label="Appts" align="right" {...sortProps('appointments_count')} />
+                  <SortHeader label="Billed" align="right" {...sortProps('appointment_revenue')} />
+                  <SortHeader label="Advances held" align="right" {...sortProps('gross_amount')} />
+                  <SortHeader label="Commission" align="right" {...sortProps('commission_deducted')} />
+                  <th className={styles.num}>Adjustments</th>
+                  <SortHeader label="Net" align="right" {...sortProps('net_amount')} />
+                  <SortHeader label="Status" {...sortProps('status')} />
+                  <th className={styles.actionsCol}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payouts.map((p) => {
+                  const owes = p.direction === 'salon_owes';
+                  const open = p.status !== 'distributed';
+                  const paymentPending = open && p.payment_submission?.status === 'pending';
+                  const paymentDeclined = open && p.payment_submission?.status === 'rejected';
+                  return (
+                    <tr key={p.id} className={paymentPending ? styles.rowAttention : undefined}>
+                      <td>
+                        <div className={styles.salonName}>{p.salon_name ?? '—'}</div>
+                        <div className={styles.salonMeta}>
+                          <span className={`${styles.pill} ${p.billing_type === 'commission' ? styles.pillCommission : styles.pillSubscription}`}>
+                            {p.billing_label}
+                          </span>
+                          {/* The statement is what the owner is handed when the money
+                              moves; SuperAdmin answers their queries weeks later, so
+                              the number stays one click away. */}
+                          {p.settlement_invoice && (
+                            <a className={styles.statementLink} href={p.settlement_invoice.url} target="_blank" rel="noreferrer">
+                              {p.settlement_invoice.number}
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className={styles.num}>{p.appointments_count}</td>
+                      <td className={styles.num}>{money(p.appointment_revenue)}</td>
+                      <td className={styles.num}>{money(p.gross_amount)}</td>
+                      <td className={styles.num}>
+                        {p.commission_deducted > 0 ? (
+                          <>
+                            <span className={styles.earned}>{money(p.commission_deducted)}</span>
+                            <div className={styles.cellSub}>at {p.commission_percentage}%</div>
+                          </>
+                        ) : (
+                          <span className={styles.muted}>—</span>
                         )}
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+                      </td>
+                      <td className={styles.num}>
+                        {p.refund_adjustment > 0 && <div className={styles.deduction}>− {money(p.refund_adjustment)}<span className={styles.cellSub}> refunds</span></div>}
+                        {p.wallet_redeemed_amount > 0 && <div className={styles.earned}>+ {money(p.wallet_redeemed_amount)}<span className={styles.cellSub}> coins</span></div>}
+                        {p.refund_adjustment === 0 && p.wallet_redeemed_amount === 0 && <span className={styles.muted}>—</span>}
+                      </td>
+                      <td className={styles.num}>
+                        {owes ? (
+                          <span title="Commission exceeded the advances held; the salon pays this by QR.">
+                            <span className={styles.owes}>{money(p.amount_due ?? Math.abs(p.net_amount))}</span>
+                            <div className={styles.cellSub}>salon owes</div>
+                          </span>
+                        ) : (
+                          <span className={styles.net}>{money(p.net_amount)}</span>
+                        )}
+                      </td>
+                      <td>
+                        {statusPill(p.status)}
+                        {paymentPending && <div className={styles.flagWarn}>Payment to verify</div>}
+                        {paymentDeclined && <div className={styles.flagMuted}>Last payment declined</div>}
+                      </td>
+                      <td className={styles.actionsCol}>
+                        <div className={styles.rowActions}>
+                          {p.status === 'pending' && (
+                            <button className={styles.btnGhost} disabled={busyId === p.id} onClick={() => confirmApprove(p)}>
+                              Approve
+                            </button>
+                          )}
+                          {paymentPending && (
+                            <button className={styles.btnPrimary} disabled={busyId === p.id} onClick={() => { setReviewTarget(p); setRejectReason(''); }}>
+                              Review payment
+                            </button>
+                          )}
+                          {open && !paymentPending && (
+                            <button className={styles.btnSuccess} disabled={busyId === p.id} onClick={() => confirmDistribute(p)}>
+                              {owes ? 'Mark collected' : 'Distribute'}
+                            </button>
+                          )}
+                          {!open && (
+                            <>
+                              <span className={styles.doneMeta}>
+                                {p.distributed_at ? fmtDate(p.distributed_at) : 'Done'}
+                                {p.distribution_reference && <span className={styles.cellSub}>Ref {p.distribution_reference}</span>}
+                              </span>
+                              {p.settlement_invoice && (
+                                <a className={styles.btnGhost} href={p.settlement_invoice.url} target="_blank" rel="noreferrer">
+                                  Statement
+                                </a>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {payouts.length > 0 && (
-        <div className={styles.pager}>
-          <Pagination
-            page={meta.current_page}
-            lastPage={meta.last_page}
-            total={meta.total}
-            noun="payouts"
-            onChange={setPage}
-            perPage={perPage}
-            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
-            disabled={isLoading}
-          />
-        </div>
-      )}
-    
+        {payouts.length > 0 && (
+          <div className={styles.pager}>
+            <Pagination
+              page={meta.current_page}
+              lastPage={meta.last_page}
+              total={meta.total}
+              noun="payouts"
+              onChange={setPage}
+              perPage={perPage}
+              onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+              disabled={isLoading}
+            />
+          </div>
+        )}
+      </section>
+
       {distributeTarget && (
         <div className={styles.modalOverlay} onClick={() => setDistributeTarget(null)}>
-          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>
-              {distributeTarget.direction === 'salon_owes' ? 'Record payment received' : 'Distribute Payout'}
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2 className={styles.modalTitle}>
+              {distributeTarget.direction === 'salon_owes' ? 'Record payment received' : 'Distribute payout'}
             </h2>
-            <p style={{ color: 'var(--text-strong)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>
-              {distributeTarget.direction === 'salon_owes' ? (
-                <>
-                  Confirm you have received <strong>{money(distributeTarget.amount_due ?? Math.abs(distributeTarget.net_amount))}</strong> from <strong>{distributeTarget.salon_name}</strong>.<br/><br/>
-                  Their {money(distributeTarget.commission_deducted)} commission was more than the {money(distributeTarget.gross_amount)} of advances BookALook held, so they pay the difference.
-                </>
-              ) : (
-                <>
-                  Distribute <strong>{money(distributeTarget.net_amount)}</strong> to <strong>{distributeTarget.salon_name}</strong>?<br/><br/>
-                  {money(distributeTarget.commission_deducted)} commission is earned in this cycle.
-                </>
-              )}
-              {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}<br/><br/>
-              <em>This cannot be undone.</em>
+            <div className={styles.modalAmount}>
+              <span>{distributeTarget.salon_name}</span>
+              <strong>
+                {money(distributeTarget.direction === 'salon_owes'
+                  ? (distributeTarget.amount_due ?? Math.abs(distributeTarget.net_amount))
+                  : distributeTarget.net_amount)}
+              </strong>
+            </div>
+            <p className={styles.modalText}>
+              {distributeTarget.direction === 'salon_owes'
+                ? `Their ${money(distributeTarget.commission_deducted)} commission was more than the ${money(distributeTarget.gross_amount)} of advances BookALook held, so they pay the difference. Confirm you have received it.`
+                : `${money(distributeTarget.commission_deducted)} commission is earned in this cycle.`}
+              {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}
             </p>
+            <p className={styles.modalWarn}>This cannot be undone.</p>
             <div className={styles.formGroup}>
               <label htmlFor="ref">
-                {distributeTarget.direction === 'salon_owes' ? 'UPI / bank reference of the payment received (required)' : 'Payment Reference (optional)'}
+                {distributeTarget.direction === 'salon_owes' ? 'UPI / bank reference of the payment received (required)' : 'Payment reference (optional)'}
               </label>
               <input
                 id="ref"
                 type="text"
                 placeholder="e.g. NEFT / UTR number"
                 value={distributeReference}
-                onChange={e => setDistributeReference(e.target.value)}
-                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)', width: '100%', fontSize: '0.95rem' }}
+                onChange={(e) => setDistributeReference(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-              <button 
-                onClick={() => setDistributeTarget(null)}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-strong)', cursor: 'pointer', fontWeight: 500 }}
-              >
-                Cancel
-              </button>
-              <button 
+            <div className={styles.modalActions}>
+              <button className={styles.btnGhost} onClick={() => setDistributeTarget(null)}>Cancel</button>
+              <button
+                className={styles.btnSuccessSolid}
                 onClick={() => act(distributeTarget, 'distribute', distributeReference)}
                 disabled={busyId === distributeTarget.id || (distributeTarget.direction === 'salon_owes' && !distributeReference.trim())}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-danger-solid)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
               >
                 {busyId === distributeTarget.id
-                  ? 'Confirming...'
-                  : distributeTarget.direction === 'salon_owes' ? 'Mark collected' : 'Confirm Distribution'}
+                  ? 'Confirming…'
+                  : distributeTarget.direction === 'salon_owes' ? 'Mark collected' : 'Confirm distribution'}
               </button>
             </div>
           </div>
@@ -681,28 +659,25 @@ export default function PayoutsPage() {
 
       {reviewTarget && reviewTarget.payment_submission && (
         <div className={styles.modalOverlay} onClick={() => setReviewTarget(null)}>
-          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '12px' }}>Verify payment</h2>
-            <p style={{ color: 'var(--text-strong)', fontSize: '0.95rem', marginBottom: '12px', lineHeight: 1.5 }}>
-              <strong>{reviewTarget.salon_name}</strong> says it paid{' '}
-              <strong>{money(reviewTarget.payment_submission.amount)}</strong> for {reviewTarget.cycle_label}.
-              Check the screenshot against your bank before approving.
-            </p>
+          <div className={`${styles.modalContent} ${styles.modalWide}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2 className={styles.modalTitle}>Verify payment</h2>
+            <div className={styles.modalAmount}>
+              <span>{reviewTarget.salon_name} · {reviewTarget.cycle_label}</span>
+              <strong>{money(reviewTarget.payment_submission.amount)}</strong>
+            </div>
+            <p className={styles.modalText}>Check the screenshot against your bank statement before approving.</p>
             <a href={reviewTarget.payment_submission.screenshot_url} target="_blank" rel="noreferrer">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={reviewTarget.payment_submission.screenshot_url}
-                alt="Payment screenshot"
-                style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--surface-color)' }}
-              />
+              <img className={styles.screenshot} src={reviewTarget.payment_submission.screenshot_url} alt="Payment screenshot" />
             </a>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-body)', margin: '12px 0', lineHeight: 1.6 }}>
-              <div>UTR / reference: <strong>{reviewTarget.payment_submission.transaction_id || '—'}</strong></div>
-              {reviewTarget.payment_submission.note && <div>Note: {reviewTarget.payment_submission.note}</div>}
+            <dl className={styles.details}>
+              <dt>UTR / reference</dt>
+              <dd>{reviewTarget.payment_submission.transaction_id || '—'}</dd>
+              {reviewTarget.payment_submission.note && (<><dt>Note</dt><dd>{reviewTarget.payment_submission.note}</dd></>)}
               {reviewTarget.payment_submission.submitted_at && (
-                <div>Sent {new Date(reviewTarget.payment_submission.submitted_at).toLocaleString()}</div>
+                <><dt>Sent</dt><dd>{new Date(reviewTarget.payment_submission.submitted_at).toLocaleString('en-IN')}</dd></>
               )}
-            </div>
+            </dl>
             <div className={styles.formGroup}>
               <label htmlFor="reject-reason">If declining, tell the salon why (they pay the full amount again)</label>
               <input
@@ -710,23 +685,18 @@ export default function PayoutsPage() {
                 type="text"
                 placeholder="e.g. Received ₹500 of ₹800"
                 value={rejectReason}
-                onChange={e => setRejectReason(e.target.value)}
-                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)', width: '100%', fontSize: '0.95rem' }}
+                onChange={(e) => setRejectReason(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
+            <div className={styles.modalActions}>
               <button
+                className={styles.btnDanger}
                 onClick={() => reviewPayment('reject')}
                 disabled={busyId === reviewTarget.id || rejectReason.trim().length < 3}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--color-danger)', cursor: 'pointer', fontWeight: 500 }}
               >
                 Decline
               </button>
-              <button
-                onClick={() => reviewPayment('approve')}
-                disabled={busyId === reviewTarget.id}
-                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-success-solid, #16a34a)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
-              >
+              <button className={styles.btnSuccessSolid} onClick={() => reviewPayment('approve')} disabled={busyId === reviewTarget.id}>
                 {busyId === reviewTarget.id ? 'Saving…' : 'Approve & mark paid'}
               </button>
             </div>

@@ -27,7 +27,7 @@ class SendAutomatedMessages extends Command
      *
      * @var string
      */
-    protected $description = 'Send 25-days reminders and birthday messages for salons that have them enabled';
+    protected $description = 'Send 25-day reminders and birthday messages, when SuperAdmin has switched them on';
 
     /**
      * Execute the console command.
@@ -120,9 +120,10 @@ class SendAutomatedMessages extends Command
         $day = $today->format('d');
         $year = $today->year;
         
-        // Find all customers whose birthday is today
-        $birthdayUsers = User::whereMonth('dob', $month)
-            ->whereDay('dob', $day)
+        // Find all customers whose birthday is today. The column is
+        // date_of_birth; there is no 'dob'.
+        $birthdayUsers = User::whereMonth('date_of_birth', $month)
+            ->whereDay('date_of_birth', $day)
             ->where('role', 'customer')
             ->get();
             

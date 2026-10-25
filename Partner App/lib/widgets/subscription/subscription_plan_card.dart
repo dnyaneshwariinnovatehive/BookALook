@@ -37,7 +37,8 @@ class _SubscriptionPlanCardState extends State<SubscriptionPlanCard> {
     final isSelected = widget.isSelected;
     final isCurrentPlan = widget.isCurrentPlan;
 
-    final included = plan.includedFeatures;
+    // Every feature, included or not, so plans can be compared side by side.
+    final included = plan.allFeatures;
     final hasMoreFeatures = included.length > widget.previewFeatureCount;
     final previewFeatures = hasMoreFeatures
         ? included.take(widget.previewFeatureCount).toList()
@@ -181,7 +182,7 @@ class _SubscriptionPlanCardState extends State<SubscriptionPlanCard> {
 
             // Section label
             Text(
-              'INCLUDED FEATURES',
+              'FEATURES · ${plan.includedFeatures.length} OF ${included.length} INCLUDED',
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -211,7 +212,7 @@ class _SubscriptionPlanCardState extends State<SubscriptionPlanCard> {
               )
             else ...[
               // Preview features (always visible)
-              ...previewFeatures.map((f) => PlanFeatureItem(feature: f)),
+              ...previewFeatures.map((f) => PlanFeatureItem(feature: f, showExcludedState: true)),
 
               // Collapsible extra features
               if (hasMoreFeatures)
@@ -219,7 +220,7 @@ class _SubscriptionPlanCardState extends State<SubscriptionPlanCard> {
                   firstChild: const SizedBox.shrink(),
                   secondChild: Column(
                     children: remainingFeatures
-                        .map((f) => PlanFeatureItem(feature: f))
+                        .map((f) => PlanFeatureItem(feature: f, showExcludedState: true))
                         .toList(),
                   ),
                   crossFadeState: _isExpanded
