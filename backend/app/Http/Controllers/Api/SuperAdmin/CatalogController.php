@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CatalogController extends Controller
 {
@@ -149,7 +150,11 @@ class CatalogController extends Controller
     public function storeTemplate(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'category_id' => 'required|uuid',
+            'category_id' => [
+                'required',
+                'uuid',
+                Rule::exists('service_categories', 'id')->whereNull('deleted_at'),
+            ],
             'name' => 'required|string|max:150',
             'estimated_duration_minutes' => 'required|integer|min:30|multiple_of:30',
             'is_active' => 'boolean',
@@ -225,12 +230,19 @@ class CatalogController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $category->update([
+        $changes = [
             'name' => $request->name,
-            'icon_url' => $request->icon_url,
             'is_active' => $request->input('is_active', $category->is_active),
             'display_order' => $request->input('display_order', $category->display_order),
-        ]);
+        ];
+
+        // Only a request that names the icon changes it. Sending null clears
+        // it on purpose; leaving the key out keeps whatever is there.
+        if ($request->exists('icon_url')) {
+            $changes['icon_url'] = $request->icon_url;
+        }
+
+        $category->update($changes);
 
         return response()->json([
             'message' => 'Category updated successfully',
@@ -238,28 +250,8 @@ class CatalogController extends Controller
         ]);
     }
 
-    /**
-     * Ensure the authenticated user has superadmin or admin privileges.
-     */
-    private function authorizeSuperAdmin(Request $request): ?JsonResponse
-    {
-        $user = $request->user();
-
-        if (! $user || ! in_array($user->role, ['superadmin', 'admin'], true)) {
-            return response()->json([
-                'message' => 'Unauthorized. Super Admin access required.',
-            ], 403);
-        }
-
-        return null;
-    }
-
     public function deleteCategory($id, Request $request)
     {
-        if ($authError = $this->authorizeSuperAdmin($request)) {
-            return $authError;
-        }
-
         $category = ServiceCategory::with('templates')->find($id);
 
         if (! $category) {
@@ -340,10 +332,6 @@ class CatalogController extends Controller
 
     public function deleteTemplate($id, Request $request)
     {
-        if ($authError = $this->authorizeSuperAdmin($request)) {
-            return $authError;
-        }
-
         $template = ServiceTemplate::find($id);
 
         if (! $template) {

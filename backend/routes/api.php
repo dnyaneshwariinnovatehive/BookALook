@@ -255,17 +255,21 @@ Route::prefix('superadmin')->group(function () {
         Route::put('/sub-areas/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'update']);
         Route::delete('/sub-areas/{id}', [\App\Http\Controllers\Api\SuperAdmin\SubAreaController::class, 'destroy']);
 
-        // Catalog Management
-        Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
-        Route::post('/catalog/categories/upload-icon', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'uploadIcon']);
-        Route::post('/catalog/categories', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeCategory']);
-        Route::post('/catalog/templates', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeTemplate']);
-        Route::put('/catalog/categories/{id}/promote', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'promoteCategory']);
-        Route::put('/catalog/templates/{id}/promote', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'promoteTemplate']);
-        Route::put('/catalog/categories/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'updateCategory']);
-        Route::delete('/catalog/categories/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteCategory']);
-        Route::put('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'updateTemplate']);
-        Route::delete('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteTemplate']);
+        // Catalog Management. The master catalog is every salon's, so only the
+        // platform owner may touch it. A salon owner removes a service from
+        // their own salon through /partner/salons/{salon_id}/services instead.
+        Route::middleware('superadmin')->group(function () {
+            Route::get('/catalog', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'index']);
+            Route::post('/catalog/categories/upload-icon', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'uploadIcon']);
+            Route::post('/catalog/categories', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeCategory']);
+            Route::post('/catalog/templates', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'storeTemplate']);
+            Route::put('/catalog/categories/{id}/promote', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'promoteCategory']);
+            Route::put('/catalog/templates/{id}/promote', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'promoteTemplate']);
+            Route::put('/catalog/categories/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'updateCategory']);
+            Route::delete('/catalog/categories/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteCategory']);
+            Route::put('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'updateTemplate']);
+            Route::delete('/catalog/templates/{id}', [\App\Http\Controllers\Api\SuperAdmin\CatalogController::class, 'deleteTemplate']);
+        });
         
         // Appointments
         Route::get('/appointments', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'index']);
