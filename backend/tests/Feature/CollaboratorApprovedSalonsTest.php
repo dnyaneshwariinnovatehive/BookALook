@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\City;
 use App\Models\Salon;
 use App\Models\SalonEnquiry;
+use App\Models\SalonSubscription;
+use App\Models\SubscriptionPlan;
 use App\Models\SubArea;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -335,6 +337,56 @@ class CollaboratorApprovedSalonsTest extends TestCase
         $res2 = $this->getJson('/api/partner/collaborator/assigned-salons');
         $res2->assertStatus(200)
             ->assertJson(['success' => true, 'data' => []]);
+    }
+
+    public function test_onboarded_and_approved_salons_load_latest_subscription_safely(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'name' => 'Pro Plan',
+            'price' => 1999,
+            'duration_days' => 30,
+            'is_active' => true,
+        ]);
+
+        $salon = $this->createSalon([
+            'name' => 'Subscription Test Salon',
+            'submitted_by' => $this->collaborator1->id,
+            'status' => 'active',
+            'approved_at' => now(),
+        ]);
+
+        // Prior expired subscription
+        SalonSubscription::create([
+            'salon_id' => $salon->id,
+            'plan_id' => $plan->id,
+            'start_date' => now()->subMonths(2),
+            'end_date' => now()->subMonth(),
+            'status' => 'expired',
+        ]);
+
+        // Current active subscription
+        SalonSubscription::create([
+            'salon_id' => $salon->id,
+            'plan_id' => $plan->id,
+            'start_date' => now()->subDays(5),
+            'end_date' => now()->addDays(25),
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($this->collaborator1);
+
+        $onboardedRes = $this->getJson('/api/partner/collaborator/onboarded-salons');
+        $onboardedRes->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $approvedRes = $this->getJson('/api/partner/collaborator/approved-salons');
+        $approvedRes->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertEquals('Pro Plan', $approvedRes->json('data.0.plan_name'));
+        $this->assertFalse($approvedRes->json('data.0.lapsed'));
+        $this->assertFalse($approvedRes->json('data.0.needs_plan'));
+        $this->assertNotNull($approvedRes->json('data.0.days_left'));
     }
 }
 

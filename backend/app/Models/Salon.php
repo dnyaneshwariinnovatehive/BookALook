@@ -155,7 +155,7 @@ class Salon extends Model
      */
     public function latestSubscription()
     {
-        return $this->hasOne(SalonSubscription::class)->latestOfMany('start_date');
+        return $this->hasOne(SalonSubscription::class)->latest('start_date');
     }
 
     public function commissionRates()
