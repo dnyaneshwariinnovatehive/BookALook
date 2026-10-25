@@ -334,7 +334,10 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
     String customerName = isWalkIn ? (apt['walk_in_customer_name'] ?? 'Walk-In') : (apt['customer']?['name'] ?? 'Unknown');
     
     List services = apt['services'] ?? [];
-    String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
+    // The name lives on the service's template; `service.name` is never sent.
+    String serviceNames = services
+        .map((s) => s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service')
+        .join(' + ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
     
     int duration = services.fold(0, (sum, s) => sum + (int.tryParse(s['duration_minutes_at_booking']?.toString() ?? '') ?? 0));
@@ -385,13 +388,34 @@ class ProviderDashboardScreenState extends State<ProviderDashboardScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Time Section
-              SizedBox(
-                width: 50,
+              // Time block: one line for the time, the AM/PM under it. It was
+              // 50px wide, so "10:30" in 18pt wrapped into "10:" / "30".
+              Container(
+                key: const ValueKey('schedule_card_time'),
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(timeNumber, style: GoogleFonts.outfit(color: statusColor, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(timeMeridiem, style: GoogleFonts.outfit(color: const Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.bold)),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        timeNumber,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: GoogleFonts.outfit(color: statusColor, fontSize: 18, fontWeight: FontWeight.w800, height: 1.1),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      timeMeridiem,
+                      maxLines: 1,
+                      style: GoogleFonts.outfit(color: statusColor.withOpacity(0.75), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                    ),
                   ],
                 ),
               ),

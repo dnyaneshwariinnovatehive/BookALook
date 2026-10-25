@@ -45,6 +45,49 @@ class ProfileService {
     return {};
   }
 
+  /// Sends an OTP to [phone], the number the customer wants to move to.
+  /// Returns what to show them; throws with the server's reason otherwise.
+  Future<String> sendPhoneChangeOtp(String phone) async {
+    final body = await _postPhone('$baseUrl/customer/profile/phone/send-otp', {'phone': phone});
+    return body['message']?.toString() ?? 'OTP sent.';
+  }
+
+  /// Confirms the OTP and moves the account to [phone]. Returns the number
+  /// as saved.
+  Future<String> confirmPhoneChange(String phone, String otp) async {
+    final body = await _postPhone('$baseUrl/customer/profile/phone/verify', {'phone': phone, 'otp': otp});
+    return body['user']?['phone']?.toString() ?? phone;
+  }
+
+  Future<Map<String, dynamic>> _postPhone(String url, Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(data),
+    );
+
+    final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
+    final body = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    if (response.statusCode == 200) return body;
+
+    if (response.statusCode == 429) {
+      throw Exception('Too many tries. Wait a minute and try again.');
+    }
+    final errors = body['errors'];
+    if (errors is Map && errors.isNotEmpty) {
+      final first = errors.values.first;
+      throw Exception(first is List && first.isNotEmpty ? first.first.toString() : first.toString());
+    }
+    throw Exception(body['message']?.toString() ?? 'Something went wrong. Try again.');
+  }
+
   Future<void> updateNotificationPreferences(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

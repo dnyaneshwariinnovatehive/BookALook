@@ -208,9 +208,17 @@
                     <td class="right">&minus; {{ $currency($invoice->commission_deducted) }}</td>
                 </tr>
             @endif
+            {{-- Negative when the salon's commission was more than the advances
+                 held: then it is the salon that paid BookALook, and the statement
+                 says so in words rather than as a minus sign. --}}
             <tr class="net">
-                <td>{{ $invoice->paid_at ? 'Paid to you' : 'Net payable' }}</td>
-                <td class="right">{{ $currency($invoice->net_amount) }}</td>
+                @if ((float) $invoice->net_amount < 0)
+                    <td>{{ $invoice->paid_at ? 'Paid by you to BookALook' : 'You owe BookALook' }}</td>
+                    <td class="right">{{ $currency(abs((float) $invoice->net_amount)) }}</td>
+                @else
+                    <td>{{ $invoice->paid_at ? 'Paid to you' : 'Net payable' }}</td>
+                    <td class="right">{{ $currency($invoice->net_amount) }}</td>
+                @endif
             </tr>
         </table>
     </div>

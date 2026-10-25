@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/check_in_api.dart';
 import '../utils/time_fmt.dart';
 import '../utils/booked_for.dart';
+import '../utils/feature_flags.dart';
 import '../widgets/initials_avatar.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
@@ -435,7 +436,7 @@ class _ProviderAppointmentDetailsScreenState extends State<ProviderAppointmentDe
                   children: [
                     // The customer cannot always show a code — a dead phone
                     // should not stop the salon working.
-                    if (isScheduled)
+                    if (isScheduled && kShowManualCheckIn)
                       TextButton.icon(
                         onPressed: _isProcessing ? null : () => _startSession(scan: false),
                         icon: const Icon(Icons.play_circle_outline, size: 18),

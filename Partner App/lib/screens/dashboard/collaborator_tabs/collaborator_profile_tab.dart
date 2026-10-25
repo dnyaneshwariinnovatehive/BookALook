@@ -7,7 +7,8 @@ import '../../../services/collaborator_api.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../phone_screen.dart';
-import 'edit_collaborator_profile_sheet.dart';
+import 'edit_collaborator_profile_sheet.dart';
+import '../../change_phone_screen.dart';
 import '../../../services/push_notification_service.dart';
 import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
@@ -411,6 +412,15 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
             'Phone',
             _profile!['phone']?.toString(),
             note: 'Used to sign in',
+            trailing: TextButton(
+              key: const ValueKey('collaborator_change_phone'),
+              onPressed: _changePhone,
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accentColor,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Change', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            ),
           ),
           _row(Icons.alternate_email, 'Email', _profile!['email']?.toString()),
           _row(
@@ -462,6 +472,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     String? value, {
     String? note,
     bool isLast = false,
+    Widget? trailing,
   }) {
     final palette = context.colors;
     final isEmpty = value == null || value.isEmpty;
@@ -503,9 +514,25 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
               ],
             ),
           ),
+          if (trailing != null) trailing,
         ],
       ),
     );
+  }
+
+  /// The number is how they sign in, so it changes through an OTP to the
+  /// new number.
+  Future<void> _changePhone() async {
+    final saved = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangePhoneScreen(currentPhone: _profile?['phone']?.toString()),
+      ),
+    );
+    if (saved == null || !mounted) return;
+    setState(() {
+      _profile = {...?_profile, 'phone': saved};
+    });
   }
 
   // ---------------------------------------------------------------- states

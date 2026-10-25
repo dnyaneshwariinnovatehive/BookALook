@@ -4,6 +4,7 @@ import '../services/check_in_api.dart';
 import '../services/insights_api.dart';
 import '../utils/time_fmt.dart';
 import '../utils/booked_for.dart';
+import '../utils/feature_flags.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
 import 'add_extra_service_sheet.dart';
@@ -212,7 +213,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
 
             // The customer cannot always show a code — a dead phone should not
             // stop the salon working. Recorded as a manual check-in.
-            if (isScheduled) ...[
+            if (isScheduled && kShowManualCheckIn) ...[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,

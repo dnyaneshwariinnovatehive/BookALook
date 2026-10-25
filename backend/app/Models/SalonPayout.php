@@ -34,6 +34,18 @@ class SalonPayout extends Model
      * `payout_id`. Left to the convention the relation reads as always null —
      * an invoice number that quietly never appears.
      */
+    /** The bookings, and late refunds, this payout settles. */
+    public function items()
+    {
+        return $this->hasMany(SalonPayoutItem::class, 'salon_payout_id');
+    }
+
+    /** Screenshots the salon sent paying what this payout says it owes. */
+    public function paymentSubmissions()
+    {
+        return $this->hasMany(PayoutPaymentSubmission::class, 'salon_payout_id');
+    }
+
     public function settlementInvoice()
     {
         return $this->hasOne(SettlementInvoice::class, 'payout_id');

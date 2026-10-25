@@ -12,6 +12,7 @@ import 'package:partner_app/widgets/subscription/subscription_plan_card.dart';
 import 'package:partner_app/theme/app_colors.dart';
 import 'package:partner_app/widgets/subscription/subscription_bill_summary_sheet.dart';
 import 'package:partner_app/widgets/subscription/payment_proof_viewer.dart';
+import '../../../widgets/payment_qr_card.dart';
 
 class UpgradePlanScreen extends StatefulWidget {
   final String salonId;
@@ -860,27 +861,9 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
                 ),
                 child: Column(
                   children: [
-                    Text(
-                      'Scan QR to Pay',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Icon(
-                      Icons.qr_code_2,
-                      size: 120,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Pay ₹${finalPrice.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    // BookALook's real QR and UPI ID, as the superadmin
+                    // uploaded them in policy settings — not a placeholder.
+                    PaymentQrCard(amount: finalPrice, framed: false),
                     const SizedBox(height: 8),
                     Text(
                       'After payment, please upload a screenshot for verification.',

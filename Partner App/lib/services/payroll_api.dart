@@ -89,6 +89,49 @@ class PayrollApi {
     throw Exception(_errorFrom(response));
   }
 
+  /// Where to pay BookALook — the QR, UPI ID and payee the superadmin set.
+  /// Shared by plan purchases and payout dues.
+  static Future<PaymentDetails> paymentDetails() async {
+    final response = await http.get(Uri.parse('$_baseUrl/payment-details'), headers: await _headers());
+    if (response.statusCode == 200) {
+      return PaymentDetails.fromJson(jsonDecode(response.body));
+    }
+    throw Exception(_errorFrom(response));
+  }
+
+  /// Sends the screenshot of paying what [payoutId] says the salon owes.
+  /// The payout's figures freeze from here until BookALook checks it.
+  static Future<PayoutPaymentInfo> submitPayoutPayment({
+    required String salonId,
+    required String payoutId,
+    required List<int> screenshotBytes,
+    required String screenshotName,
+    String? transactionId,
+    String? note,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl/salons/$salonId/payouts/$payoutId/payment'),
+    );
+    request.headers['Accept'] = 'application/json';
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    if (transactionId != null && transactionId.trim().isNotEmpty) {
+      request.fields['transaction_id'] = transactionId.trim();
+    }
+    if (note != null && note.trim().isNotEmpty) request.fields['note'] = note.trim();
+    request.files.add(http.MultipartFile.fromBytes('screenshot', screenshotBytes, filename: screenshotName));
+
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return PayoutPaymentInfo.fromJson(body['payment_submission'] as Map<String, dynamic>);
+    }
+    throw Exception(_errorFrom(response));
+  }
+
   static String _errorFrom(http.Response response) {
     try {
       final body = jsonDecode(response.body);
@@ -263,6 +306,7 @@ class MyPayroll {
 /// back; a Commission Model salon settles monthly and has commission taken off
 /// inside the cycle. [cycleLabel] is what the salon should actually read.
 class SalonPayoutRecord {
+  final String id;
   final String cycleType;
   final String cycleLabel;
   final String cycleStart;
@@ -276,6 +320,19 @@ class SalonPayoutRecord {
   final double commissionDeducted;
   final double walletRedeemed;
   final double netAmount;
+
+  /// Refunds on bookings an earlier payout already settled, taken off this one.
+  final double refundAdjustment;
+
+  /// True when the salon owes BookALook ([amountDue]) rather than the other way.
+  final bool salonOwes;
+  final double amountDue;
+
+  /// The salon has paid against this payout, so its figures are fixed.
+  final bool locked;
+
+  /// The latest screenshot sent for what is owed, if any.
+  final PayoutPaymentInfo? payment;
   final String status;
   final String? reference;
 
@@ -286,6 +343,7 @@ class SalonPayoutRecord {
   final String? invoiceUrl;
 
   SalonPayoutRecord({
+    this.id = '',
     required this.cycleType,
     required this.cycleLabel,
     required this.cycleStart,
@@ -299,6 +357,11 @@ class SalonPayoutRecord {
     required this.commissionDeducted,
     required this.walletRedeemed,
     required this.netAmount,
+    this.refundAdjustment = 0,
+    this.salonOwes = false,
+    this.amountDue = 0,
+    this.locked = false,
+    this.payment,
     required this.status,
     this.reference,
     this.invoiceNumber,
@@ -308,7 +371,10 @@ class SalonPayoutRecord {
   factory SalonPayoutRecord.fromJson(Map<String, dynamic> json) {
     final invoice = json['settlement_invoice'] as Map<String, dynamic>?;
 
+    final payment = json['payment_submission'];
+
     return SalonPayoutRecord(
+      id: json['id']?.toString() ?? '',
       cycleType: json['cycle_type'] ?? 'weekly',
       cycleLabel: json['cycle_label'] ?? '',
       cycleStart: json['cycle_start_date'] ?? '',
@@ -322,6 +388,11 @@ class SalonPayoutRecord {
       commissionDeducted: _num(json['commission_deducted']),
       walletRedeemed: _num(json['wallet_redeemed_amount']),
       netAmount: _num(json['net_amount']),
+      refundAdjustment: _num(json['refund_adjustment']),
+      salonOwes: json['direction'] == 'salon_owes' || _num(json['net_amount']) < 0,
+      amountDue: json['amount_due'] != null ? _num(json['amount_due']) : _num(json['net_amount']).abs(),
+      locked: json['locked'] == true,
+      payment: payment is Map<String, dynamic> ? PayoutPaymentInfo.fromJson(payment) : null,
       status: json['status'] ?? 'pending',
       reference: json['distribution_reference'],
       invoiceNumber: invoice?['number']?.toString(),
@@ -367,4 +438,54 @@ class SalonPayouts {
           .toList(),
     );
   }
+}
+
+/// Where salons pay BookALook, as the superadmin set it.
+class PaymentDetails {
+  final String? qrUrl;
+  final String? upiId;
+  final String? payeeName;
+
+  const PaymentDetails({this.qrUrl, this.upiId, this.payeeName});
+
+  bool get isSetUp => (qrUrl ?? '').isNotEmpty || (upiId ?? '').isNotEmpty;
+
+  factory PaymentDetails.fromJson(Map<String, dynamic> json) => PaymentDetails(
+        qrUrl: (json['qr_url'] as String?)?.trim().isEmpty == true ? null : json['qr_url'] as String?,
+        upiId: (json['upi_id'] as String?)?.trim().isEmpty == true ? null : json['upi_id'] as String?,
+        payeeName: (json['payee_name'] as String?)?.trim().isEmpty == true ? null : json['payee_name'] as String?,
+      );
+}
+
+/// A screenshot the salon sent paying what a payout owes.
+class PayoutPaymentInfo {
+  final String id;
+  final double amount;
+
+  /// pending, approved or rejected.
+  final String status;
+  final String? rejectionReason;
+  final String? transactionId;
+  final String? submittedAt;
+
+  const PayoutPaymentInfo({
+    required this.id,
+    required this.amount,
+    required this.status,
+    this.rejectionReason,
+    this.transactionId,
+    this.submittedAt,
+  });
+
+  bool get isPending => status == 'pending';
+  bool get isRejected => status == 'rejected';
+
+  factory PayoutPaymentInfo.fromJson(Map<String, dynamic> json) => PayoutPaymentInfo(
+        id: json['id']?.toString() ?? '',
+        amount: _num(json['amount']),
+        status: json['status']?.toString() ?? 'pending',
+        rejectionReason: json['rejection_reason']?.toString(),
+        transactionId: json['transaction_id']?.toString(),
+        submittedAt: json['submitted_at']?.toString(),
+      );
 }

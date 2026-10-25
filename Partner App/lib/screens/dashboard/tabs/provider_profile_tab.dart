@@ -1,5 +1,6 @@
 import 'package:partner_app/theme/app_theme.dart';
 import '../../../widgets/initials_avatar.dart';
+import '../../change_phone_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -631,7 +632,8 @@ class ProviderProfileTabState extends State<ProviderProfileTab> {
                           context,
                           'PHONE NUMBER',
                           widget.user['phone'] ?? '',
-                          actionText: 'Edit',
+                          actionText: 'Change',
+                          onAction: _changePhone,
                         ),
                         Divider(
                           height: 32,
@@ -906,6 +908,7 @@ class ProviderProfileTabState extends State<ProviderProfileTab> {
     String value, {
     IconData? actionIcon,
     String? actionText,
+    VoidCallback? onAction,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -944,16 +947,43 @@ class ProviderProfileTabState extends State<ProviderProfileTab> {
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.26),
           ),
         if (actionText != null)
-          Text(
-            actionText,
-            style: TextStyle(
-              color: AppTheme.accentColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+          InkWell(
+            key: ValueKey('profile_action_${label.toLowerCase().replaceAll(' ', '_')}'),
+            onTap: onAction,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Text(
+                actionText,
+                style: TextStyle(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ),
       ],
     );
+  }
+
+  /// The number is how they sign in, so it changes through an OTP to the
+  /// new number.
+  Future<void> _changePhone() async {
+    final saved = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangePhoneScreen(currentPhone: widget.user['phone']?.toString()),
+      ),
+    );
+    if (saved == null || !mounted) return;
+    setState(() {
+      try {
+        widget.user['phone'] = saved;
+      } catch (_) {
+        // An unmodifiable map; the saved sign-in already has the new number.
+      }
+    });
   }
 
   Widget _buildWorkingHourRow(

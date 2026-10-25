@@ -81,6 +81,9 @@ class SettingsController extends Controller
             'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
             'whatsapp_salon_deactivated_enabled' => 'sometimes|boolean',
             'combos_limit_per_salon' => 'sometimes|integer|min:0|max:100',
+            // Shown next to the payment QR. Blank is allowed: the QR alone is enough.
+            'payment_upi_id' => 'sometimes|nullable|string|max:100',
+            'payment_payee_name' => 'sometimes|nullable|string|max:150',
         ]);
 
         $user = $request->user();
@@ -199,6 +202,25 @@ class SettingsController extends Controller
             }
         }
 
+        $textSettings = [
+            'payment_upi_id' => 'UPI ID salons pay BookALook to, shown beside the payment QR.',
+            'payment_payee_name' => 'Name the payment QR pays, so the salon can check it before paying.',
+        ];
+
+        foreach ($textSettings as $key => $description) {
+            if ($request->has($key)) {
+                PlatformPolicySetting::updateOrCreate(
+                    ['setting_key' => $key],
+                    [
+                        'setting_value' => trim((string) $request->input($key)),
+                        'data_type' => 'string',
+                        'description' => $description,
+                        'updated_by' => $user->id,
+                    ]
+                );
+            }
+        }
+
         foreach ($allowedSettings as $key => $description) {
             if ($request->has($key)) {
                 PlatformPolicySetting::updateOrCreate(
@@ -243,6 +265,55 @@ class SettingsController extends Controller
      * section is a change to InvoiceSetting::DEFAULTS and this endpoint — not a
      * coordinated edit across a PHP model and a TypeScript form.
      */
+    /**
+     * The QR salons scan to pay BookALook — for a plan, and for what a payout
+     * says they owe. Replacing it takes effect for the next salon that opens
+     * the pay screen.
+     */
+    public function uploadPaymentQr(Request $request)
+    {
+        $request->validate([
+            'qr' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        $path = \Illuminate\Support\Facades\Storage::disk('cloudinary')->put('payment-qr', $request->file('qr'));
+        $url = \Illuminate\Support\Facades\Storage::disk('cloudinary')->url($path);
+
+        $this->savePaymentQr($request, $url);
+
+        return response()->json(['success' => true, 'payment_qr_url' => $url]);
+    }
+
+    /** Take the payment QR down; the pay screens then say it is not set up yet. */
+    public function removePaymentQr(Request $request)
+    {
+        $this->savePaymentQr($request, '');
+
+        return response()->json(['success' => true, 'payment_qr_url' => null]);
+    }
+
+    private function savePaymentQr(Request $request, string $url): void
+    {
+        $before = PlatformPolicySetting::value('payment_qr_url');
+
+        PlatformPolicySetting::updateOrCreate(
+            ['setting_key' => 'payment_qr_url'],
+            [
+                'setting_value' => $url,
+                'data_type' => 'string',
+                'description' => 'QR image salons scan to pay BookALook.',
+                'updated_by' => $request->user()->id,
+            ]
+        );
+
+        AuditLogger::record(
+            action: AuditLog::POLICY_UPDATED,
+            label: 'Payment QR',
+            before: ['payment_qr_url' => $before],
+            after: ['payment_qr_url' => $url],
+        );
+    }
+
     public function getInvoiceSettings()
     {
         return response()->json([

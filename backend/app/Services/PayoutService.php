@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Appointment;
 use App\Models\Salon;
 use App\Models\SalonPayout;
+use App\Models\SalonPayoutItem;
 use App\Models\User;
 use App\Support\BillingModel;
 use App\Support\PayoutCycle;
@@ -36,6 +37,7 @@ class PayoutService
     /** Appointments that count as earned revenue for a cycle. */
     public const SETTLED_STATUSES = ['completed'];
 
+
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_DISTRIBUTED = 'distributed';
@@ -65,60 +67,251 @@ class PayoutService
             ->whereDate('cycle_start_date', $start->toDateString())
             ->first();
 
-        if ($existing && $existing->status === self::STATUS_DISTRIBUTED) {
+        // Signed off means frozen: what SuperAdmin approved is what gets paid.
+        // Anything that changes afterwards lands in the next payout instead.
+        // Likewise once the salon has paid against it: the amount it paid can
+        // never move underneath it.
+        if ($existing && (in_array($existing->status, [self::STATUS_APPROVED, self::STATUS_DISTRIBUTED], true) || $existing->locked_at)) {
             return $existing;
         }
 
-        $appointments = Appointment::where('salon_id', $salonId)
-            ->whereIn('status', self::SETTLED_STATUSES)
-            ->whereBetween('appointment_date', [$start->toDateString(), $end->toDateString()])
-            ->get(['id', 'total_amount', 'final_billed_amount', 'advance_amount']);
-
-        // What the salon billed customers, which is what commission is charged on.
-        $revenue = $appointments->sum(
-            fn (Appointment $a) => (float) ($a->final_billed_amount ?? $a->total_amount)
-        );
-
-        // What the platform is actually holding on the salon's behalf.
-        $advancesHeld = (float) $appointments->sum('advance_amount');
-
-        // A Subscription Plan salon has already paid; nothing is deducted.
-        // A rate change is blocked until every payout is settled, so the rate
-        // standing now is the rate this cycle was always going to be charged.
-        $rate = BillingModel::isCommission($billingModel)
-            ? $this->commission->currentRate($salon)
-            : 0.0;
-
-        $commission = round($revenue * $rate / 100, 2);
-        $refunds = $this->refundsInCycle($salonId, $start, $end);
-
-        // Coins already settled against this cycle stay put — they were spent
-        // deliberately and give the salon back part of the commission.
-        $walletRedeemed = (float) ($existing->wallet_redeemed_amount ?? 0);
-
-        $payout = SalonPayout::updateOrCreate(
-            [
+        return DB::transaction(function () use ($salon, $salonId, $start, $end, $cycleType, $billingModel, $existing) {
+            $payout = $existing ?? new SalonPayout([
                 'salon_id' => $salonId,
                 'cycle_type' => $cycleType,
                 'cycle_start_date' => $start->toDateString(),
-            ],
-            [
-                'cycle_end_date' => $end->toDateString(),
-                'gross_amount' => round($advancesHeld, 2),
-                'appointment_revenue' => round($revenue, 2),
-                'appointments_count' => $appointments->count(),
-                'billing_type' => $billingModel,
-                'commission_percentage_snapshot' => $rate,
+                'status' => self::STATUS_PENDING,
+            ]);
+            $payout->fill(['cycle_end_date' => $end->toDateString(), 'billing_type' => $billingModel]);
+            $payout->save();
+
+            // A recalculation starts clean: give back everything this payout
+            // claimed last time, then claim again from the current facts.
+            $payout->items()->delete();
+            DB::table('payment_refunds')->where('salon_payout_id', $payout->id)->update(['salon_payout_id' => null]);
+
+            $bookingItems = $this->settleBookings($salon, $payout, $end);
+            $refundItems = $this->settleLateRefunds($salonId, $payout);
+
+            $gross = round(array_sum(array_column($bookingItems, 'gross_amount')), 2);
+            $commission = round(array_sum(array_column($bookingItems, 'commission_amount')), 2);
+            $revenue = round(array_sum(array_column($bookingItems, 'commission_base')), 2);
+            $refunds = round(array_sum(array_column($refundItems, 'refund_amount')), 2);
+
+            // Coins already settled against this cycle stay put — they were
+            // spent deliberately and give the salon back part of the commission.
+            $walletRedeemed = (float) ($payout->wallet_redeemed_amount ?? 0);
+
+            $payout->forceFill([
+                'gross_amount' => $gross,
+                'appointment_revenue' => $revenue,
+                'appointments_count' => count($bookingItems),
+                'commission_percentage_snapshot' => BillingModel::isCommission($billingModel) && $salon
+                    ? $this->commission->currentRate($salon)
+                    : 0.0,
                 'commission_deducted' => $commission,
                 'refund_adjustment' => $refunds,
                 'wallet_redeemed_amount' => $walletRedeemed,
-                'net_amount' => $this->net($advancesHeld, $commission, $refunds, $walletRedeemed),
-                'status' => $existing->status ?? self::STATUS_PENDING,
+                'net_amount' => $this->net($gross, $commission, $refunds, $walletRedeemed),
                 'calculated_at' => now(),
-            ]
-        );
+            ])->save();
 
-        return $payout->fresh();
+            return $payout->fresh();
+        });
+    }
+
+    /** Bookings whose money a payout settles. */
+    public const LEDGER_STATUSES = ['completed', 'cancelled', 'no_show'];
+
+    /**
+     * Claim every booking up to the cycle's end that no payout has settled
+     * yet, and write a line for each.
+     *
+     *  - Completed: the salon gets the advance the platform took, less any
+     *    refund on it; commission is on the full bill.
+     *  - Cancelled or no-show: the salon gets whatever of the advance was not
+     *    refunded — a forfeited advance is the salon's compensation for the
+     *    lost slot — and commission is on that forfeited amount.
+     *
+     * Commission is only ever on app bookings — walk-ins are free — and at the
+     * rate in force on the booking's own date, so a salon that joined the
+     * Commission Model mid-month is not charged for the weeks before.
+     *
+     * @return array<int, array> the lines written
+     */
+    private function settleBookings(?Salon $salon, SalonPayout $payout, Carbon $end): array
+    {
+        if (! $salon) {
+            return [];
+        }
+
+        $appointments = Appointment::where('salon_id', $salon->id)
+            ->whereIn('status', self::LEDGER_STATUSES)
+            ->whereDate('appointment_date', '<=', $end->toDateString())
+            ->when($salon->payout_ledger_since, fn ($q) => $q->whereDate('appointment_date', '>=', Carbon::parse($salon->payout_ledger_since)->toDateString()))
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('salon_payout_items as spi')
+                    ->whereColumn('spi.appointment_id', 'appointments.id')
+                    ->where('spi.kind', SalonPayoutItem::KIND_BOOKING);
+            })
+            ->orderBy('appointment_date')
+            ->get();
+
+        $lines = [];
+
+        foreach ($appointments as $appointment) {
+            $held = $this->heldByPlatform($appointment);
+            $refunds = DB::table('payment_refunds')
+                ->where('appointment_id', $appointment->id)
+                ->where('status', '!=', 'failed')
+                ->whereNull('salon_payout_id')
+                ->get(['id', 'amount']);
+            $refunded = round((float) $refunds->sum('amount'), 2);
+
+            $isApp = $this->isAppBooking($appointment);
+
+            if ($appointment->status === 'completed') {
+                $gross = round(max(0, $held - $refunded), 2);
+                $base = $isApp ? (float) ($appointment->final_billed_amount ?? $appointment->total_amount) : 0.0;
+            } else {
+                // Nothing was paid, or all of it went back: nothing to settle.
+                $gross = round(max(0, $held - $refunded), 2);
+                $base = $isApp ? $gross : 0.0;
+            }
+
+            // A walk-in that never touched the platform has nothing in it for
+            // a payout either way.
+            if ($gross <= 0 && $base <= 0) {
+                continue;
+            }
+
+            $rate = $isApp ? $this->rateOn($salon, Carbon::parse($appointment->appointment_date)) : 0.0;
+            $commission = round($base * $rate / 100, 2);
+
+            $line = [
+                'salon_payout_id' => $payout->id,
+                'kind' => SalonPayoutItem::KIND_BOOKING,
+                'appointment_id' => $appointment->id,
+                'appointment_status' => $appointment->status,
+                'gross_amount' => $gross,
+                'commission_base' => round($base, 2),
+                'commission_rate' => $rate,
+                'commission_amount' => $commission,
+                'refund_amount' => $refunded,
+                'net_amount' => round($gross - $commission, 2),
+            ];
+            SalonPayoutItem::create($line);
+            $lines[] = $line;
+
+            if ($refunds->isNotEmpty()) {
+                DB::table('payment_refunds')->whereIn('id', $refunds->pluck('id'))->update(['salon_payout_id' => $payout->id]);
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Refunds raised on bookings an earlier, signed-off payout already
+     * settled. That money went to the salon, so it comes off this payout.
+     *
+     * @return array<int, array> the lines written
+     */
+    private function settleLateRefunds(string $salonId, SalonPayout $payout): array
+    {
+        $refunds = DB::table('payment_refunds as r')
+            ->join('appointments as a', 'a.id', '=', 'r.appointment_id')
+            ->join('salon_payout_items as spi', function ($join) {
+                $join->on('spi.appointment_id', '=', 'r.appointment_id')
+                    ->where('spi.kind', '=', SalonPayoutItem::KIND_BOOKING);
+            })
+            ->join('salon_payouts as sp', 'sp.id', '=', 'spi.salon_payout_id')
+            ->where('a.salon_id', $salonId)
+            ->whereNull('r.salon_payout_id')
+            ->where('r.status', '!=', 'failed')
+            ->where('sp.id', '!=', $payout->id)
+            ->whereIn('sp.status', [self::STATUS_APPROVED, self::STATUS_DISTRIBUTED])
+            ->get(['r.id', 'r.amount', 'r.appointment_id', 'r.payment_id']);
+
+        $lines = [];
+
+        foreach ($refunds as $refund) {
+            $line = [
+                'salon_payout_id' => $payout->id,
+                'kind' => SalonPayoutItem::KIND_LATE_REFUND,
+                'appointment_id' => $refund->appointment_id,
+                'payment_id' => $refund->payment_id,
+                'payment_refund_id' => $refund->id,
+                'gross_amount' => 0,
+                'refund_amount' => round((float) $refund->amount, 2),
+                'net_amount' => -round((float) $refund->amount, 2),
+            ];
+            SalonPayoutItem::create($line);
+            $lines[] = $line;
+
+            DB::table('payment_refunds')->where('id', $refund->id)->update(['salon_payout_id' => $payout->id]);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * What the platform collected online for this booking. Only payments that
+     * went through BookALook's gateway count — money paid at the counter, cash
+     * or UPI, is the salon's already.
+     */
+    private function heldByPlatform(Appointment $appointment): float
+    {
+        $payments = DB::table('payments')
+            ->where('appointment_id', $appointment->id)
+            ->where('status', 'success')
+            ->whereNotNull('gateway');
+
+        if ($payments->exists()) {
+            return round((float) $payments->sum('amount'), 2);
+        }
+
+        // Bookings made before payments were recorded per booking carry only
+        // their advance figure. A completed app booking was paid for, so that
+        // figure stands; a cancelled one with no payment row was never paid.
+        return $appointment->status === 'completed' && $this->isAppBooking($appointment)
+            ? (float) $appointment->advance_amount
+            : 0.0;
+    }
+
+    /** Booked through the app, as opposed to a walk-in the salon entered. */
+    private function isAppBooking(Appointment $appointment): bool
+    {
+        return ! in_array($appointment->booking_source, ['walk_in', 'offline'], true)
+            && $appointment->walk_in_customer_name === null;
+    }
+
+    /**
+     * The commission rate in force on a date: from the salon's rate history,
+     * which opens when it joins the Commission Model and closes when it
+     * leaves, so a day outside it is commission-free.
+     */
+    private function rateOn(Salon $salon, Carbon $date): float
+    {
+        $hasHistory = \App\Models\SalonCommissionRate::where('salon_id', $salon->id)->exists();
+
+        if (! $hasHistory) {
+            // A commission salon from before rate history was kept.
+            return $salon->isOnCommissionModel() ? $this->commission->currentRate($salon) : 0.0;
+        }
+
+        $rate = \App\Models\SalonCommissionRate::where('salon_id', $salon->id)
+            ->whereDate('effective_from', '<=', $date->toDateString())
+            ->where(fn ($q) => $q->whereDate('effective_to', '>=', $date->toDateString())
+                // A rate left open is only live while the salon is still on the
+                // Commission Model; leaving it closes the rate, and a stray open
+                // one must not charge a Subscription Plan salon.
+                ->orWhere(fn ($open) => $open->whereNull('effective_to')->whereRaw('? = 1', [$salon->isOnCommissionModel() ? 1 : 0])))
+            ->orderByDesc('effective_from')
+            ->first();
+
+        return (float) ($rate->percentage ?? 0);
     }
 
     /**
@@ -177,17 +370,23 @@ class PayoutService
      */
     public function approve(SalonPayout $payout, User $actor): SalonPayout
     {
-        if ($payout->status === self::STATUS_DISTRIBUTED) {
-            throw new \RuntimeException('This payout has already been distributed.');
-        }
+        return DB::transaction(function () use ($payout, $actor) {
+            $payout = SalonPayout::whereKey($payout->id)->lockForUpdate()->firstOrFail();
 
-        $payout->forceFill([
-            'status' => self::STATUS_APPROVED,
-            'approved_by' => $actor->id,
-            'approved_at' => now(),
-        ])->save();
+            if ($payout->status === self::STATUS_DISTRIBUTED) {
+                throw new \RuntimeException('This payout has already been distributed.');
+            }
 
-        return $payout->fresh();
+            // From here the figures are frozen; anything later goes to the
+            // next payout.
+            $payout->forceFill([
+                'status' => self::STATUS_APPROVED,
+                'approved_by' => $actor->id,
+                'approved_at' => now(),
+            ])->save();
+
+            return $payout->fresh();
+        });
     }
 
     /**
@@ -206,11 +405,15 @@ class PayoutService
      */
     public function markDistributed(SalonPayout $payout, User $actor, ?string $reference, ?string $notes = null): SalonPayout
     {
-        if ($payout->status === self::STATUS_DISTRIBUTED) {
-            throw new \RuntimeException('This payout has already been distributed.');
-        }
-
         $payout = DB::transaction(function () use ($payout, $actor, $reference, $notes) {
+            // Locked and re-read, so two clicks cannot both get past the
+            // status check and record the money moving twice.
+            $payout = SalonPayout::whereKey($payout->id)->lockForUpdate()->firstOrFail();
+
+            if ($payout->status === self::STATUS_DISTRIBUTED) {
+                throw new \RuntimeException('This payout has already been distributed.');
+            }
+
             $payout->forceFill([
                 // Recomputed one last time so a late change cannot leave the
                 // distributed figure disagreeing with its own components.
@@ -271,6 +474,15 @@ class PayoutService
             'refund_adjustment' => (float) $payout->refund_adjustment,
             'wallet_redeemed_amount' => (float) $payout->wallet_redeemed_amount,
             'net_amount' => (float) $payout->net_amount,
+            // Which way the money moves. A Commission Model salon whose
+            // commission is more than the advances held owes the difference;
+            // it pays offline and SuperAdmin marks it collected.
+            'direction' => (float) $payout->net_amount < 0 ? 'salon_owes' : 'pay_salon',
+            'amount_due' => abs((float) $payout->net_amount),
+            // The salon has paid against it, so the figures are fixed.
+            'locked' => $payout->locked_at !== null,
+            // The latest screenshot the salon sent for what it owes, if any.
+            'payment_submission' => $this->latestSubmission($payout)?->present(),
             'status' => $payout->status,
             'approved_at' => $payout->approved_at,
             'distributed_at' => $payout->distributed_at,
@@ -291,6 +503,13 @@ class PayoutService
      *
      * @return array{number: string, issued_at: string, url: string}|null
      */
+    private function latestSubmission(SalonPayout $payout): ?\App\Models\PayoutPaymentSubmission
+    {
+        return $payout->relationLoaded('paymentSubmissions')
+            ? $payout->paymentSubmissions->sortByDesc('created_at')->first()
+            : $payout->paymentSubmissions()->latest()->first();
+    }
+
     private function settlementInvoiceState(SalonPayout $payout): ?array
     {
         $invoice = $payout->relationLoaded('settlementInvoice')
@@ -317,15 +536,37 @@ class PayoutService
      */
     private function runCycle(string $cycleType, Carbon $start, Carbon $end, string $billingModel): array
     {
-        $tradedIds = Appointment::whereIn('status', self::SETTLED_STATUSES)
-            ->whereBetween('appointment_date', [$start->toDateString(), $end->toDateString()])
+        // Every salon on this rhythm with anything still to settle up to the
+        // cycle's end — bookings no payout has taken yet, including late
+        // completions and weeks a missed run never built — or a refund on a
+        // booking already settled, or this cycle's payout already open.
+        $unsettled = Appointment::whereIn('status', self::LEDGER_STATUSES)
+            ->whereDate('appointment_date', '<=', $end->toDateString())
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('salon_payout_items as spi')
+                    ->whereColumn('spi.appointment_id', 'appointments.id')
+                    ->where('spi.kind', SalonPayoutItem::KIND_BOOKING);
+            })
             ->distinct()
             ->pluck('salon_id');
 
+        $lateRefunds = DB::table('payment_refunds as r')
+            ->join('appointments as a', 'a.id', '=', 'r.appointment_id')
+            ->whereNull('r.salon_payout_id')
+            ->where('r.status', '!=', 'failed')
+            ->distinct()
+            ->pluck('a.salon_id');
+
+        $open = SalonPayout::where('cycle_type', $cycleType)
+            ->whereDate('cycle_start_date', $start->toDateString())
+            ->where('status', self::STATUS_PENDING)
+            ->pluck('salon_id');
+
         // Only the salons settling on this rhythm. A salon that switched models
-        // mid-cycle settles on whichever one it is on now, so a cycle is never
-        // built twice for the same money.
-        $salonIds = Salon::whereIn('id', $tradedIds)
+        // settles on whichever one it is on now; bookings it already settled
+        // the other way are never taken again.
+        $salonIds = Salon::whereIn('id', $unsettled->merge($lateRefunds)->merge($open)->unique()->values())
             ->where('commission_opt_in', BillingModel::isCommission($billingModel))
             ->pluck('id');
 
@@ -347,15 +588,4 @@ class PayoutService
         return round($advancesHeld - $commission - $refunds + $walletRedeemed, 2);
     }
 
-    /**
-     * Refunds raised in the cycle come off what the platform hands over.
-     */
-    private function refundsInCycle(string $salonId, Carbon $start, Carbon $end): float
-    {
-        return round((float) DB::table('payment_refunds')
-            ->join('appointments', 'appointments.id', '=', 'payment_refunds.appointment_id')
-            ->where('appointments.salon_id', $salonId)
-            ->whereBetween('payment_refunds.created_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
-            ->sum('payment_refunds.amount'), 2);
-    }
 }

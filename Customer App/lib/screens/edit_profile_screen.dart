@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../../services/auth_service.dart';
 import '../../utils/app_haptics.dart';
+import 'change_phone_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -46,6 +47,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _addressController.dispose();
     _pincodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _changePhone() async {
+    final saved = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => ChangePhoneScreen(currentPhone: _phoneController.text.trim())),
+    );
+    if (saved != null && mounted) {
+      setState(() => _phoneController.text = saved);
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -139,7 +150,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildTextField('Name', _nameController),
-            _buildTextField('Phone', _phoneController, type: TextInputType.phone),
+            // The number is the login, so it changes through an OTP to the
+            // new number, never by typing over it here.
+            _buildTextField(
+              'Phone',
+              _phoneController,
+              type: TextInputType.phone,
+              readOnly: true,
+              onTap: _changePhone,
+              suffixIcon: TextButton(
+                key: const ValueKey('edit_profile_change_phone'),
+                onPressed: _changePhone,
+                child: Text('Change', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppTheme.accentColor)),
+              ),
+            ),
             _buildTextField('Email', _emailController, type: TextInputType.emailAddress),
             
             Padding(

@@ -189,7 +189,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'is_closed' => false,
         ]);
 
-        $response = $this->getJson("/api/superadmin/salons/pending/{$salon->id}");
+        $response = $this->asSuperAdmin()->getJson("/api/superadmin/salons/pending/{$salon->id}");
         $response->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.name', 'Vikram Grooming')
@@ -227,7 +227,7 @@ class SalonRegistrationAndReviewTest extends TestCase
         ]);
 
         // Attempt approve without specifying final commission rate -> 422
-        $response = $this->postJson("/api/superadmin/salons/{$salon->id}/approve", [
+        $response = $this->asSuperAdmin()->postJson("/api/superadmin/salons/{$salon->id}/approve", [
             'commercial_model' => 'commission',
         ]);
         $response->assertStatus(422)
@@ -259,7 +259,7 @@ class SalonRegistrationAndReviewTest extends TestCase
         ]);
 
         // SuperAdmin approves with authoritative rate = 14.50%
-        $response = $this->postJson("/api/superadmin/salons/{$salon->id}/approve", [
+        $response = $this->asSuperAdmin()->postJson("/api/superadmin/salons/{$salon->id}/approve", [
             'commercial_model' => 'commission',
             'commission_percentage' => 14.50,
         ]);
@@ -279,7 +279,7 @@ class SalonRegistrationAndReviewTest extends TestCase
         $this->assertEquals(1, $welcomeTxCount);
 
         // Approve again (idempotency check)
-        $repeatResponse = $this->postJson("/api/superadmin/salons/{$salon->id}/approve", [
+        $repeatResponse = $this->asSuperAdmin()->postJson("/api/superadmin/salons/{$salon->id}/approve", [
             'commercial_model' => 'commission',
             'commission_percentage' => 14.50,
         ]);
@@ -314,7 +314,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'status' => 'pending_approval',
         ]);
 
-        $response = $this->postJson("/api/superadmin/salons/{$salon->id}/request-corrections", [
+        $response = $this->asSuperAdmin()->postJson("/api/superadmin/salons/{$salon->id}/request-corrections", [
             'correction_notes' => 'Please re-upload clearer facade photos and check your pincode.',
         ]);
 
@@ -419,7 +419,7 @@ class SalonRegistrationAndReviewTest extends TestCase
         ]);
 
         // SuperAdmin approves registration
-        $response = $this->postJson("/api/superadmin/salons/{$salon->id}/approve", [
+        $response = $this->asSuperAdmin()->postJson("/api/superadmin/salons/{$salon->id}/approve", [
             'commercial_model' => 'subscription',
         ]);
         $response->assertStatus(200);
@@ -540,5 +540,24 @@ class SalonRegistrationAndReviewTest extends TestCase
 
         $salons = $response->json('salons');
         $this->assertCount(2, $salons);
+    }
+
+    /**
+     * The review and approval endpoints are SuperAdmin only; act as one.
+     */
+    private function asSuperAdmin(): self
+    {
+        $superadmin = User::where('role', 'superadmin')->first() ?? User::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => 'Review SuperAdmin',
+            'phone' => '7'.substr((string) crc32(uniqid('', true)), 0, 9),
+            'password_hash' => 'x',
+            'role' => 'superadmin',
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($superadmin, ['*']);
+
+        return $this;
     }
 }

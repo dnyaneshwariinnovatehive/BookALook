@@ -474,11 +474,13 @@ class PayoutAndPayrollTest extends TestCase
         ])->save();
 
         if ($isCommission) {
-            SalonCommissionRate::where('salon_id', $salon->id)->update(['effective_to' => Carbon::yesterday()]);
+            SalonCommissionRate::where('salon_id', $salon->id)->update(['effective_to' => Carbon::today()->startOfMonth()->subDay()]);
             SalonCommissionRate::create([
                 'salon_id' => $salon->id,
                 'percentage' => $rate ?? 0,
-                'effective_from' => Carbon::today()->subDay(),
+                // From the start of the month the tests settle: commission is
+                // charged at the rate in force on each booking's own date.
+                'effective_from' => Carbon::today()->startOfMonth(),
             ]);
         }
 

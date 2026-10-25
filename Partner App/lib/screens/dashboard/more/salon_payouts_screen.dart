@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../services/payroll_api.dart';
 import '../../../theme/app_theme.dart';
+import 'pay_dues_screen.dart';
 
 /// What BookALook settled with this salon, week by week.
 ///
@@ -186,8 +187,8 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
                 Text(
                   commission
                       ? 'You pay ${rate == null ? '' : '${rate.toStringAsFixed(rate % 1 == 0 ? 0 : 2)}% of '}'
-                          'everything you bill. Settled on the 1st of each month for the '
-                          'month just finished.'
+                          'what you bill on BookALook bookings — walk-ins are free. '
+                          'Settled on the 1st of each month for the month just finished.'
                       : 'Your plan is already paid for, so nothing is deducted. Each week '
                           'BookALook returns the advances it collected for you.',
                   style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
@@ -255,16 +256,37 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
               _line('Coins settled against commission', p.walletRedeemed,
                   color: Colors.green.shade700),
 
+            if (p.refundAdjustment > 0)
+              _line('Refunds on earlier bookings', -p.refundAdjustment,
+                  color: AppTheme.lightDanger),
+
             const Divider(height: 20),
+            // Commission bigger than the advances held means the salon owes the
+            // difference; say so in words, never as a bare negative number.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(distributed ? 'Paid to you' : 'Due to you',
+                Text(
+                    p.netAmount < 0
+                        ? (distributed ? 'Paid by you' : 'You owe BookALook')
+                        : (distributed ? 'Paid to you' : 'Due to you'),
                     style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('₹${p.netAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w900)),
+                Text('₹${p.netAmount.abs().toStringAsFixed(2)}',
+                    style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: p.netAmount < 0 && !distributed ? AppTheme.lightDanger : null)),
               ],
             ),
+            if (p.netAmount < 0 && !distributed) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Your commission was more than the advances BookALook held. Pay the difference by scanning BookALook\'s QR; your access renews once the payment is verified.',
+                style: GoogleFonts.outfit(fontSize: 11.5, color: Colors.grey.shade700, height: 1.4),
+              ),
+              const SizedBox(height: 10),
+              _duesAction(p),
+            ],
 
             if (p.reference != null && p.reference!.isNotEmpty) ...[
               const SizedBox(height: 4),
@@ -321,6 +343,74 @@ class _SalonPayoutsScreenState extends State<SalonPayoutsScreen> {
         const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Could not open the invoice. Try again in a moment.')),
       );
     }
+  }
+
+  /// What the owner can do about money they owe: pay it, wait while BookALook
+  /// checks the payment, or pay again after a payment was turned back.
+  Widget _duesAction(SalonPayoutRecord p) {
+    final payment = p.payment;
+
+    if (payment != null && payment.isPending) {
+      return Container(
+        key: ValueKey('payout_payment_pending_${p.id}'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.lightInfo.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.hourglass_top_rounded, size: 18, color: AppTheme.lightInfo),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Payment of ₹${payment.amount.toStringAsFixed(2)} sent — BookALook is verifying it.',
+                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.lightInfo),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (payment != null && payment.isRejected)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Your last payment was not verified: ${payment.rejectionReason ?? 'no reason given'}',
+              key: ValueKey('payout_payment_rejected_${p.id}'),
+              style: GoogleFonts.outfit(fontSize: 12.5, color: AppTheme.lightDanger, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ElevatedButton.icon(
+          key: ValueKey('payout_pay_${p.id}'),
+          onPressed: () async {
+            final sent = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => PayDuesScreen(salonId: widget.salonId, payout: p)),
+            );
+            if (sent == true && mounted) _load();
+          },
+          icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+          label: Text(
+            payment != null && payment.isRejected
+                ? 'Pay again ₹${p.amountDue.toStringAsFixed(2)}'
+                : 'Pay ₹${p.amountDue.toStringAsFixed(2)}',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.lightDanger,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _line(String label, double amount, {Color? color, bool muted = false}) => Padding(

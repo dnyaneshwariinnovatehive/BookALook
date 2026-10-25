@@ -221,12 +221,14 @@ class CustomerAuthController extends Controller
 
         $user = $request->user();
 
-        if ($request->has('phone') && $request->phone !== $user->phone) {
-            $existingUser = User::where('phone', $request->phone)->first();
-            if ($existingUser) {
-                return response()->json(['message' => 'This phone number is already registered.'], 400);
-            }
-            $user->phone = $request->phone;
+        // The phone number is the login, so it is never changed here without
+        // proof the person holds the new one. Sending the current number back
+        // unchanged is fine; a different one goes through the OTP flow.
+        if ($request->filled('phone') && $request->phone !== $user->phone) {
+            return response()->json([
+                'message' => 'To change your phone number, verify the new number with an OTP.',
+                'errors' => ['phone' => ['Verify the new number with an OTP to change it.']],
+            ], 422);
         }
 
         if ($request->has('name')) $user->name = $request->name;

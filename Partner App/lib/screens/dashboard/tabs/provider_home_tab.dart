@@ -346,7 +346,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
     bool isWalkIn = apt['booking_source'] == 'walk_in';
     String customerName = isWalkIn ? (apt['walk_in_customer_name'] ?? 'Walk-In') : (apt['customer']?['name'] ?? 'Unknown');
     List services = apt['services'] ?? [];
-    String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
+    String serviceNames = services.map((s) => s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service').join(' + ');
     if (serviceNames.isEmpty) serviceNames = 'General Service';
     
     int duration = services.fold(0, (sum, s) => sum + (int.tryParse(s['duration_minutes_at_booking']?.toString() ?? '') ?? 0));
@@ -419,7 +419,7 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
     bool isWalkIn = apt['booking_source'] == 'walk_in';
     String customerName = isWalkIn ? (apt['walk_in_customer_name'] ?? 'Walk-In') : (apt['customer']?['name'] ?? 'Unknown');
     List services = apt['services'] ?? [];
-    String serviceNames = services.map((s) => s['service']?['name'] ?? 'Service').join(' + ');
+    String serviceNames = services.map((s) => s['service']?['template']?['name'] ?? s['service']?['name'] ?? 'Service').join(' + ');
 
     final statusColor = _statusColors(apt);
 
@@ -454,7 +454,11 @@ class ProviderHomeTabState extends State<ProviderHomeTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(timeNumber, style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontSize: 18, fontWeight: FontWeight.bold)),
+                    // One line, never "10:" / "30".
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(timeNumber, maxLines: 1, softWrap: false, style: GoogleFonts.outfit(color: const Color(0xFF1F2937), fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
                     Text(timeMeridiem, style: GoogleFonts.outfit(color: statusColor.color, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),

@@ -65,7 +65,10 @@ return [
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    // India time. Appointment dates and times are entered as local wall-clock
+    // values, so "now", "today", check-in windows, reminders and no-shows
+    // must be computed in the same zone or they drift by 5½ hours.
+    'timezone' => env('APP_TIMEZONE', 'Asia/Kolkata'),
 
     /*
     |--------------------------------------------------------------------------

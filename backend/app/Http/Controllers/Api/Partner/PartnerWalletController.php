@@ -124,33 +124,46 @@ class PartnerWalletController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $payout = SalonPayout::where('id', $request->payout_id)
-            ->where('salon_id', $salonId)
-            ->first();
-
-        if (! $payout) {
+        if (! SalonPayout::where('id', $request->payout_id)->where('salon_id', $salonId)->exists()) {
             return response()->json(['message' => 'That payout does not belong to this salon.'], 404);
         }
 
         try {
-            $result = $this->wallet->redeemAgainstCommission(
-                $salonId,
-                $payout,
-                (int) $request->coins_to_redeem,
-                $request->user()
-            );
+            // Locked for the whole redemption: two at once would both read the
+            // same outstanding commission and together settle more than it.
+            $result = \Illuminate\Support\Facades\DB::transaction(function () use ($request, $salonId) {
+                $payout = SalonPayout::whereKey($request->payout_id)->lockForUpdate()->firstOrFail();
+
+                // Once SuperAdmin has signed off, the figures are fixed; coins
+                // spent after that would vanish without changing what is paid.
+                if ($payout->status !== \App\Services\PayoutService::STATUS_PENDING) {
+                    throw new \RuntimeException('This payout has already been approved, so coins can no longer be settled against it.');
+                }
+
+                // A payment has been sent for the amount as it stood; changing
+                // it now would make that payment the wrong amount.
+                if ($payout->locked_at) {
+                    throw new \RuntimeException('You have already paid against this payout, so coins can no longer be settled against it.');
+                }
+
+                $result = $this->wallet->redeemAgainstCommission(
+                    $salonId,
+                    $payout,
+                    (int) $request->coins_to_redeem,
+                    $request->user()
+                );
+
+                // The payout carries the settled amount so the distribution
+                // side pays out the right net figure.
+                $payout->wallet_redeemed_amount = round((float) $payout->wallet_redeemed_amount + $result['value'], 2);
+                $payout->net_amount = round((float) $payout->net_amount + $result['value'], 2);
+                $payout->save();
+
+                return $result;
+            });
         } catch (\RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
-
-        // The payout carries the settled amount so the distribution side pays
-        // out the right net figure.
-        $payout->wallet_redeemed_amount = round(
-            (float) $payout->wallet_redeemed_amount + $result['value'],
-            2
-        );
-        $payout->net_amount = round((float) $payout->net_amount + $result['value'], 2);
-        $payout->save();
 
         return response()->json([
             'success' => true,

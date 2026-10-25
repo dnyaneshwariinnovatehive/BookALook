@@ -88,6 +88,11 @@ class PlatformPolicySetting extends Model
         
         // Limit on how many combos a salon can create.
         'combos_limit_per_salon' => 10,
+        // Where salons pay BookALook — for a plan, and for what a payout says
+        // they owe. One QR and UPI ID, set by SuperAdmin; blank until set.
+        'payment_qr_url' => '',
+        'payment_upi_id' => '',
+        'payment_payee_name' => '',
 
         // First-Time Customer Discount platform policy limits & defaults
         'first_time_discount_min_percentage' => 5,

@@ -76,7 +76,7 @@ class PayoutController extends Controller
 
         // settlementInvoice is eager-loaded because present() hands back its
         // signed link, and a page of 20 payouts would otherwise be 20 queries.
-        $rowQuery = $applyFilters(SalonPayout::with(['salon:id,name', 'settlementInvoice']));
+        $rowQuery = $applyFilters(SalonPayout::with(['salon:id,name', 'settlementInvoice', 'paymentSubmissions']));
 
         if ($column === 'salon') {
             $rowQuery->orderBy(
@@ -233,6 +233,16 @@ class PayoutController extends Controller
 
         $payout = SalonPayout::with('salon:id,name')->findOrFail($id);
 
+        // A salon that owes pays offline, so recording it as collected needs
+        // the payment's reference — it is the only trace of money received.
+        if ((float) $payout->net_amount < 0 && ! $request->filled('distribution_reference')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This salon owes BookALook. Enter the UPI or bank reference of the payment you received.',
+                'errors' => ['distribution_reference' => ['Enter the reference of the payment received.']],
+            ], 422);
+        }
+
         try {
             $payout = $this->payouts->markDistributed(
                 $payout,
@@ -280,6 +290,62 @@ class PayoutController extends Controller
                     $payout->salon->name ?? 'the salon'
                 ),
             'payout' => $this->payouts->present($payout->load('salon:id,name')),
+        ]);
+    }
+
+    /**
+     * The salon's screenshot shows the full amount it owed: settle the payout.
+     * For a Commission Model month that renews the salon's access.
+     */
+    public function approvePayment(Request $request, $id, $submissionId)
+    {
+        $submission = \App\Models\PayoutPaymentSubmission::where('id', $submissionId)
+            ->where('salon_payout_id', $id)
+            ->firstOrFail();
+
+        try {
+            $payout = app(\App\Services\PayoutDuesService::class)->approve($submission, $request->user());
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        AuditLogger::record(
+            action: AuditLog::PAYOUT_DISTRIBUTED,
+            entity: $payout,
+            label: sprintf('%s paid what it owed', $payout->salon->name ?? 'Salon'),
+            after: ['status' => $payout->status, 'amount_received' => (float) $submission->amount],
+            metadata: ['payout_id' => $payout->id, 'payment_submission_id' => $submission->id],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment verified and the payout marked paid.',
+            'payout' => $this->payouts->present($payout->load('salon:id,name')),
+        ]);
+    }
+
+    /**
+     * The screenshot does not prove the full payment. The salon sees the
+     * reason and pays again; what it owes is unchanged.
+     */
+    public function rejectPayment(Request $request, $id, $submissionId)
+    {
+        $request->validate(['reason' => 'required|string|min:3|max:500']);
+
+        $submission = \App\Models\PayoutPaymentSubmission::where('id', $submissionId)
+            ->where('salon_payout_id', $id)
+            ->firstOrFail();
+
+        try {
+            $submission = app(\App\Services\PayoutDuesService::class)->reject($submission, $request->user(), $request->input('reason'));
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment declined. The salon has been told why.',
+            'payout' => $this->payouts->present($submission->payout->load('salon:id,name')),
         ]);
     }
 

@@ -34,6 +34,9 @@ Route::prefix('customer')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
         Route::put('/profile/update', [CustomerAuthController::class, 'updateProfile']);
+        // A new phone number is a new login, so it is verified with an OTP first.
+        Route::post('/profile/phone/send-otp', [\App\Http\Controllers\Api\AccountPhoneController::class, 'sendCode'])->middleware('throttle:5,1');
+        Route::post('/profile/phone/verify', [\App\Http\Controllers\Api\AccountPhoneController::class, 'confirm'])->middleware('throttle:10,1');
         // Switching market happens from the home screen, not the profile form.
         Route::put('/profile/city', [CustomerAuthController::class, 'updateCity']);
         Route::delete('/account', [CustomerAuthController::class, 'deleteAccount']);
@@ -144,34 +147,40 @@ Route::get('/public/subscription-plans', [\App\Http\Controllers\Api\Partner\Part
 Route::prefix('superadmin')->group(function () {
     Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
 
-    // Salon Approval Queue API (Unprotected for now to ease frontend testing)
-    Route::get('/salons/pending', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'index']);
-    Route::get('/salons/pending/{id}', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'show']);
-    Route::post('/salons/{id}/approve', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'approve']);
-    Route::post('/salons/{id}/reject', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'reject']);
-    Route::post('/salons/{id}/request-corrections', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'requestCorrections']);
+    // Everything below is SuperAdmin only. These were open to anyone while the
+    // dashboard was being built; real salons, payouts and customer contact
+    // details sit behind them, so they now need a SuperAdmin sign-in.
+    Route::middleware(['auth:sanctum', 'superadmin'])->group(function () {
+        // Salon Approval Queue API (Unprotected for now to ease frontend testing)
+        Route::get('/salons/pending', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'index']);
+        Route::get('/salons/pending/{id}', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'show']);
+        Route::post('/salons/{id}/approve', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'approve']);
+        Route::post('/salons/{id}/reject', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'reject']);
+        Route::post('/salons/{id}/request-corrections', [\App\Http\Controllers\Admin\SalonApprovalController::class, 'requestCorrections']);
 
-    // Salon Directory API (Unprotected for now)
-    Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
-    Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
-    Route::get('/salons/{id}/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'forSalon']);
-    Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
-    // The directory is the only surface that holds partner-app salons, which
-    // never passed through an enquiry to be assigned a collaborator.
-    Route::post('/salons/{id}/assign-collaborator', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'assignCollaborator']);
+        // Salon Directory API (Unprotected for now)
+        Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
+        Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+        Route::get('/salons/{id}/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'forSalon']);
+        Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
+        // The directory is the only surface that holds partner-app salons, which
+        // never passed through an enquiry to be assigned a collaborator.
+        Route::post('/salons/{id}/assign-collaborator', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'assignCollaborator']);
 
 
-    // Public Enquiries API (Unprotected for now to ease frontend testing)
-    Route::get('/enquiries', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'index']);
-    Route::get('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'getCollaborators']);
-    Route::post('/enquiries/{id}/assign', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'assignCollaborator']);
+        // Public Enquiries API (Unprotected for now to ease frontend testing)
+        Route::get('/enquiries', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'index']);
+        Route::get('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'getCollaborators']);
+        Route::post('/enquiries/{id}/assign', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminEnquiryController::class, 'assignCollaborator']);
 
-    // Collaborator Management
-    Route::get('/collaborators/stats', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'index']);
-    Route::post('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'store']);
+        // Collaborator Management
+        Route::get('/collaborators/stats', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'index']);
+        Route::post('/collaborators', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCollaboratorController::class, 'store']);
+    });
 
-    // Protected superadmin routes
-        Route::middleware('auth:sanctum')->group(function () {
+    // Protected superadmin routes: signed in AND a SuperAdmin. A partner or
+    // customer token is a valid token, so auth alone is not enough here.
+        Route::middleware(['auth:sanctum', 'superadmin'])->group(function () {
         Route::post('/auth/logout', [SuperAdminAuthController::class, 'logout']);
 
         // First-Time Customer Offers
@@ -210,6 +219,9 @@ Route::prefix('superadmin')->group(function () {
 
         Route::get('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'getPolicySettings']);
         Route::put('/settings/policy', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'updatePolicySettings']);
+        // The QR salons scan to pay BookALook, for plans and for payout dues.
+        Route::post('/settings/payment-qr', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'uploadPaymentQr']);
+        Route::delete('/settings/payment-qr', [\App\Http\Controllers\Api\SuperAdmin\SettingsController::class, 'removePaymentQr']);
 
         // How invoices look. Separate from policy because it is branding, not
         // a rule anybody is bound by.
@@ -231,6 +243,9 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/payouts/{id}', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'show']);
         Route::post('/payouts/{id}/approve', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'approve']);
         Route::post('/payouts/{id}/distribute', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'distribute']);
+        // A salon that owes pays by QR and uploads the screenshot; SuperAdmin checks it here.
+        Route::post('/payouts/{id}/payments/{submissionId}/approve', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'approvePayment']);
+        Route::post('/payouts/{id}/payments/{submissionId}/reject', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'rejectPayment']);
 
 
         // Localities. One list, kept clean here, because two spellings of the
@@ -318,6 +333,12 @@ Route::prefix('partner')->group(function () {
     Route::post('/register', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'register']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        // Change the signed-in owner's, staff member's or collaborator's own
+        // phone number, verified with an OTP to the new number. Outside the
+        // plan check: it is the person's login, not a salon feature.
+        Route::post('/me/phone/send-otp', [\App\Http\Controllers\Api\AccountPhoneController::class, 'sendCode'])->middleware('throttle:5,1');
+        Route::post('/me/phone/verify', [\App\Http\Controllers\Api\AccountPhoneController::class, 'confirm'])->middleware('throttle:10,1');
+
         // Retrieve all salons owned by the authenticated admin
         Route::get('/salons', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'mySalons']);
 
@@ -345,6 +366,12 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/subscription/upgrade', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'upgradeSubscription']);
         Route::post('/salons/{salon_id}/subscription/renew', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'renew']);
         Route::post('/salons/{salon_id}/subscription/payment-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'paymentRequest']);
+        // What the salon is paid, or owes, and paying what it owes. Outside the
+        // plan gate on purpose: an unsettled Commission Model month is what locks
+        // a salon out, so seeing and paying the bill must always work.
+        Route::get('/salons/{salon_id}/payouts', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'salonPayouts']);
+        Route::get('/payment-details', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'paymentDetails']);
+        Route::post('/salons/{salon_id}/payouts/{payout_id}/payment', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'submit'])->middleware('throttle:10,1');
         // Postpaid: no money changes hands here, so there is nothing to upload.
         Route::post('/salons/{salon_id}/subscription/commission-request', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'commissionRequest']);
         // WhatsApp marketing. Inside auth but outside the salon.active gate for
@@ -464,7 +491,6 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/payroll/{payslip_id}/mark-unpaid', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'markUnpaid']);
 
         // The salon's own copy of the weekly settlement
-        Route::get('/salons/{salon_id}/payouts', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'salonPayouts']);
 
 
         // Appointments

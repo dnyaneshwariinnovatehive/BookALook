@@ -24,11 +24,30 @@ interface Payout {
   refund_adjustment: number;
   wallet_redeemed_amount: number;
   net_amount: number;
+  /** pay_salon: BookALook pays the salon. salon_owes: commission exceeded the
+   *  advances held, so the salon pays the difference offline. */
+  direction?: 'pay_salon' | 'salon_owes';
+  amount_due?: number;
+  /** Frozen because the salon has paid against it. */
+  locked?: boolean;
+  /** The latest screenshot the salon sent for what it owes. */
+  payment_submission?: PaymentSubmission | null;
   status: string;
   distributed_at: string | null;
   distribution_reference: string | null;
   /** The statement issued for this cycle, present only once the money moved. */
   settlement_invoice: { number: string; url: string; issued_at: string } | null;
+}
+
+interface PaymentSubmission {
+  id: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  screenshot_url: string;
+  transaction_id: string | null;
+  note: string | null;
+  rejection_reason: string | null;
+  submitted_at: string | null;
 }
 
 interface Totals {
@@ -128,6 +147,8 @@ export default function PayoutsPage() {
   const [error, setError] = useState('');
   const [distributeTarget, setDistributeTarget] = useState<Payout | null>(null);
   const [distributeReference, setDistributeReference] = useState('');
+  const [reviewTarget, setReviewTarget] = useState<Payout | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [confirm, confirmDialog] = useConfirm();
 
   const [page, setPage] = useState(1);
@@ -233,7 +254,7 @@ export default function PayoutsPage() {
   const confirmGenerate = async () => {
     const ok = await confirm({
       title: `Rebuild the ${selectedCycleLabel()} cycle?`,
-      body: 'This recalculates every salon’s figures for this cycle from their completed appointments, overwriting whatever is already calculated. Nothing is paid out by this, but the numbers you approve and distribute afterwards will be these.',
+      body: 'This recalculates the open payouts for this cycle from every booking not yet settled — including late completions and no-show advances. Approved and distributed payouts are never changed. Nothing is paid out by this.',
       confirmLabel: 'Recalculate cycle',
     });
     if (!ok) return;
@@ -241,9 +262,12 @@ export default function PayoutsPage() {
   };
 
   const confirmApprove = async (payout: Payout) => {
+    const owes = payout.direction === 'salon_owes';
     const ok = await confirm({
-      title: `Approve ${money(payout.net_amount)} for ${payout.salon_name ?? 'this salon'}?`,
-      body: 'Approving releases this payout for distribution. It locks in the commission and the salon’s access for this cycle.',
+      title: owes
+        ? `Approve: ${payout.salon_name ?? 'this salon'} owes ${money(payout.amount_due ?? Math.abs(payout.net_amount))}?`
+        : `Approve ${money(payout.net_amount)} for ${payout.salon_name ?? 'this salon'}?`,
+      body: 'Approving freezes these figures — anything that changes afterwards goes into the next payout — and releases it to be settled.',
       confirmLabel: 'Approve payout',
     });
     if (!ok) return;
@@ -271,6 +295,36 @@ export default function PayoutsPage() {
       if (action === 'distribute') {
         setDistributeTarget(null);
       }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'That did not work.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Checking the salon's screenshot of paying what it owed.
+  const reviewPayment = async (decision: 'approve' | 'reject') => {
+    const payout = reviewTarget;
+    const submission = payout?.payment_submission;
+    if (!payout || !submission) return;
+    if (decision === 'reject' && rejectReason.trim().length < 3) {
+      setError('Say why the payment is being declined. The salon sees this.');
+      return;
+    }
+
+    setBusyId(payout.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/proxy/superadmin/payouts/${payout.id}/payments/${submission.id}/${decision}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(decision === 'reject' ? { reason: rejectReason.trim() } : {}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'That did not work.');
+      setReviewTarget(null);
+      setRejectReason('');
+      await fetchPayouts();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'That did not work.');
     } finally {
@@ -483,7 +537,21 @@ export default function PayoutsPage() {
                   )}
                   {p.refund_adjustment === 0 && p.wallet_redeemed_amount === 0 && '—'}
                 </td>
-                <td className={styles.net}>{money(p.net_amount)}</td>
+                <td className={styles.net}>
+                  {p.direction === 'salon_owes' ? (
+                    <span style={{ color: 'var(--color-danger)' }} title="Commission exceeded the advances held; the salon pays this by QR.">
+                      Salon owes {money(p.amount_due ?? Math.abs(p.net_amount))}
+                      {p.payment_submission?.status === 'pending' && p.status !== 'distributed' && (
+                        <small style={{ display: 'block', color: 'var(--color-warning, #b45309)' }}>Payment to verify</small>
+                      )}
+                      {p.payment_submission?.status === 'rejected' && p.status !== 'distributed' && (
+                        <small style={{ display: 'block', color: 'var(--text-body)' }}>Last payment declined</small>
+                      )}
+                    </span>
+                  ) : (
+                    money(p.net_amount)
+                  )}
+                </td>
                 <td>{statusPill(p.status)}</td>
                 <td style={{ textAlign: 'right' }}>
                   <div className={styles.rowActions} style={{ justifyContent: 'flex-end' }}>
@@ -496,13 +564,22 @@ export default function PayoutsPage() {
                         Approve
                       </button>
                     )}
-                    {p.status !== 'distributed' && (
+                    {p.status !== 'distributed' && p.payment_submission?.status === 'pending' && (
+                      <button
+                        className={`${styles.smallButton} ${styles.payButton}`}
+                        disabled={busyId === p.id}
+                        onClick={() => { setReviewTarget(p); setRejectReason(''); }}
+                      >
+                        Review payment
+                      </button>
+                    )}
+                    {p.status !== 'distributed' && p.payment_submission?.status !== 'pending' && (
                       <button
                         className={`${styles.smallButton} ${styles.payButton}`}
                         disabled={busyId === p.id}
                         onClick={() => confirmDistribute(p)}
                       >
-                        Distribute
+                        {p.direction === 'salon_owes' ? 'Mark collected' : 'Distribute'}
                       </button>
                     )}
                     {p.status === 'distributed' && (
@@ -550,15 +627,28 @@ export default function PayoutsPage() {
       {distributeTarget && (
         <div className={styles.modalOverlay} onClick={() => setDistributeTarget(null)}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>Distribute Payout</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '16px' }}>
+              {distributeTarget.direction === 'salon_owes' ? 'Record payment received' : 'Distribute Payout'}
+            </h2>
             <p style={{ color: 'var(--text-strong)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>
-              Distribute <strong>{money(distributeTarget.net_amount)}</strong> to <strong>{distributeTarget.salon_name}</strong>?<br/><br/>
-              {money(distributeTarget.commission_deducted)} commission is earned in this cycle.
+              {distributeTarget.direction === 'salon_owes' ? (
+                <>
+                  Confirm you have received <strong>{money(distributeTarget.amount_due ?? Math.abs(distributeTarget.net_amount))}</strong> from <strong>{distributeTarget.salon_name}</strong>.<br/><br/>
+                  Their {money(distributeTarget.commission_deducted)} commission was more than the {money(distributeTarget.gross_amount)} of advances BookALook held, so they pay the difference.
+                </>
+              ) : (
+                <>
+                  Distribute <strong>{money(distributeTarget.net_amount)}</strong> to <strong>{distributeTarget.salon_name}</strong>?<br/><br/>
+                  {money(distributeTarget.commission_deducted)} commission is earned in this cycle.
+                </>
+              )}
               {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}<br/><br/>
               <em>This cannot be undone.</em>
             </p>
             <div className={styles.formGroup}>
-              <label htmlFor="ref">Payment Reference (optional)</label>
+              <label htmlFor="ref">
+                {distributeTarget.direction === 'salon_owes' ? 'UPI / bank reference of the payment received (required)' : 'Payment Reference (optional)'}
+              </label>
               <input
                 id="ref"
                 type="text"
@@ -577,10 +667,67 @@ export default function PayoutsPage() {
               </button>
               <button 
                 onClick={() => act(distributeTarget, 'distribute', distributeReference)}
-                disabled={busyId === distributeTarget.id}
+                disabled={busyId === distributeTarget.id || (distributeTarget.direction === 'salon_owes' && !distributeReference.trim())}
                 style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-danger-solid)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
               >
-                {busyId === distributeTarget.id ? 'Confirming...' : 'Confirm Distribution'}
+                {busyId === distributeTarget.id
+                  ? 'Confirming...'
+                  : distributeTarget.direction === 'salon_owes' ? 'Mark collected' : 'Confirm Distribution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewTarget && reviewTarget.payment_submission && (
+        <div className={styles.modalOverlay} onClick={() => setReviewTarget(null)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '12px' }}>Verify payment</h2>
+            <p style={{ color: 'var(--text-strong)', fontSize: '0.95rem', marginBottom: '12px', lineHeight: 1.5 }}>
+              <strong>{reviewTarget.salon_name}</strong> says it paid{' '}
+              <strong>{money(reviewTarget.payment_submission.amount)}</strong> for {reviewTarget.cycle_label}.
+              Check the screenshot against your bank before approving.
+            </p>
+            <a href={reviewTarget.payment_submission.screenshot_url} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={reviewTarget.payment_submission.screenshot_url}
+                alt="Payment screenshot"
+                style={{ width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--surface-color)' }}
+              />
+            </a>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-body)', margin: '12px 0', lineHeight: 1.6 }}>
+              <div>UTR / reference: <strong>{reviewTarget.payment_submission.transaction_id || '—'}</strong></div>
+              {reviewTarget.payment_submission.note && <div>Note: {reviewTarget.payment_submission.note}</div>}
+              {reviewTarget.payment_submission.submitted_at && (
+                <div>Sent {new Date(reviewTarget.payment_submission.submitted_at).toLocaleString()}</div>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="reject-reason">If declining, tell the salon why (they pay the full amount again)</label>
+              <input
+                id="reject-reason"
+                type="text"
+                placeholder="e.g. Received ₹500 of ₹800"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--text-heading)', width: '100%', fontSize: '0.95rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
+              <button
+                onClick={() => reviewPayment('reject')}
+                disabled={busyId === reviewTarget.id || rejectReason.trim().length < 3}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-strong)', background: 'var(--surface-color)', color: 'var(--color-danger)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                Decline
+              </button>
+              <button
+                onClick={() => reviewPayment('approve')}
+                disabled={busyId === reviewTarget.id}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--color-success-solid, #16a34a)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
+              >
+                {busyId === reviewTarget.id ? 'Saving…' : 'Approve & mark paid'}
               </button>
             </div>
           </div>

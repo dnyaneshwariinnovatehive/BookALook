@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import 'package:partner_app/main.dart';
 import 'package:partner_app/screens/phone_screen.dart';
+import 'package:partner_app/screens/change_phone_screen.dart';
+import 'package:partner_app/services/account_api.dart';
 import 'package:partner_app/screens/dashboard/salon_selection_screen.dart';
 import 'package:partner_app/services/api_service.dart';
 import 'package:partner_app/screens/notifications_screen.dart';
@@ -615,6 +617,31 @@ class MoreMenuCatalog {
             ],
             onSelect: (ctx, salonData, _) =>
                 logout(ctx, action: 'Switch Account', salonData: salonData),
+          ),
+          MoreMenuItem(
+            id: 'change_phone',
+            title: 'Change Phone Number',
+            category: 'Account & app settings',
+            subtitle: 'The number you sign in with, verified by OTP',
+            icon: Icons.phone_iphone_rounded,
+            iconColor: AppTheme.accentColor,
+            type: MenuItemType.action,
+            keywords: const [
+              'change phone',
+              'phone number',
+              'mobile number',
+              'update number',
+              'login number',
+              'account',
+            ],
+            onSelect: (ctx, salonData, _) async {
+              final current = await AccountApi.savedPhone();
+              if (!ctx.mounted) return;
+              await Navigator.push<String>(
+                ctx,
+                MaterialPageRoute(builder: (_) => ChangePhoneScreen(currentPhone: current)),
+              );
+            },
           ),
           MoreMenuItem(
             id: 'push_notifications',

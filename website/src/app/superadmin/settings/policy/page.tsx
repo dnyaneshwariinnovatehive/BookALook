@@ -175,13 +175,14 @@ function DurationField({
 
 // ---------------------------------------------------------------------- tabs
 
-type PolicyTab = 'catalog' | 'bookings' | 'subscriptions' | 'coins' | 'links' | 'whatsapp';
+type PolicyTab = 'catalog' | 'bookings' | 'subscriptions' | 'coins' | 'payments' | 'links' | 'whatsapp';
 
 const TAB_LABELS: Record<PolicyTab, string> = {
   catalog: 'Services',
   bookings: 'Bookings',
   subscriptions: 'Subscriptions',
   coins: 'Coins',
+  payments: 'Payments',
   links: 'Links & QR',
   whatsapp: 'WhatsApp',
 };
@@ -192,6 +193,7 @@ const TAB_FIELDS: Record<PolicyTab, (keyof FormState)[]> = {
   bookings: ['cancelCutoff', 'rescheduleCutoff', 'startEarly'],
   subscriptions: ['warningDays', 'reminderHour', 'graceDays'],
   coins: ['coinValue', 'welcomeBonusCoins'],
+  payments: ['paymentUpiId', 'paymentPayeeName'],
   links: ['publicWebUrl', 'androidAppUrl', 'iosAppUrl', 'androidApkUrl'],
   whatsapp: [
     'reminderLead',
@@ -219,6 +221,8 @@ interface FormState {
   androidAppUrl: string;
   iosAppUrl: string;
   androidApkUrl: string;
+  paymentUpiId: string;
+  paymentPayeeName: string;
   waBookingConfirmed: boolean;
   waAppointmentReminder: boolean;
   waAppointmentCancelled: boolean;
@@ -241,6 +245,8 @@ const EMPTY: FormState = {
   androidAppUrl: '',
   iosAppUrl: '',
   androidApkUrl: '',
+  paymentUpiId: '',
+  paymentPayeeName: '',
   waBookingConfirmed: true,
   waAppointmentReminder: true,
   waAppointmentCancelled: true,
@@ -275,6 +281,42 @@ export default function PlatformPolicyPage() {
   // is the only proof the write actually landed.
   const [savePulse, setSavePulse] = useState(0);
 
+  // The payment QR is an image, uploaded the moment it is picked rather than
+  // with the form — so it sits outside the form state.
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string>('');
+  const [qrBusy, setQrBusy] = useState(false);
+
+  const uploadQr = async (file: File) => {
+    setQrBusy(true);
+    setBanner(null);
+    try {
+      const body = new FormData();
+      body.append('qr', file);
+      const res = await fetch('/api/proxy/superadmin/settings/payment-qr', { method: 'POST', body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Could not upload the QR');
+      setPaymentQrUrl(data.payment_qr_url || '');
+      setBanner({ tone: 'ok', text: 'Payment QR updated. Salons see it the next time they open a pay screen.' });
+    } catch (e) {
+      setBanner({ tone: 'bad', text: e instanceof Error ? e.message : 'Could not upload the QR' });
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const removeQr = async () => {
+    setQrBusy(true);
+    try {
+      const res = await fetch('/api/proxy/superadmin/settings/payment-qr', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Could not remove the QR');
+      setPaymentQrUrl('');
+    } catch (e) {
+      setBanner({ tone: 'bad', text: e instanceof Error ? e.message : 'Could not remove the QR' });
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     // A "Saved." notice sitting above fields that have since been edited is
@@ -289,6 +331,7 @@ export default function PlatformPolicyPage() {
       if (!data.success) throw new Error(data.message || 'Could not load settings');
 
       const s = data.settings;
+      setPaymentQrUrl(s.payment_qr_url || '');
       const next: FormState = {
         warningDays: String(s.subscription_expiry_warning_days ?? 3),
         cancelCutoff: toDuration(Number(s.cancellation_cutoff_minutes ?? 90)),
@@ -303,6 +346,8 @@ export default function PlatformPolicyPage() {
         androidAppUrl: s.android_app_url || '',
         iosAppUrl: s.ios_app_url || '',
         androidApkUrl: s.android_apk_url || '',
+        paymentUpiId: s.payment_upi_id || '',
+        paymentPayeeName: s.payment_payee_name || '',
         waBookingConfirmed: s.whatsapp_booking_confirmed_enabled ?? true,
         waAppointmentReminder: s.whatsapp_appointment_reminder_enabled ?? true,
         waAppointmentCancelled: s.whatsapp_appointment_cancelled_enabled ?? true,
@@ -392,6 +437,8 @@ export default function PlatformPolicyPage() {
       android_app_url: state.androidAppUrl.trim(),
       ios_app_url: state.iosAppUrl.trim(),
       android_apk_url: state.androidApkUrl.trim(),
+      payment_upi_id: state.paymentUpiId.trim(),
+      payment_payee_name: state.paymentPayeeName.trim(),
       whatsapp_booking_confirmed_enabled: state.waBookingConfirmed,
       whatsapp_appointment_reminder_enabled: state.waAppointmentReminder,
       whatsapp_appointment_cancelled_enabled: state.waAppointmentCancelled,
@@ -763,6 +810,84 @@ export default function PlatformPolicyPage() {
               placeholder="https://bookalook.in/downloads/bookalook.apk"
               value={form.androidApkUrl}
               onChange={(e) => set('androidApkUrl', e.target.value)}
+            />
+          </Field>
+        </section>
+        )}
+
+        {tab === 'payments' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Where salons pay BookALook</h2>
+          <p className={styles.sectionHint}>
+            Shown to salon owners when they buy a plan and when they pay what a
+            payout says they owe. They scan it, pay, and upload the screenshot for
+            you to verify.
+          </p>
+
+          <Field
+            label="Payment QR"
+            hint="A clear image of your UPI QR code. It replaces the current one immediately."
+          >
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              {paymentQrUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={paymentQrUrl}
+                  alt="Payment QR"
+                  style={{ width: 140, height: 140, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border-strong)', background: '#fff' }}
+                />
+              ) : (
+                <div style={{ width: 140, height: 140, display: 'grid', placeItems: 'center', borderRadius: 8, border: '1px dashed var(--border-strong)', color: 'var(--text-body)', fontSize: 13, textAlign: 'center', padding: 8 }}>
+                  No QR yet — salons are told to contact you
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className={styles.input} style={{ cursor: qrBusy ? 'wait' : 'pointer', textAlign: 'center' }}>
+                  {qrBusy ? 'Working…' : paymentQrUrl ? 'Replace QR' : 'Upload QR'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    hidden
+                    disabled={qrBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) uploadQr(file);
+                    }}
+                  />
+                </label>
+                {paymentQrUrl && (
+                  <button type="button" className={styles.input} disabled={qrBusy} onClick={removeQr}>
+                    Remove QR
+                  </button>
+                )}
+              </div>
+            </div>
+          </Field>
+
+          <Field
+            label="UPI ID"
+            hint="Shown under the QR with a copy button, for owners who prefer to type it."
+          >
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="e.g. bookalook@okhdfcbank"
+              value={form.paymentUpiId}
+              onChange={(e) => set('paymentUpiId', e.target.value)}
+            />
+          </Field>
+
+          <Field
+            label="Payee name"
+            hint="The name their UPI app will show, so they can check they are paying BookALook."
+          >
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="e.g. InnovateHive Technologies"
+              value={form.paymentPayeeName}
+              onChange={(e) => set('paymentPayeeName', e.target.value)}
             />
           </Field>
         </section>

@@ -422,6 +422,11 @@ class BillingModelTest extends TestCase
             User::where('role', 'superadmin')->first() ?? User::first()
         );
 
+        // As if the salon joined at the start of the month the tests settle:
+        // commission is charged at the rate in force on each booking's date.
+        SalonCommissionRate::where('salon_id', $salon->id)->whereNull('effective_to')
+            ->update(['effective_from' => Carbon::today()->startOfMonth()]);
+
         $salon->refresh();
     }
 
