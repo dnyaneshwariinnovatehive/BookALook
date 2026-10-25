@@ -8,16 +8,25 @@ use Illuminate\Http\Request;
 use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Salon;
 use App\Models\ServiceProvider;
+use Illuminate\Support\Str;
 
 class ServiceManagementController extends Controller
 {
-    public function getMasterCatalog(Request $request)
+    public function getMasterCatalog($salon_id, Request $request)
     {
-        // Get all standard categories, plus any custom categories created by this salon (if salon_id provided)
-        $salonId = $request->query('salon_id');
+        $salon = Salon::findOrFail($salon_id);
+        if ($salon->admin_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized for this salon'], 403);
+        }
+
+        // Every standard category, plus the custom ones this salon made. The
+        // salon is the one in the path, which the owner check above vouches
+        // for, never one the caller names in the query string.
+        $salonId = $salon->id;
 
         $query = ServiceCategory::with(['templates' => function ($q) use ($salonId) {
             $q->where('is_active', true)
@@ -146,27 +155,21 @@ class ServiceManagementController extends Controller
             }
 
             $categoryId = $request->category_id;
-            
-            if ($categoryId === 'new_custom') {
-                $category = ServiceCategory::create([
-                    'name' => $request->custom_category_name,
-                    'is_custom' => true,
-                    'created_by_salon_id' => $salon_id,
-                ]);
-                $categoryId = $category->id;
-            }
 
-            $template = ServiceTemplate::create([
-                'category_id' => $categoryId,
-                'name' => $request->custom_template_name,
-                'estimated_duration_minutes' => $request->estimated_duration_minutes,
-                'is_custom' => true,
-                'created_by_salon_id' => $salon_id,
-            ]);
-            $templateId = $template->id;
+            // A custom service goes into a category this salon can see: a
+            // live standard one, or one of its own. Never another salon's.
+            if ($categoryId !== 'new_custom' && ! $this->categoryAvailableTo($categoryId, $salon_id)) {
+                return response()->json([
+                    'message' => 'That category is not available to this salon.',
+                    'errors' => ['category_id' => ['That category is not available to this salon.']],
+                ], 422);
+            }
         } else {
-            $template = ServiceTemplate::find($templateId);
-            if (!$template) {
+            $template = ServiceTemplate::with('category')->find($templateId);
+
+            // Retired, switched off, or another salon's own: as far as this
+            // salon is concerned, it does not exist.
+            if (! $template || ! $this->templateAvailableTo($template, $salon_id)) {
                 return response()->json(['message' => 'Service template not found'], 404);
             }
             $normalizedTemplateName = mb_strtolower(trim($template->name));
@@ -187,42 +190,104 @@ class ServiceManagementController extends Controller
             }
         }
 
-        // Check if service already exists (including soft-deleted ones)
-        $exists = Service::withTrashed()->where('salon_id', $salon_id)->where('template_id', $templateId)->first();
-        
-        if ($exists) {
-            if (!$exists->trashed()) {
-                return response()->json(['message' => 'Service already exists in this salon'], 400);
+        $details = [
+            'price' => $request->price,
+            'description' => $request->description,
+            'advance_percentage' => $advancePercentage,
+            'gender_focus' => $request->gender_focus ?? 'Unisex',
+            'will_refund_advance_if_cancelled' => $willRefund,
+        ];
+
+        // The custom category, its template and the service land together or
+        // not at all, so a failure part-way leaves no orphan behind.
+        $service = DB::transaction(function () use ($request, $salon_id, $templateId, $details) {
+            if ($request->is_custom) {
+                $categoryId = $request->category_id;
+
+                if ($categoryId === 'new_custom') {
+                    $categoryId = ServiceCategory::create([
+                        'name' => $request->custom_category_name,
+                        'is_custom' => true,
+                        'created_by_salon_id' => $salon_id,
+                    ])->id;
+                }
+
+                $templateId = ServiceTemplate::create([
+                    'category_id' => $categoryId,
+                    'name' => $request->custom_template_name,
+                    'estimated_duration_minutes' => $request->estimated_duration_minutes,
+                    'is_custom' => true,
+                    'created_by_salon_id' => $salon_id,
+                ])->id;
             }
-            
+
+            // Check if service already exists (including soft-deleted ones)
+            $exists = Service::withTrashed()->where('salon_id', $salon_id)->where('template_id', $templateId)->first();
+
+            if (! $exists) {
+                return Service::create($details + [
+                    'salon_id' => $salon_id,
+                    'template_id' => $templateId,
+                ]);
+            }
+
+            if (! $exists->trashed()) {
+                return null;
+            }
+
             // If it was soft-deleted, restore it and update the details
             $exists->restore();
-            $exists->update([
-                'price' => $request->price,
-                'description' => $request->description,
-                'advance_percentage' => $advancePercentage,
-                'gender_focus' => $request->gender_focus ?? 'Unisex',
-                'will_refund_advance_if_cancelled' => $willRefund,
-                'is_active' => true,
-            ]);
-            
-            $service = $exists;
-        } else {
-            $service = Service::create([
-                'salon_id' => $salon_id,
-                'template_id' => $templateId,
-                'price' => $request->price,
-                'description' => $request->description,
-                'advance_percentage' => $advancePercentage,
-                'gender_focus' => $request->gender_focus ?? 'Unisex',
-                'will_refund_advance_if_cancelled' => $willRefund,
-            ]);
+            $exists->update($details + ['is_active' => true]);
+
+            return $exists;
+        });
+
+        if (! $service) {
+            return response()->json(['message' => 'Service already exists in this salon'], 400);
         }
 
         return response()->json([
             'message' => 'Service added successfully',
             'service' => $service->load('template.category')
         ]);
+    }
+
+    /**
+     * Whether a salon may file a custom service under this category: it must
+     * still be live, and be either standard or this salon's own.
+     */
+    private function categoryAvailableTo($categoryId, string $salonId): bool
+    {
+        if (! is_string($categoryId) || ! Str::isUuid($categoryId)) {
+            return false;
+        }
+
+        return ServiceCategory::where('id', $categoryId)
+            ->where('is_active', true)
+            ->where(function ($q) use ($salonId) {
+                $q->where('is_custom', false)
+                  ->orWhere('created_by_salon_id', $salonId);
+            })
+            ->exists();
+    }
+
+    /**
+     * Whether a salon may offer this template: it, and the category it sits
+     * in, must be live, and a custom one must be this salon's own.
+     */
+    private function templateAvailableTo(ServiceTemplate $template, string $salonId): bool
+    {
+        if (! $template->is_active) {
+            return false;
+        }
+
+        if ($template->is_custom && $template->created_by_salon_id !== $salonId) {
+            return false;
+        }
+
+        $category = $template->category;
+
+        return $category && ! $category->trashed() && $category->is_active;
     }
 
     public function updateService($salon_id, $service_id, Request $request)

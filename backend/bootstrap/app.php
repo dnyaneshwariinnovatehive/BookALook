@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // Closes a salon's features when its plan has lapsed.
             'salon.active' => \App\Http\Middleware\EnsureSalonSubscriptionActive::class,
             'app.version' => \App\Http\Middleware\EnforceAppVersion::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
         ]);
 
         $middleware->api(append: [
