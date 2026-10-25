@@ -224,14 +224,18 @@ class WalkInController extends Controller
                   ->orWhereNotNull('walk_in_customer_name');
             });
 
-        // Overall salon summary metrics for walk-ins
-        $summaryQuery = clone $baseQuery;
-        if ($isProvider && $request->input('scope') === 'my' && $currentProviderId) {
-            $summaryQuery->where(function ($q) use ($currentProviderId) {
+        // A staff member sees the walk-ins they were booked for or served,
+        // never the whole salon's — whatever scope the app asks for. Only the
+        // owner sees everyone's.
+        if ($isProvider) {
+            $baseQuery->where(function ($q) use ($currentProviderId) {
                 $q->where('appointed_provider_id', $currentProviderId)
                   ->orWhere('serving_provider_id', $currentProviderId);
             });
         }
+
+        // Summary metrics over what this viewer may see
+        $summaryQuery = clone $baseQuery;
 
         $todayStr = Carbon::today()->toDateString();
         $totalWalkIns = (clone $summaryQuery)->count();
@@ -245,13 +249,8 @@ class WalkInController extends Controller
         // Filter query
         $query = clone $baseQuery;
 
-        // Staff scope
-        if ($isProvider && $request->input('scope') === 'my' && $currentProviderId) {
-            $query->where(function ($q) use ($currentProviderId) {
-                $q->where('appointed_provider_id', $currentProviderId)
-                  ->orWhere('serving_provider_id', $currentProviderId);
-            });
-        } elseif ($request->filled('provider_id') && $request->provider_id !== 'all') {
+        // The owner can narrow to one staff member.
+        if (! $isProvider && $request->filled('provider_id') && $request->provider_id !== 'all') {
             $pId = $request->provider_id;
             $query->where(function ($q) use ($pId) {
                 $q->where('appointed_provider_id', $pId)

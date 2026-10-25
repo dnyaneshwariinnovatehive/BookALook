@@ -284,4 +284,38 @@ void main() {
       expect(dropdown.items!.map((i) => i.value), ['Unisex', 'Men Only', 'Women Only']);
     });
   });
+  group('AddServiceFlow - Linked add-ons', () {
+    testWidgets('a salon with no services says so in the add-on dropdown', (tester) async {
+      await tester.pumpWidget(createWidget(categories: [sampleCategorySpa], existingServices: const []));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('linked_addons_dropdown')), 300,
+          scrollable: find.byType(Scrollable).first);
+
+      final dropdown = tester.widget<DropdownButton<String>>(find.byKey(const ValueKey('linked_addons_dropdown')));
+      expect(dropdown.onChanged, isNull);
+      expect(find.text('No services registered yet'), findsOneWidget);
+    });
+
+    testWidgets('when every service is already linked it says that instead', (tester) async {
+      final only = SalonService(
+        id: 'serv-only',
+        salonId: 'test-salon-123',
+        templateId: 't-hair-1',
+        price: 300,
+        template: sampleCategoryHair.templates![0],
+      );
+      await tester.pumpWidget(createWidget(categories: [sampleCategorySpa], existingServices: [only]));
+      await tester.pumpAndSettle();
+
+      // Link the only service there is.
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('linked_addons_dropdown')), 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.byKey(const ValueKey('linked_addons_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Men's Haircut").last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('All your services are already linked'), findsOneWidget);
+    });
+  });
 }

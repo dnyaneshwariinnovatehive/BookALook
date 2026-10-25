@@ -42,9 +42,14 @@ class PayrollController extends Controller
         // shows up without the admin having to remember to press a button.
         $this->payroll->buildForSalon($salonId, $month);
 
+        // Never the owner's own provider profile, including any payslip made
+        // for it before owners were left out.
+        $ownerId = Salon::whereKey($salonId)->value('admin_id');
+
         $payslips = SalaryPayout::with('provider.user:id,name')
             ->where('salon_id', $salonId)
             ->whereDate('salary_month', $month->copy()->startOfMonth()->toDateString())
+            ->whereHas('provider', fn ($q) => $q->where('user_id', '!=', $ownerId))
             ->get()
             ->sortBy(fn (SalaryPayout $p) => $p->provider->user->name ?? '')
             ->map(fn (SalaryPayout $p) => $this->payroll->present($p))

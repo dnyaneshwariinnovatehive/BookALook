@@ -318,16 +318,29 @@ class CartPricingService
             return [];
         }
 
-        $together = $this->boughtTogether($cart->salon_id, $inCart, $limit);
+        // What the owner chose to recommend comes first; it is the salon
+        // speaking. History and category only fill the rest of the strip.
+        $picks = $this->ownerPicks($cart->salon_id, $inCart, $limit);
 
-        if (count($together) >= $limit) {
-            return $together;
+        if (count($picks) >= $limit) {
+            return $picks;
+        }
+
+        $exclude = array_merge($inCart, array_column($picks, 'id'));
+        $together = array_values(array_filter(
+            $this->boughtTogether($cart->salon_id, $inCart, $limit),
+            fn ($row) => ! in_array($row['id'], $exclude, true)
+        ));
+        $suggestions = array_slice(array_merge($picks, $together), 0, $limit);
+
+        if (count($suggestions) >= $limit) {
+            return $suggestions;
         }
 
         // Top up with same-category services so the strip is never near-empty.
-        $exclude = array_merge($inCart, array_column($together, 'id'));
+        $exclude = array_merge($inCart, array_column($suggestions, 'id'));
 
-        return array_merge($together, $this->sameCategory($cart->salon_id, $inCart, $exclude, $limit - count($together)));
+        return array_merge($suggestions, $this->sameCategory($cart->salon_id, $inCart, $exclude, $limit - count($suggestions)));
     }
 
     // ------------------------------------------------------------- internals
@@ -446,6 +459,54 @@ class CartPricingService
      * @param  string[]  $inCart
      * @return array<int, array>
      */
+    /**
+     * The add-ons the owner linked to what is in the cart, each saying which
+     * cart service it goes with. Only live services somebody can perform.
+     *
+     * @param  string[]  $inCart
+     * @return array<int, array>
+     */
+    private function ownerPicks(string $salonId, array $inCart, int $limit): array
+    {
+        $rows = DB::table('service_upsells as u')
+            ->join('services as base', 'base.id', '=', 'u.service_id')
+            ->join('service_templates as bt', 'bt.id', '=', 'base.template_id')
+            ->join('services as s', 's.id', '=', 'u.upsell_service_id')
+            ->join('service_templates as t', 't.id', '=', 's.template_id')
+            ->whereIn('u.service_id', $inCart)
+            ->whereNotIn('u.upsell_service_id', $inCart)
+            ->where('s.salon_id', $salonId)
+            ->where('s.is_active', true)
+            ->whereNull('s.deleted_at')
+            ->whereExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('provider_services as ps')
+                    ->join('service_providers as sp', 'sp.id', '=', 'ps.provider_id')
+                    ->whereColumn('ps.service_id', 's.id')
+                    ->where('sp.is_active', true)
+                    ->whereNull('sp.deleted_at');
+            })
+            ->orderBy('u.display_order')
+            ->get([
+                's.id as id',
+                't.name as name',
+                's.price as price',
+                't.estimated_duration_minutes as duration',
+                'bt.name as paired_with',
+            ]);
+
+        return $rows->unique('id')->take($limit)->map(fn ($row) => [
+            'id' => $row->id,
+            'name' => $row->name,
+            'price' => (float) $row->price,
+            'duration_minutes' => (int) ($row->duration ?? AvailabilityService::SLOT_MINUTES),
+            'reason' => 'salon_pick',
+            'paired_with' => $row->paired_with,
+            'together_count' => 0,
+            'together_percent' => 0,
+        ])->values()->all();
+    }
+
     private function boughtTogether(string $salonId, array $inCart, int $limit): array
     {
         // How many completed appointments contained each cart service, so the
@@ -476,13 +537,14 @@ class CartPricingService
             ->whereNotIn('other.service_id', $inCart)
             ->where('s.is_active', true)
             ->whereNull('s.deleted_at')
-            ->groupBy('other.service_id', 't.name', 's.price')
+            ->groupBy('other.service_id', 't.name', 's.price', 't.estimated_duration_minutes')
             ->orderByDesc(DB::raw('COUNT(DISTINCT a.id)'))
             ->limit($limit)
             ->get([
                 'other.service_id as id',
                 't.name as name',
                 's.price as price',
+                't.estimated_duration_minutes as duration',
                 DB::raw('COUNT(DISTINCT a.id) as together_count'),
             ]);
 
@@ -490,6 +552,7 @@ class CartPricingService
             'id' => $row->id,
             'name' => $row->name,
             'price' => (float) $row->price,
+            'duration_minutes' => (int) ($row->duration ?? AvailabilityService::SLOT_MINUTES),
             'reason' => 'bought_together',
             'together_count' => (int) $row->together_count,
             'together_percent' => (int) round($row->together_count / $baseline * 100),
@@ -531,6 +594,7 @@ class CartPricingService
                 'id' => $service->id,
                 'name' => $service->template->name ?? 'Service',
                 'price' => (float) $service->price,
+                'duration_minutes' => $this->serviceDuration($service),
                 'reason' => 'same_category',
                 'together_count' => 0,
                 'together_percent' => 0,

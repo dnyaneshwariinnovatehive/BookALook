@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/salon_service.dart';
 import '../services/audience_service.dart';
+import '../widgets/pairs_well_with_sheet.dart';
 import '../services/cart_service.dart';
 import '../services/auth_service.dart';
 import '../services/review_service.dart';
@@ -467,6 +468,51 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     }
   }
 
+  /// Services the pairing sheet has already been shown for this visit, so a
+  /// customer is offered the salon's add-ons once, not on every tap.
+  final Set<String> _pairingsOffered = {};
+
+  /// The salon's recommended add-ons for a service just added, offered in a
+  /// sheet. Skips any already in the cart or that nobody can perform.
+  Future<void> _offerPairings(String serviceId) async {
+    if (_pairingsOffered.contains(serviceId)) return;
+
+    final all = ((_salon?['services'] as List?) ?? const []).whereType<Map>().map((s) => Map<String, dynamic>.from(s)).toList();
+    final base = all.where((s) => s['id'].toString() == serviceId).firstOrNull;
+    if (base == null) return;
+
+    final ids = ((base['upsell_ids'] as List?) ?? const []).map((id) => id.toString()).toList();
+    final picks = [
+      for (final id in ids)
+        ...all.where((s) =>
+            s['id'].toString() == id &&
+            (s['provider_count'] ?? 0) > 0 &&
+            _getServiceQuantity(id) == 0),
+    ];
+    if (picks.isEmpty) return;
+
+    _pairingsOffered.add(serviceId);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return;
+
+    await showPairsWellWithSheet(
+      context,
+      baseName: base['name']?.toString() ?? 'service',
+      salonName: _salon?['name']?.toString(),
+      services: picks,
+      onAdd: (id) async {
+        try {
+          final cart = await _cartService.addItem(widget.salonId, id, quantity: 1);
+          if (!mounted) return false;
+          setState(() => _cart = cart);
+          return true;
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+  }
+
   Future<void> _addToCart({
     String? serviceId,
     String? comboId,
@@ -564,6 +610,9 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               ),
             );
         }
+      } else if (serviceId != null) {
+        // Not awaited: the add itself is done, the offer is a bonus.
+        _offerPairings(serviceId);
       }
     } on CartConflictException catch (e) {
       if (!mounted) return;

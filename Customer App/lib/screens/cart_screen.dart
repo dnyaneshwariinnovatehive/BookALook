@@ -436,6 +436,7 @@ class _CartScreenState extends State<CartScreen> {
             SizedBox(height: 20),
             SuggestionStrip(
               suggestions: suggestions,
+              salonName: _cart!['salon']?['name']?.toString(),
               onAdd: _isAdding ? null : _addService,
             ),
           ],

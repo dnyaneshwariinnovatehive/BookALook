@@ -79,10 +79,11 @@ class ServiceManagementController extends Controller
             return response()->json(['message' => 'Unauthorized for this salon'], 403);
         }
 
-        $services = Service::with(['template.category'])
+        $services = Service::with(['template.category', 'upsells:id'])
             ->where('salon_id', $salon_id)
             ->where('is_active', true)
-            ->get();
+            ->get()
+            ->map(fn (Service $service) => $this->withUpsellIds($service));
 
         // Group by category
         $grouped = [];
@@ -140,6 +141,9 @@ class ServiceManagementController extends Controller
             'advance_percentage' => 'nullable|numeric|min:0|max:100',
             'gender_focus' => 'nullable|string|'.GenderFocus::rule(),
             'will_refund_advance_if_cancelled' => 'nullable|boolean',
+            // Add-ons the owner recommends with this service.
+            'linked_service_ids' => 'sometimes|nullable|array|max:'.self::MAX_UPSELLS,
+            'linked_service_ids.*' => 'string',
         ]);
 
         if ($validator->fails()) {
@@ -283,9 +287,13 @@ class ServiceManagementController extends Controller
             return response()->json(['message' => 'Service already exists in this salon'], 400);
         }
 
+        if ($request->has('linked_service_ids')) {
+            $this->syncUpsells($service, (array) $request->input('linked_service_ids', []));
+        }
+
         return response()->json([
             'message' => 'Service added successfully',
-            'service' => $service->load('template.category')
+            'service' => $this->withUpsellIds($service->load('template.category')),
         ]);
     }
 
@@ -325,6 +333,53 @@ class ServiceManagementController extends Controller
         $category = $template->category;
 
         return $category && ! $category->trashed() && $category->is_active;
+    }
+
+    /** How many add-ons one service may recommend. */
+    private const MAX_UPSELLS = 10;
+
+    /**
+     * Make these the service's recommended add-ons, in the order given.
+     *
+     * Only the same salon's live services count, never the service itself and
+     * never twice; anything else in the list is dropped rather than refused,
+     * so a stale id from an old screen cannot fail the whole save.
+     */
+    private function syncUpsells(Service $service, array $ids): void
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('strval', $ids),
+            fn ($id) => $id !== '' && $id !== (string) $service->id
+        )));
+
+        $valid = $ids === [] ? [] : Service::where('salon_id', $service->salon_id)
+            ->where('is_active', true)
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        $sync = [];
+        foreach ($ids as $order => $id) {
+            if (in_array($id, $valid, true)) {
+                $sync[$id] = ['display_order' => $order];
+            }
+        }
+
+        $service->upsells()->sync($sync);
+    }
+
+    /** The service as the partner app reads it, with its add-on ids. */
+    private function withUpsellIds(Service $service): Service
+    {
+        $ids = $service->relationLoaded('upsells')
+            ? $service->upsells->pluck('id')
+            : $service->upsells()->pluck('services.id');
+
+        $service->setAttribute('linked_service_ids', $ids->map(fn ($id) => (string) $id)->values()->all());
+        $service->unsetRelation('upsells');
+
+        return $service;
     }
 
     /**
@@ -369,6 +424,8 @@ class ServiceManagementController extends Controller
             'price' => 'sometimes|numeric|min:0',
             'description' => 'nullable|string',
             'gender_focus' => 'sometimes|string|'.GenderFocus::rule(),
+            'linked_service_ids' => 'sometimes|nullable|array|max:'.self::MAX_UPSELLS,
+            'linked_service_ids.*' => 'string',
         ]);
 
         if ($validator->fails()) {
@@ -400,9 +457,14 @@ class ServiceManagementController extends Controller
 
         $service->save();
 
+        // Present means "these are the add-ons now" — an empty list clears them.
+        if ($request->has('linked_service_ids')) {
+            $this->syncUpsells($service, (array) $request->input('linked_service_ids', []));
+        }
+
         return response()->json([
             'message' => 'Service updated successfully',
-            'service' => $service->load('template.category')
+            'service' => $this->withUpsellIds($service->load('template.category'))
         ]);
     }
 

@@ -753,26 +753,52 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
             border: Border.all(color: theme.colorScheme.onSurface.withOpacity(0.6)),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              isExpanded: true,
-              hint: const Text('Select manual add-ons...'),
-              value: null,
-              items: _allServices.where((s) => !_linkedServiceIds.contains(s.id)).map((s) {
-                return DropdownMenuItem(
-                  value: s.id,
-                  child: Text(s.template?.name ?? 'Custom Service'),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _linkedServiceIds.add(val));
-                }
-              },
-            ),
+          child: Builder(
+            builder: (context) {
+              final linkable = _allServices.where((s) => !_linkedServiceIds.contains(s.id)).toList();
+
+              // Say why there is nothing to pick rather than open an empty list.
+              final emptyMessage = _allServices.isEmpty
+                  ? 'No services registered yet'
+                  : 'All your services are already linked';
+
+              return DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const ValueKey('linked_addons_dropdown'),
+                  isExpanded: true,
+                  hint: const Text('Select manual add-ons...'),
+                  disabledHint: Text(
+                    emptyMessage,
+                    style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                  ),
+                  value: null,
+                  items: linkable.map((s) {
+                    return DropdownMenuItem(
+                      value: s.id,
+                      child: Text(s.template?.name ?? 'Custom Service'),
+                    );
+                  }).toList(),
+                  onChanged: linkable.isEmpty
+                      ? null
+                      : (val) {
+                          if (val != null) {
+                            setState(() => _linkedServiceIds.add(val));
+                          }
+                        },
+                ),
+              );
+            },
           ),
         ),
-        
+        if (_allServices.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              'Add a few services first, then link them here as upsells.',
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+            ),
+          ),
+
         if (_linkedServiceIds.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 12.0),

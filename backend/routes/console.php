@@ -47,3 +47,11 @@ Schedule::command('app:drain-whatsapp-outbox')->everyMinute()->withoutOverlappin
 
 // Sends automated messages (25-day reminders and birthdays) for salons that have them enabled.
 Schedule::command('app:send-automated-messages')->dailyAt('09:00')->withoutOverlapping();
+
+// Old in-app notifications, customers' and partners' alike, so the table does
+// not grow forever: read ones after 30 days, any after 90 (both set in
+// config/notifications.php). Their push delivery rows cascade with them.
+// Overnight, when nobody is reading their inbox.
+Schedule::command('model:prune', ['--model' => [\App\Models\Notification::class]])
+    ->dailyAt('03:30')
+    ->withoutOverlapping();

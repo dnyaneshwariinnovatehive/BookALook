@@ -227,8 +227,13 @@ class PayrollService
      */
     public function buildForSalon(string $salonId, Carbon $month): array
     {
+        // The owner can also take bookings as a provider, but they do not pay
+        // themselves a salary, so they get no payslip.
+        $ownerId = \App\Models\Salon::whereKey($salonId)->value('admin_id');
+
         $providers = ServiceProvider::where('salon_id', $salonId)
             ->where('is_active', true)
+            ->when($ownerId, fn ($q) => $q->where('user_id', '!=', $ownerId))
             ->get();
 
         return DB::transaction(

@@ -32,8 +32,11 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
     super.initState();
     _priceController = TextEditingController(text: widget.service.price.toStringAsFixed(0));
     _descriptionController = TextEditingController(text: widget.service.description ?? '');
+    _linkedServiceIds = List<String>.from(widget.service.linkedServiceIds);
     _loadExtraData();
   }
+
+  bool _linksTouched = false;
 
   Future<void> _loadExtraData() async {
     try {
@@ -56,6 +59,11 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
           _allServices = flatServices;
           _insights = insights;
           _isLoadingExtra = false;
+          // What is saved right now, unless the owner already started editing.
+          final saved = flatServices.where((s) => s.id == widget.service.id).firstOrNull;
+          if (saved != null && !_linksTouched) {
+            _linkedServiceIds = List<String>.from(saved.linkedServiceIds);
+          }
         });
       }
     } catch (e) {
@@ -73,7 +81,8 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
         serviceId: widget.service.id,
         price: double.parse(_priceController.text),
         description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-        linkedServiceIds: _linkedServiceIds.isNotEmpty ? _linkedServiceIds : null,
+        // Always the full list, so removing the last add-on clears it.
+        linkedServiceIds: _linkedServiceIds,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -246,7 +255,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
                     trailing: isSelected 
                       ? const Icon(Icons.check_circle, color: Color(0xFF8B5CF6))
                       : OutlinedButton(
-                          onPressed: () => setState(() => _linkedServiceIds.add(matchingService.id)),
+                          onPressed: () => setState(() { _linksTouched = true; _linkedServiceIds.add(matchingService.id); }),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF8B5CF6),
                             side: const BorderSide(color: Color(0xFF8B5CF6)),
@@ -282,7 +291,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
               }).toList(),
               onChanged: (val) {
                 if (val != null) {
-                  setState(() => _linkedServiceIds.add(val));
+                  setState(() { _linksTouched = true; _linkedServiceIds.add(val); });
                 }
               },
             ),
@@ -299,7 +308,7 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
                 final s = _allServices.firstWhere((s) => s.id == id, orElse: () => SalonService(id: id, salonId: '', templateId: '', price: 0));
                 return Chip(
                   label: Text(s.template?.name ?? 'Unknown', style: const TextStyle(fontSize: 12)),
-                  onDeleted: () => setState(() => _linkedServiceIds.remove(id)),
+                  onDeleted: () => setState(() { _linksTouched = true; _linkedServiceIds.remove(id); }),
                   backgroundColor: theme.colorScheme.surface,
                   side: BorderSide(color: theme.colorScheme.onSurface.withOpacity(0.2)),
                 );

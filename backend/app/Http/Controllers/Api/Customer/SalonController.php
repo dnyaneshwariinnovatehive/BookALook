@@ -128,7 +128,7 @@ class SalonController extends Controller
      */
     private function services(string $salonId, ?\App\Models\User $user = null, ?string $salonFocus = null): array
     {
-        $rows = Service::with('template.category:id,name,icon_url')
+        $rows = Service::with(['template.category:id,name,icon_url', 'upsells:id'])
             ->where('salon_id', $salonId)
             ->where('is_active', true)
             ->orderBy('display_order')
@@ -161,7 +161,7 @@ class SalonController extends Controller
             ? app(\App\Services\CustomerOfferEligibilityService::class)
             : null;
 
-        $services = $rows->map(function (Service $service) use ($providerCounts, $bookingStats, $salonId, $user, $eligibilityService, $salonFocus) {
+        $services = $rows->map(function (Service $service) use ($rows, $providerCounts, $bookingStats, $salonId, $user, $eligibilityService, $salonFocus) {
             $discountInfo = null;
             $discountedPrice = (float) $service->price;
 
@@ -213,6 +213,13 @@ class SalonController extends Controller
                 'booking_count' => (int) ($bookingStats[$service->id]->booking_count ?? 0),
                 'last_booked_at' => isset($bookingStats[$service->id]) ? (string) $bookingStats[$service->id]->last_booked_at : null,
                 'display_order' => (int) ($service->display_order ?? 0),
+                // What the salon recommends adding to this one, among services
+                // listed on this page. The app offers them right after "Add".
+                'upsell_ids' => $service->upsells
+                    ->map(fn ($u) => (string) $u->id)
+                    ->filter(fn ($id) => $rows->contains('id', $id) && (int) ($providerCounts[$id] ?? 0) > 0)
+                    ->values()
+                    ->all(),
             ];
         })->all();
 

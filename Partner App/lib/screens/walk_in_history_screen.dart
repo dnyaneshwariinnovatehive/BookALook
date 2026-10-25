@@ -33,7 +33,8 @@ class _WalkInHistoryScreenState extends State<WalkInHistoryScreen> {
   // Filters
   String _selectedDateFilter = 'all'; // 'all', 'today', 'yesterday', 'this_week', 'this_month', or 'YYYY-MM-DD'
   String _selectedStatusFilter = 'all'; // 'all', 'in_progress', 'completed', 'scheduled', 'cancelled'
-  String _selectedScope = 'all'; // 'all' or 'my'
+  // Staff are always scoped to themselves by the server; the owner sees all.
+  final String _selectedScope = 'all';
   DateTime? _customSelectedDate;
 
   final DateFormat _dateFormat = DateFormat('EEE, d MMM yyyy');
@@ -126,13 +127,6 @@ class _WalkInHistoryScreenState extends State<WalkInHistoryScreen> {
   void _onStatusFilterSelected(String statusKey) {
     setState(() {
       _selectedStatusFilter = statusKey;
-    });
-    _loadHistory();
-  }
-
-  void _onScopeChanged(String scope) {
-    setState(() {
-      _selectedScope = scope;
     });
     _loadHistory();
   }
@@ -260,9 +254,20 @@ class _WalkInHistoryScreenState extends State<WalkInHistoryScreen> {
             _buildSummaryMetrics(),
             const SizedBox(height: 14),
 
-            // Provider scope toggle (if viewer is service_provider)
+            // A staff member only ever sees the walk-ins they served; the
+            // server enforces it, so this just says so.
             if (isProvider) ...[
-              _buildProviderScopeFilter(),
+              Row(
+                key: const ValueKey('walk_in_history_my_scope_note'),
+                children: [
+                  const Icon(Icons.person_outline, size: 16, color: Color(0xFF6B7280)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Walk-in customers you served',
+                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF4B5563)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
             ],
 
@@ -429,69 +434,6 @@ class _WalkInHistoryScreenState extends State<WalkInHistoryScreen> {
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF6B7280),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------- Scope Toggle
-  Widget _buildProviderScopeFilter() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE5E7EB),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _onScopeChanged('all'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: _selectedScope == 'all' ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: _selectedScope == 'all'
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'All Salon Walk-ins',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: _selectedScope == 'all' ? FontWeight.w700 : FontWeight.w500,
-                    color: _selectedScope == 'all' ? AppTheme.accentColor : const Color(0xFF4B5563),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _onScopeChanged('my'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: _selectedScope == 'my' ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: _selectedScope == 'my'
-                      ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'My Served Walk-ins',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: _selectedScope == 'my' ? FontWeight.w700 : FontWeight.w500,
-                    color: _selectedScope == 'my' ? AppTheme.accentColor : const Color(0xFF4B5563),
-                  ),
-                ),
-              ),
             ),
           ),
         ],

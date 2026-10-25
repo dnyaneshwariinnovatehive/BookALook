@@ -2,7 +2,9 @@ import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../../../../../models/salon_working_hour.dart';
 import '../../../../../services/salon_settings_api.dart';
-import '../../../../theme/app_theme.dart';
+import '../../../../../models/staff_models.dart';
+import '../../../../../services/staff_api.dart';
+import '../../../../../widgets/staff_hours_review_sheet.dart';
 
 class SalonTimingsScreen extends StatefulWidget {
   final String salonId;
@@ -80,10 +82,34 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
     setState(() => _isSaving = true);
     try {
       await SalonSettingsApi.updateWorkingHours(widget.salonId, _workingHours);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Working hours updated successfully!')));
-        Navigator.pop(context);
+      if (!mounted) return;
+
+      // New salon hours rarely suit everyone the same way, so offer to sort
+      // each person's shift out now rather than leave it for the staff screen.
+      // A staff list that will not load never blocks the save itself.
+      List<StaffMember> staff = const [];
+      try {
+        staff = (await StaffApi.fetchStaff(widget.salonId)).where((s) => s.isActive).toList();
+      } catch (_) {}
+      if (!mounted) return;
+
+      int? updated;
+      if (staff.isNotEmpty) {
+        setState(() => _isSaving = false);
+        updated = await showStaffHoursReviewSheet(
+          context,
+          salonId: widget.salonId,
+          staff: staff,
+          salonHours: _workingHours,
+        );
+        if (!mounted) return;
       }
+
+      final message = (updated ?? 0) > 0
+          ? 'Working hours updated, and $updated staff schedule${updated == 1 ? '' : 's'} changed.'
+          : 'Working hours updated successfully!';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
+      Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         String msg = e.toString();

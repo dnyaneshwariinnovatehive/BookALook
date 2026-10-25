@@ -95,6 +95,9 @@ class SalonService {
   final String? description;
   final ServiceTemplate? template;
 
+  /// The add-ons the owner recommends with this service, in their order.
+  final List<String> linkedServiceIds;
+
   SalonService({
     required this.id,
     required this.salonId,
@@ -102,6 +105,7 @@ class SalonService {
     required this.price,
     this.description,
     this.template,
+    this.linkedServiceIds = const [],
   });
 
   factory SalonService.fromJson(Map<String, dynamic> json) {
@@ -112,6 +116,7 @@ class SalonService {
       price: double.parse(json['price'].toString()),
       description: json['description'],
       template: json['template'] != null ? ServiceTemplate.fromJson(json['template']) : null,
+      linkedServiceIds: (json['linked_service_ids'] as List?)?.map((id) => id.toString()).toList() ?? const [],
     );
   }
 }

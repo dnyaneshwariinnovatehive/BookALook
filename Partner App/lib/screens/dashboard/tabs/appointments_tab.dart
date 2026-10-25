@@ -9,7 +9,6 @@ import '../../walk_in_screen.dart';
 import '../../walk_in_history_screen.dart';
 import '../close_day_sheet.dart';
 import '../../../../theme/app_theme.dart';
-import '../../../widgets/wallet_coin_pill.dart';
 import '../../../../models/admin_provider_models.dart';
 import '../../../../services/admin_provider_api.dart';
 import '../../../../utils/lifecycle_poller.dart';
@@ -452,37 +451,28 @@ class AppointmentsTabState extends State<AppointmentsTab> {
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      // Title on its own line and the actions on a wrapping row beneath it.
+      // Side by side they need ~410dp, so on a 360dp phone History and Close
+      // day were pushed off the edge. No wallet pill here either: in this
+      // header it only crowded the actions out.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Beside the title rather than on the right, because the right of
-          // this particular header already carries Walk-in and Close day — a
-          // third pill there overflows a small phone. Flexible so a narrow
-          // screen shortens the title instead of overflowing the row.
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    'Appointments',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: headingColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                WalletCoinPill(salonId: widget.salonId, compact: true),
-              ],
+          Text(
+            'Appointments',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: headingColor,
             ),
           ),
-          const SizedBox(width: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: 12),
+          Wrap(
+            key: const ValueKey('appointments_header_actions'),
+            spacing: 8,
+            runSpacing: 8,
             children: [
               InkWell(
                 onTap: _openWalkIn,
@@ -510,7 +500,6 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
               InkWell(
                 onTap: _openWalkInHistory,
                 borderRadius: BorderRadius.circular(20),
@@ -540,7 +529,6 @@ class AppointmentsTabState extends State<AppointmentsTab> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
               InkWell(
                 onTap: _openCloseDay,
                 borderRadius: BorderRadius.circular(20),

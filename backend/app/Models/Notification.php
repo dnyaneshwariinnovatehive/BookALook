@@ -4,13 +4,32 @@ namespace App\Models;
 
 use App\Support\Notifications\NotificationAction;
 use App\Support\Notifications\NotificationType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 class Notification extends Model
 {
-    use HasUuids;
+    use HasUuids, MassPrunable;
+
+    /**
+     * What the nightly `model:prune` removes: read notifications past their
+     * retention, and anything at all past the longer unread one. Mass-pruned
+     * in chunks with plain deletes; delivery rows cascade at the database.
+     */
+    public function prunable(): Builder
+    {
+        $readDays = max(1, (int) config('notifications.retention.read_days', 30));
+        $unreadDays = max($readDays, (int) config('notifications.retention.unread_days', 90));
+
+        return static::query()->where(function (Builder $q) use ($readDays, $unreadDays) {
+            $q->where(function (Builder $read) use ($readDays) {
+                $read->where('is_read', true)->where('created_at', '<', now()->subDays($readDays));
+            })->orWhere('created_at', '<', now()->subDays($unreadDays));
+        });
+    }
 
     protected $guarded = [];
 

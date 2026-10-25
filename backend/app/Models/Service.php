@@ -37,6 +37,18 @@ class Service extends Model
                     ->withPivot('combo_special_price');
     }
 
+    /**
+     * The add-ons the salon owner recommends with this service, in the order
+     * they chose them.
+     */
+    public function upsells()
+    {
+        return $this->belongsToMany(Service::class, 'service_upsells', 'service_id', 'upsell_service_id')
+            ->withPivot('display_order')
+            ->withTimestamps()
+            ->orderBy('service_upsells.display_order');
+    }
+
     public function providers()
     {
         return $this->belongsToMany(ServiceProvider::class, 'provider_services', 'service_id', 'provider_id');
