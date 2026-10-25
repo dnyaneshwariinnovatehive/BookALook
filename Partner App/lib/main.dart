@@ -16,9 +16,12 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> _loadThemeMode() async {
+  // Clean up any legacy dark mode preference safely so light mode is permanently active
   final prefs = await SharedPreferences.getInstance();
-  final isDark = prefs.getBool('isDarkMode') ?? false;
-  themeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+  if (prefs.containsKey('isDarkMode')) {
+    await prefs.remove('isDarkMode');
+  }
+  themeNotifier.value = ThemeMode.light;
 }
 
 Future<void> main() async {
@@ -79,19 +82,13 @@ class _PartnerAppState extends State<PartnerApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, currentMode, child) {
-        return MaterialApp(
-          navigatorKey: navigatorKey,
-          title: 'BookALook Partner',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: currentMode,
-          home: const SplashScreen(),
-          debugShowCheckedModeBanner: false,
-        );
-      },
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'BookALook Partner',
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
+      home: const SplashScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

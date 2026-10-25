@@ -636,43 +636,6 @@ class MoreMenuCatalog {
                 const PushNotificationToggle(compact: true),
           ),
           MoreMenuItem(
-            id: 'dark_mode',
-            title: 'Dark Mode',
-            category: 'Account & app settings',
-            subtitle: 'Toggle dark or light visual appearance',
-            icon: Icons.dark_mode_outlined,
-            iconColor: Colors.amber,
-            type: MenuItemType.inlineToggle,
-            keywords: const [
-              'dark mode',
-              'light mode',
-              'theme',
-              'night mode',
-              'appearance',
-              'colors',
-              'display',
-            ],
-            inlineWidgetBuilder: (ctx, _) {
-              return ValueListenableBuilder<ThemeMode>(
-                valueListenable: themeNotifier,
-                builder: (context, currentMode, _) {
-                  final dark = currentMode == ThemeMode.dark;
-                  return Switch.adaptive(
-                    value: dark,
-                    activeTrackColor: AppTheme.accentColor,
-                    onChanged: (val) async {
-                      themeNotifier.value = val
-                          ? ThemeMode.dark
-                          : ThemeMode.light;
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool('isDarkMode', val);
-                    },
-                  );
-                },
-              );
-            },
-          ),
-          MoreMenuItem(
             id: 'help_support',
             title: 'Help & Support',
             category: 'Account & app settings',

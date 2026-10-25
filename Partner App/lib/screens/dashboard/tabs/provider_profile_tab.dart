@@ -821,46 +821,6 @@ class ProviderProfileTabState extends State<ProviderProfileTab> {
                   const PushNotificationToggle(
                     contentPadding: EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  Divider(
-                    height: 1,
-                    indent: 56,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.12),
-                  ),
-
-                  // Dark Mode
-                  ValueListenableBuilder<ThemeMode>(
-                    valueListenable: themeNotifier,
-                    builder: (context, currentMode, _) {
-                      final isDarkMode = currentMode == ThemeMode.dark;
-                      return SwitchListTile(
-                        value: isDarkMode,
-                        onChanged: (val) async {
-                          themeNotifier.value = val
-                              ? ThemeMode.dark
-                              : ThemeMode.light;
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool('isDarkMode', val);
-                        },
-                        secondary: Icon(
-                          isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                          color: isDarkMode ? Colors.yellow : Colors.orange,
-                          size: 26,
-                        ),
-                        title: const Text(
-                          'Dark Mode',
-                          style: TextStyle(
-                            fontWeight: FontWeight.normal,
-                            fontSize: 16,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                        ),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),

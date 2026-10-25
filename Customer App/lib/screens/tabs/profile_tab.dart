@@ -15,8 +15,8 @@ import '../../widgets/logout_confirmation_dialog.dart';
 import '../../utils/app_haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/bottom_clearance.dart';
-import '../../main.dart'; // To access themeNotifier
 import '../edit_profile_screen.dart';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/appointment_service.dart';
@@ -649,18 +649,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   borderRadius: BorderRadius.circular(20),
                   child: Column(
                     children: [
-                      _buildToggleRow(
-                        context,
-                        icon: Icons.dark_mode_outlined,
-                        label: 'Dark Mode',
-                        value: isDark,
-                        onChanged: (val) {
-                          themeNotifier.value = val
-                              ? ThemeMode.dark
-                              : ThemeMode.light;
-                        },
-                      ),
-                      Divider(height: 1, thickness: 1, color: borderColor),
                       _buildToggleRow(
                         context,
                         icon: Icons.notifications_none_rounded,

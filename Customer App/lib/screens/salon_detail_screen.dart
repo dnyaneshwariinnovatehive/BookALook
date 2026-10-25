@@ -1867,7 +1867,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         (context, index) {
           if (index < displayedCount) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: _serviceCard(services[index]),
             );
           }
@@ -1986,109 +1986,72 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       opacity: canAdd ? 1.0 : 0.6,
       child: Container(
         key: isHighlighted ? _highlightServiceKey : null,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: _cardDecoration(
           accentBorder: isHighlighted,
           isSelected: isSelected,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (isHighlighted || isSelected)
+            if (isHighlighted)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (isHighlighted)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: AppTheme.accentColor.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.touch_app,
-                              size: 13,
-                              color: AppTheme.accentColor,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              widget.categoryName ?? 'From category',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.accentColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    if (isSelected)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppTheme.accentColor.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.touch_app,
+                        size: 12,
+                        color: AppTheme.accentColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.categoryName ?? 'From category',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                           color: AppTheme.accentColor,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Selected',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppTheme.accentColor.withValues(alpha: 0.15)
                         : context.colors.accentSoft,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     isSelected
                         ? Icons.check_circle_rounded
                         : Icons.spa_outlined,
                     color: AppTheme.accentColor,
-                    size: 28,
+                    size: 22,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2096,15 +2059,15 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       Text(
                         service['name'] ?? 'Service',
                         style: GoogleFonts.outfit(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: context.colors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           _metaChip(
                             Icons.access_time,
@@ -2128,36 +2091,40 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             ),
 
             if (description.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Text(
                 description,
                 style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  height: 1.5,
+                  fontSize: 13,
+                  height: 1.35,
                   color: context.colors.textSecondary,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
 
             if (!hasStaff) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               Text(
                 'No staff available for this service right now',
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: context.colors.danger,
                 ),
               ),
             ],
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Divider(color: context.colors.border, height: 1),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -2166,18 +2133,18 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         Text(
                           '₹${effectivePrice.toStringAsFixed(0)}',
                           style: GoogleFonts.outfit(
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.accentColor,
                           ),
                         ),
                         if (isDiscounted) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           AnimatedOriginalPrice(
                             originalPrice: origPrice,
                             price: effectivePrice,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           DiscountBadge(
                             originalPrice: origPrice,
                             price: effectivePrice,
@@ -2193,7 +2160,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                         child: Text(
                           'Save ₹${(origPrice - effectivePrice).toStringAsFixed(0)} · First visit',
                           style: GoogleFonts.outfit(
-                            fontSize: 11.5,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: context.colors.success,
                           ),
@@ -2226,21 +2193,21 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _metaChip(IconData icon, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: context.colors.surfaceMuted,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: context.colors.textSecondary),
-          const SizedBox(width: 6),
+          Icon(icon, size: 12, color: context.colors.textSecondary),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
               style: GoogleFonts.outfit(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: FontWeight.w500,
                 color: context.colors.textSecondary,
               ),
@@ -2255,21 +2222,21 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _firstTimeOfferChip(String? label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: AppTheme.accentColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.auto_awesome, size: 12, color: AppTheme.accentColor),
+          const Icon(Icons.auto_awesome, size: 11, color: AppTheme.accentColor),
           const SizedBox(width: 4),
           Text(
             label ?? 'First visit offer',
             style: GoogleFonts.outfit(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
               color: AppTheme.accentColor,
             ),
@@ -2379,31 +2346,34 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     bool inFlight = false,
     required VoidCallback onTap,
   }) {
-    return ElevatedButton.icon(
-      key: const ValueKey('add_service_button'),
-      onPressed: enabled && !inFlight ? onTap : null,
-      icon: inFlight
-          ? const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Icon(Icons.add, size: 18),
-      label: Text(
-        'ADD',
-        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.accentColor,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: context.colors.border,
-        disabledForegroundColor: context.colors.textTertiary,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    return SizedBox(
+      height: 36,
+      child: ElevatedButton.icon(
+        key: const ValueKey('add_service_button'),
+        onPressed: enabled && !inFlight ? onTap : null,
+        icon: inFlight
+            ? const SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.add, size: 16),
+        label: Text(
+          'ADD',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.accentColor,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: context.colors.border,
+          disabledForegroundColor: context.colors.textTertiary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       ),
     );
   }
@@ -2412,74 +2382,78 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     required bool inFlight,
     required VoidCallback onRemove,
   }) {
-    return Container(
-      key: const ValueKey('added_service_container'),
-      decoration: BoxDecoration(
-        color: context.colors.accentSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppTheme.accentColor.withValues(alpha: 0.35),
-          width: 1.5,
+    return SizedBox(
+      height: 36,
+      child: Container(
+        key: const ValueKey('added_service_container'),
+        decoration: BoxDecoration(
+          color: context.colors.accentSoft,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: AppTheme.accentColor.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
         ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: inFlight ? null : onRemove,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (inFlight)
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: inFlight ? null : onRemove,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (inFlight)
+                      const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.accentColor,
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.check_rounded,
+                        size: 15,
                         color: AppTheme.accentColor,
                       ),
-                    )
-                  else
-                    const Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: AppTheme.accentColor,
+                    const SizedBox(width: 4),
+                    Text(
+                      'ADDED',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 0.4,
+                        color: AppTheme.accentColor,
+                      ),
                     ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'ADDED',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 0.5,
-                      color: AppTheme.accentColor,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Container(
-            width: 1,
-            height: 18,
-            color: AppTheme.accentColor.withValues(alpha: 0.25),
-          ),
-          IconButton(
-            key: const ValueKey('remove_service_button'),
-            tooltip: 'Remove from cart',
-            icon: Icon(
-              Icons.close_rounded,
-              size: 16,
-              color: context.colors.textSecondary,
+            Container(
+              width: 1,
+              height: 16,
+              color: AppTheme.accentColor.withValues(alpha: 0.25),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
-            onPressed: inFlight ? null : onRemove,
-          ),
-        ],
+            IconButton(
+              key: const ValueKey('remove_service_button'),
+              tooltip: 'Remove from cart',
+              icon: Icon(
+                Icons.close_rounded,
+                size: 15,
+                color: context.colors.textSecondary,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 36),
+              onPressed: inFlight ? null : onRemove,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2822,26 +2796,29 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   }) {
     return BoxDecoration(
       color: isSelected ? context.colors.accentSoft : context.colors.surface,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(16),
       border: (isSelected || accentBorder)
           ? Border.all(
               color: AppTheme.accentColor,
-              width: isSelected ? 2.0 : 1.8,
+              width: 1.5,
             )
-          : Border.all(color: context.colors.border),
+          : Border.all(
+              color: context.colors.border,
+              width: 1.5,
+            ),
       boxShadow: (isSelected || accentBorder)
           ? [
               BoxShadow(
-                color: AppTheme.accentColor.withValues(alpha: 0.18),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                color: AppTheme.accentColor.withValues(alpha: 0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ]
           : [
               BoxShadow(
                 color: context.colors.cardShadow,
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
     );

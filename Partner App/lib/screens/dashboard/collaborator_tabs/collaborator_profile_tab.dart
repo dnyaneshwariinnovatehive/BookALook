@@ -157,11 +157,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     );
   }
 
-  Future<void> _toggleDarkMode(bool value) async {
-    themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', value);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -220,14 +215,6 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
                           context,
                         ).colorScheme.onSurface.withValues(alpha: 0.12),
                       ),
-                      _buildAppearanceCard(),
-                      Divider(
-                        height: 1,
-                        indent: 56,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.12),
-                      ),
                       const PushNotificationToggle(
                         contentPadding: EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -246,35 +233,7 @@ class CollaboratorProfileTabState extends State<CollaboratorProfileTab> {
     );
   }
 
-  /// Dark mode, offered here because the admin "More" tab and the provider
-  /// profile both have it and the collaborator had no way to reach it at all.
-  ///
-  /// A collaborator who set dark mode while signed in as another role got a
-  /// light-coloured app on every one of these four tabs, with no way to change
-  /// it back without logging out.
 
-  Widget _buildAppearanceCard() {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, mode, _) {
-        final isDark = mode == ThemeMode.dark;
-        return SwitchListTile(
-          value: isDark,
-          onChanged: _toggleDarkMode,
-          secondary: Icon(
-            isDark ? Icons.dark_mode : Icons.light_mode,
-            color: isDark ? Colors.yellow : Colors.orange,
-            size: 26,
-          ),
-          title: const Text(
-            'Dark Mode',
-            style: TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        );
-      },
-    );
-  }
 
   // ---------------------------------------------------------------- header
 

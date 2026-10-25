@@ -174,7 +174,7 @@ void main() {
       },
     );
 
-    testWidgets('9. Searching "dark mode" renders the live inline switch', (
+    testWidgets('9. Searching "dark mode" does not render any dark mode option (removed)', (
       tester,
     ) async {
       await tester.pumpWidget(createWidgetUnderTest());
@@ -183,8 +183,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'dark mode');
       await tester.pump();
 
-      expect(find.text('Dark Mode'), findsOneWidget);
-      expect(find.byType(Switch), findsOneWidget);
+      expect(find.text('Dark Mode'), findsNothing);
+      expect(find.byType(Switch), findsNothing);
     });
 
     testWidgets('10. Searching "push notifications" renders the inline PushNotificationToggle', (
