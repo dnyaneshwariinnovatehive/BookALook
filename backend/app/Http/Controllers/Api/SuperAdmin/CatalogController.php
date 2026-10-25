@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Api\SuperAdmin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
+use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\ServiceTemplate;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -234,21 +238,78 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function deleteCategory($id)
+    /**
+     * Ensure the authenticated user has superadmin or admin privileges.
+     */
+    private function authorizeSuperAdmin(Request $request): ?JsonResponse
     {
-        $category = ServiceCategory::withCount('templates')->findOrFail($id);
-        
-        if ($category->templates_count > 0) {
+        $user = $request->user();
+
+        if (! $user || ! in_array($user->role, ['superadmin', 'admin'], true)) {
             return response()->json([
-                'message' => 'Cannot delete category with existing templates'
-            ], 400);
+                'message' => 'Unauthorized. Super Admin access required.',
+            ], 403);
         }
 
-        $category->delete();
+        return null;
+    }
 
-        return response()->json([
-            'message' => 'Category deleted successfully'
-        ]);
+    public function deleteCategory($id, Request $request)
+    {
+        if ($authError = $this->authorizeSuperAdmin($request)) {
+            return $authError;
+        }
+
+        $category = ServiceCategory::with('templates')->find($id);
+
+        if (! $category) {
+            return response()->json([
+                'message' => 'Category not found'
+            ], 404);
+        }
+
+        try {
+            DB::transaction(function () use ($category) {
+                // Retire all templates associated with this category
+                foreach ($category->templates as $template) {
+                    // Retire linked salon services
+                    $linkedServices = Service::where('template_id', $template->id)->get();
+                    foreach ($linkedServices as $service) {
+                        $service->is_active = false;
+                        $service->save();
+                        $service->delete();
+                    }
+
+                    // Remove from active first-time offers
+                    DB::table('first_time_offer_services')
+                        ->where('service_template_id', $template->id)
+                        ->delete();
+
+                    // Retire the template itself
+                    $template->is_active = false;
+                    $template->save();
+                    $template->delete();
+                }
+
+                // Retire the category itself
+                $category->is_active = false;
+                $category->save();
+                $category->delete();
+            });
+
+            return response()->json([
+                'message' => 'Category and associated templates retired successfully'
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Failed to retire service category: ' . $e->getMessage(), [
+                'category_id' => $id,
+                'exception' => $e
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete category due to an internal server error.'
+            ], 500);
+        }
     }
 
     public function updateTemplate($id, Request $request)
@@ -277,15 +338,53 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function deleteTemplate($id)
+    public function deleteTemplate($id, Request $request)
     {
-        $template = ServiceTemplate::findOrFail($id);
-        // Note: Could check if services are using this template before deleting,
-        // but typically templates are soft-deleted or cascades apply.
-        $template->delete();
+        if ($authError = $this->authorizeSuperAdmin($request)) {
+            return $authError;
+        }
 
-        return response()->json([
-            'message' => 'Template deleted successfully'
-        ]);
+        $template = ServiceTemplate::find($id);
+
+        if (! $template) {
+            return response()->json([
+                'message' => 'Service template not found'
+            ], 404);
+        }
+
+        try {
+            DB::transaction(function () use ($template) {
+                // Retire linked salon services
+                $linkedServices = Service::where('template_id', $template->id)->get();
+                foreach ($linkedServices as $service) {
+                    $service->is_active = false;
+                    $service->save();
+                    $service->delete();
+                }
+
+                // Remove from active first-time offers
+                DB::table('first_time_offer_services')
+                    ->where('service_template_id', $template->id)
+                    ->delete();
+
+                // Retire the template itself
+                $template->is_active = false;
+                $template->save();
+                $template->delete();
+            });
+
+            return response()->json([
+                'message' => 'Service template retired successfully'
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Failed to retire service template: ' . $e->getMessage(), [
+                'template_id' => $id,
+                'exception' => $e
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to delete template due to an internal server error.'
+            ], 500);
+        }
     }
 }

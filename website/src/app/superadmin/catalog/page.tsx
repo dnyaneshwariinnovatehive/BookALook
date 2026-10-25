@@ -47,6 +47,7 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirm, confirmDialog] = useConfirm();
 
   // Modals state
@@ -156,16 +157,20 @@ export default function CatalogPage() {
 
   const handleDeleteCategory = async (cat: Category, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (deletingId) return;
+
     const templateCount = cat.templates?.length ?? 0;
     const ok = await confirm({
-      title: `Delete “${cat.name}”?`,
+      title: `Retire “${cat.name}”?`,
       body: templateCount > 0
-        ? `Its ${templateCount} service${templateCount === 1 ? '' : 's'} go with it, and any salon still offering them loses them from its catalog. This cannot be undone.`
-        : 'This category is shared across the platform and disappears for every salon. This cannot be undone.',
-      confirmLabel: 'Delete category',
+        ? `Its ${templateCount} template${templateCount === 1 ? '' : 's'} will be retired, and salons will no longer offer them for new bookings. Past appointments and invoices remain intact.`
+        : 'This category will be retired from the platform catalog. Past appointments and invoices remain intact.',
+      confirmLabel: 'Retire category',
       tone: 'danger',
     });
     if (!ok) return;
+
+    setDeletingId(cat.id);
     setNotice('');
     try {
       const res = await fetch(`/api/proxy/superadmin/catalog/categories/${cat.id}`, {
@@ -174,15 +179,20 @@ export default function CatalogPage() {
           'Accept': 'application/json'
         }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setNotice(`Deleted “${cat.name}”.`);
-        fetchCatalog();
+        setNotice(data?.message || `Retired “${cat.name}”.`);
+        if (viewingCategory?.id === cat.id) {
+          setViewingCategory(null);
+        }
+        await fetchCatalog();
       } else {
-        const data = await res.json();
-        setNotice(data.message || 'Failed to delete category');
+        setNotice(data?.message || 'Failed to retire category');
       }
     } catch {
-      setNotice('Error deleting category');
+      setNotice('Error retiring category');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -229,13 +239,17 @@ export default function CatalogPage() {
 
   const handleDeleteTemplate = async (tpl: Template, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (deletingId) return;
+
     const ok = await confirm({
-      title: `Delete “${tpl.name}”?`,
-      body: 'Salons currently offering this service lose it from their catalog. This cannot be undone.',
-      confirmLabel: 'Delete service',
+      title: `Retire “${tpl.name}”?`,
+      body: 'Salons offering this service will have it retired so it can no longer be newly booked. Past appointments and invoices remain intact.',
+      confirmLabel: 'Retire service',
       tone: 'danger',
     });
     if (!ok) return;
+
+    setDeletingId(tpl.id);
     setNotice('');
     try {
       const res = await fetch(`/api/proxy/superadmin/catalog/templates/${tpl.id}`, {
@@ -244,14 +258,17 @@ export default function CatalogPage() {
           'Accept': 'application/json'
         }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setNotice(`Deleted “${tpl.name}”.`);
-        fetchCatalog();
+        setNotice(data?.message || `Retired “${tpl.name}”.`);
+        await fetchCatalog();
       } else {
-        setNotice('Failed to delete template');
+        setNotice(data?.message || 'Failed to retire template');
       }
     } catch {
-      setNotice('Error deleting template');
+      setNotice('Error retiring template');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -353,7 +370,7 @@ export default function CatalogPage() {
   useEffect(() => {
     if (viewingCategory) {
       const updatedCat = categories.find(c => c.id === viewingCategory.id);
-      if (updatedCat) setViewingCategory(updatedCat);
+      setViewingCategory(updatedCat || null);
     }
   }, [categories]);
 
@@ -373,6 +390,29 @@ export default function CatalogPage() {
           + Add Standard Category
         </button>
       </div>
+
+      {notice && (
+        <div style={{
+          padding: '12px 16px',
+          marginBottom: '20px',
+          borderRadius: '8px',
+          background: 'rgba(139, 92, 246, 0.1)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          color: 'var(--text-body)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>{notice}</span>
+          <button 
+            type="button"
+            onClick={() => setNotice('')}
+            style={{ background: 'none', border: 'none', color: 'var(--text-body)', cursor: 'pointer', fontSize: '18px', padding: '0 4px' }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className={styles.catalogGrid}>
         {categories.map(cat => (
@@ -425,6 +465,8 @@ export default function CatalogPage() {
                 <button 
                   className={`${styles.iconBtn} ${styles.deleteBtn}`} 
                   title="Delete Category"
+                  disabled={deletingId === cat.id}
+                  style={deletingId === cat.id ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   onClick={(e) => handleDeleteCategory(cat, e)}
                 >
                   <TrashIcon />
@@ -489,6 +531,8 @@ export default function CatalogPage() {
                       <button 
                         className={`${styles.iconBtn} ${styles.deleteBtn}`} 
                         title="Delete Template"
+                        disabled={deletingId === tpl.id}
+                        style={deletingId === tpl.id ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                         onClick={(e) => handleDeleteTemplate(tpl, e)}
                       >
                         <TrashIcon />

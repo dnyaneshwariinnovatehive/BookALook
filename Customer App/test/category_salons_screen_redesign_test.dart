@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:customer_app/models/category.dart';
 import 'package:customer_app/screens/category_salons_screen.dart';
+import 'package:customer_app/screens/salon_detail_screen.dart';
 import 'package:customer_app/widgets/discovery_salon_card.dart';
 
 void main() {
@@ -11,7 +12,7 @@ void main() {
   });
 
   group('CategorySalonsScreen & DiscoverySalonCard Redesign Tests', () {
-    testWidgets('DiscoverySalonCard renders photo, badge, info, services, and selects on tap', (tester) async {
+    testWidgets('DiscoverySalonCard renders clean compact card with photo, info, and View Salon & Book button without mini service cards', (tester) async {
       final sampleSalon = {
         'id': 'salon-1',
         'name': 'Glow Up Studio',
@@ -30,7 +31,7 @@ void main() {
         ],
       };
 
-      Map<String, dynamic>? selectedService;
+      bool favToggled = false;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -39,9 +40,8 @@ void main() {
               salon: sampleSalon,
               categoryId: 'cat-hair',
               categoryName: 'Hair',
-              onToggleFavourite: () {},
-              onServiceSelected: (svc) {
-                selectedService = svc;
+              onToggleFavourite: () {
+                favToggled = true;
               },
             ),
           ),
@@ -59,37 +59,29 @@ void main() {
       expect(find.text('8+ Photos'), findsOneWidget);
       expect(find.text('Open • Closes 9:00 PM'), findsOneWidget);
 
-      // Verify service chips
-      expect(find.text("Men's Haircut"), findsOneWidget);
-      expect(find.text('₹350'), findsOneWidget);
-      expect(find.text('Hair Spa'), findsOneWidget);
-      expect(find.text('₹999'), findsOneWidget);
-      expect(find.text('Hair Colour'), findsOneWidget);
-      expect(find.text('₹1499'), findsOneWidget);
+      // Verify mini service cards, names, and prices are REMOVED from the card
+      expect(find.text("Men's Haircut"), findsNothing);
+      expect(find.text('₹350'), findsNothing);
+      expect(find.text('Hair Spa'), findsNothing);
+      expect(find.text('₹999'), findsNothing);
+      expect(find.text('Hair Colour'), findsNothing);
+      expect(find.text('₹1499'), findsNothing);
 
-      // Verify CTA button
+      // Verify prominent CTA button
       expect(find.text('View Salon & Book'), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_forward_rounded), findsOneWidget);
 
-      // Tap on a service chip to select it
-      await tester.tap(find.text("Men's Haircut"));
-      await tester.pump();
-
-      expect(selectedService, isNotNull);
-      expect(selectedService!['name'], "Men's Haircut");
+      // Verify favourite button works
+      await tester.tap(find.byIcon(Icons.favorite_border));
+      expect(favToggled, isTrue);
     });
 
-    testWidgets('DiscoverySalonCard deselects service when tapped again', (tester) async {
+    testWidgets('Tapping View Salon & Book navigates to SalonDetailScreen', (tester) async {
       final sampleSalon = {
         'id': 'salon-1',
         'name': 'Glow Up Studio',
         'address': 'Koregaon Park, Pune',
-        'category_services': [
-          {'id': 'svc-1', 'name': "Men's Haircut", 'price': 350},
-        ],
       };
-
-      Map<String, dynamic>? selectedService;
-      Map<String, dynamic>? deselectedService;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -99,8 +91,6 @@ void main() {
               categoryId: 'cat-hair',
               categoryName: 'Hair',
               onToggleFavourite: () {},
-              onServiceSelected: (svc) => selectedService = svc,
-              onServiceDeselected: (svc) => deselectedService = svc,
             ),
           ),
         ),
@@ -108,16 +98,13 @@ void main() {
 
       await tester.pump();
 
-      // Tap once to select
-      await tester.tap(find.text("Men's Haircut"));
+      // Tap View Salon & Book
+      await tester.tap(find.text('View Salon & Book'));
       await tester.pump();
-      expect(selectedService?['id'], 'svc-1');
-      expect(deselectedService, isNull);
+      await tester.pump(const Duration(milliseconds: 100));
 
-      // Tap again to deselect
-      await tester.tap(find.text("Men's Haircut"));
-      await tester.pump();
-      expect(deselectedService?['id'], 'svc-1');
+      // Verify SalonDetailScreen is pushed
+      expect(find.byType(SalonDetailScreen), findsOneWidget);
     });
 
     testWidgets('CategorySalonsScreen renders header, search, and category pills', (tester) async {

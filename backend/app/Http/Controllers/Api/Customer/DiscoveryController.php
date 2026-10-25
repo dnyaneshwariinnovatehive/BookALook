@@ -46,6 +46,8 @@ class DiscoveryController extends Controller
             ->join('service_templates as t', 't.id', '=', 'sv.template_id')
             ->join('salons as s', 's.id', '=', 'sv.salon_id')
             ->where('t.category_id', $category->id)
+            ->where('t.is_active', true)
+            ->whereNull('t.deleted_at')
             ->where('sv.is_active', true)
             ->whereNull('sv.deleted_at')
             ->where('s.status', 'active')

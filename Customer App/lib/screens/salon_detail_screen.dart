@@ -35,12 +35,15 @@ class SalonDetailScreen extends StatefulWidget {
   final String? categoryName;
   final String? serviceId;
 
+  final bool initialScrollToServices;
+
   const SalonDetailScreen({
     Key? key,
     required this.salonId,
     this.categoryId,
     this.categoryName,
     this.serviceId,
+    this.initialScrollToServices = false,
   }) : super(key: key);
 
   @override
@@ -51,8 +54,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   final SalonService _salonService = SalonService();
   final CartService _cartService = CartService();
   final PageController _galleryController = PageController();
-  final ScrollController _scrollController = ScrollController();
+  late final ScrollController _scrollController;
   final GlobalKey _reviewsKey = GlobalKey();
+  final GlobalKey _categoryTabsKey = GlobalKey();
+  final GlobalKey _combosKey = GlobalKey();
+  final ScrollController _categoryTabsScrollController = ScrollController();
 
   Map<String, dynamic>? _salon;
   Map<String, dynamic>? _cart;
@@ -65,6 +71,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   /// null = the "All Services" tab.
   String? _selectedCategoryId;
   bool _hoursExpanded = false;
+  bool _isServicesExpanded = false;
 
   /// The exact template a discovery sub-service pick points at, so its card (if
   /// this salon offers it) can be visibly highlighted. Matched against the
@@ -83,6 +90,12 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final shouldScrollToServices = widget.initialScrollToServices ||
+        (widget.categoryId != null && widget.categoryId!.isNotEmpty) ||
+        (widget.categoryName != null && widget.categoryName!.isNotEmpty);
+    _scrollController = ScrollController(
+      initialScrollOffset: shouldScrollToServices ? 380.0 : 0.0,
+    );
     _loadSalonDetails();
     _loadCart();
     _loadAllReviews();
@@ -94,6 +107,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     CartService.globalCartNotifier.removeListener(_onGlobalCartChanged);
     _galleryController.dispose();
     _scrollController.dispose();
+    _categoryTabsScrollController.dispose();
     super.dispose();
   }
 
@@ -275,11 +289,81 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     } catch (_) {}
   }
 
+  Future<void> _scrollToServicesSection() async {
+    if (!_scrollController.hasClients) return;
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final isComboCategory = widget.categoryId == 'combo' ||
+          (widget.categoryName?.toLowerCase() == 'combo');
+      final targetKey = isComboCategory ? _combosKey : _categoryTabsKey;
+
+      for (var attempt = 0; attempt < 5; attempt++) {
+        if (targetKey.currentContext != null && mounted) {
+          final targetContext = targetKey.currentContext!;
+          if (!targetContext.mounted) return;
+          final viewport = _scrollController.position.viewportDimension;
+          final toolbar = MediaQuery.of(context).padding.top + kToolbarHeight;
+          final alignment = (toolbar / viewport).clamp(0.0, 0.25).toDouble();
+          await Scrollable.ensureVisible(
+            targetContext,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            alignment: alignment,
+          );
+          return;
+        }
+        _scrollController.jumpTo(
+          (_scrollController.offset + 300).clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          ),
+        );
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadSalonDetails() async {
     setState(() => _error = '');
     try {
       final data = await _salonService.fetchSalonDetails(widget.salonId);
       if (!mounted) return;
+
+      final categories = (data['categories'] as List?) ?? [];
+      String? resolvedCatId = widget.categoryId;
+      if (resolvedCatId != null && categories.isNotEmpty) {
+        final exists = categories.any(
+          (c) => c['id']?.toString().toLowerCase() == resolvedCatId!.toLowerCase(),
+        );
+        if (!exists) {
+          final nameTarget = (widget.categoryName ?? resolvedCatId).toLowerCase();
+          final nameMatch = categories.firstWhere(
+            (c) {
+              final cName = (c['name'] ?? '').toString().toLowerCase();
+              return cName == nameTarget || cName.contains(nameTarget) || nameTarget.contains(cName);
+            },
+            orElse: () => null,
+          );
+          if (nameMatch != null) {
+            resolvedCatId = nameMatch['id']?.toString();
+          }
+        }
+      } else if (widget.categoryName != null && categories.isNotEmpty) {
+        final nameTarget = widget.categoryName!.toLowerCase();
+        final nameMatch = categories.firstWhere(
+          (c) {
+            final cName = (c['name'] ?? '').toString().toLowerCase();
+            return cName == nameTarget || cName.contains(nameTarget) || nameTarget.contains(cName);
+          },
+          orElse: () => null,
+        );
+        if (nameMatch != null) {
+          resolvedCatId = nameMatch['id']?.toString();
+        }
+      }
+
       setState(() {
         _salon = data;
         _isFavourited =
@@ -288,13 +372,22 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             data['is_favourited'] == '1';
         // Land on the category the customer came in through, so unrelated
         // categories stay out of the way until they switch tabs themselves.
-        _selectedCategoryId = widget.categoryId;
+        _selectedCategoryId = resolvedCatId;
         _highlightServiceId = widget.serviceId;
+        if (widget.serviceId != null) {
+          _isServicesExpanded = true;
+        }
         _isLoading = false;
       });
       if (widget.serviceId != null) {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _revealHighlightedService(),
+        );
+      } else if (widget.initialScrollToServices ||
+          widget.categoryId != null ||
+          widget.categoryName != null) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToServicesSection(),
         );
       }
     } catch (e) {
@@ -695,11 +788,63 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   bool get _isBookable => _salon?['is_bookable'] == true;
 
   List<dynamic> get _visibleServices {
-    final services = (_salon?['services'] as List?) ?? [];
-    if (_selectedCategoryId == null) return services;
-    return services
-        .where((s) => s['category_id'] == _selectedCategoryId)
-        .toList();
+    final rawServices = (_salon?['services'] as List?) ?? [];
+    List<dynamic> filtered;
+    if (_selectedCategoryId == null) {
+      filtered = List<dynamic>.from(rawServices);
+    } else {
+      final target = _selectedCategoryId!.toLowerCase();
+      filtered = rawServices.where((s) {
+        final cId = s['category_id']?.toString().toLowerCase();
+        final cName = s['category_name']?.toString().toLowerCase();
+        return cId == target ||
+            (widget.categoryName != null &&
+                cName != null &&
+                cName == widget.categoryName!.toLowerCase());
+      }).toList();
+    }
+
+    filtered.sort((a, b) {
+      final mapA = a is Map ? a : <String, dynamic>{};
+      final mapB = b is Map ? b : <String, dynamic>{};
+
+      // 1. Completed booking count (popularity) DESC
+      final int countA = int.tryParse('${mapA['booking_count'] ?? 0}') ?? 0;
+      final int countB = int.tryParse('${mapB['booking_count'] ?? 0}') ?? 0;
+      if (countA != countB) {
+        return countB.compareTo(countA);
+      }
+
+      // 2. Most recently booked (last_booked_at) DESC
+      final String? lastBookedA = mapA['last_booked_at']?.toString();
+      final String? lastBookedB = mapB['last_booked_at']?.toString();
+      if (lastBookedA != null || lastBookedB != null) {
+        if (lastBookedA == null) return 1;
+        if (lastBookedB == null) return -1;
+        final comp = lastBookedB.compareTo(lastBookedA);
+        if (comp != 0) return comp;
+      }
+
+      // 3. Display order ASC
+      final int orderA = int.tryParse('${mapA['display_order'] ?? 0}') ?? 0;
+      final int orderB = int.tryParse('${mapB['display_order'] ?? 0}') ?? 0;
+      if (orderA != orderB) {
+        return orderA.compareTo(orderB);
+      }
+
+      // 4. Service name ASC
+      final String nameA = (mapA['name'] ?? '').toString().toLowerCase();
+      final String nameB = (mapB['name'] ?? '').toString().toLowerCase();
+      final nameComp = nameA.compareTo(nameB);
+      if (nameComp != 0) return nameComp;
+
+      // 5. Fallback ID ASC
+      final String idA = (mapA['id'] ?? '').toString();
+      final String idB = (mapB['id'] ?? '').toString();
+      return idA.compareTo(idB);
+    });
+
+    return filtered;
   }
 
   @override
@@ -767,8 +912,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
               SliverToBoxAdapter(child: _buildNotices()),
               SliverToBoxAdapter(child: _buildFirstTimeOfferBanner()),
               SliverToBoxAdapter(child: _buildHoursPanel()),
-              SliverToBoxAdapter(child: _buildCombos()),
-              SliverToBoxAdapter(child: _buildCategoryTabs()),
+              SliverToBoxAdapter(key: _combosKey, child: _buildCombos()),
+              SliverToBoxAdapter(key: _categoryTabsKey, child: _buildCategoryTabs()),
               _buildServiceSliver(),
               SliverToBoxAdapter(child: _buildTeam()),
               SliverToBoxAdapter(key: _reviewsKey, child: _buildReviews()),
@@ -1394,7 +1539,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
   Widget _buildCombos() {
     final combos = (_salon!['combos'] as List?) ?? [];
-    if (combos.isEmpty) return SizedBox.shrink();
+    if (combos.isEmpty ||
+        (_selectedCategoryId != null && _selectedCategoryId != 'combo')) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1631,20 +1779,26 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         SizedBox(
           height: 44,
           child: ListView.separated(
+            controller: _categoryTabsScrollController,
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16),
             itemCount: tabs.length,
             separatorBuilder: (_, __) => SizedBox(width: 4),
             itemBuilder: (context, index) {
               final tab = tabs[index];
-              final isSelected = _selectedCategoryId == tab['id'];
+              final isSelected = _selectedCategoryId == tab['id'] ||
+                  (_selectedCategoryId != null &&
+                   tab['id'] != null &&
+                   tab['id'].toString().toLowerCase() == _selectedCategoryId!.toLowerCase());
               final textColor = isSelected
                   ? AppTheme.accentColor
                   : (context.colors.textSecondary);
 
               return GestureDetector(
-                onTap: () =>
-                    setState(() => _selectedCategoryId = tab['id'] as String?),
+                onTap: () => setState(() {
+                  _selectedCategoryId = tab['id'] as String?;
+                  _isServicesExpanded = false;
+                }),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1692,7 +1846,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     if (services.isEmpty) {
       return SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Center(
             child: Text(
               'No services in this category.',
@@ -1703,13 +1857,88 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
       );
     }
 
+    final bool hasToggle = services.length > 5;
+    final int displayedCount =
+        (_isServicesExpanded || !hasToggle) ? services.length : 5;
+    final int totalCount = displayedCount + (hasToggle ? 1 : 0);
+
     return SliverList(
       delegate: SliverChildBuilderDelegate(
-        (context, index) => Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: _serviceCard(services[index]),
+        (context, index) {
+          if (index < displayedCount) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: _serviceCard(services[index]),
+            );
+          }
+          return _buildExploreServicesButton();
+        },
+        childCount: totalCount,
+      ),
+    );
+  }
+
+  Widget _buildExploreServicesButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          key: const ValueKey('explore_all_services_button'),
+          onPressed: () {
+            AppHaptics.lightImpact();
+            final wasExpanded = _isServicesExpanded;
+            setState(() {
+              _isServicesExpanded = !_isServicesExpanded;
+            });
+            if (wasExpanded) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_categoryTabsKey.currentContext != null) {
+                  Scrollable.ensureVisible(
+                    _categoryTabsKey.currentContext!,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              });
+            }
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.accentColor,
+            backgroundColor: context.colors.surface,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: BorderSide(
+              color: AppTheme.accentColor.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _isServicesExpanded ? 'Show Less' : 'Explore All Services',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.accentColor,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                _isServicesExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: AppTheme.accentColor,
+              ),
+            ],
+          ),
         ),
-        childCount: services.length,
       ),
     );
   }
@@ -1747,9 +1976,11 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
 
     // Highlight came-from-category service: matched on the real template_id so
     // the salon + service relationship stays exact, never a name guess.
-    final isHighlighted =
-        _highlightServiceId != null &&
-        service['template_id']?.toString() == _highlightServiceId;
+    final isHighlighted = _highlightServiceId != null &&
+        (service['template_id']?.toString() == _highlightServiceId ||
+         service['id']?.toString() == _highlightServiceId ||
+         (service['name'] != null &&
+          service['name'].toString().toLowerCase() == _highlightServiceId!.toLowerCase()));
 
     return Opacity(
       opacity: canAdd ? 1.0 : 0.6,

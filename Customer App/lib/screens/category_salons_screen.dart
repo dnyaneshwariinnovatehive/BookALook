@@ -49,8 +49,6 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   String _selectedSort = 'Recommended';
   String _selectedGender = 'All';
 
-  /// Maps salonId -> selected serviceId so selections persist across rebuilds
-  final Map<String, String> _selectedServiceBySalon = {};
 
   bool get _isCombo => widget.category.id == 'combo';
   String get _categoryName => widget.category.name;
@@ -859,23 +857,27 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
             );
           }
 
+          String? subServiceId;
+          if (_selectedSubCategory != 'All') {
+            final catServices = (salon['category_services'] as List<dynamic>? ?? const [])
+                .whereType<Map<String, dynamic>>();
+            for (final s in catServices) {
+              final sName = (s['name'] ?? '').toString().toLowerCase();
+              final target = _selectedSubCategory.toLowerCase();
+              if (sName == target || sName.contains(target) || target.contains(sName)) {
+                subServiceId = s['template_id']?.toString() ?? s['id']?.toString();
+                break;
+              }
+            }
+          }
+
           return DiscoverySalonCard(
             salon: salon,
             isFavourited: _favouritedIds.contains(id),
             showFavourite: _signedIn,
             categoryId: _isCombo ? null : widget.category.id,
             categoryName: _isCombo ? null : widget.category.name,
-            selectedServiceId: _selectedServiceBySalon[id],
-            onServiceSelected: (service) {
-              setState(() {
-                _selectedServiceBySalon[id] = service['id'].toString();
-              });
-            },
-            onServiceDeselected: (service) {
-              setState(() {
-                _selectedServiceBySalon.remove(id);
-              });
-            },
+            serviceId: subServiceId,
             onToggleFavourite: () => _toggleFavourite(id),
           );
         },

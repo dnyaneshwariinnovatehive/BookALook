@@ -23,7 +23,7 @@ class Service extends Model
 
     public function template()
     {
-        return $this->belongsTo(ServiceTemplate::class, 'template_id');
+        return $this->belongsTo(ServiceTemplate::class, 'template_id')->withTrashed();
     }
 
     public function salon()

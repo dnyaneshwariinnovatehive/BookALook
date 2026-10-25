@@ -162,6 +162,46 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Cart is empty.'], 400);
         }
 
+        // Validate that all items in the cart remain active and bookable.
+        // If any catalog items were retired, gracefully remove them, preserve valid items, and explain the issue.
+        $retiredItemNames = [];
+        foreach ($cart->items as $item) {
+            $isRetired = false;
+            $name = null;
+            if ($item->service_id) {
+                $service = $item->service;
+                if (! $service || ! $service->is_active || $service->trashed() || ! $service->template || ! $service->template->is_active || $service->template->trashed()) {
+                    $isRetired = true;
+                    $name = $service?->template?->name ?? 'A service';
+                }
+            } elseif ($item->combo_id) {
+                $combo = $item->combo;
+                if (! $combo || ! $combo->is_active) {
+                    $isRetired = true;
+                    $name = $combo?->name ?? 'A combo package';
+                }
+            }
+
+            if ($isRetired) {
+                $retiredItemNames[] = $name;
+                $item->delete();
+            }
+        }
+
+        if (! empty($retiredItemNames)) {
+            $uniqueNames = array_values(array_unique($retiredItemNames));
+            $namesStr = implode(', ', $uniqueNames);
+            $message = count($uniqueNames) === 1
+                ? "The offering '{$namesStr}' is no longer available and has been removed from your cart. Please review your updated cart before booking."
+                : "The following offerings are no longer available and have been removed from your cart: {$namesStr}. Please review your updated cart before booking.";
+
+            return response()->json([
+                'message' => $message,
+                'retired_items_removed' => true,
+                'removed_offerings' => $uniqueNames,
+            ], 422);
+        }
+
         $requirements = $this->availability->summariseCart($cart);
         $candidates = $this->candidateProviders(
             $salon_id,

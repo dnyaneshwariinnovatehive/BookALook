@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceTemplate extends Model
 {
-    use HasUuids;
+    use HasUuids, SoftDeletes;
 
     public $timestamps = false;
 
@@ -24,7 +25,7 @@ class ServiceTemplate extends Model
 
     public function category()
     {
-        return $this->belongsTo(ServiceCategory::class, 'category_id');
+        return $this->belongsTo(ServiceCategory::class, 'category_id')->withTrashed();
     }
 
     public function firstTimeOffers()

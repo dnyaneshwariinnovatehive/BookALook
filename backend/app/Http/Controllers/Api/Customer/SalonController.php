@@ -142,11 +142,25 @@ class SalonController extends Controller
             ->pluck(DB::raw('count(*) as total'), 'provider_services.service_id')
             ->all();
 
+        $bookingStats = DB::table('appointment_services')
+            ->join('appointments', 'appointments.id', '=', 'appointment_services.appointment_id')
+            ->where('appointments.salon_id', $salonId)
+            ->where('appointments.status', 'completed')
+            ->where('appointment_services.line_status', '!=', 'cancelled')
+            ->groupBy('appointment_services.service_id')
+            ->select(
+                'appointment_services.service_id',
+                DB::raw('count(*) as booking_count'),
+                DB::raw('max(appointments.created_at) as last_booked_at')
+            )
+            ->get()
+            ->keyBy('service_id');
+
         $eligibilityService = class_exists(\App\Services\CustomerOfferEligibilityService::class)
             ? app(\App\Services\CustomerOfferEligibilityService::class)
             : null;
 
-        return $rows->map(function (Service $service) use ($providerCounts, $salonId, $user, $eligibilityService) {
+        $services = $rows->map(function (Service $service) use ($providerCounts, $bookingStats, $salonId, $user, $eligibilityService) {
             $discountInfo = null;
             $discountedPrice = (float) $service->price;
 
@@ -191,8 +205,41 @@ class SalonController extends Controller
                 // Zero means nobody at this salon is trained for it — the app greys
                 // it out rather than letting the customer hit a dead end at checkout.
                 'provider_count' => (int) ($providerCounts[$service->id] ?? 0),
+                'booking_count' => (int) ($bookingStats[$service->id]->booking_count ?? 0),
+                'last_booked_at' => isset($bookingStats[$service->id]) ? (string) $bookingStats[$service->id]->last_booked_at : null,
+                'display_order' => (int) ($service->display_order ?? 0),
             ];
         })->all();
+
+        // Sort by popularity (completed bookings DESC, last booked DESC, display_order ASC, name ASC, id ASC)
+        usort($services, function ($a, $b) {
+            $countA = (int) ($a['booking_count'] ?? 0);
+            $countB = (int) ($b['booking_count'] ?? 0);
+            if ($countA !== $countB) {
+                return $countB <=> $countA;
+            }
+
+            $lastA = $a['last_booked_at'] ?? '';
+            $lastB = $b['last_booked_at'] ?? '';
+            if ($lastA !== $lastB) {
+                return strcmp($lastB, $lastA);
+            }
+
+            $orderA = (int) ($a['display_order'] ?? 0);
+            $orderB = (int) ($b['display_order'] ?? 0);
+            if ($orderA !== $orderB) {
+                return $orderA <=> $orderB;
+            }
+
+            $nameComp = strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+            if ($nameComp !== 0) {
+                return $nameComp;
+            }
+
+            return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+        });
+
+        return $services;
     }
 
     /**

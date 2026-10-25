@@ -142,13 +142,7 @@ class SalonCardSkeleton extends StatelessWidget {
                   SizedBox(height: 10),
                   SkeletonLine(widthFactor: 0.35),
                   SizedBox(height: 18),
-                  Row(
-                    children: [
-                      SkeletonBox(width: 64, height: 22, radius: 6),
-                      SizedBox(width: 8),
-                      SkeletonBox(width: 52, height: 22, radius: 6),
-                    ],
-                  ),
+                  SkeletonBox(width: double.infinity, height: 36, radius: 10),
                 ],
               ),
             ),

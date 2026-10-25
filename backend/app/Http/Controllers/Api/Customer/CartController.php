@@ -35,6 +35,14 @@ class CartController extends Controller
             return response()->json(['message' => 'Cart is empty', 'cart' => null]);
         }
 
+        $this->purgeRetiredItems($cart);
+
+        if ($cart->items()->count() === 0) {
+            return response()->json(['message' => 'Cart is empty', 'cart' => null]);
+        }
+
+        $cart->load(['items.service.template', 'items.combo.services.template', 'items.preferredProvider.user']);
+
         return response()->json(['cart' => $this->withSummary($cart)]);
     }
 
@@ -52,7 +60,39 @@ class CartController extends Controller
             return response()->json(['message' => 'Cart is empty', 'cart' => null]);
         }
 
+        $this->purgeRetiredItems($cart);
+
+        if ($cart->items()->count() === 0) {
+            return response()->json(['message' => 'Cart is empty', 'cart' => null]);
+        }
+
+        $cart->load(['items.service.template', 'items.combo.services.template', 'items.preferredProvider.user', 'salon']);
+
         return response()->json(['cart' => $this->withSummary($cart)]);
+    }
+
+    /**
+     * Remove any items whose service or template has been retired or deactivated.
+     */
+    private function purgeRetiredItems(Cart $cart): array
+    {
+        $removed = [];
+        foreach ($cart->items as $item) {
+            if ($item->service_id) {
+                $service = $item->service;
+                if (! $service || ! $service->is_active || $service->trashed() || ! $service->template || ! $service->template->is_active || $service->template->trashed()) {
+                    $removed[] = $service?->template?->name ?? 'Service';
+                    $item->delete();
+                }
+            } elseif ($item->combo_id) {
+                $combo = $item->combo;
+                if (! $combo || ! $combo->is_active) {
+                    $removed[] = $combo?->name ?? 'Package';
+                    $item->delete();
+                }
+            }
+        }
+        return $removed;
     }
 
     /**
@@ -179,6 +219,19 @@ class CartController extends Controller
         );
 
         if ($request->service_id) {
+            // Validate that the service is active, not retired/trashed, and belongs to an active template
+            $activeService = Service::where('salon_id', $salon_id)
+                ->where('is_active', true)
+                ->whereHas('template', function ($q) {
+                    $q->where('is_active', true);
+                })
+                ->find($request->service_id);
+
+            if (! $activeService) {
+                return response()->json([
+                    'message' => 'This service is no longer available.',
+                ], 422);
+            }
             // Check if this service is already included in an existing combo in the cart
             $existingComboWithService = CartItem::where('cart_id', $cart->id)
                 ->whereNotNull('combo_id')
