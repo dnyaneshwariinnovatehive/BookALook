@@ -20,6 +20,24 @@ import '../theme/app_colors.dart';
 ///
 /// Implements modern mobile design with search, sub-service category pills,
 /// and interactive salon cards where services can be directly selected.
+/// Whether a directory row is for the audience picked on the category screen
+/// ("Unisex", "Women Only", "Men Only"; anything else means everyone).
+///
+/// A salon that does not say whom it serves is open to everyone. The server has
+/// already filtered by gender, and treating a missing value as "no match" used
+/// to empty the whole list for anyone with a gender on their profile.
+bool salonServesAudience(Map<String, dynamic> salon, String audience) {
+  final target = audience.toLowerCase();
+  final raw = (salon['gender_focus'] ?? '').toString().trim().toLowerCase();
+  final focus = raw.isEmpty ? 'unisex' : raw;
+  return switch (target) {
+    'unisex' => focus == 'unisex',
+    'women only' => focus == 'women only' || focus == 'unisex',
+    'men only' => focus == 'men only' || focus == 'unisex',
+    _ => true,
+  };
+}
+
 class CategorySalonsScreen extends StatefulWidget {
   final ServiceCategory category;
 
@@ -297,18 +315,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
 
     // Gender focus match
     if (_selectedGender != 'All') {
-      final target = _selectedGender.toLowerCase();
-      list = list.where((salon) {
-        final g = (salon['gender_focus'] ?? '').toString().toLowerCase();
-        if (target == 'unisex') return g == 'unisex';
-        if (target == 'women only') {
-          return g == 'women only' || g == 'unisex';
-        }
-        if (target == 'men only') {
-          return g == 'men only' || g == 'unisex';
-        }
-        return true;
-      }).toList();
+      list = list.where((salon) => salonServesAudience(salon, _selectedGender)).toList();
     }
 
     // Sort order

@@ -815,6 +815,10 @@ class SalonController extends Controller
                 'id' => $salon->id,
                 'name' => $salon->name,
                 'address' => $salon->address,
+                // Who the salon serves. The category screen filters on it; when
+                // it was missing every salon failed that filter, so anyone with
+                // a gender on their profile saw "No salons found".
+                'gender_focus' => GenderFocus::normalise($salon->gender_focus),
                 'cover_photo_url' => $salon->cover_photo_url,
                 'avg_rating' => (float) $salon->avg_rating,
                 'review_count' => (int) $salon->review_count,

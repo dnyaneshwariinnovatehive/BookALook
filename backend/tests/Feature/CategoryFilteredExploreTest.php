@@ -71,6 +71,23 @@ class CategoryFilteredExploreTest extends TestCase
         $this->assertNotContains($salon->id, $this->listedSalonIds($city, ['category_id' => $hair->id]));
     }
 
+    public function test_each_row_says_whom_the_salon_serves(): void
+    {
+        [$salon, $city] = $this->givenSalonInItsOwnCity();
+        [$hair] = $this->givenHairAndNails();
+        $this->givenService($salon, $hair);
+
+        // The category screen filters on this; without it every salon failed
+        // the filter for anyone with a gender on their profile.
+        $rows = $this->getJson("/api/customer/salons?city_id={$city->id}&category_id={$hair->id}&gender=women")
+            ->assertOk()
+            ->json('salons');
+
+        $row = collect($rows)->firstWhere('id', $salon->id);
+        $this->assertNotNull($row);
+        $this->assertContains($row['gender_focus'], ['Unisex', 'Women Only']);
+    }
+
     public function test_a_category_with_no_salons_is_empty_rather_than_filled_with_others(): void
     {
         [$nailsSalon, $city] = $this->givenSalonInItsOwnCity();
