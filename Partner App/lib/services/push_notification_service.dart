@@ -9,6 +9,7 @@ import '../firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'api_config.dart';
+import '../utils/live_sync.dart';
 import '../main.dart' as main;
 import 'package:path_provider/path_provider.dart';
 
@@ -54,6 +55,19 @@ class PushNotificationService {
 
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('Received a foreground message: ${message.messageId}');
+
+        // A silent "bookings changed" nudge: refresh the open screens, show
+        // nothing.
+        if (message.data['type'] == 'salon_sync') {
+          LiveSync.ping();
+          return;
+        }
+
+        // Any booking notice also means the lists on screen are out of date.
+        if ((message.data['appointment_id'] ?? '').toString().isNotEmpty) {
+          LiveSync.ping();
+        }
+
         _showLocalNotification(message);
       });
 

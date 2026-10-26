@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import 'live_sync.dart';
+
 /// Manages lifecycle-aware, visibility-aware periodic polling for Partner App screens.
 ///
 /// Guarantees:
@@ -20,6 +22,7 @@ class LifecyclePoller with WidgetsBindingObserver {
   final String debugLabel;
 
   Timer? _timer;
+  StreamSubscription<void>? _liveSync;
   bool _isActive;
   bool _isDisposed = false;
   bool _isFetching = false;
@@ -35,6 +38,9 @@ class LifecyclePoller with WidgetsBindingObserver {
     if (_isActive) {
       _startTimer();
     }
+    // A booking changed somewhere: refresh now rather than at the next tick.
+    // poll() already skips hidden screens and a backgrounded app.
+    _liveSync = LiveSync.changes.listen((_) => poll(silent: true));
   }
 
   /// Whether this poller is currently considered visible/active by its screen/shell.
@@ -127,6 +133,7 @@ class LifecyclePoller with WidgetsBindingObserver {
   void dispose() {
     _isDisposed = true;
     _stopTimer();
+    _liveSync?.cancel();
     WidgetsBinding.instance.removeObserver(this);
   }
 }

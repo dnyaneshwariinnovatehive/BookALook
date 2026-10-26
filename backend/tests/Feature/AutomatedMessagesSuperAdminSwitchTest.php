@@ -71,7 +71,8 @@ class AutomatedMessagesSuperAdminSwitchTest extends TestCase
         $this->artisan('app:send-automated-messages')->assertSuccessful();
 
         $this->assertSame([], $this->queuedTemplates());
-        Queue::assertNothingPushed();
+        // Booking a visit in setUp nudges the salon's partner apps; that is not a message.
+        Queue::assertNotPushed(SendWhatsAppMessageJob::class);
     }
 
     public function test_both_are_sent_once_superadmin_switches_them_on(): void

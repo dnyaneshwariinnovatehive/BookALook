@@ -26,6 +26,9 @@ final class PushPayload
         public readonly ?string $appointmentId = null,
         public readonly ?string $salonId = null,
         public readonly ?string $imageUrl = null,
+        // Data only, nothing in the tray: a nudge for an open app to refresh,
+        // such as the salon's screens catching a booking as it lands.
+        public readonly bool $silent = false,
     ) {
     }
 

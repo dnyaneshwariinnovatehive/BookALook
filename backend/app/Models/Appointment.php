@@ -18,6 +18,44 @@ class Appointment extends Model
     /** The QR hash and internal phone hash are credentials/internal identifiers — never ship them to a client. */
     protected $hidden = ['qr_token_hash', 'customer_phone_hash'];
 
+    /** Changes that move what the salon's screens show. */
+    private const SYNCED_FIELDS = [
+        'status', 'appointment_date', 'start_time', 'end_time',
+        'appointed_provider_id', 'serving_provider_id', 'total_amount',
+    ];
+
+    /**
+     * Live sync: when a booking appears or changes, the salon's open partner
+     * apps are nudged to refresh. Sent after the transaction commits, so a
+     * phone never reloads before the change is there to see, and held back a
+     * couple of seconds so the several saves one booking makes become one push.
+     */
+    protected static function booted(): void
+    {
+        static::created(fn (Appointment $appointment) => $appointment->nudgeSalon());
+
+        static::updated(function (Appointment $appointment) {
+            if ($appointment->wasChanged(self::SYNCED_FIELDS)) {
+                $appointment->nudgeSalon();
+            }
+        });
+    }
+
+    private function nudgeSalon(): void
+    {
+        if (! $this->salon_id) {
+            return;
+        }
+
+        if (! \Illuminate\Support\Facades\Cache::add('salon_sync:' . $this->salon_id, true, 3)) {
+            return;
+        }
+
+        \App\Jobs\SendSalonSyncJob::dispatch($this->salon_id, $this->id)
+            ->delay(now()->addSeconds(2))
+            ->afterCommit();
+    }
+
     public function firstTimeOffer()
     {
         return $this->belongsTo(FirstTimeOffer::class, 'first_time_offer_id');

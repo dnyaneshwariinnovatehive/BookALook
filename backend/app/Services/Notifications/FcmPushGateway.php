@@ -134,6 +134,16 @@ class FcmPushGateway implements PushGateway
      */
     private function messageFor(string $token, PushPayload $payload): array
     {
+        if ($payload->silent) {
+            // No notification block, so nothing is shown; high priority so it
+            // is delivered straight away to an app that is open.
+            return [
+                'token' => $token,
+                'data' => $payload->toDataArray(),
+                'android' => ['priority' => 'high'],
+            ];
+        }
+
         $androidNotification = [
             'channel_id' => (string) config('services.push.fcm.channel_id', 'bookalook_notifications'),
         ];
