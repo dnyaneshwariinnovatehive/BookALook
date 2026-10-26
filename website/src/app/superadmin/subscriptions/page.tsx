@@ -926,6 +926,8 @@ export default function SubscriptionsPage() {
 
           <div className={styles.overviewGrid}>
             <Card
+              padded
+              className={styles.overviewCard}
               title={<>Needs attention</>}
               subtitle="Requests to verify, and subscriptions running out."
               actions={pendingRequests.length > 0 ? <Button size="sm" variant="soft" onClick={() => setTab('requests')}>Open requests</Button> : undefined}
@@ -978,7 +980,7 @@ export default function SubscriptionsPage() {
               )}
             </Card>
 
-            <Card title="Plan mix" subtitle="Where salons are, and what each plan brings in a month.">
+            <Card padded className={styles.overviewCard} title="Plan mix" subtitle="Where salons are, and what each plan brings in a month.">
               {isLoading ? (
                 <Skeleton height={160} radius={14} />
               ) : plans.length === 0 ? (
@@ -1006,6 +1008,8 @@ export default function SubscriptionsPage() {
             </Card>
 
             <Card
+              padded
+              className={styles.overviewCard}
               title="Recent payments"
               subtitle="The latest approved plan payments."
               actions={<Button size="sm" variant="soft" onClick={() => setTab('payments')}>All payments</Button>}
@@ -1023,7 +1027,9 @@ export default function SubscriptionsPage() {
                         <b>{r.salon?.name ?? 'Unknown salon'}</b>
                         <span>{r.plan?.name ?? r.billing_label ?? '—'} · {fmtDateStr(r.updated_at)}</span>
                       </div>
-                      <b className={styles.amount}>{r.amount_payable_inr != null ? formatINR(r.amount_payable_inr) : '—'}</b>
+                      {r.amount_payable_inr != null
+                        ? <b className={styles.amount}>{formatINR(r.amount_payable_inr)}</b>
+                        : <span className={styles.amountMuted}>—</span>}
                     </li>
                   ))}
                 </ul>
