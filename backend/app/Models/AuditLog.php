@@ -77,6 +77,8 @@ class AuditLog extends Model
     public const PLAN_DELETED = 'plan.deleted';
     public const PAYOUT_APPROVED = 'payout.approved';
     public const PAYOUT_DISTRIBUTED = 'payout.distributed';
+    public const SALON_BANK_DETAILS_UPDATED = 'salon.bank_details_updated';
+    public const SALON_BANK_DETAILS_REVEALED = 'salon.bank_details_revealed';
 
     // Platform settings — rules everybody is bound by.
     public const POLICY_UPDATED = 'policy.updated';
@@ -117,6 +119,10 @@ class AuditLog extends Model
         self::PLAN_DELETED => ['label' => 'Deleted a plan', 'category' => 'Money', 'severity' => 'critical'],
         self::PAYOUT_APPROVED => ['label' => 'Approved a payout', 'category' => 'Money', 'severity' => 'high'],
         self::PAYOUT_DISTRIBUTED => ['label' => 'Distributed a payout', 'category' => 'Money', 'severity' => 'critical'],
+        // Where a salon's money is sent. Changing it is how a settlement goes
+        // astray, so it stands out as much as moving the money itself.
+        self::SALON_BANK_DETAILS_UPDATED => ['label' => "Changed a salon's bank details", 'category' => 'Money', 'severity' => 'critical'],
+        self::SALON_BANK_DETAILS_REVEALED => ['label' => "Viewed a salon's full account number", 'category' => 'Money', 'severity' => 'high'],
 
         self::POLICY_UPDATED => ['label' => 'Changed platform policy', 'category' => 'Settings', 'severity' => 'critical'],
         // Rewrites the letterhead, and the tax identity on it, on every

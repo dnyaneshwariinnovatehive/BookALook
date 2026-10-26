@@ -12,7 +12,19 @@ class Salon extends Model
 
     protected $guarded = [];
 
+    /**
+     * Bank details never travel with a salon's ordinary JSON — every salon
+     * payload in the app would otherwise carry them. They are read through
+     * BankDetailsService, which masks the account number.
+     */
+    protected $hidden = [
+        'bank_account_holder_name', 'bank_name', 'bank_account_number', 'bank_account_last4',
+        'bank_ifsc', 'bank_upi_id', 'bank_details_updated_at', 'bank_details_updated_by',
+    ];
+
     protected $casts = [
+        'bank_account_number' => 'encrypted',
+        'bank_details_updated_at' => 'datetime',
         'commission_opt_in' => 'boolean',
         'commission_percentage' => 'decimal:2',
         'commission_rate_effective_from' => 'date',

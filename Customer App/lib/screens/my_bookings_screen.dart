@@ -1459,382 +1459,280 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
+  /// One past booking: who, what and when on top, the amount beside the date,
+  /// and one clear action at the bottom — "Rate your experience" until the
+  /// visit is rated, then "View invoice".
   Widget _buildCompactHistoryCard(Map<String, dynamic> booking) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final date =
-        DateTime.tryParse(booking['appointment_date']?.toString() ?? '') ??
-        DateTime.now();
+    final date = DateTime.tryParse(booking['appointment_date']?.toString() ?? '');
     final services = (booking['services'] as List?) ?? [];
     final total = _toDouble(booking['total_amount']);
 
-    String serviceNames = services.map((s) => s['name']).join(', ');
-    if (serviceNames.isEmpty) serviceNames = 'Service';
-
-    final formattedDate = DateFormat('d MMM yyyy').format(date);
-    final timeStr = booking['start_time'] ?? '';
+    final names = services.map((s) => s['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+    final serviceNames = names.isEmpty
+        ? 'Service'
+        : names.length <= 2
+            ? names.join(', ')
+            : '${names.take(2).join(', ')} +${names.length - 2} more';
 
     final status = (booking['status'] ?? '').toString();
     final statusText = status
         .replaceAll('_', ' ')
         .split(' ')
-        .map(
-          (s) => s.isNotEmpty
-              ? s[0].toUpperCase() + s.substring(1).toLowerCase()
-              : '',
-        )
+        .map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1).toLowerCase() : '')
         .join(' ');
-
-    final imageUrl =
-        booking['salon']?['cover_image'] ??
-        booking['salon']?['cover_photo_url'] ??
-        booking['salon']?['logo_image'] ??
-        '';
-
     final badgeColors = _getStatusBadgeColors(status, isDark: isDark);
 
+    final imageUrl = (booking['salon']?['cover_image'] ??
+            booking['salon']?['cover_photo_url'] ??
+            booking['salon']?['logo_image'] ??
+            '')
+        .toString();
+
+    final when = [
+      if (date != null) DateFormat('EEE, d MMM yyyy').format(date),
+      _historyTime(booking['start_time']?.toString()),
+    ].where((p) => p.isNotEmpty).join(' · ');
+
+    Future<void> openDetails() async {
+      await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => AppointmentDetailsScreen(booking: booking, isUpcoming: false)),
+      );
+      if (mounted) _loadBookings();
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      key: ValueKey('history_card_${booking['id']}'),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: context.colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.colors.border, width: 1.0),
-        boxShadow: isDark
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: AppTheme.accentColor.withValues(alpha: 0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black.withValues(alpha: 0.2) : AppTheme.accentColor.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: () async {
-          final changed = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  AppointmentDetailsScreen(booking: booking, isUpcoming: false),
-            ),
-          );
-          if (changed == true || mounted) {
-            _loadBookings();
-          }
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: openDetails,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? context.colors.accentSoft
-                          : const Color(0xFFF5EFFF),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isDark
-                            ? context.colors.border
-                            : const Color(0xFFEEE3FD),
-                        width: 1.0,
-                      ),
-                    ),
-                    clipBehavior: Clip.hardEdge,
-                    child: imageUrl.isNotEmpty
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.storefront_outlined,
-                                  color: AppTheme.accentColor,
-                                  size: 20,
-                                ),
-                          )
-                        : const Icon(
-                            Icons.storefront_outlined,
-                            color: AppTheme.accentColor,
-                            size: 20,
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          booking['salon']?['name'] ?? 'Salon',
-                          style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: context.colors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          serviceNames,
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            color: context.colors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _historyThumb(imageUrl, isDark),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                '$formattedDate • $timeStr',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  color: context.colors.textSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
                             Text(
-                              '₹${total.toStringAsFixed(0)}',
+                              booking['salon']?['name'] ?? 'Salon',
                               style: GoogleFonts.outfit(
-                                fontSize: 13,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.bold,
                                 color: context.colors.textPrimary,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: badgeColors.bg,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: badgeColors.border,
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Text(
-                                statusText,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: badgeColors.text,
-                                ),
-                              ),
+                            const SizedBox(height: 3),
+                            Text(
+                              serviceNames,
+                              style: GoogleFonts.outfit(fontSize: 13, color: context.colors.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColors.bg,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: badgeColors.border, width: 0.8),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColors.text),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isDark ? context.colors.accentSoft : const Color(0xFFF8F5FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_outlined, size: 15, color: AppTheme.accentColor),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            when,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: context.colors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '₹${NumberFormat('#,##,##0').format(total)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: context.colors.textPrimary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              ..._buildCompactReviewAndInvoiceSection(booking, isDark),
-            ],
+            ),
           ),
-        ),
+          ..._buildCompactReviewAndInvoiceSection(booking, isDark),
+        ],
       ),
     );
   }
 
-  List<Widget> _buildCompactReviewAndInvoiceSection(
-    Map<String, dynamic> booking,
-    bool isDark,
-  ) {
+  Widget _historyThumb(String imageUrl, bool isDark) {
+    const fallback = Icon(Icons.storefront_outlined, color: AppTheme.accentColor, size: 22);
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: isDark ? context.colors.accentSoft : const Color(0xFFF5EFFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? context.colors.border : const Color(0xFFEEE3FD)),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: imageUrl.isNotEmpty
+          ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback)
+          : fallback,
+    );
+  }
+
+  /// "10:30:00" → "10:30 AM"; anything unreadable is shown as it came.
+  String _historyTime(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    final parts = raw.split(':');
+    final h = int.tryParse(parts.first);
+    final m = parts.length > 1 ? int.tryParse(parts[1]) : 0;
+    if (h == null || m == null) return raw;
+    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
+  }
+
+  /// The bottom of a history card. A completed visit not yet rated gets a bold
+  /// "Rate your experience" button; once rated, the same button becomes "View
+  /// invoice" (when there is one) with the rating beside it. "Report issue"
+  /// stays a quiet link on every finished visit.
+  List<Widget> _buildCompactReviewAndInvoiceSection(Map<String, dynamic> booking, bool isDark) {
     final review = booking['review'] as Map<String, dynamic>?;
     final canReview = booking['can_review'] == true;
     final blockedReason = booking['review_blocked_reason']?.toString();
-    final isPast = ['completed', 'cancelled', 'no_show']
-        .contains(booking['status']?.toString().toLowerCase());
+    final status = booking['status']?.toString().toLowerCase();
+    final isPast = ['completed', 'cancelled', 'no_show'].contains(status);
+    final hasInvoice = InvoiceInfo.fromBooking(booking) != null;
 
-    final bool mightHaveInvoice =
-        booking['invoice'] is Map && booking['status'] == 'completed';
+    if (!isPast && review == null && !canReview && !hasInvoice) return const [];
 
-    if (!mightHaveInvoice &&
-        review == null &&
-        !canReview &&
-        !isPast &&
-        (blockedReason == null || booking['status'] != 'completed')) {
-      return const [];
+    Widget? primary;
+    if (review == null && canReview) {
+      primary = _historyAction(
+        key: const ValueKey('history_rate_button'),
+        icon: Icons.star_rounded,
+        label: 'Rate your experience',
+        onTap: () => _rateVisit(booking),
+      );
+    } else if (review != null && hasInvoice) {
+      primary = _historyAction(
+        key: const ValueKey('history_invoice_button'),
+        icon: Icons.receipt_long_rounded,
+        label: 'View invoice',
+        onTap: () => openInvoice(context, booking),
+      );
     }
 
-    return [
-      const SizedBox(height: 12),
-      Divider(color: context.colors.border, height: 1),
-      const SizedBox(height: 4),
-      InvoiceLinkButton(booking: booking),
-      if (review != null) ...[
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: _buildCompactGivenRating(review),
-        ),
-        if (isPast)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 8),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: InkWell(
-                onTap: () => _reportProblem(booking),
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.report_problem_outlined,
-                        size: 13,
-                        color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Report issue',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+    final reportLink = InkWell(
+      onTap: () => _reportProblem(booking),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.report_problem_outlined, size: 13, color: context.colors.textSecondary),
+            const SizedBox(width: 4),
+            Text(
+              'Report issue',
+              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w500, color: context.colors.textSecondary),
             ),
-          ),
-      ] else if (canReview)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: InkWell(
-                  onTap: () => _rateVisit(booking),
-                  borderRadius: BorderRadius.circular(30),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star_outline_rounded,
-                          size: 16,
-                          color: AppTheme.accentColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'Rate your visit',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.accentColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => _reportProblem(booking),
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.report_problem_outlined,
-                        size: 13,
-                        color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Report issue',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        )
-      else if (isPast)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (blockedReason != null && booking['status'] == 'completed')
-                Expanded(
-                  child: Text(
-                    blockedReason,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: context.colors.textSecondary,
-                    ),
-                  ),
-                )
-              else
-                const Spacer(),
-              InkWell(
-                onTap: () => _reportProblem(booking),
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.report_problem_outlined,
-                        size: 13,
-                        color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Report issue',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? context.colors.textSecondary : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
+      ),
+    );
+
+    return [
+      Divider(color: context.colors.border, height: 1),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (review != null) ...[
+              _buildCompactGivenRating(review),
+              const SizedBox(height: 10),
+            ],
+            if (primary != null) primary,
+            if (primary == null && review == null && blockedReason != null && status == 'completed')
+              Text(blockedReason, style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary)),
+            // An invoice on a visit that cannot be rated (yet) is still worth a link.
+            if (primary == null && review == null && hasInvoice)
+              Align(alignment: Alignment.centerLeft, child: InvoiceLinkButton(booking: booking)),
+            if (isPast) Align(alignment: Alignment.centerRight, child: reportLink),
+          ],
+        ),
+      ),
     ];
+  }
+
+  Widget _historyAction({required Key key, required IconData icon, required String label, required VoidCallback onTap}) {
+    return SizedBox(
+      height: 44,
+      child: ElevatedButton.icon(
+        key: key,
+        onPressed: onTap,
+        icon: Icon(icon, size: 19),
+        label: Text(label, style: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w800)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.accentColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
   }
 
   Widget _buildCompactGivenRating(Map<String, dynamic> review) {

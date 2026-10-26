@@ -27,10 +27,24 @@ class SalonEnquiry extends Model
         'status',
         'assigned_collaborator_id',
         'assigned_at',
+        // Optional bank details from the website form, carried to the salon
+        // when a collaborator onboards it.
+        'bank_account_holder_name',
+        'bank_name',
+        'bank_account_number',
+        'bank_account_last4',
+        'bank_ifsc',
+        'bank_upi_id',
+    ];
+
+    protected $hidden = [
+        'bank_account_holder_name', 'bank_name', 'bank_account_number', 'bank_account_last4',
+        'bank_ifsc', 'bank_upi_id',
     ];
 
     protected $casts = [
         'assigned_at' => 'datetime',
+        'bank_account_number' => 'encrypted',
     ];
 
     public function cityRecord()

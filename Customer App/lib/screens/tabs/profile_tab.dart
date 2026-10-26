@@ -17,7 +17,8 @@ import '../../theme/app_colors.dart';
 import '../../utils/bottom_clearance.dart';
 import '../edit_profile_screen.dart';
 
-import 'package:firebase_messaging/firebase_messaging.dart';
+import '../../services/push_notification_service.dart';
+import '../../services/push_toggle_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/appointment_service.dart';
 import '../../widgets/complaint_bottom_sheet.dart';
@@ -53,12 +54,39 @@ class _ProfileTabState extends State<ProfileTab> {
   String _error = '';
 
   // Settings states
-  bool _pushNotifications = true;
   bool _locationAccess = true;
+
+  /// Push Notifications: on only when the account wants pushes (on the server;
+  /// on the device for a guest) and the phone allows them.
+  late final PushToggleController _push = PushToggleController(
+    loadServer: () async {
+      if (widget.isGuest) {
+        final prefs = await SharedPreferences.getInstance();
+        return prefs.getBool('push_notifications') ?? true;
+      }
+      final prefsData = await _profileService.getNotificationPreferences();
+      return prefsData['push_enabled'] != false;
+    },
+    saveServer: (enabled) async {
+      if (widget.isGuest) {
+        await _toggleSetting('push_notifications', enabled);
+        return;
+      }
+      await _profileService.updateNotificationPreferences({'push_enabled': enabled});
+    },
+    registerDevice: widget.isGuest ? null : () => PushNotificationService().registerDevice(),
+  );
+
+  @override
+  void dispose() {
+    _push.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _push.start();
     if (!widget.isGuest) {
       _loadProfileData();
       _loadSettings();
@@ -94,29 +122,6 @@ class _ProfileTabState extends State<ProfileTab> {
       });
     }
 
-    final settings = await FirebaseMessaging.instance.getNotificationSettings();
-    bool osEnabled =
-        settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
-    bool apiEnabled = true;
-
-    // Load Push notification preference from backend if not guest
-    if (!widget.isGuest) {
-      try {
-        final prefsData = await _profileService.getNotificationPreferences();
-        apiEnabled = prefsData['push_enabled'] ?? true;
-      } catch (e) {
-        debugPrint('Error loading notification preferences: $e');
-      }
-    } else {
-      apiEnabled = prefs.getBool('push_notifications') ?? true;
-    }
-
-    if (mounted) {
-      setState(() {
-        _pushNotifications = osEnabled && apiEnabled;
-      });
-    }
   }
 
   Future<void> _toggleSetting(String key, bool value) async {
@@ -265,51 +270,12 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Future<void> _onTogglePushNotifications(bool val) async {
-    if (val) {
-      NotificationSettings settings = await FirebaseMessaging.instance
-          .getNotificationSettings();
-      if (settings.authorizationStatus == AuthorizationStatus.denied ||
-          settings.authorizationStatus == AuthorizationStatus.notDetermined) {
-        settings = await FirebaseMessaging.instance.requestPermission();
-        if (settings.authorizationStatus != AuthorizationStatus.authorized &&
-            settings.authorizationStatus != AuthorizationStatus.provisional) {
-          if (!mounted) return;
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Notifications Disabled'),
-              content: const Text(
-                'Please enable notifications for BookALook in your device settings to receive updates.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
-      }
-    }
-
-    if (!mounted) return;
-    setState(() => _pushNotifications = val);
-    if (!widget.isGuest) {
-      try {
-        await _profileService.updateNotificationPreferences({
-          'push_enabled': val,
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _pushNotifications = !val);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update preferences')),
-        );
-      }
-    } else {
-      _toggleSetting('push_notifications', val);
+    final error = await _push.setEnabled(
+      val,
+      askToOpenSettings: () => showOpenNotificationSettingsDialog(context),
+    );
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     }
   }
 
@@ -649,12 +615,17 @@ class _ProfileTabState extends State<ProfileTab> {
                   borderRadius: BorderRadius.circular(20),
                   child: Column(
                     children: [
-                      _buildToggleRow(
-                        context,
-                        icon: Icons.notifications_none_rounded,
-                        label: 'Push Notifications',
-                        value: _pushNotifications,
-                        onChanged: _onTogglePushNotifications,
+                      ListenableBuilder(
+                        listenable: _push,
+                        builder: (context, _) => _buildToggleRow(
+                          context,
+                          key: const ValueKey('push_toggle_row'),
+                          icon: _push.enabled ? Icons.notifications_active_outlined : Icons.notifications_none_rounded,
+                          label: 'Push Notifications',
+                          subtitle: _push.blockedByPhone ? 'Blocked in phone settings — turn on to fix' : null,
+                          value: _push.enabled,
+                          onChanged: _push.loading || _push.saving ? null : _onTogglePushNotifications,
+                        ),
                       ),
                       Divider(height: 1, thickness: 1, color: borderColor),
                       _buildToggleRow(
@@ -741,7 +712,7 @@ class _ProfileTabState extends State<ProfileTab> {
               // Legal contact info
               Center(
                 child: Text(
-                  'BooKalook · $kLegalContactEmail',
+                  'BookALook · $kLegalContactEmail',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(
                     fontSize: 12,
@@ -881,13 +852,16 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Widget _buildToggleRow(
     BuildContext context, {
+    Key? key,
     required IconData icon,
     required String label,
+    String? subtitle,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
+      key: key,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Row(
         children: [
@@ -897,13 +871,23 @@ class _ProfileTabState extends State<ProfileTab> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: context.colors.textPrimary,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.outfit(fontSize: 12, color: context.colors.warning),
+                  ),
+              ],
             ),
           ),
           Container(

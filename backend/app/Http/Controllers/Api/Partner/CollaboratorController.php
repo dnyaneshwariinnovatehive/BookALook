@@ -71,6 +71,9 @@ class CollaboratorController extends Controller
                     'phone' => $enquiry->phone,
                     'city' => $enquiry->cityRecord?->name ?? ($enquiry->getAttribute('city') ?: ''),
                     'message' => $enquiry->message,
+                    // What the owner gave on the website, masked, so the
+                    // collaborator knows not to ask again.
+                    'bank_details' => app(\App\Services\BankDetailsService::class)->present($enquiry),
                     'assigned_at' => $enquiry->assigned_at,
                     'needs_correction' => $needsCorrection,
                     'rejection_reason' => $reason,
@@ -564,6 +567,8 @@ class CollaboratorController extends Controller
                 'preferred_commercial_model' => $salon->preferred_commercial_model ?? 'subscription',
                 'requested_commission_percentage' => $salon->requested_commission_percentage === null ? null : (float) $salon->requested_commission_percentage,
                 'cover_photo_url' => $salon->cover_photo_url,
+                // Masked: the account number is never sent back in full.
+                'bank_details' => app(\App\Services\BankDetailsService::class)->present($salon),
                 'status' => $salon->status,
                 'rejection_reason' => $salon->rejection_reason,
                 'correction_notes' => $salon->correction_notes,
@@ -627,14 +632,19 @@ class CollaboratorController extends Controller
               ->orWhere('assigned_collaborator_id', $user->id);
         })->pluck('id');
 
-        $notifications = Notification::with('salon:id,name')
-            ->where('user_id', $user->id)
-            ->whereIn('related_salon_id', $salonIds)
+        $query = \App\Support\NotificationInbox::visible(
+            Notification::with('salon:id,name')->where('user_id', $user->id)->whereIn('related_salon_id', $salonIds)
+        );
+        \App\Support\NotificationInbox::inPeriod($query, \App\Support\NotificationInbox::period($request));
+
+        $notifications = $query
             ->orderByDesc('created_at')
             ->limit((int) $request->get('limit', 50))
             ->get();
 
-        $scoped = Notification::where('user_id', $user->id)->whereIn('related_salon_id', $salonIds);
+        $scoped = \App\Support\NotificationInbox::visible(
+            Notification::where('user_id', $user->id)->whereIn('related_salon_id', $salonIds)
+        );
 
         return response()->json([
             'success' => true,
@@ -671,6 +681,50 @@ class CollaboratorController extends Controller
             ->update(['is_read' => true]);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Delete one notice from this collaborator's inbox — scoped like the list,
+     * so a guessed id from someone else's inbox deletes nothing.
+     */
+    public function deleteNotification(Request $request, $id)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $deleted = \App\Support\NotificationInbox::dismissOne($this->collaboratorInbox($user), (string) $id);
+
+        return $deleted
+            ? response()->json(['success' => true])
+            : response()->json(['success' => false, 'message' => 'Notification not found.'], 404);
+    }
+
+    /** Delete several: given ids, everything in a period, or everything (`all`). */
+    public function deleteNotifications(Request $request)
+    {
+        $user = $this->collaborator($request);
+
+        if (! $user) {
+            return $this->notACollaborator();
+        }
+
+        $deleted = \App\Support\NotificationInbox::dismiss($this->collaboratorInbox($user), $request);
+
+        return response()->json(['success' => true, 'deleted' => $deleted]);
+    }
+
+    /** This collaborator's notifications about the salons that are theirs. */
+    private function collaboratorInbox(\App\Models\User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        $salonIds = Salon::where(function ($q) use ($user) {
+            $q->where('submitted_by', $user->id)
+              ->orWhere('assigned_collaborator_id', $user->id);
+        })->pluck('id');
+
+        return Notification::where('user_id', $user->id)->whereIn('related_salon_id', $salonIds);
     }
 
     /** Mark everything in this collaborator's inbox read, and nothing else. */
@@ -786,6 +840,10 @@ class CollaboratorController extends Controller
         }
 
         $data = $this->validateSubmission($request, $enquiry);
+        $data['bank_details'] = app(\App\Services\BankDetailsService::class)->validate(
+            $request->only(\App\Services\BankDetailsService::FIELDS),
+            $enquiry->salon()->first() ?? $enquiry,
+        );
 
         try {
             $result = $this->onboarding->onboard(
@@ -844,6 +902,10 @@ class CollaboratorController extends Controller
         }
 
         $data = $this->validateSubmission($request, null, $existingSalon);
+        $data['bank_details'] = app(\App\Services\BankDetailsService::class)->validate(
+            $request->only(\App\Services\BankDetailsService::FIELDS),
+            $existingSalon,
+        );
 
         try {
             $result = $this->onboarding->onboardDirect(

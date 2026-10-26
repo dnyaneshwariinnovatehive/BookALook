@@ -94,7 +94,7 @@ class ProfileService {
     
     if (token == null) return;
 
-    await http.put(
+    final response = await http.put(
       Uri.parse('$baseUrl/customer/notifications/preferences'),
       headers: {
         'Authorization': 'Bearer $token',
@@ -103,5 +103,11 @@ class ProfileService {
       },
       body: jsonEncode(data),
     );
+
+    // A refusal used to pass silently, so the switch said "on" while the
+    // server still had it off.
+    if (response.statusCode != 200) {
+      throw Exception('Could not save notification preferences.');
+    }
   }
 }

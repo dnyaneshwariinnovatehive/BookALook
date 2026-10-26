@@ -299,7 +299,10 @@ class WalkInController extends Controller
                 'appointedProvider.user:id,name,phone',
                 'servingProvider.user:id,name,phone',
                 'paymentCollector:id,name',
-                'invoice:id,appointment_id,invoice_number,total_amount,pdf_url',
+                // The invoices table calls it `total`. Asking for `total_amount`
+                // made PostgreSQL reject the whole history request; SQLite
+                // silently read the name as a string, so it only broke live.
+                'invoice:id,appointment_id,invoice_number,total,pdf_url',
                 'services.service.template.category:id,name',
                 'services.servingProvider.user:id,name',
                 'serviceAdditions.service.template:id,name,estimated_duration_minutes',

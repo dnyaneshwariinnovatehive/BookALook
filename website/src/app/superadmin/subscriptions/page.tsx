@@ -112,7 +112,41 @@ const PAYMENT_OPTION_LABEL: Record<string, string> = {
   full_upfront: 'Paid in full',
 };
 
+/** "3 h ago", "2 d ago" — how long something has waited. */
+const relTime = (str?: string | null) => {
+  if (!str) return '—';
+  const d = new Date(str.includes('T') ? str : str.replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return '—';
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+};
+
+/** A CSV of [rows] saved by the browser. Values are quoted; nothing leaves the page. */
+const downloadCsv = (filename: string, rows: (string | number | null | undefined)[][]) => {
+  const escape = (v: string | number | null | undefined) => {
+    const text = String(v ?? '');
+    // A leading = + - @ would be run as a formula by a spreadsheet.
+    const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const csv = rows.map((r) => r.map(escape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+type DashTab = 'overview' | 'requests' | 'payments' | 'salons' | 'plans' | 'commission';
+
 export default function SubscriptionsPage() {
+  // One section at a time instead of one long scroll.
+  const [tab, setTab] = useState<DashTab>('overview');
   const [plans, setPlans] = useState<any[]>([]);
   const [salons, setSalons] = useState<any[]>([]);
   const [commissionPlanId, setCommissionPlanId] = useState<string | null>(null);
@@ -658,7 +692,7 @@ export default function SubscriptionsPage() {
     }
     if (salonSearch) {
       const q = salonSearch.toLowerCase();
-      return (s.name || '').toLowerCase().includes(q) || (s.owner || '').toLowerCase().includes(q);
+      return [s.name, s.owner, s.owner_phone, s.city].some((v) => String(v ?? '').toLowerCase().includes(q));
     }
     return true;
   }).sort((a, b) => {
@@ -666,6 +700,8 @@ export default function SubscriptionsPage() {
     if (salonSort === 'name_desc') return (b.name || '').localeCompare(a.name || '');
     if (salonSort === 'rate_desc') return (b.commission_percentage || 0) - (a.commission_percentage || 0);
     if (salonSort === 'expiry_asc') return (a.expiry || 'Z').localeCompare(b.expiry || 'Z');
+    if (salonSort === 'paid_desc') return (b.lifetime_paid || 0) - (a.lifetime_paid || 0);
+    if (salonSort === 'joined_desc') return String(b.joined_at ?? '').localeCompare(String(a.joined_at ?? ''));
     return 0;
   });
 
@@ -704,6 +740,124 @@ export default function SubscriptionsPage() {
   const statusTone = (status: string): 'success' | 'danger' | 'neutral' =>
     status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'neutral';
 
+  // ------------------------------------------------------------ dashboard data
+
+  const today = localISODate();
+  const monthKey = today.slice(0, 7);
+
+  const lapsedSalons = useMemo(
+    () =>
+      salons.filter((s) => {
+        if (s.billing_model === COMMISSION) return false;
+        if (!s.current_plan || s.current_plan === 'None') return true;
+        const d = daysUntil(s.expiry);
+        return d !== null && d < 0;
+      }),
+    [salons],
+  );
+
+  /** Subscription income normalised to 30 days, from plans that are live now. */
+  const monthlyRecurring = useMemo(
+    () =>
+      subscriptionSalons.reduce((sum, s) => {
+        const d = daysUntil(s.expiry);
+        if (!s.plan_price || !s.plan_validity_days || d === null || d < 0) return sum;
+        return sum + (Number(s.plan_price) / Number(s.plan_validity_days)) * 30;
+      }, 0),
+    [subscriptionSalons],
+  );
+
+  const approvedRequests = useMemo(() => allRequests.filter((r) => r.status === 'approved'), [allRequests]);
+
+  const collectedThisMonth = useMemo(
+    () =>
+      approvedRequests
+        .filter((r) => String(r.updated_at ?? r.created_at ?? '').slice(0, 7) === monthKey)
+        .reduce((sum, r) => sum + Number(r.amount_payable_inr ?? 0), 0),
+    [approvedRequests, monthKey],
+  );
+
+  const averageRate = useMemo(() => {
+    const rates = commissionSalons.map((s) => Number(s.commission_percentage)).filter((n) => !Number.isNaN(n));
+    return rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+  }, [commissionSalons]);
+
+  const recentPayments = useMemo(
+    () =>
+      [...approvedRequests]
+        .sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')))
+        .slice(0, 6),
+    [approvedRequests],
+  );
+
+  /** Per plan: salons on it, what it brings in a month, and what it has collected. */
+  const planStats = useMemo(() => {
+    const stats: Record<string, { salons: number; monthly: number; payments: number; collected: number }> = {};
+    for (const plan of plans) {
+      const onPlan = salons.filter((s) => s.current_plan === plan.name);
+      const paid = approvedRequests.filter((r) => (r.plan?.id ?? r.subscription_plan_id) === plan.id);
+      stats[plan.id] = {
+        salons: onPlan.length,
+        monthly: plan.validity_days ? onPlan.filter((s) => s.billing_model !== COMMISSION).length * (Number(plan.price) / Number(plan.validity_days)) * 30 : 0,
+        payments: paid.length,
+        collected: paid.reduce((sum, r) => sum + Number(r.amount_payable_inr ?? 0), 0),
+      };
+    }
+    return stats;
+  }, [plans, salons, approvedRequests]);
+
+  const tabs: { value: DashTab; label: React.ReactNode }[] = [
+    { value: 'overview', label: <span><Icon name="chart" size={15} /> Overview</span> },
+    {
+      value: 'requests',
+      label: (
+        <span>
+          <Icon name="receipt" size={15} /> Requests
+          {pendingRequests.length > 0 && <span className={styles.tabCount}>{pendingRequests.length}</span>}
+        </span>
+      ),
+    },
+    { value: 'payments', label: <span><Icon name="rupee" size={15} /> Payments</span> },
+    { value: 'salons', label: <span><Icon name="store" size={15} /> Salons <span className={styles.tabCountMuted}>{salons.length}</span></span> },
+    { value: 'plans', label: <span><Icon name="crown" size={15} /> Plans <span className={styles.tabCountMuted}>{plans.length}</span></span> },
+    { value: 'commission', label: <span><Icon name="percent" size={15} /> Commission model</span> },
+  ];
+
+  const salonCell = (salon: any, fallbackId?: string) => (
+    <button
+      type="button"
+      className={styles.salonBtn}
+      onClick={() => openSalonInfo(salon?.id ? salon : { id: fallbackId, name: salon?.name })}
+      title="View salon details"
+    >
+      <Person
+        name={salon?.name ?? 'Unknown salon'}
+        sub={[salon?.admin?.name ?? salon?.owner, salon?.admin?.phone ?? salon?.owner_phone].filter(Boolean).join(' · ') || undefined}
+        size={32}
+      />
+    </button>
+  );
+
+  const exportSalons = () =>
+    downloadCsv(`salons-billing-${today}.csv`, [
+      ['Salon', 'Owner', 'Phone', 'City', 'Salon status', 'Billing model', 'Current plan', 'Plan price', 'Commission %', 'Plan started', 'Access until', 'Paid to date', 'Payments', 'Last paid', 'Pending requests'],
+      ...filteredSalons.map((s) => [
+        s.name, s.owner, s.owner_phone ?? '', s.city ?? '', s.salon_status ?? '', modelLabel(s.billing_model), s.current_plan,
+        s.plan_price ?? '', s.billing_model === COMMISSION ? s.commission_percentage ?? '' : '', s.plan_started ?? '',
+        s.billing_model === COMMISSION ? 'Ongoing' : s.expiry ?? '', s.lifetime_paid ?? 0, s.payments_count ?? 0, s.last_paid_at ?? '', s.pending_requests ?? 0,
+      ]),
+    ]);
+
+  const exportPayments = () =>
+    downloadCsv(`subscription-payments-${today}.csv`, [
+      ['Salon', 'Owner', 'Arrangement', 'Plan', 'Amount paid', 'Coins', 'Transaction ID', 'Note', 'Sent', 'Decided', 'Decision'],
+      ...decidedRequests.map((r) => [
+        r.salon?.name ?? '', r.salon?.admin?.name ?? '', r.billing_label ?? modelLabel(r.billing_type), r.plan?.name ?? '',
+        r.amount_payable_inr ?? '', r.coins_to_redeem ?? 0, r.transaction_id ?? '', r.note ?? '',
+        String(r.created_at ?? '').slice(0, 10), String(r.updated_at ?? '').slice(0, 10), r.status,
+      ]),
+    ]);
+
   return (
     <div className={styles.container}>
       <PageHeader
@@ -716,7 +870,12 @@ export default function SubscriptionsPage() {
             settled on the 1st for the month just finished.
           </>
         }
-        actions={<Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
+        actions={
+          <div className={styles.headerActions}>
+            <Button variant="ghost" icon="refresh" onClick={fetchData}>Refresh</Button>
+            <Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>
+          </div>
+        }
       />
 
       {banner && (
@@ -731,471 +890,783 @@ export default function SubscriptionsPage() {
         </Alert>
       )}
 
-      {/* ------------------------------------------------ overview */}
-      <div className={ui.statGrid}>
-        <StatCard label="On subscription" icon="crown" tone="info" loading={isLoading} value={subscriptionSalons.length} sub={`${purchasablePlans.length} plan${purchasablePlans.length === 1 ? '' : 's'} for sale`} />
-        <StatCard label="On commission" icon="percent" tone="accent" loading={isLoading} value={commissionSalons.length} sub="Settled monthly, on the 1st" />
-        <StatCard
-          label="Waiting on you"
-          icon="receipt"
-          tone={pendingRequests.length ? 'warning' : 'success'}
-          loading={isLoading}
-          value={pendingRequests.length}
-          sub={pendingRequests.length ? 'Requests to verify' : 'Nothing pending'}
-        />
-        <StatCard
-          label="Expiring in 7 days"
-          icon="clock"
-          tone={expiringSoon.length ? 'danger' : 'neutral'}
-          loading={isLoading}
-          value={expiringSoon.length}
-          sub={expiringSoon.length ? 'Subscriptions about to lapse' : 'No renewals due'}
-        />
+      <div className={styles.dashTabs}>
+        <Tabs<DashTab> value={tab} onChange={setTab} tabs={tabs} />
       </div>
 
-      {/* ------------------------------------------------ pending requests */}
-      {pendingRequests.length > 0 && (
-        <Card
-          className={styles.pendingCard}
-          title={<>Waiting on you <Badge tone="warning" dot={false}>{pendingRequests.length}</Badge></>}
-          subtitle="Paid subscriptions to verify, and salons asking to move onto the Commission Model. A commission request has no receipt — you agree the percentage when you approve it."
-        >
-          <div className={ui.tableWrap}>
-            <table className={ui.table}>
-              <thead>
-                <tr>
-                  <th>Salon</th>
-                  <th>Current plan</th>
-                  <th>Asking for</th>
-                  <th>Plan</th>
-                  <th>Transaction reference</th>
-                  <th>Raised</th>
-                  <th className={ui.alignRight}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingRequests.map((req) => {
-                  const isCommission = req.billing_type === COMMISSION;
-                  return (
-                    <tr key={req.id}>
-                      <td>
-                        <button
-                          type="button"
-                          className={styles.salonBtn}
-                          onClick={() => openSalonInfo(req.salon || { id: req.salon_id, name: req.salon?.name })}
-                          title="View salon details"
-                        >
-                          <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
-                        </button>
-                      </td>
-                      <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
-                      <td>
-                        <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
-                      </td>
-                      <td>{req.plan?.name || '—'}</td>
-                      {/* What the owner said about their transfer, on the row
-                          itself. Deciding a request on the strength of a
-                          reference should not require opening the receipt. */}
-                      <td><div className={styles.refCell}>{refText(req)}</div></td>
-                      <td className={ui.num}>{new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</td>
-                      <td className={ui.alignRight}>
-                        <div className={styles.rowActions}>
-                          {req.screenshot_url ? (
-                            <Button size="sm" icon="receipt" onClick={() => setViewingRequest(req)}>Receipt</Button>
-                          ) : (
-                            !isCommission && <span className={styles.mutedNote}>Nothing paid yet</span>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon="check"
-                            onClick={() => openAssign(req.salon, req.billing_type, isCommission ? undefined : (req.plan?.id ?? req.subscription_plan_id))}
-                          >
-                            {isCommission ? 'Set rate & approve' : 'Approve'}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* ============================================================ overview */}
+      {tab === 'overview' && (
+        <div className={styles.tabPane}>
+          <div className={ui.statGrid}>
+            <StatCard label="On subscription" icon="crown" tone="info" loading={isLoading} value={subscriptionSalons.length} sub={`${purchasablePlans.length} plan${purchasablePlans.length === 1 ? '' : 's'} for sale`} />
+            <StatCard label="On commission" icon="percent" tone="accent" loading={isLoading} value={commissionSalons.length} sub={averageRate === null ? 'Settled monthly, on the 1st' : `Average rate ${averageRate.toFixed(1)}%`} />
+            <StatCard
+              label="Waiting on you"
+              icon="receipt"
+              tone={pendingRequests.length ? 'warning' : 'success'}
+              loading={isLoading}
+              value={pendingRequests.length}
+              sub={pendingRequests.length ? 'Requests to verify' : 'Nothing pending'}
+            />
+            <StatCard
+              label="Expiring in 7 days"
+              icon="clock"
+              tone={expiringSoon.length ? 'danger' : 'neutral'}
+              loading={isLoading}
+              value={expiringSoon.length}
+              sub={expiringSoon.length ? 'Subscriptions about to lapse' : 'No renewals due'}
+            />
           </div>
-        </Card>
+          <div className={ui.statGrid}>
+            <StatCard label="Monthly recurring" icon="chart" tone="success" loading={isLoading} value={formatINR(monthlyRecurring)} sub="Live subscriptions, per 30 days" />
+            <StatCard label="Collected this month" icon="rupee" tone="success" loading={isLoading} value={formatINR(collectedThisMonth)} sub="Approved plan payments" />
+            <StatCard label="Lapsed or no plan" icon="alert" tone={lapsedSalons.length ? 'danger' : 'neutral'} loading={isLoading} value={lapsedSalons.length} sub="Subscription salons offline" />
+            <StatCard label="Commission plan" icon="sparkle" tone="accent" loading={isLoading} value={commissionPlan?.name ?? '—'} sub={commissionPlan ? 'Benefits for commission salons' : 'Not nominated yet'} />
+          </div>
+
+          <div className={styles.overviewGrid}>
+            <Card
+              title={<>Needs attention</>}
+              subtitle="Requests to verify, and subscriptions running out."
+              actions={pendingRequests.length > 0 ? <Button size="sm" variant="soft" onClick={() => setTab('requests')}>Open requests</Button> : undefined}
+            >
+              {isLoading ? (
+                <Skeleton height={160} radius={14} />
+              ) : pendingRequests.length === 0 && expiringSoon.length === 0 && lapsedSalons.length === 0 ? (
+                <EmptyState icon="check" title="All clear" hint="No requests waiting and no plans about to run out." />
+              ) : (
+                <ul className={styles.attentionList}>
+                  {pendingRequests.slice(0, 5).map((req) => (
+                    <li key={`p-${req.id}`}>
+                      <span className={cx(styles.attentionDot, styles.dotWarning)} />
+                      <div className={styles.attentionMain}>
+                        <b>{req.salon?.name ?? 'Unknown salon'}</b>
+                        <span>
+                          Asking for {req.billing_type === COMMISSION ? 'the Commission Model' : req.plan?.name ?? 'a plan'}
+                          {' · '}{relTime(req.created_at)}
+                        </span>
+                      </div>
+                      <Button size="sm" variant="primary" onClick={() => openAssign(req.salon, req.billing_type, req.billing_type === COMMISSION ? undefined : (req.plan?.id ?? req.subscription_plan_id))}>
+                        Review
+                      </Button>
+                    </li>
+                  ))}
+                  {[...expiringSoon].sort((a, b) => String(a.expiry).localeCompare(String(b.expiry))).slice(0, 5).map((s) => {
+                    const left = daysUntil(s.expiry);
+                    return (
+                      <li key={`e-${s.id}`}>
+                        <span className={cx(styles.attentionDot, styles.dotDanger)} />
+                        <div className={styles.attentionMain}>
+                          <b>{s.name}</b>
+                          <span>{s.current_plan} ends {left === 0 ? 'today' : `in ${left} day${left === 1 ? '' : 's'}`}{s.owner_phone ? ` · ${s.owner_phone}` : ''}</span>
+                        </div>
+                        <Button size="sm" variant="soft" onClick={() => openSalonInfo(s, 'plan_history')}>Details</Button>
+                      </li>
+                    );
+                  })}
+                  {lapsedSalons.slice(0, 3).map((s) => (
+                    <li key={`l-${s.id}`}>
+                      <span className={cx(styles.attentionDot, styles.dotMuted)} />
+                      <div className={styles.attentionMain}>
+                        <b>{s.name}</b>
+                        <span>{s.current_plan && s.current_plan !== 'None' ? `${s.current_plan} expired ${fmtDay(s.expiry)}` : 'No active plan'}</span>
+                      </div>
+                      <Button size="sm" variant="soft" onClick={() => openAssign(s)}>Assign plan</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card title="Plan mix" subtitle="Where salons are, and what each plan brings in a month.">
+              {isLoading ? (
+                <Skeleton height={160} radius={14} />
+              ) : plans.length === 0 ? (
+                <EmptyState icon="crown" title="No plans yet" />
+              ) : (
+                <ul className={styles.mixList}>
+                  {plans.map((plan) => {
+                    const st = planStats[plan.id] ?? { salons: 0, monthly: 0 };
+                    const share = salons.length ? (st.salons / salons.length) * 100 : 0;
+                    return (
+                      <li key={plan.id}>
+                        <div className={styles.mixHead}>
+                          <span className={styles.mixName}>
+                            {plan.name}
+                            {plan.id === commissionPlanId && <Badge tone="accent" dot={false}>Commission</Badge>}
+                          </span>
+                          <span className={styles.mixValue}>{st.salons} salon{st.salons === 1 ? '' : 's'} · {formatINR(st.monthly)}/mo</span>
+                        </div>
+                        <div className={styles.mixBar}><span style={{ width: `${Math.max(share, st.salons ? 3 : 0)}%` }} /></div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+
+            <Card
+              title="Recent payments"
+              subtitle="The latest approved plan payments."
+              actions={<Button size="sm" variant="soft" onClick={() => setTab('payments')}>All payments</Button>}
+            >
+              {isLoading ? (
+                <Skeleton height={160} radius={14} />
+              ) : recentPayments.length === 0 ? (
+                <EmptyState icon="receipt" title="No payments yet" />
+              ) : (
+                <ul className={styles.attentionList}>
+                  {recentPayments.map((r) => (
+                    <li key={`r-${r.id}`}>
+                      <span className={cx(styles.attentionDot, styles.dotSuccess)} />
+                      <div className={styles.attentionMain}>
+                        <b>{r.salon?.name ?? 'Unknown salon'}</b>
+                        <span>{r.plan?.name ?? r.billing_label ?? '—'} · {fmtDateStr(r.updated_at)}</span>
+                      </div>
+                      <b className={styles.amount}>{r.amount_payable_inr != null ? formatINR(r.amount_payable_inr) : '—'}</b>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </div>
       )}
 
-      {/* ------------------------------------------------ payment history */}
-      <Card
-        title="Payment history"
-        subtitle="Every payment a salon has sent, and what became of it. Approved rows are the record that money arrived; a transaction id typed by the owner is kept against them so a transfer can still be traced to this row later."
-        actions={
-          <Segmented
-            ariaLabel="Filter by decision"
-            value={requestStatus}
-            onChange={setRequestStatus}
-            options={[
-              { value: 'all', label: 'All', count: allRequests.filter((r) => r.status !== 'pending').length },
-              { value: 'approved', label: 'Approved', count: allRequests.filter((r) => r.status === 'approved').length },
-              { value: 'rejected', label: 'Rejected', count: allRequests.filter((r) => r.status === 'rejected').length },
-            ]}
-          />
-        }
-      >
-        <div className={styles.subToolbar}>
-          <SearchInput
-            value={requestSearch}
-            onChange={setRequestSearch}
-            placeholder="Search salon, plan, transaction ID or note."
-            ariaLabel="Search payment history"
-          />
-          <span className={styles.mutedNote}>
-            {decidedRequests.length} of {allRequests.filter((r) => r.status !== 'pending').length} shown
-          </span>
+      {/* ============================================================ requests */}
+      {tab === 'requests' && (
+        <div className={styles.tabPane}>
+          <Card
+            title={<>Waiting on you <Badge tone={pendingRequests.length ? 'warning' : 'success'} dot={false}>{pendingRequests.length}</Badge></>}
+            subtitle="Paid subscriptions to verify, and salons asking to move onto the Commission Model. A commission request has no receipt — you agree the percentage when you approve it."
+          >
+            {isLoading ? (
+              <Skeleton height={140} radius={14} />
+            ) : pendingRequests.length === 0 ? (
+              <EmptyState icon="check" title="Nothing to verify" hint="New plan payments and commission requests appear here." />
+            ) : (
+              <div className={ui.tableWrap}>
+                <table className={ui.table}>
+                  <thead>
+                    <tr>
+                      <th>Salon</th>
+                      <th>City</th>
+                      <th>Current plan</th>
+                      <th>Asking for</th>
+                      <th className={ui.alignRight}>Amount</th>
+                      <th>Transaction reference</th>
+                      <th>Waiting</th>
+                      <th className={ui.alignRight}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingRequests.map((req) => {
+                      const isCommission = req.billing_type === COMMISSION;
+                      const salonRow = salonsById[req.salon_id ?? req.salon?.id];
+                      return (
+                        <tr key={req.id}>
+                          <td>{salonCell(req.salon, req.salon_id)}</td>
+                          <td>{salonRow?.city ?? <span className={styles.mutedNote}>—</span>}</td>
+                          <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
+                          <td>
+                            <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
+                            <div className={ui.cellSub}>
+                              {isCommission
+                                ? req.salon?.requested_commission_percentage != null
+                                  ? `Asked for ${pct(req.salon.requested_commission_percentage)}`
+                                  : 'Rate to agree'
+                                : req.plan
+                                  ? `${req.plan.name} · ${formatINR(req.plan.price)} / ${req.plan.validity_days} days`
+                                  : '—'}
+                            </div>
+                          </td>
+                          <td className={ui.alignRight}>
+                            {req.amount_payable_inr != null ? <b>{formatINR(req.amount_payable_inr, 2)}</b> : <span className={styles.mutedNote}>—</span>}
+                            {Number(req.coins_to_redeem) > 0 && <div className={styles.refNote}>+{req.coins_to_redeem} coins</div>}
+                          </td>
+                          {/* What the owner said about their transfer, on the row
+                              itself. Deciding a request on the strength of a
+                              reference should not require opening the receipt. */}
+                          <td><div className={styles.refCell}>{refText(req)}</div></td>
+                          <td>
+                            <div className={ui.num}>{relTime(req.created_at)}</div>
+                            <div className={ui.cellSub}>{fmtDateStr(req.created_at)}</div>
+                          </td>
+                          <td className={ui.alignRight}>
+                            <div className={styles.rowActions}>
+                              {req.screenshot_url ? (
+                                <Button size="sm" icon="receipt" onClick={() => setViewingRequest(req)}>Receipt</Button>
+                              ) : (
+                                !isCommission && <span className={styles.mutedNote}>Nothing paid yet</span>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                icon="check"
+                                onClick={() => openAssign(req.salon, req.billing_type, isCommission ? undefined : (req.plan?.id ?? req.subscription_plan_id))}
+                              >
+                                {isCommission ? 'Set rate & approve' : 'Approve'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
+      )}
 
-        {isLoading ? (
-          <Skeleton height={120} radius={14} />
-        ) : decidedRequests.length === 0 ? (
-          <EmptyState
-            icon="receipt"
-            title={requestSearch || requestStatus !== 'all' ? 'Nothing matches that' : 'No payments decided yet'}
-            hint={
-              requestSearch || requestStatus !== 'all'
-                ? 'Try a different status, or clear the search.'
-                : 'Once a payment is approved or declined it is listed here.'
+      {/* ============================================================ payments */}
+      {tab === 'payments' && (
+        <div className={styles.tabPane}>
+          <div className={ui.statGrid}>
+            <StatCard label="Approved payments" icon="check" tone="success" loading={isLoading} value={approvedRequests.length} sub={formatINR(approvedRequests.reduce((s, r) => s + Number(r.amount_payable_inr ?? 0), 0)) + ' collected'} />
+            <StatCard label="This month" icon="rupee" tone="success" loading={isLoading} value={formatINR(collectedThisMonth)} sub="Approved since the 1st" />
+            <StatCard label="Declined" icon="close" tone="danger" loading={isLoading} value={allRequests.filter((r) => r.status === 'rejected').length} sub="Payments not accepted" />
+          </div>
+          <Card
+            title="Payment history"
+            subtitle="Every payment a salon has sent, and what became of it. Approved rows are the record that money arrived; the transaction id the owner typed is kept so a transfer can be traced back here."
+            actions={
+              <div className={styles.headerActions}>
+                <Segmented
+                  ariaLabel="Filter by decision"
+                  value={requestStatus}
+                  onChange={setRequestStatus}
+                  options={[
+                    { value: 'all', label: 'All', count: allRequests.filter((r) => r.status !== 'pending').length },
+                    { value: 'approved', label: 'Approved', count: approvedRequests.length },
+                    { value: 'rejected', label: 'Rejected', count: allRequests.filter((r) => r.status === 'rejected').length },
+                  ]}
+                />
+                <Button size="sm" variant="ghost" icon="download" onClick={exportPayments} disabled={decidedRequests.length === 0}>Export CSV</Button>
+              </div>
             }
-          />
-        ) : (
-          <div className={ui.tableWrap}>
-            <table className={ui.table}>
-              <thead>
-                <tr>
-                  <th>Salon</th>
-                  <th>Current plan</th>
-                  <th>Arrangement</th>
-                  <th>Plan paid for</th>
-                  <th className={ui.alignRight}>Paid</th>
-                  <th>Transaction reference</th>
-                  <th>Sent</th>
-                  <th>Decision</th>
-                  <th>Plan history</th>
-                  <th className={ui.alignRight}>Receipt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {decidedRequests.map((req) => (
-                  <tr key={req.id}>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.salonBtn}
-                        onClick={() => openSalonInfo(req.salon || { id: req.salon_id, name: req.salon?.name })}
-                        title="View salon details"
-                      >
-                        <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
-                      </button>
-                    </td>
-                    <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
-                    <td><Badge tone={req.billing_type === COMMISSION ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge></td>
-                    <td>{req.plan?.name || '—'}</td>
-                    <td className={ui.alignRight}>
-                      {req.amount_payable_inr != null ? formatINR(req.amount_payable_inr, 2) : <span className={styles.mutedNote}>—</span>}
-                      {Number(req.coins_to_redeem) > 0 && (
-                        <div className={styles.refNote}>+{req.coins_to_redeem} coins</div>
-                      )}
-                    </td>
-                    <td><div className={styles.refCell}>{refText(req)}</div></td>
-                    <td className={ui.num}>
-                      {new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td>
-                      <Badge tone={statusTone(req.status)} dot={false}>
-                        {req.status === 'approved' ? 'Approved' : 'Rejected'}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="soft"
-                        icon="history"
-                        onClick={() => openSalonPlanHistory(req.salon_id ?? req.salon?.id, req.salon?.name)}
-                      >
-                        Plan history
-                      </Button>
-                    </td>
-                    <td className={ui.alignRight}>
-                      {req.screenshot_url ? (
-                        <Button size="sm" variant="ghost" icon="receipt" onClick={() => setViewingRequest(req)}>
-                          View
-                        </Button>
-                      ) : (
-                        <span className={styles.mutedNote}>None</span>
-                      )}
-                    </td>
+          >
+            <div className={styles.subToolbar}>
+              <SearchInput
+                value={requestSearch}
+                onChange={setRequestSearch}
+                placeholder="Search salon, plan, transaction ID or note."
+                ariaLabel="Search payment history"
+              />
+              <span className={styles.mutedNote}>
+                {decidedRequests.length} of {allRequests.filter((r) => r.status !== 'pending').length} shown
+              </span>
+            </div>
+
+            {isLoading ? (
+              <Skeleton height={120} radius={14} />
+            ) : decidedRequests.length === 0 ? (
+              <EmptyState
+                icon="receipt"
+                title={requestSearch || requestStatus !== 'all' ? 'Nothing matches that' : 'No payments decided yet'}
+                hint={
+                  requestSearch || requestStatus !== 'all'
+                    ? 'Try a different status, or clear the search.'
+                    : 'Once a payment is approved or declined it is listed here.'
+                }
+              />
+            ) : (
+              <div className={ui.tableWrap}>
+                <table className={ui.table}>
+                  <thead>
+                    <tr>
+                      <th>Salon</th>
+                      <th>Current plan</th>
+                      <th>Paid for</th>
+                      <th className={ui.alignRight}>Amount paid</th>
+                      <th>Transaction reference</th>
+                      <th>Sent</th>
+                      <th>Decided</th>
+                      <th>Decision</th>
+                      <th className={ui.alignRight}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {decidedRequests.map((req) => (
+                      <tr key={req.id}>
+                        <td>{salonCell(req.salon, req.salon_id)}</td>
+                        <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
+                        <td>
+                          <Badge tone={req.billing_type === COMMISSION ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
+                          <div className={ui.cellSub}>
+                            {req.plan ? `${req.plan.name} · ${req.plan.validity_days} days` : '—'}
+                          </div>
+                        </td>
+                        <td className={ui.alignRight}>
+                          {req.amount_payable_inr != null ? <b>{formatINR(req.amount_payable_inr, 2)}</b> : <span className={styles.mutedNote}>—</span>}
+                          {Number(req.coins_to_redeem) > 0 && <div className={styles.refNote}>+{req.coins_to_redeem} coins</div>}
+                        </td>
+                        <td><div className={styles.refCell}>{refText(req)}</div></td>
+                        <td className={ui.num}>{fmtDateStr(req.created_at)}</td>
+                        <td className={ui.num}>{fmtDateStr(req.updated_at)}</td>
+                        <td>
+                          <Badge tone={statusTone(req.status)} dot={false}>
+                            {req.status === 'approved' ? 'Approved' : 'Rejected'}
+                          </Badge>
+                        </td>
+                        <td className={ui.alignRight}>
+                          <div className={styles.rowActions}>
+                            <Button size="sm" variant="soft" icon="history" onClick={() => openSalonPlanHistory(req.salon_id ?? req.salon?.id, req.salon?.name)}>
+                              History
+                            </Button>
+                            {req.screenshot_url ? (
+                              <Button size="sm" variant="ghost" icon="receipt" onClick={() => setViewingRequest(req)}>Receipt</Button>
+                            ) : (
+                              <span className={styles.mutedNote}>No receipt</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ============================================================== salons */}
+      {tab === 'salons' && (
+        <div className={styles.tabPane}>
+          <Card>
+            <div className={ui.toolbar}>
+              <div className={styles.salonsTitle}>
+                <h2 className={ui.cardTitle}>Salons</h2>
+                <p className={ui.cardSubtitle}>Billing, plan and payments for every salon. A commission rate can only change once that salon has no open payout.</p>
+              </div>
+              <Segmented
+                ariaLabel="Billing model"
+                value={salonFilterModel}
+                onChange={setSalonFilterModel}
+                options={[
+                  { value: '', label: 'All', count: salons.length },
+                  { value: SUBSCRIPTION, label: 'Subscription', count: subscriptionSalons.length },
+                  { value: COMMISSION, label: 'Commission', count: commissionSalons.length },
+                  ...(expiringSoon.length ? [{ value: 'expiring', label: 'Expiring', count: expiringSoon.length }] : []),
+                ]}
+              />
+            </div>
+            <div className={cx(ui.toolbar, styles.subToolbar)}>
+              <SearchInput className={ui.toolbarGrow} value={salonSearch} onChange={setSalonSearch} placeholder="Search salon, owner, phone or city…" />
+              <select className={cx(ui.control, styles.sortSelect)} value={salonSort} onChange={(e) => setSalonSort(e.target.value)} aria-label="Sort salons">
+                <option value="name_asc">Name (A–Z)</option>
+                <option value="name_desc">Name (Z–A)</option>
+                <option value="rate_desc">Commission rate (high–low)</option>
+                <option value="expiry_asc">Access ends (soonest)</option>
+                <option value="paid_desc">Paid to date (high–low)</option>
+                <option value="joined_desc">Newest first</option>
+              </select>
+              <Button size="sm" variant="ghost" icon="download" onClick={exportSalons} disabled={filteredSalons.length === 0}>Export CSV</Button>
+            </div>
+
+            <div className={ui.tableWrap}>
+              <table className={ui.table}>
+                <thead>
+                  <tr>
+                    <th>Salon</th>
+                    <th>City</th>
+                    <th>Billing</th>
+                    <th>Current plan</th>
+                    <th>Rate</th>
+                    <th>Access</th>
+                    <th className={ui.alignRight}>Paid to date</th>
+                    <th className={ui.alignRight}>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }, (_, i) => (
+                      <tr key={i}>
+                        <td><div className={ui.personCell}><Skeleton width={34} height={34} radius={11} /><Skeleton width={140} /></div></td>
+                        <td><Skeleton width={70} /></td>
+                        <td><Skeleton width={110} height={22} radius={999} /></td>
+                        <td><Skeleton width={80} /></td>
+                        <td><Skeleton width={40} /></td>
+                        <td><Skeleton width={90} /></td>
+                        <td><Skeleton width={70} /></td>
+                        <td><Skeleton width={120} /></td>
+                      </tr>
+                    ))
+                  ) : filteredSalons.length === 0 ? (
+                    <tr>
+                      <td colSpan={8}>
+                        <EmptyState icon="store" title="No salons match" hint="Try another search or billing model." />
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredSalons.map((salon) => {
+                      const onCommission = salon.billing_model === COMMISSION;
+                      const blocked = onCommission && salon.unsettled_payouts > 0;
+                      const left = onCommission ? null : daysUntil(salon.expiry);
 
-      {/* ------------------------------------------------ commission model */}
-      <Card padded>
-        <div className={styles.commission}>
-          <div className={styles.commissionIntro}>
-            <span className={styles.commissionIcon}><Icon name="percent" size={22} /></span>
-            <div>
-              <h2 className={ui.cardTitle}>The Commission Model</h2>
-              <p className={ui.cardSubtitle}>
-                Every commission salon enjoys the same benefits, so one plan carries them. The percentage is agreed
-                per salon; the plan is not. A salon has {graceDays} day{graceDays === 1 ? '' : 's'} after a month
-                closes to settle before it goes offline.
-              </p>
+                      return (
+                        <tr key={salon.id}>
+                          <td>
+                            <button type="button" className={styles.salonBtn} onClick={() => openSalonInfo(salon)} title="View salon details">
+                              <Person name={salon.name} sub={[salon.owner, salon.owner_phone].filter(Boolean).join(' · ')} size={34} />
+                            </button>
+                            <div className={styles.salonFlags}>
+                              {salon.salon_status && salon.salon_status !== 'active' && (
+                                <Badge tone={salon.salon_status === 'suspended' ? 'danger' : 'neutral'} dot={false}>{fmtStatus(salon.salon_status)}</Badge>
+                              )}
+                              {salon.pending_requests > 0 && (
+                                <Badge tone="warning" dot={false}>{salon.pending_requests} request{salon.pending_requests === 1 ? '' : 's'} waiting</Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td>{salon.city ?? <span className={styles.mutedNote}>—</span>}</td>
+                          <td>
+                            <Badge tone={onCommission ? 'accent' : 'info'}>{salon.billing_label ?? modelLabel(salon.billing_model)}</Badge>
+                            {salon.joined_at && <div className={ui.cellSub}>Joined {fmtDay(salon.joined_at)}</div>}
+                          </td>
+                          <td>
+                            <div className={salon.current_plan === 'None' ? styles.mutedNote : ui.cellPrimary}>{salon.current_plan}</div>
+                            {salon.plan_price != null && !onCommission && (
+                              <div className={ui.cellSub}>{formatINR(salon.plan_price)} / {salon.plan_validity_days ?? '—'} days</div>
+                            )}
+                          </td>
+                          <td>
+                            {onCommission ? (
+                              <>
+                                <div className={cx(ui.cellPrimary, ui.num)}>{pct(salon.commission_percentage)}</div>
+                                {salon.commission_rate_effective_from && (
+                                  <div className={ui.cellSub}>since {fmtDay(salon.commission_rate_effective_from)}</div>
+                                )}
+                              </>
+                            ) : (
+                              <span className={styles.mutedNote}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            {onCommission ? (
+                              <span className={styles.mutedNote}>Ongoing</span>
+                            ) : salon.expiry ? (
+                              <>
+                                <div className={ui.num}>{fmtDay(salon.expiry)}</div>
+                                {salon.plan_started && <div className={ui.cellSub}>from {fmtDay(salon.plan_started)}</div>}
+                                {left !== null && left < 0 && <Badge tone="danger" dot={false}>Expired</Badge>}
+                                {left !== null && left >= 0 && left <= 7 && (
+                                  <Badge tone="warning" dot={false}>{left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left`}</Badge>
+                                )}
+                              </>
+                            ) : (
+                              <span className={styles.mutedNote}>No access</span>
+                            )}
+                            {blocked && (
+                              <div className={styles.blockedNote}>
+                                <Icon name="alert" size={12} />
+                                {salon.unsettled_payouts} payout{salon.unsettled_payouts === 1 ? '' : 's'} open
+                              </div>
+                            )}
+                          </td>
+                          <td className={ui.alignRight}>
+                            <div className={cx(ui.cellPrimary, ui.num)}>{formatINR(salon.lifetime_paid ?? 0)}</div>
+                            <div className={ui.cellSub}>
+                              {salon.payments_count ? `${salon.payments_count} payment${salon.payments_count === 1 ? '' : 's'} · last ${fmtDay(salon.last_paid_at)}` : 'No payments'}
+                            </div>
+                          </td>
+                          <td className={ui.alignRight}>
+                            <div className={styles.rowActions}>
+                              {onCommission && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => openRateChange(salon)}
+                                  disabled={blocked}
+                                  title={blocked ? 'Settle this salon’s open payouts before changing the rate' : 'Change the agreed commission percentage'}
+                                >
+                                  Change rate
+                                </Button>
+                              )}
+                              <Button size="sm" variant="soft" onClick={() => openAssign(salon)}>Change model</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
+          </Card>
+        </div>
+      )}
 
-          {isLoading ? (
-            <Skeleton height={64} radius={14} />
-          ) : commissionPlanId ? (
-            <div className={styles.commissionFacts}>
-              <Field label="Benefits carried by">
-                <select
-                  className={ui.control}
-                  value={commissionPlanId || ''}
-                  onChange={(e) => {
-                    const plan = plans.find((p) => p.id === e.target.value);
-                    if (plan) nominateCommissionPlan(plan);
-                  }}
-                >
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </Field>
-              <div className={styles.fact}>
-                <span>Salons on it</span>
-                <b>{commissionSalons.length}</b>
+      {/* =============================================================== plans */}
+      {tab === 'plans' && (
+        <div className={styles.tabPane}>
+          <Card
+            title="Plan comparison"
+            subtitle="Price, reach and earnings for every plan at a glance."
+            actions={<Button size="sm" variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
+          >
+            {isLoading ? (
+              <Skeleton height={140} radius={14} />
+            ) : plans.length === 0 ? (
+              <EmptyState
+                icon="crown"
+                title="No plans yet"
+                hint="Create the first plan salons can subscribe to."
+                action={<Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
+              />
+            ) : (
+              <div className={ui.tableWrap}>
+                <table className={ui.table}>
+                  <thead>
+                    <tr>
+                      <th>Plan</th>
+                      <th className={ui.alignRight}>Price</th>
+                      <th className={ui.alignRight}>Per 30 days</th>
+                      <th>Insights</th>
+                      <th className={ui.alignRight}>Salons</th>
+                      <th className={ui.alignRight}>Monthly value</th>
+                      <th className={ui.alignRight}>Collected</th>
+                      <th>Status</th>
+                      <th className={ui.alignRight}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {plans.map((plan) => {
+                      const isCommissionPlan = plan.id === commissionPlanId;
+                      const st = planStats[plan.id] ?? { salons: 0, monthly: 0, payments: 0, collected: 0 };
+                      const per30 = plan.validity_days ? (Number(plan.price) / Number(plan.validity_days)) * 30 : 0;
+                      return (
+                        <tr key={plan.id}>
+                          <td>
+                            <div className={ui.cellPrimary}>{plan.name}</div>
+                            <div className={ui.cellSub}>{plan.validity_days} days</div>
+                          </td>
+                          <td className={cx(ui.alignRight, ui.num)}>{formatINR(plan.price)}</td>
+                          <td className={cx(ui.alignRight, ui.num)}>{formatINR(per30)}</td>
+                          <td>
+                            <Badge tone={plan.has_advanced_insights ? 'accent' : 'neutral'} dot={false}>{plan.has_advanced_insights ? 'Growth' : 'Starter'}</Badge>
+                            <div className={ui.cellSub}>
+                              Upsell {LEVEL_LABEL[levelOf(plan.has_upsell_recommendations)].toLowerCase()} · cross-sell {LEVEL_LABEL[levelOf(plan.has_cross_sell_recommendations)].toLowerCase()}
+                            </div>
+                          </td>
+                          <td className={cx(ui.alignRight, ui.num)}>{st.salons}</td>
+                          <td className={cx(ui.alignRight, ui.num)}>{formatINR(st.monthly)}</td>
+                          <td className={ui.alignRight}>
+                            <div className={ui.num}>{formatINR(st.collected)}</div>
+                            <div className={ui.cellSub}>{st.payments} payment{st.payments === 1 ? '' : 's'}</div>
+                          </td>
+                          <td>
+                            {isCommissionPlan ? (
+                              <Badge tone="accent">Commission plan</Badge>
+                            ) : plan.is_active ? (
+                              <Badge tone="success">For sale</Badge>
+                            ) : (
+                              <Badge tone="neutral">Inactive</Badge>
+                            )}
+                          </td>
+                          <td className={ui.alignRight}>
+                            <div className={styles.rowActions}>
+                              <Button size="sm" icon="edit" onClick={() => openEditModal(plan)}>Edit</Button>
+                              {!isCommissionPlan && (
+                                <IconButton icon="trash" label={`Delete ${plan.name}`} className={styles.deleteBtn} onClick={() => handleDeletePlan(plan)} />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <div className={styles.fact}>
-                <span>Settlement</span>
-                <b>Monthly, 1st</b>
-              </div>
+            )}
+          </Card>
+
+          {!isLoading && plans.length > 0 && (
+            <div className={styles.planGrid}>
+              {plans.map((plan) => {
+                const isCommissionPlan = plan.id === commissionPlanId;
+                const count = planSalonCounts[plan.name] ?? 0;
+                return (
+                  <article key={plan.id} className={cx(styles.plan, isCommissionPlan && styles.planFeatured, !plan.is_active && !isCommissionPlan && styles.planInactive)}>
+                    <div className={styles.planTop}>
+                      <h3 className={styles.planName}>{plan.name}</h3>
+                      {isCommissionPlan ? (
+                        <Badge tone="accent">Commission plan</Badge>
+                      ) : plan.is_active ? (
+                        <Badge tone="success">For sale</Badge>
+                      ) : (
+                        <Badge tone="neutral">Inactive</Badge>
+                      )}
+                    </div>
+
+                    <div className={styles.planPrice}>
+                      <span className={styles.planAmount}>{formatINR(plan.price)}</span>
+                      <span className={styles.planPer}>/ {plan.validity_days} days</span>
+                    </div>
+                    <p className={styles.planMeta}>
+                      {count} salon{count === 1 ? '' : 's'} on this plan
+                    </p>
+
+                    <ul className={styles.featureList}>
+                      {BASE_FEATURES.map((label) => (
+                        <li key={label} className={styles.featureOn}>
+                          <Icon name="check" size={15} strokeWidth={2.2} />
+                          {label}
+                        </li>
+                      ))}
+                      <li className={styles.featureOn}>
+                        <Icon name="check" size={15} strokeWidth={2.2} />
+                        Upsell tips · {LEVEL_LABEL[levelOf(plan.has_upsell_recommendations)]}
+                      </li>
+                      <li className={styles.featureOn}>
+                        <Icon name="check" size={15} strokeWidth={2.2} />
+                        Cross-sell pairs · {LEVEL_LABEL[levelOf(plan.has_cross_sell_recommendations)]}
+                      </li>
+                      {GROWTH_FEATURES.map((label) => (
+                        <li key={label} className={plan.has_advanced_insights ? styles.featureOn : styles.featureOff}>
+                          <Icon name={plan.has_advanced_insights ? 'check' : 'close'} size={15} strokeWidth={2.2} />
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {isCommissionPlan && (
+                      <p className={styles.planNote}>
+                        Commission salons get these benefits without the fee.
+                      </p>
+                    )}
+
+                    <div className={styles.planActions}>
+                      <Button size="sm" icon="edit" onClick={() => openEditModal(plan)}>Edit</Button>
+                      {!isCommissionPlan && (
+                        <>
+                          <Button size="sm" variant="soft" onClick={() => nominateCommissionPlan(plan)}>Make commission plan</Button>
+                          <IconButton icon="trash" label={`Delete ${plan.name}`} className={styles.deleteBtn} onClick={() => handleDeletePlan(plan)} />
+                        </>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          ) : (
-            <Alert tone="warning">
-              No plan carries the Commission Model yet, so no salon can be moved onto it. Pick one below with{' '}
-              <strong>Make commission plan</strong>.
-            </Alert>
           )}
         </div>
-      </Card>
+      )}
 
-      {/* ------------------------------------------------------------ plans */}
-      <section>
-        <div className={styles.sectionHead}>
-          <div>
-            <h2 className={ui.cardTitle}>Subscription plans</h2>
-            <p className={ui.cardSubtitle}>What a salon can buy. The commission plan’s benefits go to commission salons instead of being sold.</p>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className={styles.planGrid}>
-            {[1, 2, 3].map((i) => <Skeleton key={i} height={300} radius={18} />)}
-          </div>
-        ) : plans.length === 0 ? (
+      {/* ========================================================== commission */}
+      {tab === 'commission' && (
+        <div className={styles.tabPane}>
           <Card padded>
-            <EmptyState
-              icon="crown"
-              title="No plans yet"
-              hint="Create the first plan salons can subscribe to."
-              action={<Button variant="primary" icon="plus" onClick={openCreateModal}>New plan</Button>}
-            />
-          </Card>
-        ) : (
-          <div className={styles.planGrid}>
-            {plans.map((plan) => {
-              const isCommissionPlan = plan.id === commissionPlanId;
-              const count = planSalonCounts[plan.name] ?? 0;
-              return (
-                <article key={plan.id} className={cx(styles.plan, isCommissionPlan && styles.planFeatured, !plan.is_active && !isCommissionPlan && styles.planInactive)}>
-                  <div className={styles.planTop}>
-                    <h3 className={styles.planName}>{plan.name}</h3>
-                    {isCommissionPlan ? (
-                      <Badge tone="accent">Commission plan</Badge>
-                    ) : plan.is_active ? (
-                      <Badge tone="success">For sale</Badge>
-                    ) : (
-                      <Badge tone="neutral">Inactive</Badge>
-                    )}
-                  </div>
-
-                  <div className={styles.planPrice}>
-                    <span className={styles.planAmount}>{formatINR(plan.price)}</span>
-                    <span className={styles.planPer}>/ {plan.validity_days} days</span>
-                  </div>
-                  <p className={styles.planMeta}>
-                    {count} salon{count === 1 ? '' : 's'} on this plan
+            <div className={styles.commission}>
+              <div className={styles.commissionIntro}>
+                <span className={styles.commissionIcon}><Icon name="percent" size={22} /></span>
+                <div>
+                  <h2 className={ui.cardTitle}>The Commission Model</h2>
+                  <p className={ui.cardSubtitle}>
+                    Every commission salon enjoys the same benefits, so one plan carries them. The percentage is agreed
+                    per salon; the plan is not. A salon has {graceDays} day{graceDays === 1 ? '' : 's'} after a month
+                    closes to settle before it goes offline.
                   </p>
+                </div>
+              </div>
 
-                  <ul className={styles.featureList}>
-                    {BASE_FEATURES.map((label) => (
-                      <li key={label} className={styles.featureOn}>
-                        <Icon name="check" size={15} strokeWidth={2.2} />
-                        {label}
-                      </li>
-                    ))}
-                    <li className={styles.featureOn}>
-                      <Icon name="check" size={15} strokeWidth={2.2} />
-                      Upsell tips · {LEVEL_LABEL[levelOf(plan.has_upsell_recommendations)]}
-                    </li>
-                    <li className={styles.featureOn}>
-                      <Icon name="check" size={15} strokeWidth={2.2} />
-                      Cross-sell pairs · {LEVEL_LABEL[levelOf(plan.has_cross_sell_recommendations)]}
-                    </li>
-                    {GROWTH_FEATURES.map((label) => (
-                      <li key={label} className={plan.has_advanced_insights ? styles.featureOn : styles.featureOff}>
-                        <Icon name={plan.has_advanced_insights ? 'check' : 'close'} size={15} strokeWidth={2.2} />
-                        {label}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {isCommissionPlan && (
-                    <p className={styles.planNote}>
-                      Commission salons get these benefits without the fee. It isn’t sold while it carries the Commission Model.
-                    </p>
-                  )}
-
-                  <div className={styles.planActions}>
-                    <Button size="sm" icon="edit" onClick={() => openEditModal(plan)}>Edit</Button>
-                    {!isCommissionPlan && (
-                      <>
-                        <Button size="sm" variant="soft" onClick={() => nominateCommissionPlan(plan)}>Make commission plan</Button>
-                        <IconButton icon="trash" label={`Delete ${plan.name}`} className={styles.deleteBtn} onClick={() => handleDeletePlan(plan)} />
-                      </>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* ----------------------------------------------------------- salons */}
-      <Card>
-        <div className={ui.toolbar}>
-          <div className={styles.salonsTitle}>
-            <h2 className={ui.cardTitle}>Salons</h2>
-            <p className={ui.cardSubtitle}>A commission rate can only change once that salon has no open payout.</p>
-          </div>
-          <Segmented
-            ariaLabel="Billing model"
-            value={salonFilterModel}
-            onChange={setSalonFilterModel}
-            options={[
-              { value: '', label: 'All', count: salons.length },
-              { value: SUBSCRIPTION, label: 'Subscription', count: subscriptionSalons.length },
-              { value: COMMISSION, label: 'Commission', count: commissionSalons.length },
-              ...(expiringSoon.length ? [{ value: 'expiring', label: 'Expiring', count: expiringSoon.length }] : []),
-            ]}
-          />
-        </div>
-        <div className={cx(ui.toolbar, styles.subToolbar)}>
-          <SearchInput className={ui.toolbarGrow} value={salonSearch} onChange={setSalonSearch} placeholder="Search salon or owner…" />
-          <select className={cx(ui.control, styles.sortSelect)} value={salonSort} onChange={(e) => setSalonSort(e.target.value)} aria-label="Sort salons">
-            <option value="name_asc">Name (A–Z)</option>
-            <option value="name_desc">Name (Z–A)</option>
-            <option value="rate_desc">Commission rate (high–low)</option>
-            <option value="expiry_asc">Access ends (soonest)</option>
-          </select>
-        </div>
-
-        <div className={ui.tableWrap}>
-          <table className={ui.table}>
-            <thead>
-              <tr>
-                <th>Salon</th>
-                <th>Billing model</th>
-                <th>Current plan</th>
-                <th>Rate</th>
-                <th>Access until</th>
-                <th className={ui.alignRight}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
               {isLoading ? (
-                Array.from({ length: 5 }, (_, i) => (
-                  <tr key={i}>
-                    <td><div className={ui.personCell}><Skeleton width={34} height={34} radius={11} /><Skeleton width={140} /></div></td>
-                    <td><Skeleton width={120} height={22} radius={999} /></td>
-                    <td><Skeleton width={80} /></td>
-                    <td><Skeleton width={40} /></td>
-                    <td><Skeleton width={90} /></td>
-                    <td><Skeleton width={120} /></td>
-                  </tr>
-                ))
-              ) : filteredSalons.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <EmptyState icon="store" title="No salons match" hint="Try another search or billing model." />
-                  </td>
-                </tr>
+                <Skeleton height={64} radius={14} />
+              ) : commissionPlanId ? (
+                <div className={styles.commissionFacts}>
+                  <Field label="Benefits carried by">
+                    <select
+                      className={ui.control}
+                      value={commissionPlanId || ''}
+                      onChange={(e) => {
+                        const plan = plans.find((p) => p.id === e.target.value);
+                        if (plan) nominateCommissionPlan(plan);
+                      }}
+                    >
+                      {plans.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className={styles.fact}>
+                    <span>Salons on it</span>
+                    <b>{commissionSalons.length}</b>
+                  </div>
+                  <div className={styles.fact}>
+                    <span>Average rate</span>
+                    <b>{averageRate === null ? '—' : `${averageRate.toFixed(1)}%`}</b>
+                  </div>
+                  <div className={styles.fact}>
+                    <span>Settlement</span>
+                    <b>Monthly, 1st</b>
+                  </div>
+                </div>
               ) : (
-                filteredSalons.map((salon) => {
-                  const onCommission = salon.billing_model === COMMISSION;
-                  const blocked = onCommission && salon.unsettled_payouts > 0;
-                  const left = onCommission ? null : daysUntil(salon.expiry);
+                <Alert tone="warning">
+                  No plan carries the Commission Model yet, so no salon can be moved onto it. Choose one from the Plans
+                  tab with <strong>Make commission plan</strong>.
+                </Alert>
+              )}
+            </div>
+          </Card>
 
-                  return (
-                    <tr key={salon.id}>
-                      <td>
-                        <button type="button" className={styles.salonBtn} onClick={() => openSalonInfo(salon)} title="View salon details">
-                          <Person name={salon.name} sub={salon.owner} size={34} />
-                        </button>
-                      </td>
-                      <td>
-                        <Badge tone={onCommission ? 'accent' : 'info'}>{salon.billing_label ?? modelLabel(salon.billing_model)}</Badge>
-                      </td>
-                      <td className={salon.current_plan === 'None' ? styles.mutedNote : ui.cellPrimary}>{salon.current_plan}</td>
-                      <td>
-                        {onCommission ? (
-                          <>
-                            <div className={cx(ui.cellPrimary, ui.num)}>{pct(salon.commission_percentage)}</div>
-                            {salon.commission_rate_effective_from && (
-                              <div className={ui.cellSub}>since {fmtDay(salon.commission_rate_effective_from)}</div>
+          {commissionPlan && (
+            <Card title={`What commission salons get — ${commissionPlan.name}`} subtitle="The underlying plan's benefits, granted to every commission salon without the plan fee.">
+              <ul className={cx(styles.featureList, styles.featureColumns)}>
+                {BASE_FEATURES.map((label) => (
+                  <li key={label} className={styles.featureOn}><Icon name="check" size={15} strokeWidth={2.2} />{label}</li>
+                ))}
+                <li className={styles.featureOn}><Icon name="check" size={15} strokeWidth={2.2} />Upsell tips · {LEVEL_LABEL[levelOf(commissionPlan.has_upsell_recommendations)]}</li>
+                <li className={styles.featureOn}><Icon name="check" size={15} strokeWidth={2.2} />Cross-sell pairs · {LEVEL_LABEL[levelOf(commissionPlan.has_cross_sell_recommendations)]}</li>
+                {GROWTH_FEATURES.map((label) => (
+                  <li key={label} className={commissionPlan.has_advanced_insights ? styles.featureOn : styles.featureOff}>
+                    <Icon name={commissionPlan.has_advanced_insights ? 'check' : 'close'} size={15} strokeWidth={2.2} />{label}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <Card title="Commission salons" subtitle="Agreed rates and open payouts. A rate cannot change while a payout is still open.">
+            {isLoading ? (
+              <Skeleton height={140} radius={14} />
+            ) : commissionSalons.length === 0 ? (
+              <EmptyState icon="percent" title="No commission salons yet" hint="Approve a commission request, or use Change model on a salon." />
+            ) : (
+              <div className={ui.tableWrap}>
+                <table className={ui.table}>
+                  <thead>
+                    <tr>
+                      <th>Salon</th>
+                      <th>City</th>
+                      <th className={ui.alignRight}>Rate</th>
+                      <th>Since</th>
+                      <th>Open payouts</th>
+                      <th className={ui.alignRight}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...commissionSalons].sort((a, b) => (b.commission_percentage || 0) - (a.commission_percentage || 0)).map((salon) => {
+                      const blocked = salon.unsettled_payouts > 0;
+                      return (
+                        <tr key={salon.id}>
+                          <td>
+                            <button type="button" className={styles.salonBtn} onClick={() => openSalonInfo(salon, 'payouts')} title="View salon details">
+                              <Person name={salon.name} sub={[salon.owner, salon.owner_phone].filter(Boolean).join(' · ')} size={32} />
+                            </button>
+                          </td>
+                          <td>{salon.city ?? <span className={styles.mutedNote}>—</span>}</td>
+                          <td className={cx(ui.alignRight, ui.num)}><b>{pct(salon.commission_percentage)}</b></td>
+                          <td className={ui.num}>{fmtDay(salon.commission_rate_effective_from)}</td>
+                          <td>
+                            {blocked ? (
+                              <Badge tone="warning" dot={false}>{salon.unsettled_payouts} open</Badge>
+                            ) : (
+                              <span className={styles.mutedNote}>All settled</span>
                             )}
-                          </>
-                        ) : (
-                          <span className={styles.mutedNote}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        {onCommission ? (
-                          <span className={styles.mutedNote}>Ongoing</span>
-                        ) : salon.expiry ? (
-                          <>
-                            <div className={ui.num}>{fmtDay(salon.expiry)}</div>
-                            {left !== null && left < 0 && <Badge tone="danger" dot={false}>Expired</Badge>}
-                            {left !== null && left >= 0 && left <= 7 && (
-                              <Badge tone="warning" dot={false}>{left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left`}</Badge>
-                            )}
-                          </>
-                        ) : (
-                          <span className={styles.mutedNote}>No access</span>
-                        )}
-                        {blocked && (
-                          <div className={styles.blockedNote}>
-                            <Icon name="alert" size={12} />
-                            {salon.unsettled_payouts} payout{salon.unsettled_payouts === 1 ? '' : 's'} open
-                          </div>
-                        )}
-                      </td>
-                      <td className={ui.alignRight}>
-                        <div className={styles.rowActions}>
-                          {onCommission && (
+                          </td>
+                          <td className={ui.alignRight}>
                             <Button
                               size="sm"
                               onClick={() => openRateChange(salon)}
@@ -1204,18 +1675,17 @@ export default function SubscriptionsPage() {
                             >
                               Change rate
                             </Button>
-                          )}
-                          <Button size="sm" variant="soft" onClick={() => openAssign(salon)}>Change model</Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
-      </Card>
+      )}
 
       {/* ============================================================ overlays */}
 

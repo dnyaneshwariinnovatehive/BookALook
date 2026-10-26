@@ -36,7 +36,7 @@ export default function SiteFooter() {
         <div className="blk-footer__col">
           <p className="blk-footer__head">Company</p>
           <Link className="blk-footer__link" href="/about">
-            About BooKalook
+            About BookALook
           </Link>
           <Link className="blk-footer__link" href="/terms">
             Terms &amp; Conditions

@@ -7,6 +7,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
+import '../../../widgets/notification_inbox_controls.dart';
 
 /// The collaborator's inbox.
 ///
@@ -25,7 +26,12 @@ class CollaboratorNotificationsScreen extends StatefulWidget {
   /// collaborator comes back, rather than waiting for the next poll.
   final Future<void> Function()? onRead;
 
-  const CollaboratorNotificationsScreen({super.key, this.onRead});
+  /// Test seams; default to the real API.
+  final Future<CollaboratorInbox> Function({String? period})? fetch;
+  final Future<void> Function(String id)? delete;
+  final Future<int> Function({String? period})? deleteMany;
+
+  const CollaboratorNotificationsScreen({super.key, this.onRead, this.fetch, this.delete, this.deleteMany});
 
   @override
   State<CollaboratorNotificationsScreen> createState() =>
@@ -36,6 +42,9 @@ class _CollaboratorNotificationsScreenState
     extends State<CollaboratorNotificationsScreen> {
   List<CollaboratorNotification> _notifications = const [];
   bool _loading = true;
+  NotificationPeriod _period = NotificationPeriod.all;
+  bool _deleting = false;
+  int _restoreTick = 0;
 
   @override
   void initState() {
@@ -48,7 +57,9 @@ class _CollaboratorNotificationsScreenState
       setState(() => _loading = _notifications.isEmpty);
     }
 
-    final inbox = await CollaboratorApi.notifications();
+    final inbox = await (widget.fetch ?? ({String? period}) => CollaboratorApi.notifications(period: period))(
+      period: _period.apiValue,
+    );
 
     if (!mounted) return;
 
@@ -87,6 +98,61 @@ class _CollaboratorNotificationsScreenState
 
     await CollaboratorApi.markAllNotificationsRead();
     if (mounted) await widget.onRead?.call();
+  }
+
+  void _setPeriod(NotificationPeriod period) {
+    if (period == _period) return;
+    setState(() {
+      _period = period;
+      _notifications = const [];
+      _loading = true;
+    });
+    _load();
+  }
+
+  /// Swiped away: gone at once, put back if the server refuses.
+  Future<void> _deleteOne(CollaboratorNotification notification) async {
+    final before = _notifications;
+    setState(() => _notifications = _notifications.where((n) => n.id != notification.id).toList());
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await (widget.delete ?? CollaboratorApi.deleteNotification)(notification.id);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Notification deleted'), duration: Duration(seconds: 2)));
+      if (!notification.isRead) await widget.onRead?.call();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        // A fresh key: the swiped-away row cannot be reused once dismissed.
+        _restoreTick++;
+        _notifications = before;
+      });
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notification. Try again.')));
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    if (_deleting || _notifications.isEmpty) return;
+    final ok = await confirmDeleteNotifications(context, count: _notifications.length, period: _period);
+    if (!ok || !mounted) return;
+
+    setState(() => _deleting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final deleted = await (widget.deleteMany ?? ({String? period}) => CollaboratorApi.deleteNotifications(period: period))(
+        period: _period.apiValue,
+      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text('$deleted notification${deleted == 1 ? '' : 's'} deleted')));
+      await _load();
+      await widget.onRead?.call();
+    } catch (_) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notifications. Try again.')));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
   }
 
   /// What tapping a card does depends on the notice.
@@ -156,7 +222,18 @@ class _CollaboratorNotificationsScreenState
               ),
               child: const Text('Mark all read'),
             ),
+          if (_notifications.isNotEmpty)
+            IconButton(
+              key: const ValueKey('notifications_delete_all'),
+              tooltip: 'Delete notifications',
+              onPressed: _deleting ? null : _deleteAll,
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: NotificationPeriodChips(selected: _period, onChanged: _setPeriod),
+        ),
       ),
       body: _buildBody(palette),
     );
@@ -170,15 +247,21 @@ class _CollaboratorNotificationsScreenState
         onRefresh: _load,
         color: AppTheme.accentColor,
         child: ListView(
-          children: const [
-            SizedBox(height: 90),
-            CollaboratorEmptyState(
-              icon: Icons.notifications_none_outlined,
-              title: 'Nothing needs you right now',
-              body:
-                  'When a salon you onboarded is close to its plan ending, '
-                  'or the owner renews it, you will be told here.',
-            ),
+          children: [
+            const SizedBox(height: 90),
+            _period == NotificationPeriod.all
+                ? const CollaboratorEmptyState(
+                    icon: Icons.notifications_none_outlined,
+                    title: 'Nothing needs you right now',
+                    body:
+                        'When a salon you onboarded is close to its plan ending, '
+                        'or the owner renews it, you will be told here.',
+                  )
+                : CollaboratorEmptyState(
+                    icon: Icons.notifications_none_outlined,
+                    title: 'Nothing from ${_period.label.toLowerCase()}',
+                    body: 'Try a longer period, or All.',
+                  ),
           ],
         ),
       );
@@ -191,8 +274,14 @@ class _CollaboratorNotificationsScreenState
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         itemCount: _notifications.length,
         separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, index) =>
-            _buildCard(_notifications[index], palette),
+        itemBuilder: (context, index) {
+          final n = _notifications[index];
+          return DeletableNotification(
+            id: '${n.id}#$_restoreTick',
+            onDelete: () => _deleteOne(n),
+            child: _buildCard(n, palette),
+          );
+        },
       ),
     );
   }

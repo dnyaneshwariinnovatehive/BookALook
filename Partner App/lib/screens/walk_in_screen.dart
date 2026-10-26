@@ -22,11 +22,28 @@ class WalkInScreen extends StatefulWidget {
   /// tab (provider walk-in) tell the home tab to refresh its appointments.
   final VoidCallback? onCreated;
 
+  /// Test seams; each defaults to the real thing.
+  final Future<WalkInOptions> Function(String salonId)? loadOptions;
+  final Future<WalkInResult> Function({
+    required String customerName,
+    required String customerPhone,
+    required String gender,
+    required List<String> serviceIds,
+    String? providerId,
+    required bool allowOverlap,
+  })? createWalkIn;
+
+  /// Opens "collect payment & complete"; true once the payment is taken.
+  final Future<bool> Function(BuildContext context, String salonId, String appointmentId)? collectPayment;
+
   const WalkInScreen({
     Key? key,
     required this.salonId,
     this.embedded = false,
     this.onCreated,
+    this.loadOptions,
+    this.createWalkIn,
+    this.collectPayment,
   }) : super(key: key);
 
   @override
@@ -75,7 +92,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
     });
 
     try {
-      final options = await WalkInApi.options(widget.salonId);
+      final options = await (widget.loadOptions ?? WalkInApi.options)(widget.salonId);
       if (!mounted) return;
       setState(() {
         _options = options;
@@ -146,14 +163,32 @@ class _WalkInScreenState extends State<WalkInScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final result = await WalkInApi.create(
-        widget.salonId,
+      final create = widget.createWalkIn ??
+          ({
+            required String customerName,
+            required String customerPhone,
+            required String gender,
+            required List<String> serviceIds,
+            String? providerId,
+            required bool allowOverlap,
+          }) =>
+              WalkInApi.create(
+                widget.salonId,
+                customerName: customerName,
+                customerPhone: customerPhone,
+                gender: gender,
+                serviceIds: serviceIds,
+                providerId: providerId,
+                startTime: null,
+                allowOverlap: allowOverlap,
+              );
+
+      final result = await create(
         customerName: _nameController.text.trim(),
         customerPhone: _phoneController.text.trim(),
         gender: _gender,
         serviceIds: _selectedServiceIds.toList(),
         providerId: _providerId,
-        startTime: null,
         allowOverlap: allowOverlap,
       );
 
@@ -221,30 +256,28 @@ class _WalkInScreenState extends State<WalkInScreen> {
       return;
     }
 
-    // Walk-ins pay at the counter, so offer the bill straight away.
-    final goToBill = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Walk-in started'),
-        content: Text(
-          '${result.appointment.customerName} is now in progress with '
-          '${result.appointment.servingProviderName ?? 'your staff'}.\n\n'
-          '₹${result.bill.balanceDue.toStringAsFixed(0)} to collect when they are done.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Add another')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Go to bill')),
-        ],
-      ),
-    );
+    // Walk-ins pay at the counter, so the "collect payment & complete" sheet
+    // opens straight away. Once it is taken, the visit is in the history, so
+    // that is where the desk goes next.
+    final collect = widget.collectPayment ??
+        (ctx, salonId, appointmentId) =>
+            CollectPaymentSheet.show(ctx, salonId: salonId, appointmentId: appointmentId);
 
-    if (goToBill == true && mounted) {
-      await CollectPaymentSheet.show(
-        context,
-        salonId: widget.salonId,
-        appointmentId: result.appointment.id,
-      );
+    final collected = await collect(context, widget.salonId, result.appointment.id);
+    if (!mounted) return;
+
+    if (collected) {
+      _openHistory(replace: !widget.embedded);
+      return;
     }
+
+    // Closed without collecting: the customer is still in the chair. The
+    // visit stays in progress and can be finished from Appointments or the
+    // walk-in history when they are done.
+    _showMessage(
+      '${result.appointment.customerName} is in progress. Collect payment from '
+      'Appointments or Walk-in history when they are done.',
+    );
   }
 
   void _showMessage(String text) {
@@ -264,13 +297,18 @@ class _WalkInScreenState extends State<WalkInScreen> {
     );
   }
 
-  void _openHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => WalkInHistoryScreen(salonId: widget.salonId),
-      ),
+  /// [replace] swaps this form for the history, so Back from the history
+  /// returns to where the walk-in was started rather than to an empty form.
+  void _openHistory({bool replace = false}) {
+    final route = MaterialPageRoute<void>(
+      builder: (_) => WalkInHistoryScreen(salonId: widget.salonId),
     );
+
+    if (replace) {
+      Navigator.pushReplacement(context, route);
+    } else {
+      Navigator.push(context, route);
+    }
   }
 
   // ------------------------------------------------------------- build
@@ -310,7 +348,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
                   padding: const EdgeInsets.only(right: 12),
                   child: Center(
                     child: InkWell(
-                      onTap: _openHistory,
+                      onTap: () => _openHistory(),
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -379,7 +417,7 @@ class _WalkInScreenState extends State<WalkInScreen> {
           ),
         ),
         InkWell(
-          onTap: _openHistory,
+          onTap: () => _openHistory(),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

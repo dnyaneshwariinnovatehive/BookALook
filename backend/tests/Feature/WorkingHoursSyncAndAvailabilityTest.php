@@ -660,4 +660,120 @@ class WorkingHoursSyncAndAvailabilityTest extends TestCase
 
         $res->assertStatus(403);
     }
+
+    /** A week of salon hours, every day the same unless overridden. */
+    private function salonWeek(string $open, string $close, array $overrides = []): array
+    {
+        $week = [];
+        for ($i = 0; $i < 7; $i++) {
+            $week[] = $overrides[$i] ?? [
+                'day_of_week' => $i,
+                'is_closed' => false,
+                'open_time' => $open,
+                'close_time' => $close,
+            ];
+        }
+
+        return $week;
+    }
+
+    /** A custom week for a staff member: same shift every day. */
+    private function customWeek(string $start, string $end, ?string $breakStart = null, ?string $breakEnd = null): array
+    {
+        $week = [];
+        for ($i = 0; $i < 7; $i++) {
+            $week[] = [
+                'day_of_week' => $i,
+                'is_weekly_off' => false,
+                'shift_start' => $start,
+                'shift_end' => $end,
+                'break_start' => $breakStart,
+                'break_end' => $breakEnd,
+            ];
+        }
+
+        return $week;
+    }
+
+    public function test_shorter_salon_hours_trim_custom_shifts_and_say_so(): void
+    {
+        $custom = $this->createStaff("Trim {$this->unique}", false, $this->customWeek('08:00:00', '17:00:00', '08:30:00', '09:30:00'));
+
+        // Salon now 10:00-16:00, and closed on Sunday.
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $this->salonWeek('10:00:00', '16:00:00', [
+                    0 => ['day_of_week' => 0, 'is_closed' => true, 'open_time' => null, 'close_time' => null],
+                ]),
+            ])
+            ->assertOk();
+
+        $monday = ProviderWorkingHour::where('provider_id', $custom->id)->where('day_of_week', 1)->first();
+        $this->assertSame('10:00:00', $monday->shift_start);
+        $this->assertSame('16:00:00', $monday->shift_end);
+        // The break fell outside the new shift, so it goes.
+        $this->assertNull($monday->break_start);
+
+        $sunday = ProviderWorkingHour::where('provider_id', $custom->id)->where('day_of_week', 0)->first();
+        $this->assertTrue((bool) $sunday->is_weekly_off);
+
+        // Still on their own hours.
+        $this->assertFalse((bool) $custom->fresh()->use_salon_hours);
+
+        $trimmed = collect($res->json('trimmed_shifts'))->where('provider_id', $custom->id);
+        $this->assertCount(7, $trimmed);
+        $this->assertSame(['10:00', '16:00'], $trimmed->firstWhere('day_of_week', 1)['to']);
+        $this->assertSame(['08:00', '17:00'], $trimmed->firstWhere('day_of_week', 1)['from']);
+        $this->assertSame([null, null], $trimmed->firstWhere('day_of_week', 0)['to']);
+    }
+
+    public function test_longer_salon_hours_leave_custom_shifts_alone(): void
+    {
+        $custom = $this->createStaff("Keep {$this->unique}", false, $this->customWeek('11:00:00', '16:00:00'));
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $this->salonWeek('08:00:00', '22:00:00'),
+            ])
+            ->assertOk();
+
+        $monday = ProviderWorkingHour::where('provider_id', $custom->id)->where('day_of_week', 1)->first();
+        $this->assertSame('11:00:00', $monday->shift_start);
+        $this->assertSame('16:00:00', $monday->shift_end);
+        $this->assertSame([], collect($res->json('trimmed_shifts'))->where('provider_id', $custom->id)->values()->all());
+    }
+
+    public function test_bookings_that_fall_outside_the_new_hours_are_reported_not_moved(): void
+    {
+        $staff = $this->createStaff("Booked {$this->unique}", true);
+        $date = Carbon::today()->addDays(7);
+
+        $late = Appointment::create([
+            'salon_id' => $this->salon->id,
+            'customer_id' => $this->customer->id,
+            'appointed_provider_id' => $staff->id,
+            'booking_source' => 'online',
+            'appointment_date' => $date->toDateString(),
+            'start_time' => '17:00:00',
+            'end_time' => '17:30:00',
+            'status' => 'scheduled',
+            'payment_option' => 'advance_only',
+            'total_amount' => 500,
+            'advance_amount' => 100,
+            'balance_amount' => 400,
+        ]);
+
+        $res = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/partner/salons/{$this->salon->id}/working-hours", [
+                'working_hours' => $this->salonWeek('09:00:00', '16:00:00'),
+            ])
+            ->assertOk();
+
+        $this->assertContains(
+            ['day_of_week' => $date->dayOfWeek, 'count' => 1],
+            $res->json('bookings_outside_hours')
+        );
+        $this->assertSame('scheduled', $late->fresh()->status);
+        $this->assertSame('17:00:00', $late->fresh()->start_time);
+    }
 }

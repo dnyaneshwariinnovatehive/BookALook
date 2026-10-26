@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import 'steps/step1_owner_details.dart';
 import 'steps/step2_salon_details.dart';
 import 'steps/step3_terms.dart';
+import 'steps/step_bank_details.dart';
 import '../../services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../dashboard/salon_selection_screen.dart';
@@ -37,7 +38,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
 
   void _nextStep(Map<String, dynamic> stepData) {
     _formData.addAll(stepData);
-    if (_currentStep < 2) {
+    if (_currentStep < 3) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -162,10 +163,12 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
                     _buildDot(1),
                     _buildLine(),
                     _buildDot(2),
+                    _buildLine(),
+                    _buildDot(3),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Step ${_currentStep + 1} of 3', style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
+                Text('Step ${_currentStep + 1} of 4', style: TextStyle(fontSize: 12, color: AppTheme.lightTextBody)),
               ],
             ),
           ),
@@ -177,6 +180,8 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
         children: [
           Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep, phone: widget.phone, initialData: widget.initialData, isExistingAdmin: widget.isExistingAdmin),
           Step2SalonDetails(onNext: _nextStep, onBack: _previousStep, initialData: widget.initialData),
+          // Optional: a salon registers and goes live without it.
+          StepBankDetails(onNext: _nextStep, onBack: _previousStep),
           Step3Terms(onSubmit: _nextStep, onBack: _previousStep, isLoading: _isLoading),
         ],
       ),

@@ -10,6 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+/// What a signed-in request carries. Only a request with a session can find
+/// that session expired.
+const _session = {'Authorization': 'Bearer expired-token'};
+
 /// How many login pages are on the stack.
 int _loginPages(WidgetTester tester) => find.byType(PhoneScreen).evaluate().length;
 
@@ -17,6 +21,10 @@ void main() {
   setUp(() {
     // Start every test from a clean single-flight claim.
     AuthService.cancelSessionExpiryRedirect();
+    // The redirect signs the customer out, which reads and clears stored
+    // preferences; without a mock that call never returns in a widget test.
+    SharedPreferences.setMockInitialValues({});
+    dotenv.loadFromString(envString: 'API_BASE_URL=http://localhost/api');
     api.debugSetClient(MockClient((_) async => http.Response('{}', 401)));
   });
 
@@ -34,12 +42,12 @@ void main() {
       await tester.pump();
 
       // Every in-flight request fails together when a token expires.
-      await Future.wait([
-        api.get(Uri.parse('http://localhost/a')),
-        api.get(Uri.parse('http://localhost/b')),
-        api.get(Uri.parse('http://localhost/c')),
-        api.get(Uri.parse('http://localhost/d')),
-      ]);
+      await tester.runAsync(() => Future.wait([
+        api.get(Uri.parse('http://localhost/a'), headers: _session),
+        api.get(Uri.parse('http://localhost/b'), headers: _session),
+        api.get(Uri.parse('http://localhost/c'), headers: _session),
+        api.get(Uri.parse('http://localhost/d'), headers: _session),
+      ]));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(_loginPages(tester), 1);
@@ -49,14 +57,14 @@ void main() {
       await tester.pumpWidget(app());
       await tester.pump();
 
-      await api.get(Uri.parse('http://localhost/a'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/a'), headers: _session));
       await tester.pump(const Duration(milliseconds: 600));
       expect(_loginPages(tester), 1);
 
       // Storing a new token makes the next expiry a genuine new event.
       AuthService.markSessionAuthenticated();
 
-      await api.get(Uri.parse('http://localhost/b'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/b'), headers: _session));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(_loginPages(tester), 1);
@@ -67,16 +75,29 @@ void main() {
       await tester.pumpWidget(app());
       await tester.pump();
 
-      await api.get(Uri.parse('http://localhost/a'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/a'), headers: _session));
       await tester.pump(const Duration(milliseconds: 600));
       expect(_loginPages(tester), 1);
 
       AuthService.markSessionAuthenticated();
 
-      await api.get(Uri.parse('http://localhost/b'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/b'), headers: _session));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(_loginPages(tester), 1);
+    });
+
+    testWidgets('a guest request answered 401 never redirects', (tester) async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+
+      // No account, no token: a 401 here is "sign in to use this", not an
+      // expired session, and must not take over the screen.
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/a')));
+      await tester.runAsync(() => api.post(Uri.parse('http://localhost/b')));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(_loginPages(tester), 0);
     });
 
     testWidgets('a non-401 response never redirects', (tester) async {
@@ -85,7 +106,7 @@ void main() {
 
       api.debugSetClient(MockClient((_) async => http.Response('{}', 500)));
 
-      await api.get(Uri.parse('http://localhost/a'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/a'), headers: _session));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(_loginPages(tester), 0);
@@ -104,7 +125,7 @@ void main() {
 
       // Auth goes through the shared client now (so this mock sees it), but a
       // 401 from signing in is a failed sign-in, not an expired session.
-      final result = await AuthService().sendOtp('9876543210');
+      final result = await tester.runAsync(() => AuthService().sendOtp('9876543210'));
       await tester.pump(const Duration(milliseconds: 600));
 
       expect(result, isNot('success'));
@@ -121,7 +142,7 @@ void main() {
       ));
       await tester.pump();
 
-      await api.get(Uri.parse('http://localhost/a'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/a'), headers: _session));
       await tester.pump(const Duration(seconds: 1));
       expect(_loginPages(tester), 1);
 
@@ -130,7 +151,7 @@ void main() {
 
       // A late request from the screen they left expires too. They are already
       // on the login page: it must not be swapped for a blank copy.
-      await api.get(Uri.parse('http://localhost/b'));
+      await tester.runAsync(() => api.get(Uri.parse('http://localhost/b'), headers: _session));
       await tester.pump(const Duration(seconds: 1));
 
       expect(_loginPages(tester), 1);

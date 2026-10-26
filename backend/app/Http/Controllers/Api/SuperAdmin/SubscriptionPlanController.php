@@ -41,9 +41,21 @@ class SubscriptionPlanController extends Controller
     {
         $plans = SubscriptionPlan::orderByDesc('is_commission_plan')->orderBy('price')->get();
 
-        $salons = Salon::with(['currentSubscription.plan', 'admin'])->get()->map(function (Salon $salon) {
+        // Payment totals per salon in one query each, not one per row.
+        $paidBySalon = SubscriptionPaymentRequest::where('status', 'approved')
+            ->groupBy('salon_id')
+            ->selectRaw('salon_id, SUM(COALESCE(amount_payable_inr, 0)) as total, COUNT(*) as payments, MAX(updated_at) as last_paid_at')
+            ->get()
+            ->keyBy('salon_id');
+        $pendingBySalon = SubscriptionPaymentRequest::where('status', 'pending')
+            ->groupBy('salon_id')
+            ->selectRaw('salon_id, COUNT(*) as pending')
+            ->pluck('pending', 'salon_id');
+
+        $salons = Salon::with(['currentSubscription.plan', 'admin', 'city:id,name'])->get()->map(function (Salon $salon) use ($paidBySalon, $pendingBySalon) {
             $model = $salon->billingModel();
             $subscription = $salon->currentSubscription;
+            $paid = $paidBySalon->get($salon->id);
 
             return [
                 'id' => $salon->id,
@@ -63,6 +75,19 @@ class SubscriptionPlanController extends Controller
                     : 0,
                 'expiry' => $subscription?->end_date?->format('Y-m-d'),
                 'status' => $subscription->status ?? 'N/A',
+                // For the dashboard tables: who to call, where, and how the
+                // money has gone so far.
+                'owner_phone' => $salon->admin?->phone,
+                'city' => $salon->city?->name,
+                'salon_status' => $salon->status,
+                'plan_started' => $subscription?->start_date?->format('Y-m-d'),
+                'plan_price' => $subscription ? (float) ($subscription->plan_price_snapshot ?? $subscription->plan?->price ?? 0) : null,
+                'plan_validity_days' => $subscription?->plan?->validity_days,
+                'lifetime_paid' => round((float) ($paid->total ?? 0), 2),
+                'payments_count' => (int) ($paid->payments ?? 0),
+                'last_paid_at' => $paid?->last_paid_at ? \Illuminate\Support\Carbon::parse($paid->last_paid_at)->toDateString() : null,
+                'pending_requests' => (int) ($pendingBySalon[$salon->id] ?? 0),
+                'joined_at' => $salon->created_at?->toDateString(),
             ];
         })->values();
 

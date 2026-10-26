@@ -3,7 +3,7 @@ import LegalDocumentView from '@/components/LegalDocumentView';
 import { ABOUT } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'About BooKalook',
+  title: 'About BookALook',
   description: ABOUT.summary,
 };
 

@@ -14,6 +14,7 @@ import '../../services/onboarding_draft_store.dart';
 import '../../services/salon_location_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/sub_area_dropdown.dart';
+import '../../widgets/bank_details_fields.dart';
 import 'service_picker_sheet.dart';
 
 /// Building a salon on behalf of an owner, on site.
@@ -58,6 +59,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
   final _ownerName = TextEditingController();
   final _ownerPhone = TextEditingController();
   final _ownerEmail = TextEditingController();
+  final _bank = BankDetailsControllers();
   final _salonName = TextEditingController();
   final _description = TextEditingController();
   final _salonPhone = TextEditingController();
@@ -91,6 +93,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
     if (draft.requestedCommissionPercentage != null) {
       _commissionController.text = draft.requestedCommissionPercentage.toString();
     }
+    _fillBank(draft);
 
     if (mounted) setState(() => _draft = draft);
 
@@ -157,6 +160,17 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
     setState(() {});
   }
 
+  void _fillBank(OnboardingDraft draft) {
+    _bank.fillFromMap({
+      'bank_account_holder_name': draft.bankHolder,
+      'bank_name': draft.bankName,
+      'bank_account_number': draft.bankAccount,
+      'bank_ifsc': draft.bankIfsc,
+      'bank_upi_id': draft.bankUpi,
+    });
+    _bank.hasSavedAccount = draft.hasSavedBankAccount;
+  }
+
   String? _stateOfSelectedCity(String? cityId) {
     if (cityId == null) return null;
     for (final city in _cities) {
@@ -187,7 +201,12 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
       ..description = _description.text
       ..salonPhone = _salonPhone.text
       ..address = _address.text
-      ..pincode = _pincode.text;
+      ..pincode = _pincode.text
+      ..bankHolder = _bank.holder.text
+      ..bankName = _bank.bankName.text
+      ..bankAccount = _bank.account.text
+      ..bankIfsc = _bank.ifsc.text
+      ..bankUpi = _bank.upi.text;
 
     final parsedCommission = double.tryParse(_commissionController.text.trim());
     draft.requestedCommissionPercentage = parsedCommission;
@@ -200,7 +219,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
   void dispose() {
     _autosave?.cancel();
     // Whatever is on screen when they walk away is what they come back to.
-    unawaited(_persist());
+    unawaited(_persist().whenComplete(_bank.dispose));
     _pageController.dispose();
     for (final c in [
       _ownerName,
@@ -530,6 +549,18 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
           _label('Owner email', optional: true),
           _field(_ownerEmail, 'Leave blank if they do not have one', Icons.alternate_email,
               keyboard: TextInputType.emailAddress),
+
+          const SizedBox(height: 28),
+          _sectionTitle('Bank details'),
+          Text(
+            _draft!.savedBankSummary.isNotEmpty
+                ? 'Optional. On file: ${_draft!.savedBankSummary}. Leave the account number empty to keep it.'
+                : 'Optional. Where BookALook sends the salon\'s settlements. The owner can add these later in the app.',
+            key: const ValueKey('onboard_bank_note'),
+            style: const TextStyle(fontSize: 12, height: 1.4, color: AppTheme.lightTextBody),
+          ),
+          const SizedBox(height: 14),
+          BankDetailsFields(controllers: _bank, onChanged: _touch),
 
           const SizedBox(height: 28),
           _sectionTitle('Commercial preferences'),

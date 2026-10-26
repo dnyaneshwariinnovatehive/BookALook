@@ -22,6 +22,8 @@ import '../../../models/admin_provider_models.dart';
 import '../../../services/admin_provider_api.dart';
 import 'staff/admin_provider_config_sheet.dart';
 import '../../../utils/lifecycle_poller.dart';
+import '../../../services/bank_details_api.dart';
+import '../more/bank_details_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -63,6 +65,9 @@ class HomeTabState extends State<HomeTab> {
   int _myAppointmentsToday = 0;
 
   int _unreadNotifications = 0;
+
+  /// Plan is live but the details BookALook pays settlements into are not.
+  bool _bankDetailsMissing = false;
 
   LifecyclePoller? _poller;
 
@@ -152,6 +157,13 @@ class HomeTabState extends State<HomeTab> {
         adminStatus = await AdminProviderApi.getStatus(widget.salonId);
       } catch (_) {}
 
+      // The server decides: a live plan and the transfer details missing. A
+      // failed check keeps whatever was showing rather than flashing it away.
+      bool? bankMissing;
+      try {
+        bankMissing = (await BankDetailsApi.fetch(widget.salonId)).showMissingWarning;
+      } catch (_) {}
+
       final appointments = responses[0] as List<dynamic>;
       final staff = responses[1] as List<StaffMember>;
       final leaves = responses[2] as List<ProviderLeave>;
@@ -228,6 +240,7 @@ class HomeTabState extends State<HomeTab> {
         _needsWorkingHours = workingHoursResponse['is_default'] == true;
         _insights = insights;
         _adminStatus = adminStatus;
+        _bankDetailsMissing = bankMissing ?? _bankDetailsMissing;
         _myAppointmentsToday = myApptsToday;
         _isLoading = false;
       });
@@ -446,6 +459,10 @@ class HomeTabState extends State<HomeTab> {
                            ),
                          ),
                        ],
+                       if (_bankDetailsMissing) ...[
+                         const SizedBox(height: 16),
+                         _buildBankDetailsWarning(),
+                       ],
                        if (_needsWorkingHours) ...[
                          const SizedBox(height: 16),
                          _buildWorkingHoursPrompt(),
@@ -629,6 +646,68 @@ class HomeTabState extends State<HomeTab> {
           fontWeight: FontWeight.bold,
           color: isGrowth ? Colors.purple : Colors.blue,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openBankDetails() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => BankDetailsScreen(salonId: widget.salonId)),
+    );
+    if (!mounted) return;
+    // Hidden only once the server has confirmed the save; the refresh below
+    // asks it again either way.
+    if (saved == true) setState(() => _bankDetailsMissing = false);
+    _fetchHomeData(silent: true);
+  }
+
+  Widget _buildBankDetailsWarning() {
+    return Container(
+      key: const ValueKey('bank_details_warning'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2), // red-50
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFCA5A5)), // red-300
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.account_balance_outlined, color: Color(0xFFDC2626)), // red-600
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Bank details not added!',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF991B1B)), // red-800
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Please add your bank account details to receive payments from BookALook.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF991B1B), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              key: const ValueKey('bank_details_warning_add'),
+              onPressed: _openBankDetails,
+              icon: const Icon(Icons.add_card, size: 18),
+              label: const Text('Add Bank Details', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

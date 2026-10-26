@@ -1,3 +1,5 @@
+import '../widgets/bank_details_fields.dart';
+
 /// A salon a collaborator is building, as it exists on the device.
 ///
 /// Collaborators work inside other people's salons, where the signal is
@@ -50,6 +52,20 @@ class OnboardingDraft {
   /// Absolute paths to photos copied into app storage.
   List<String> photoPaths;
   int coverIndex;
+
+  /// Optional bank details for settlements. A salon is submitted, approved
+  /// and goes live without them; the owner can add them later.
+  String bankHolder;
+  String bankName;
+  String bankAccount;
+  String bankIfsc;
+  String bankUpi;
+
+  /// What is already on file (from the website form or an earlier
+  /// submission), masked — e.g. "HDFC Bank •••• 6789". A blank account number
+  /// keeps it.
+  String savedBankSummary;
+  bool hasSavedBankAccount;
 
   /// Registration preferences (commercial model & plan preference)
   String? preferredPlanId;
@@ -104,6 +120,13 @@ class OnboardingDraft {
     this.preferredPlanId,
     this.preferredCommercialModel = '',
     this.requestedCommissionPercentage,
+    this.bankHolder = '',
+    this.bankName = '',
+    this.bankAccount = '',
+    this.bankIfsc = '',
+    this.bankUpi = '',
+    this.savedBankSummary = '',
+    this.hasSavedBankAccount = false,
     this.existingPhotoCount = 0,
     this.submitted = false,
     this.queuedForSubmission = false,
@@ -124,7 +147,22 @@ class OnboardingDraft {
       ownerPhone: enquiry['phone']?.toString() ?? '',
       salonName: enquiry['salon_name']?.toString() ?? '',
       cityLabel: enquiry['city']?.toString() ?? '',
-    );
+    ).._takeBankDetails(enquiry['bank_details']);
+  }
+
+  /// Prefill from the server's masked bank details. The account number itself
+  /// never comes back; only that one is saved.
+  void _takeBankDetails(dynamic raw) {
+    if (raw is! Map) return;
+    String s(String k) => raw[k]?.toString() ?? '';
+    bankHolder = s('account_holder_name');
+    bankName = s('bank_name');
+    bankIfsc = s('ifsc');
+    bankUpi = s('upi_id');
+    bankAccount = '';
+    final last4 = s('account_number_last4');
+    hasSavedBankAccount = last4.isNotEmpty;
+    savedBankSummary = hasSavedBankAccount ? '${bankName.isEmpty ? 'Account' : bankName} •••• $last4' : '';
   }
 
   /// A fresh direct onboarding draft without an enquiry.
@@ -148,6 +186,7 @@ class OnboardingDraft {
     ownerName = salon['owner_name']?.toString() ?? ownerName;
     ownerPhone = salon['owner_phone']?.toString() ?? ownerPhone;
     ownerEmail = salon['owner_email']?.toString() ?? '';
+    _takeBankDetails(salon['bank_details']);
     salonName = salon['salon_name']?.toString() ?? salonName;
     description = salon['description']?.toString() ?? '';
     address = salon['address']?.toString() ?? '';
@@ -239,6 +278,7 @@ class OnboardingDraft {
                     requestedCommissionPercentage! < 0 ||
                     requestedCommissionPercentage! > 100))
               'Requested commission rate (0-100%)',
+            ...bankProblems,
           ],
         1 => [
             if (address.trim().isEmpty) 'Street address',
@@ -254,6 +294,30 @@ class OnboardingDraft {
           ],
         _ => const [],
       };
+
+  /// Bank details are optional, but what is entered has to be usable: valid
+  /// values, and the four transfer fields together or not at all.
+  List<String> get bankProblems {
+    final problems = <String>[
+      if (BankDetailsRules.holder(bankHolder) != null) 'Bank: account holder name',
+      if (BankDetailsRules.bankName(bankName) != null) 'Bank: bank name',
+      if (BankDetailsRules.account(bankAccount) != null) 'Bank: account number (9 to 18 digits)',
+      if (BankDetailsRules.ifsc(bankIfsc) != null) 'Bank: IFSC code',
+      if (BankDetailsRules.upi(bankUpi) != null) 'Bank: UPI ID',
+    ];
+    final started = bankHolder.trim().isNotEmpty ||
+        bankName.trim().isNotEmpty ||
+        bankIfsc.trim().isNotEmpty ||
+        bankAccount.trim().isNotEmpty;
+    final complete = bankHolder.trim().isNotEmpty &&
+        bankName.trim().isNotEmpty &&
+        bankIfsc.trim().isNotEmpty &&
+        (bankAccount.trim().isNotEmpty || hasSavedBankAccount);
+    if (started && !complete) {
+      problems.add('Bank: fill holder, bank, account number and IFSC together (or leave them empty)');
+    }
+    return problems;
+  }
 
   static bool _isPhone(String value) =>
       RegExp(r'^\d{10,15}$').hasMatch(value.trim().replaceAll(RegExp(r'[\s-]'), ''));
@@ -285,6 +349,13 @@ class OnboardingDraft {
         'preferred_plan_id': preferredPlanId,
         'preferred_commercial_model': preferredCommercialModel,
         'requested_commission_percentage': requestedCommissionPercentage,
+        'bank_holder': bankHolder,
+        'bank_name': bankName,
+        'bank_account': bankAccount,
+        'bank_ifsc': bankIfsc,
+        'bank_upi': bankUpi,
+        'saved_bank_summary': savedBankSummary,
+        'has_saved_bank_account': hasSavedBankAccount,
         'existing_photo_count': existingPhotoCount,
         'submitted': submitted,
         'queued_for_submission': queuedForSubmission,
@@ -321,6 +392,13 @@ class OnboardingDraft {
         preferredPlanId: json['preferred_plan_id']?.toString(),
         preferredCommercialModel: json['preferred_commercial_model']?.toString() ?? '',
         requestedCommissionPercentage: (json['requested_commission_percentage'] as num?)?.toDouble(),
+        bankHolder: json['bank_holder'] ?? '',
+        bankName: json['bank_name'] ?? '',
+        bankAccount: json['bank_account'] ?? '',
+        bankIfsc: json['bank_ifsc'] ?? '',
+        bankUpi: json['bank_upi'] ?? '',
+        savedBankSummary: json['saved_bank_summary'] ?? '',
+        hasSavedBankAccount: json['has_saved_bank_account'] == true,
         existingPhotoCount: json['existing_photo_count'] ?? 0,
         submitted: json['submitted'] == true,
         queuedForSubmission: json['queued_for_submission'] == true,
@@ -350,6 +428,12 @@ class OnboardingDraft {
         'preferred_commercial_model': preferredCommercialModel,
         if (preferredCommercialModel == 'commission' && requestedCommissionPercentage != null)
           'requested_commission_percentage': requestedCommissionPercentage!.toString(),
+        // Optional. A blank account number keeps the one on file.
+        if (bankHolder.trim().isNotEmpty) 'bank_account_holder_name': bankHolder.trim(),
+        if (bankName.trim().isNotEmpty) 'bank_name': bankName.trim(),
+        if (bankAccount.trim().isNotEmpty) 'bank_account_number': BankDetailsRules.cleanAccount(bankAccount),
+        if (bankIfsc.trim().isNotEmpty) 'bank_ifsc': BankDetailsRules.cleanIfsc(bankIfsc),
+        if (bankUpi.trim().isNotEmpty) 'bank_upi_id': bankUpi.replaceAll(RegExp(r'\s'), ''),
       };
 }
 

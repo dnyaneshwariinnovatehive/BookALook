@@ -46,7 +46,7 @@ export interface LegalDocument {
 // ---------------------------------------------------------------- shared bits
 
 const ALL_RELATED: RelatedLink[] = [
-  { href: '/about', label: 'About BooKalook' },
+  { href: '/about', label: 'About BookALook' },
   { href: '/terms', label: 'Terms of Use' },
   { href: '/privacy', label: 'Privacy Policy' },
   { href: '/cancellation-refund', label: 'Cancellation & Refund Policy' },
@@ -67,16 +67,16 @@ const CONTACT_BLOCKS: LegalBlock[] = [
 export const TERMS_OF_USE: LegalDocument = {
   slug: 'terms',
   title: 'Terms of Use',
-  kicker: 'BooKalook',
+  kicker: 'BookALook',
   summary:
-    'These Terms of Use govern your access to and use of the BooKalook.in website, mobile application and related services.',
+    'These Terms of Use govern your access to and use of the BookALook.in website, mobile application and related services.',
   related: ALL_RELATED,
   sections: [
     {
       heading: 'A. Introduction',
       blocks: [
         {
-          text: 'Welcome to BooKalook.in ("Company", "we", "our", "us"). These Terms of Use ("Terms") govern your access to and use of our website, mobile application, and related services (collectively, the "Platform") that enable users to discover, schedule, and manage appointments with salons and beauty parlours ("Services").',
+          text: 'Welcome to BookALook.in ("Company", "we", "our", "us"). These Terms of Use ("Terms") govern your access to and use of our website, mobile application, and related services (collectively, the "Platform") that enable users to discover, schedule, and manage appointments with salons and beauty parlours ("Services").',
         },
         {
           text: 'By accessing or using the Platform, you agree to be bound by these Terms and our Privacy Policy. If you do not agree, you must not use or access the Platform.',
@@ -95,7 +95,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'C. Platform Overview',
       blocks: [
         {
-          text: 'BooKalook.in provides an online appointment booking and discovery platform for salons, spas, and beauty parlours. The Platform connects users seeking grooming or beauty services ("Customers") with independent salon owners or professionals ("Service Providers").',
+          text: 'BookALook.in provides an online appointment booking and discovery platform for salons, spas, and beauty parlours. The Platform connects users seeking grooming or beauty services ("Customers") with independent salon owners or professionals ("Service Providers").',
         },
         {
           text: 'We do not own, operate, or control any salon or service listed on the Platform. Each Service Provider is solely responsible for its services, staff, pricing, availability, and quality standards.',
@@ -115,15 +115,15 @@ export const TERMS_OF_USE: LegalDocument = {
           text: 'You agree to immediately notify us of any unauthorised access or use of your account.',
         },
         {
-          text: 'BooKalook.in reserves the right to suspend or terminate accounts suspected of misuse, fraudulent activity, or violation of these Terms.',
+          text: 'BookALook.in reserves the right to suspend or terminate accounts suspected of misuse, fraudulent activity, or violation of these Terms.',
         },
       ],
     },
     {
-      heading: 'E. Role of BooKalook.in',
+      heading: 'E. Role of BookALook.in',
       blocks: [
         {
-          text: 'BooKalook.in acts solely as a facilitator and intermediary between Customers and Service Providers.',
+          text: 'BookALook.in acts solely as a facilitator and intermediary between Customers and Service Providers.',
         },
         { text: 'All bookings are directly between the Customer and the Service Provider.' },
         { text: 'The Company is not responsible for:' },
@@ -185,7 +185,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'I. Content and Intellectual Property',
       blocks: [
         {
-          text: 'All content on the Platform — including text, graphics, images, logos, software, and layout — is the exclusive property of BooKalook.in or its licensors and is protected under applicable copyright and trademark laws.',
+          text: 'All content on the Platform — including text, graphics, images, logos, software, and layout — is the exclusive property of BookALook.in or its licensors and is protected under applicable copyright and trademark laws.',
         },
         {
           text: 'You may not copy, reproduce, modify, distribute or create derivative works from the Platform without prior written consent.',
@@ -199,7 +199,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'J. Third-Party Services',
       blocks: [
         {
-          text: 'The Platform may contain links to third-party websites or integrate services from third-party providers (including payment gateways, analytics tools, etc.). BooKalook.in is not responsible for the content, terms, or privacy practices of such third parties.',
+          text: 'The Platform may contain links to third-party websites or integrate services from third-party providers (including payment gateways, analytics tools, etc.). BookALook.in is not responsible for the content, terms, or privacy practices of such third parties.',
         },
       ],
     },
@@ -222,7 +222,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'L. Limitation of Liability',
       blocks: [
         {
-          text: 'To the fullest extent permitted by law, BooKalook.in shall not be liable for any direct, indirect, incidental, consequential, or punitive damages arising out of or relating to:',
+          text: 'To the fullest extent permitted by law, BookALook.in shall not be liable for any direct, indirect, incidental, consequential, or punitive damages arising out of or relating to:',
         },
         {
           bullets: [
@@ -240,7 +240,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'M. Indemnification',
       blocks: [
         {
-          text: 'You agree to indemnify, defend and hold harmless BooKalook.in, its partners, employees, affiliates, and service providers from any claims, liabilities, damages, or expenses (including legal fees) arising from your use of the Platform or violation of these Terms.',
+          text: 'You agree to indemnify, defend and hold harmless BookALook.in, its partners, employees, affiliates, and service providers from any claims, liabilities, damages, or expenses (including legal fees) arising from your use of the Platform or violation of these Terms.',
         },
       ],
     },
@@ -256,7 +256,7 @@ export const TERMS_OF_USE: LegalDocument = {
       heading: 'O. Modifications to Terms',
       blocks: [
         {
-          text: 'BooKalook.in reserves the right to amend or update these Terms from time to time. Updated versions will be posted on the Platform with an effective date. Continued use of the Platform constitutes your acceptance of the revised Terms.',
+          text: 'BookALook.in reserves the right to amend or update these Terms from time to time. Updated versions will be posted on the Platform with an effective date. Continued use of the Platform constitutes your acceptance of the revised Terms.',
         },
       ],
     },
@@ -283,16 +283,16 @@ export const TERMS_OF_USE: LegalDocument = {
 export const PRIVACY_POLICY: LegalDocument = {
   slug: 'privacy',
   title: 'Privacy Policy',
-  kicker: 'BooKalook',
+  kicker: 'BookALook',
   summary:
-    'This Privacy Policy sets out how BooKalook.in collects, uses, discloses and protects your personal information, in accordance with applicable laws of India.',
+    'This Privacy Policy sets out how BookALook.in collects, uses, discloses and protects your personal information, in accordance with applicable laws of India.',
   related: ALL_RELATED,
   sections: [
     {
       heading: 'A. Introduction',
       blocks: [
         {
-          text: 'BooKalook.in ("Company", "we", "our", "us") recognises the importance of the privacy of its users ("you", "your", "User") and the confidentiality of the information that you provide in the use of our website, platform, and related services (collectively, the "Platform"). This Privacy Policy sets out the practices for collection, use, disclosure and protection of your Personal Information in accordance with applicable laws of India.',
+          text: 'BookALook.in ("Company", "we", "our", "us") recognises the importance of the privacy of its users ("you", "your", "User") and the confidentiality of the information that you provide in the use of our website, platform, and related services (collectively, the "Platform"). This Privacy Policy sets out the practices for collection, use, disclosure and protection of your Personal Information in accordance with applicable laws of India.',
         },
         {
           text: 'By accessing or using our Platform, you agree to the terms and conditions of this Privacy Policy. If you do not agree with this Privacy Policy, please discontinue use of the Platform immediately.',
@@ -471,19 +471,19 @@ export const PRIVACY_POLICY: LegalDocument = {
 export const CANCELLATION_REFUND_POLICY: LegalDocument = {
   slug: 'cancellation-refund',
   title: 'Cancellation & Refund Policy',
-  kicker: 'BooKalook',
+  kicker: 'BookALook',
   summary:
-    'How cancellations, rescheduling and refunds work for appointments booked through BooKalook.in.',
+    'How cancellations, rescheduling and refunds work for appointments booked through BookALook.in.',
   related: ALL_RELATED,
   sections: [
     {
       heading: 'A. Introduction',
       blocks: [
         {
-          text: 'This Cancellation and Refund Policy ("Policy") describes the terms under which BooKalook.in ("Company", "we", "our", "us") permits cancellation, rescheduling, and refund of appointments booked through our website or mobile application ("Platform").',
+          text: 'This Cancellation and Refund Policy ("Policy") describes the terms under which BookALook.in ("Company", "we", "our", "us") permits cancellation, rescheduling, and refund of appointments booked through our website or mobile application ("Platform").',
         },
         {
-          text: 'By booking an appointment via BooKalook.in, the user ("Customer", "you", "your") acknowledges and agrees to the terms stated herein.',
+          text: 'By booking an appointment via BookALook.in, the user ("Customer", "you", "your") acknowledges and agrees to the terms stated herein.',
         },
       ],
     },
@@ -506,7 +506,7 @@ export const CANCELLATION_REFUND_POLICY: LegalDocument = {
         },
         { lead: 'Platform Cancellations' },
         {
-          text: 'BooKalook.in reserves the right to cancel a booking for operational, technical, or compliance reasons. In such cases, a full refund shall be processed to the original payment method.',
+          text: 'BookALook.in reserves the right to cancel a booking for operational, technical, or compliance reasons. In such cases, a full refund shall be processed to the original payment method.',
         },
       ],
     },
@@ -557,7 +557,7 @@ export const CANCELLATION_REFUND_POLICY: LegalDocument = {
       heading: 'F. Special Conditions / Force Majeure',
       blocks: [
         {
-          text: "In case of unforeseen circumstances such as natural disasters, government restrictions, internet outages, or technical failures beyond the Company's control, BooKalook.in reserves the right to cancel or reschedule bookings without liability. Refund eligibility in such cases shall be determined at the Company's sole discretion.",
+          text: "In case of unforeseen circumstances such as natural disasters, government restrictions, internet outages, or technical failures beyond the Company's control, BookALook.in reserves the right to cancel or reschedule bookings without liability. Refund eligibility in such cases shall be determined at the Company's sole discretion.",
         },
       ],
     },
@@ -573,7 +573,7 @@ export const CANCELLATION_REFUND_POLICY: LegalDocument = {
       heading: 'H. Modification of Policy',
       blocks: [
         {
-          text: 'BooKalook.in reserves the right to modify, amend, or update this Policy at any time without prior notice. The updated Policy shall be posted on the Platform with a revised effective date. Your continued use of the Platform after such updates constitutes acceptance of the revised terms.',
+          text: 'BookALook.in reserves the right to modify, amend, or update this Policy at any time without prior notice. The updated Policy shall be posted on the Platform with a revised effective date. Your continued use of the Platform after such updates constitutes acceptance of the revised terms.',
         },
       ],
     },
@@ -593,19 +593,19 @@ export const CANCELLATION_REFUND_POLICY: LegalDocument = {
 export const PARTNER_TERMS: LegalDocument = {
   slug: 'partner-terms',
   title: 'Partner Terms & Conditions',
-  kicker: 'BooKalook for Salons',
+  kicker: 'BookALook for Salons',
   summary:
-    'The agreement between BooKalook.in and every salon, parlour or individual stylist who lists and provides services on the platform.',
+    'The agreement between BookALook.in and every salon, parlour or individual stylist who lists and provides services on the platform.',
   related: ALL_RELATED,
   sections: [
     {
       heading: '1. Introduction',
       blocks: [
         {
-          text: 'These Partner Terms and Conditions ("Agreement") govern the relationship between BooKalook.in ("Platform", "Company", "We", "Our", "Us") and each salon, parlour, or individual stylist ("Partner", "You", "Your") who lists and provides services through the BooKalook.in platform.',
+          text: 'These Partner Terms and Conditions ("Agreement") govern the relationship between BookALook.in ("Platform", "Company", "We", "Our", "Us") and each salon, parlour, or individual stylist ("Partner", "You", "Your") who lists and provides services through the BookALook.in platform.',
         },
         {
-          text: 'By registering as a Partner, You acknowledge that You have read, understood, and agreed to be bound by the terms of this Agreement, the Privacy Policy, and the general Terms of Use available on BooKalook.in.',
+          text: 'By registering as a Partner, You acknowledge that You have read, understood, and agreed to be bound by the terms of this Agreement, the Privacy Policy, and the general Terms of Use available on BookALook.in.',
         },
       ],
     },
@@ -616,7 +616,7 @@ export const PARTNER_TERMS: LegalDocument = {
           text: 'Partners must provide accurate and verifiable details during registration, including business name, address, GST number, and owner identification.',
         },
         {
-          text: 'BooKalook.in reserves the right to verify such information and approve or reject onboarding requests at its discretion.',
+          text: 'BookALook.in reserves the right to verify such information and approve or reject onboarding requests at its discretion.',
         },
         {
           text: 'The Partner shall be responsible for maintaining and updating its information to ensure it remains true and accurate at all times.',
@@ -630,7 +630,7 @@ export const PARTNER_TERMS: LegalDocument = {
           text: 'Partners are solely responsible for the accuracy of their service descriptions, prices, offers, and images displayed on the platform.',
         },
         {
-          text: 'BooKalook.in shall not be liable for any misrepresentation or outdated information provided by the Partner.',
+          text: 'BookALook.in shall not be liable for any misrepresentation or outdated information provided by the Partner.',
         },
         {
           text: 'Partners must update their service availability regularly to prevent double bookings or schedule conflicts.',
@@ -642,7 +642,7 @@ export const PARTNER_TERMS: LegalDocument = {
       blocks: [
         { text: 'Partners agree to honour all confirmed bookings received through the platform.' },
         {
-          text: 'Any cancellation by the Partner must be immediately communicated to both the customer and BooKalook.in.',
+          text: 'Any cancellation by the Partner must be immediately communicated to both the customer and BookALook.in.',
         },
         {
           text: 'Repeated cancellations, delays, or customer complaints may lead to temporary suspension or permanent delisting from the platform.',
@@ -653,7 +653,7 @@ export const PARTNER_TERMS: LegalDocument = {
       heading: '5. Fees, Commissions & Subscriptions',
       blocks: [
         {
-          text: 'BooKalook.in may charge subscription fees or commissions on bookings made through the platform.',
+          text: 'BookALook.in may charge subscription fees or commissions on bookings made through the platform.',
         },
         {
           text: 'The applicable commission or subscription structure will be communicated via the Partner Dashboard or onboarding process.',
@@ -670,10 +670,10 @@ export const PARTNER_TERMS: LegalDocument = {
           text: 'Payments to Partners will be made after deducting platform commissions, taxes, and other applicable charges.',
         },
         {
-          text: 'Settlements will occur on a defined payment cycle as communicated by BooKalook.in.',
+          text: 'Settlements will occur on a defined payment cycle as communicated by BookALook.in.',
         },
         {
-          text: 'BooKalook.in shall not be liable for delays arising from banking networks, Razorpay, or other payment intermediaries.',
+          text: 'BookALook.in shall not be liable for delays arising from banking networks, Razorpay, or other payment intermediaries.',
         },
       ],
     },
@@ -691,7 +691,7 @@ export const PARTNER_TERMS: LegalDocument = {
           ],
         },
         {
-          text: 'BooKalook.in may remove any Partner who fails to maintain the required quality standards.',
+          text: 'BookALook.in may remove any Partner who fails to maintain the required quality standards.',
         },
       ],
     },
@@ -700,7 +700,7 @@ export const PARTNER_TERMS: LegalDocument = {
       blocks: [
         { text: 'Customers can rate and review Partner services on the platform.' },
         {
-          text: 'BooKalook.in reserves the right to display, remove, or moderate reviews at its discretion.',
+          text: 'BookALook.in reserves the right to display, remove, or moderate reviews at its discretion.',
         },
         {
           text: 'Repeated negative feedback or verified complaints may result in suspension or delisting.',
@@ -711,10 +711,10 @@ export const PARTNER_TERMS: LegalDocument = {
       heading: '9. Intellectual Property',
       blocks: [
         {
-          text: 'Partners grant BooKalook.in a non-exclusive, royalty-free licence to use their business name, logo, photos, and descriptions for marketing and listing purposes.',
+          text: 'Partners grant BookALook.in a non-exclusive, royalty-free licence to use their business name, logo, photos, and descriptions for marketing and listing purposes.',
         },
         {
-          text: "Partners shall not use BooKalook.in's name, logo, or brand assets without prior written consent.",
+          text: "Partners shall not use BookALook.in's name, logo, or brand assets without prior written consent.",
         },
       ],
     },
@@ -723,7 +723,7 @@ export const PARTNER_TERMS: LegalDocument = {
       blocks: [
         { text: "Either party may terminate this Agreement with 30 days' written notice." },
         {
-          text: 'BooKalook.in may terminate immediately for material breaches, fraud, or repeated service failures.',
+          text: 'BookALook.in may terminate immediately for material breaches, fraud, or repeated service failures.',
         },
         { text: 'Upon termination, all outstanding dues must be settled before account closure.' },
       ],
@@ -732,7 +732,7 @@ export const PARTNER_TERMS: LegalDocument = {
       heading: '11. Indemnity & Liability',
       blocks: [
         {
-          text: 'The Partner agrees to indemnify and hold BooKalook.in harmless from any claims, damages, or losses arising out of:',
+          text: 'The Partner agrees to indemnify and hold BookALook.in harmless from any claims, damages, or losses arising out of:',
         },
         {
           bullets: [
@@ -742,7 +742,7 @@ export const PARTNER_TERMS: LegalDocument = {
           ],
         },
         {
-          text: "BooKalook.in's liability under this Agreement shall be limited to the amount of commission earned from the disputed transaction.",
+          text: "BookALook.in's liability under this Agreement shall be limited to the amount of commission earned from the disputed transaction.",
         },
       ],
     },
@@ -759,7 +759,7 @@ export const PARTNER_TERMS: LegalDocument = {
       blocks: [
         { text: 'Partners must maintain punctuality, hygiene, and professional conduct at all times.' },
         {
-          text: 'BooKalook.in may conduct quality checks and customer surveys to ensure service standards.',
+          text: 'BookALook.in may conduct quality checks and customer surveys to ensure service standards.',
         },
         {
           text: 'Breach of SLA terms may result in penalties, temporary suspension, or removal from the platform.',
@@ -770,7 +770,7 @@ export const PARTNER_TERMS: LegalDocument = {
       heading: '14. Non-Solicitation & Platform Integrity',
       blocks: [
         {
-          text: "Partners shall not directly approach, solicit, or induce BooKalook.in customers to transact outside the platform.",
+          text: "Partners shall not directly approach, solicit, or induce BookALook.in customers to transact outside the platform.",
         },
         {
           text: 'Any circumvention of platform booking, manipulation of pricing, or fee avoidance shall constitute a material breach, leading to termination and potential damages recovery.',
@@ -787,7 +787,7 @@ export const PARTNER_TERMS: LegalDocument = {
           text: 'Partners may use customer data only for service fulfilment, not for direct marketing or third-party sharing.',
         },
         {
-          text: 'BooKalook.in will handle partner data in compliance with applicable Indian data protection and IT laws.',
+          text: 'BookALook.in will handle partner data in compliance with applicable Indian data protection and IT laws.',
         },
       ],
     },
@@ -817,24 +817,24 @@ export const PARTNER_TERMS: LegalDocument = {
 
 export const ABOUT: LegalDocument = {
   slug: 'about',
-  title: 'About BooKalook',
+  title: 'About BookALook',
   kicker: 'India’s Smarter Way to Book Salon Appointments',
   summary:
-    'BooKalook is a modern online salon booking platform that helps customers discover trusted salons, book appointments instantly, and arrive at their scheduled time without unnecessary waiting.',
+    'BookALook is a modern online salon booking platform that helps customers discover trusted salons, book appointments instantly, and arrive at their scheduled time without unnecessary waiting.',
   related: ALL_RELATED,
   sections: [
     {
-      heading: 'Why We Started BooKalook',
+      heading: 'Why We Started BookALook',
       blocks: [
         {
-          text: 'At BooKalook, we believe your time is valuable. Standing in long salon queues or making multiple phone calls to check availability shouldn’t be part of your grooming experience.',
+          text: 'At BookALook, we believe your time is valuable. Standing in long salon queues or making multiple phone calls to check availability shouldn’t be part of your grooming experience.',
         },
         {
-          text: 'BooKalook is a modern online salon booking platform that helps customers discover trusted salons, book appointments instantly, and arrive at their scheduled time without unnecessary waiting. Our mission is simple:',
+          text: 'BookALook is a modern online salon booking platform that helps customers discover trusted salons, book appointments instantly, and arrive at their scheduled time without unnecessary waiting. Our mission is simple:',
         },
         { text: 'No Waiting. Just Booking.' },
         {
-          text: 'Whether you’re planning a quick haircut, beard styling, facial, hair spa, or any grooming service, BooKalook makes the entire booking process fast, simple, and reliable.',
+          text: 'Whether you’re planning a quick haircut, beard styling, facial, hair spa, or any grooming service, BookALook makes the entire booking process fast, simple, and reliable.',
         },
       ],
     },
@@ -852,15 +852,15 @@ export const ABOUT: LegalDocument = {
           ],
         },
         {
-          text: 'We created BooKalook to solve these everyday problems through technology that benefits both customers and salon businesses. Instead of waiting in crowded salons, customers can reserve their preferred time slot in advance and enjoy a smoother, more organized experience.',
+          text: 'We created BookALook to solve these everyday problems through technology that benefits both customers and salon businesses. Instead of waiting in crowded salons, customers can reserve their preferred time slot in advance and enjoy a smoother, more organized experience.',
         },
       ],
     },
     {
-      heading: 'What Makes BooKalook Different?',
+      heading: 'What Makes BookALook Different?',
       blocks: [
         {
-          text: 'Unlike traditional salon directories or discount-focused platforms, BooKalook is built around time management and customer convenience. Our platform offers:',
+          text: 'Unlike traditional salon directories or discount-focused platforms, BookALook is built around time management and customer convenience. Our platform offers:',
         },
         {
           bullets: [
@@ -879,7 +879,7 @@ export const ABOUT: LegalDocument = {
     {
       heading: 'For Customers',
       blocks: [
-        { text: 'BooKalook makes salon visits easier than ever. With just a few clicks, you can:' },
+        { text: 'BookALook makes salon visits easier than ever. With just a few clicks, you can:' },
         {
           bullets: [
             'Find nearby salons',
@@ -896,7 +896,7 @@ export const ABOUT: LegalDocument = {
       heading: 'For Salon Partners',
       blocks: [
         {
-          text: 'BooKalook is more than a booking platform — it’s a digital growth partner for salons. Our platform helps salon owners:',
+          text: 'BookALook is more than a booking platform — it’s a digital growth partner for salons. Our platform helps salon owners:',
         },
         {
           bullets: [
@@ -910,7 +910,7 @@ export const ABOUT: LegalDocument = {
           ],
         },
         {
-          text: 'Whether you operate a small neighborhood salon or multiple branches, BooKalook is designed to simplify operations and support business growth.',
+          text: 'Whether you operate a small neighborhood salon or multiple branches, BookALook is designed to simplify operations and support business growth.',
         },
       ],
     },
@@ -937,7 +937,7 @@ export const ABOUT: LegalDocument = {
     {
       heading: 'Powered by Technology',
       blocks: [
-        { text: 'BooKalook combines modern technology with everyday convenience. Our platform includes:' },
+        { text: 'BookALook combines modern technology with everyday convenience. Our platform includes:' },
         {
           bullets: [
             'Smart appointment scheduling',
@@ -954,10 +954,10 @@ export const ABOUT: LegalDocument = {
       ],
     },
     {
-      heading: 'Join the BooKalook Community',
+      heading: 'Join the BookALook Community',
       blocks: [
         {
-          text: 'Whether you’re looking for your next haircut or want to grow your salon business, BooKalook is here to make the experience effortless.',
+          text: 'Whether you’re looking for your next haircut or want to grow your salon business, BookALook is here to make the experience effortless.',
         },
         {
           text: 'Discover trusted salons, book your preferred time, skip the waiting, and enjoy a smarter way to manage your grooming appointments.',

@@ -131,7 +131,7 @@ class HelpSupportScreen extends StatelessWidget {
           const SizedBox(height: 28),
           Center(
             child: Text(
-              'BooKalook',
+              'BookALook',
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

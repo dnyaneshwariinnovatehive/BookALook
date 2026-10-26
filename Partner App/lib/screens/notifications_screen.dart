@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../services/notification_service.dart';
+import '../widgets/notification_inbox_controls.dart';
 
 /// The salon owner's inbox. A superadmin warning is the message that matters
 /// most here, so it is rendered as a distinct amber notice rather than a
 /// plain entry — the owner should not be able to scroll past it.
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  /// Test seams; default to the real API.
+  final Future<Map<String, dynamic>> Function({String? period})? fetch;
+  final Future<void> Function(String id)? delete;
+  final Future<int> Function({String? period})? deleteMany;
+
+  const NotificationsScreen({super.key, this.fetch, this.delete, this.deleteMany});
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -17,6 +23,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   String _error = '';
+  NotificationPeriod _period = NotificationPeriod.all;
+  bool _deleting = false;
+  int _restoreTick = 0;
 
   static const List<String> _warningTypes = ['complaint_warning'];
 
@@ -30,7 +39,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _load() async {
     try {
-      final data = await PartnerNotificationService.fetch();
+      final data = await (widget.fetch ?? ({String? period}) => PartnerNotificationService.fetch(period: period))(
+        period: _period.apiValue,
+      );
       if (!mounted) return;
       setState(() {
         _notifications = (data['notifications'] ?? [])
@@ -52,6 +63,59 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       await PartnerNotificationService.markAllRead();
     } catch (_) {}
     _load();
+  }
+
+  void _setPeriod(NotificationPeriod period) {
+    if (period == _period) return;
+    setState(() {
+      _period = period;
+      _isLoading = true;
+      _error = '';
+    });
+    _load();
+  }
+
+  /// Swiped away: gone from the list at once, put back if the server refuses.
+  Future<void> _deleteOne(Map<String, dynamic> notification) async {
+    final index = _notifications.indexOf(notification);
+    setState(() => _notifications.remove(notification));
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await (widget.delete ?? PartnerNotificationService.delete)(notification['id'].toString());
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Notification deleted'), duration: Duration(seconds: 2)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        // A fresh key: the swiped-away row cannot be reused once dismissed.
+        _restoreTick++;
+        _notifications.insert(index.clamp(0, _notifications.length), notification);
+      });
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notification. Try again.')));
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    if (_deleting || _notifications.isEmpty) return;
+    final ok = await confirmDeleteNotifications(context, count: _notifications.length, period: _period);
+    if (!ok || !mounted) return;
+
+    setState(() => _deleting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final deleted = await (widget.deleteMany ?? ({String? period}) => PartnerNotificationService.deleteMany(period: period))(
+        period: _period.apiValue,
+      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text('$deleted notification${deleted == 1 ? '' : 's'} deleted')));
+      await _load();
+    } catch (_) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notifications. Try again.')));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
   }
 
   Future<void> _open(Map<String, dynamic> notification) async {
@@ -85,7 +149,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       fontWeight: FontWeight.w600,
                       color: AppTheme.accentColor)),
             ),
+          if (_notifications.isNotEmpty)
+            IconButton(
+              key: const ValueKey('notifications_delete_all'),
+              tooltip: 'Delete notifications',
+              onPressed: _deleting ? null : _deleteAll,
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: NotificationPeriodChips(selected: _period, onChanged: _setPeriod),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
@@ -105,8 +180,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         itemCount: _notifications.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) =>
-                            _buildTile(_notifications[index], theme, isDark),
+                        itemBuilder: (context, index) {
+                          final n = _notifications[index];
+                          return DeletableNotification(
+                            id: '${n['id']}#$_restoreTick',
+                            onDelete: () => _deleteOne(n),
+                            child: _buildTile(n, theme, isDark),
+                          );
+                        },
                       ),
                     ),
     );
@@ -123,7 +204,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? AppTheme.darkTextLight
                   : AppTheme.lightTextLight),
           const SizedBox(height: 12),
-          Text('No messages yet',
+          Text(_period == NotificationPeriod.all ? 'No messages yet' : 'Nothing from ${_period.label.toLowerCase()}',
               style: TextStyle(
                   fontSize: 16,
                   color: theme.brightness == Brightness.dark

@@ -18,6 +18,7 @@ import 'package:partner_app/screens/dashboard/more/salon_reviews_screen.dart';
 import 'package:partner_app/screens/dashboard/more/insights_screen.dart';
 import 'package:partner_app/screens/dashboard/more/payroll_screen.dart';
 import 'package:partner_app/screens/dashboard/more/salon_payouts_screen.dart';
+import 'package:partner_app/screens/dashboard/more/bank_details_screen.dart';
 import 'package:partner_app/screens/dashboard/more/edit_salon_profile_screen.dart';
 import 'package:partner_app/screens/dashboard/more/salon_offers_screen.dart';
 import 'package:partner_app/screens/dashboard/more/upgrade_plan_screen.dart';
@@ -488,6 +489,32 @@ class MoreMenuCatalog {
                 MaterialPageRoute(
                   builder: (_) =>
                       SalonPayoutsScreen(salonId: salonData['id'].toString()),
+                ),
+              );
+            },
+          ),
+          MoreMenuItem(
+            id: 'bank_details',
+            title: 'Bank Details',
+            category: 'Payments & payroll',
+            subtitle: 'Where BookALook sends your settlements',
+            icon: Icons.account_balance_wallet_outlined,
+            iconColor: Colors.teal,
+            keywords: const [
+              'bank',
+              'bank details',
+              'bank account',
+              'account number',
+              'ifsc',
+              'upi',
+              'settlement account',
+              'payout account',
+            ],
+            onSelect: (ctx, salonData, _) async {
+              await Navigator.push(
+                ctx,
+                MaterialPageRoute(
+                  builder: (_) => BankDetailsScreen(salonId: salonData['id'].toString()),
                 ),
               );
             },

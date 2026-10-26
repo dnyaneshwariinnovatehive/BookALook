@@ -104,6 +104,7 @@ class SalonOnboardingService
                 $this->writeServices($salon, $payload['services'] ?? [], true);
             }
             $this->storePhotos($salon, $collaborator, $photos, (int) ($payload['cover_index'] ?? 0));
+            $this->writeBankDetails($salon, $collaborator, $payload, $enquiry);
 
             // The enquiry's job is done the moment the salon exists. Whether it
             // is approved is the salon's status to carry, not the enquiry's.
@@ -159,6 +160,7 @@ class SalonOnboardingService
                 $this->writeServices($salon, $payload['services'] ?? [], true);
             }
             $this->storePhotos($salon, $collaborator, $photos, (int) ($payload['cover_index'] ?? 0));
+            $this->writeBankDetails($salon, $collaborator, $payload);
 
             return [
                 'salon' => $salon->fresh()->load('city:id,name,state'),
@@ -250,6 +252,26 @@ class SalonOnboardingService
         ]);
 
         return $salon;
+    }
+
+    /**
+     * Bank details typed by the collaborator win; otherwise whatever the owner
+     * gave on the website form carries over. Neither is required.
+     */
+    private function writeBankDetails(Salon $salon, User $collaborator, array $payload, ?SalonEnquiry $enquiry = null): void
+    {
+        $bank = app(BankDetailsService::class);
+        $typed = $payload['bank_details'] ?? [];
+
+        if ($typed !== []) {
+            $bank->apply($salon, $typed, $collaborator);
+
+            return;
+        }
+
+        if ($enquiry) {
+            $bank->carryFromEnquiry($enquiry, $salon, $collaborator);
+        }
     }
 
     /** @return array<string, mixed> */

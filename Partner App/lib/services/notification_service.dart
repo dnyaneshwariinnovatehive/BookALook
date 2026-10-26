@@ -19,9 +19,10 @@ class PartnerNotificationService {
   }
 
   /// Returns `{notifications: [...], unread_count: n}`.
-  static Future<Map<String, dynamic>> fetch({int limit = 50}) async {
+  /// [period] narrows to `today`, `yesterday`, `week` or `month`.
+  static Future<Map<String, dynamic>> fetch({int limit = 50, String? period}) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/notifications?limit=$limit'),
+      Uri.parse('$baseUrl/notifications?limit=$limit${period == null ? '' : '&period=$period'}'),
       headers: await _getHeaders(),
     );
 
@@ -41,6 +42,26 @@ class PartnerNotificationService {
       Uri.parse('$baseUrl/notifications/$id/read'),
       headers: await _getHeaders(),
     );
+  }
+
+  /// Delete one notification. Throws if the server did not confirm it.
+  static Future<void> delete(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/notifications/$id'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode != 200) throw Exception('Could not delete the notification.');
+  }
+
+  /// Delete every notification in [period], or all of them. Returns how many.
+  static Future<int> deleteMany({String? period}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/notifications/delete'),
+      headers: await _getHeaders(),
+      body: jsonEncode(period == null ? {'all': true} : {'period': period}),
+    );
+    if (response.statusCode != 200) throw Exception('Could not delete the notifications.');
+    return ((jsonDecode(response.body) as Map)['deleted'] as num?)?.toInt() ?? 0;
   }
 
   static Future<void> markAllRead() async {

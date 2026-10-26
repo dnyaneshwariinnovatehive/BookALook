@@ -20,14 +20,14 @@ class NotificationService {
 
   /// Returns `{notifications: [...], unread_count: n}`. Guests have no inbox,
   /// so an unauthenticated read is an empty one rather than an error.
-  Future<Map<String, dynamic>> fetch() async {
+  Future<Map<String, dynamic>> fetch({String? period}) async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getString('auth_token') == null) {
       return {'notifications': [], 'unread_count': 0};
     }
 
     final response = await http.get(
-      Uri.parse('$baseUrl/customer/notifications'),
+      Uri.parse('$baseUrl/customer/notifications${period == null ? '' : '?period=$period'}'),
       headers: await _headers(),
     );
 
@@ -42,6 +42,26 @@ class NotificationService {
       Uri.parse('$baseUrl/customer/notifications/$id/read'),
       headers: await _headers(),
     );
+  }
+
+  /// Delete one notification. Throws if the server did not confirm it.
+  Future<void> delete(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/customer/notifications/$id'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) throw Exception('Could not delete the notification.');
+  }
+
+  /// Delete every notification in [period], or all of them. Returns how many.
+  Future<int> deleteMany({String? period}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/customer/notifications/delete'),
+      headers: await _headers(),
+      body: jsonEncode(period == null ? {'all': true} : {'period': period}),
+    );
+    if (response.statusCode != 200) throw Exception('Could not delete the notifications.');
+    return ((jsonDecode(response.body) as Map)['deleted'] as num?)?.toInt() ?? 0;
   }
 
   Future<void> markAllRead() async {

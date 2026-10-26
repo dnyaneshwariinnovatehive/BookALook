@@ -212,6 +212,39 @@ class AuthService {
     return prefs.getString('auth_token');
   }
 
+  /// Whether a stored token still signs the customer in.
+  ///
+  /// `true` when the server accepts it, `false` when it rejects it (401), and
+  /// `null` when it could not tell — offline, slow, or a server error. Only a
+  /// clear rejection should end the session; being offline must not log
+  /// anyone out.
+  static Future<bool?> checkSession(String token) async {
+    try {
+      final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
+      final response = await http
+          .get(
+            Uri.parse('$apiBaseUrl/customer/profile'),
+            headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
+            redirectOn401: false,
+          )
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) return true;
+      if (response.statusCode == 401) return false;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Forget a token the server no longer accepts, without the logout call
+  /// (which would only be refused too).
+  static Future<void> clearStaleSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await AudienceService.forget();
+  }
+
   /// Deletes the customer account securely.
   Future<bool> deleteAccount() async {
     final token = await getToken();

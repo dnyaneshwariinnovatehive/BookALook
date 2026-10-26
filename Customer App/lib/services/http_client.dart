@@ -115,8 +115,18 @@ Future<void> _handle426(http_real.Response response) async {
 }
 
 /// Sends the customer to the login screen when a request comes back unauthorised.
-Future<void> _handle401(http_real.Response response) async {
+Future<void> _handle401(http_real.Response response, Map<String, String> sentHeaders) async {
   if (response.statusCode != 401) return;
+
+  // Only a request that carried a session can mean the session expired. A
+  // guest browsing without an account gets a 401 from anything that needs
+  // one, and throwing them to the login screen for it took over the app on
+  // first launch, right on top of the location prompt.
+  final authorization = sentHeaders.entries
+      .where((h) => h.key.toLowerCase() == 'authorization')
+      .map((h) => h.value)
+      .join();
+  if (authorization.trim().isEmpty) return;
 
   if (!AuthService.beginSessionExpiryRedirect()) return;
 
@@ -146,11 +156,11 @@ Future<void> _handle401(http_real.Response response) async {
   );
 }
 
-Future<http_real.Response> get(Uri url, {Map<String, String>? headers}) async {
+Future<http_real.Response> get(Uri url, {Map<String, String>? headers, bool redirectOn401 = true}) async {
   final effectiveHeaders = await _mergeAppVersionHeaders(headers);
   final response = await _client.get(url, headers: effectiveHeaders);
   await _handle426(response);
-  await _handle401(response);
+  if (redirectOn401) await _handle401(response, effectiveHeaders);
   return response;
 }
 
@@ -164,7 +174,7 @@ Future<http_real.Response> post(
   final effectiveHeaders = await _mergeAppVersionHeaders(headers);
   final response = await _client.post(url, headers: effectiveHeaders, body: body, encoding: encoding);
   await _handle426(response);
-  if (redirectOn401) await _handle401(response);
+  if (redirectOn401) await _handle401(response, effectiveHeaders);
   return response;
 }
 
@@ -172,7 +182,7 @@ Future<http_real.Response> put(Uri url, {Map<String, String>? headers, Object? b
   final effectiveHeaders = await _mergeAppVersionHeaders(headers);
   final response = await _client.put(url, headers: effectiveHeaders, body: body, encoding: encoding);
   await _handle426(response);
-  await _handle401(response);
+  await _handle401(response, effectiveHeaders);
   return response;
 }
 
@@ -180,7 +190,7 @@ Future<http_real.Response> patch(Uri url, {Map<String, String>? headers, Object?
   final effectiveHeaders = await _mergeAppVersionHeaders(headers);
   final response = await _client.patch(url, headers: effectiveHeaders, body: body, encoding: encoding);
   await _handle426(response);
-  await _handle401(response);
+  await _handle401(response, effectiveHeaders);
   return response;
 }
 
@@ -188,6 +198,6 @@ Future<http_real.Response> delete(Uri url, {Map<String, String>? headers, Object
   final effectiveHeaders = await _mergeAppVersionHeaders(headers);
   final response = await _client.delete(url, headers: effectiveHeaders, body: body, encoding: encoding);
   await _handle426(response);
-  await _handle401(response);
+  await _handle401(response, effectiveHeaders);
   return response;
 }

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useConfirm } from '@/components/admin/ui';
 import StaffDetailsModal from './StaffDetailsModal';
+import BankDetailsPanel from './BankDetailsPanel';
 import styles from './page.module.css';
 
 interface Salon {
@@ -65,6 +66,23 @@ export default function SalonDirectoryDetail() {
 
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('Overview');
+  // Unsaved bank details are lost when the tab unmounts, so switching away asks.
+  const [bankDirty, setBankDirty] = useState(false);
+
+  const switchTab = async (tab: string) => {
+    if (tab === activeTab) return;
+    if (activeTab === 'Bank details' && bankDirty) {
+      const leave = await confirm({
+        title: 'Leave without saving?',
+        body: 'Your changes to the bank details have not been saved and will be lost.',
+        confirmLabel: 'Discard changes',
+        tone: 'danger',
+      });
+      if (!leave) return;
+      setBankDirty(false);
+    }
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
     async function fetchSalon() {
@@ -178,11 +196,11 @@ export default function SalonDirectoryDetail() {
         </div>
 
         <div className={styles.pageTabs}>
-          {['Overview', 'Collaborator', 'Staff', 'Catalog'].map(tab => (
+          {['Overview', 'Collaborator', 'Bank details', 'Staff', 'Catalog'].map(tab => (
             <button
               key={tab}
               className={`${styles.pageTab} ${activeTab === tab ? styles.pageTabActive : ''}`}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => switchTab(tab)}
             >
               {tab}
             </button>
@@ -302,6 +320,10 @@ export default function SalonDirectoryDetail() {
 
           {assignNote && <p className={styles.assignNote}>{assignNote}</p>}
         </div>
+      )}
+
+      {activeTab === 'Bank details' && (
+        <BankDetailsPanel salonId={salon.id} salonName={salon.name} onDirtyChange={setBankDirty} />
       )}
 
       {activeTab === 'Staff' && (

@@ -290,7 +290,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'By completing your profile you are creating a BooKalook account. '
+              'By completing your profile you are creating a BookALook account. '
               'We use your phone number, name and location to show you salons near you.',
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(

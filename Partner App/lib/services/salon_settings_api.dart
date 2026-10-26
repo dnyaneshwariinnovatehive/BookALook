@@ -37,7 +37,10 @@ class SalonSettingsApi {
     }
   }
 
-  static Future<void> updateWorkingHours(String salonId, List<SalonWorkingHour> hours) async {
+  /// Saves the salon's week. The server moves staff on salon hours to it,
+  /// trims custom shifts that no longer fit, and reports both those trims and
+  /// any booking now outside the hours.
+  static Future<WorkingHoursSaveResult> updateWorkingHours(String salonId, List<SalonWorkingHour> hours) async {
     final body = {
       'working_hours': hours.map((h) => h.toJson()).toList(),
     };
@@ -68,6 +71,12 @@ class SalonSettingsApi {
       } catch (_) {}
       throw Exception(errorMessage);
     }
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) return WorkingHoursSaveResult.fromJson(decoded);
+    } catch (_) {}
+    return const WorkingHoursSaveResult();
   }
 
   static Future<Map<String, dynamic>> updateSalonProfile({
@@ -147,5 +156,65 @@ class SalonSettingsApi {
     
     final json = jsonDecode(bodyStr);
     return json['salon'] as Map<String, dynamic>;
+  }
+}
+
+/// What saving the salon's hours did beyond saving them.
+class WorkingHoursSaveResult {
+  /// Custom shifts the server cut back to fit the new hours.
+  final List<TrimmedShift> trimmed;
+
+  /// Upcoming bookings now outside the hours, by day of week (0 = Sunday).
+  final Map<int, int> bookingsOutsideHours;
+
+  const WorkingHoursSaveResult({this.trimmed = const [], this.bookingsOutsideHours = const {}});
+
+  factory WorkingHoursSaveResult.fromJson(Map<String, dynamic> json) => WorkingHoursSaveResult(
+        trimmed: ((json['trimmed_shifts'] as List?) ?? [])
+            .whereType<Map>()
+            .map((e) => TrimmedShift.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+        bookingsOutsideHours: {
+          for (final e in ((json['bookings_outside_hours'] as List?) ?? []).whereType<Map>())
+            int.tryParse('${e['day_of_week']}') ?? 0: int.tryParse('${e['count']}') ?? 0,
+        },
+      );
+}
+
+class TrimmedShift {
+  final String providerId;
+  final String name;
+  final int dayOfWeek;
+  final String? fromStart;
+  final String? fromEnd;
+
+  /// Null when the day became a day off.
+  final String? toStart;
+  final String? toEnd;
+
+  const TrimmedShift({
+    required this.providerId,
+    required this.name,
+    required this.dayOfWeek,
+    this.fromStart,
+    this.fromEnd,
+    this.toStart,
+    this.toEnd,
+  });
+
+  bool get becameDayOff => toStart == null || toEnd == null;
+
+  factory TrimmedShift.fromJson(Map<String, dynamic> json) {
+    final from = (json['from'] as List?) ?? const [];
+    final to = (json['to'] as List?) ?? const [];
+    return TrimmedShift(
+      providerId: '${json['provider_id']}',
+      name: json['name']?.toString() ?? 'Staff',
+      dayOfWeek: int.tryParse('${json['day_of_week']}') ?? 0,
+      fromStart: from.isNotEmpty ? from[0]?.toString() : null,
+      fromEnd: from.length > 1 ? from[1]?.toString() : null,
+      toStart: to.isNotEmpty ? to[0]?.toString() : null,
+      toEnd: to.length > 1 ? to[1]?.toString() : null,
+    );
   }
 }

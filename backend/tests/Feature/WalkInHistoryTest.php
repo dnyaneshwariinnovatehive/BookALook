@@ -298,4 +298,17 @@ class WalkInHistoryTest extends TestCase
             ->getJson("/api/partner/salons/{$this->salon->id}/walk-in/history")
             ->assertStatus(403);
     }
+
+    /**
+     * The history eager-loads a few named invoice columns. SQLite reads an
+     * unknown double-quoted name as a string instead of failing, so a typo
+     * there (`total_amount` for `total`) passed here and broke the whole
+     * history on PostgreSQL. Pin the names to the real table.
+     */
+    public function test_the_invoice_columns_it_reads_exist(): void
+    {
+        $this->assertTrue(
+            \Illuminate\Support\Facades\Schema::hasColumns('invoices', ['id', 'appointment_id', 'invoice_number', 'total', 'pdf_url'])
+        );
+    }
 }

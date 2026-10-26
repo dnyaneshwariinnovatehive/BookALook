@@ -45,6 +45,11 @@ class PublicEnquiryController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        // Optional. Where BookALook will pay the salon, carried to the salon
+        // when it is onboarded.
+        $bank = app(\App\Services\BankDetailsService::class);
+        $bankDetails = $bank->validate($request->only(\App\Services\BankDetailsService::FIELDS));
+
         try {
             $city = City::find($request->city_id);
 
@@ -69,6 +74,8 @@ class PublicEnquiryController extends Controller
                 'photo_url' => $photoUrl,
                 'status' => 'new',
             ]);
+
+            $bank->apply($enquiry, $bankDetails);
 
             return response()->json([
                 'message' => 'Enquiry submitted successfully.',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Partner;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Support\NotificationInbox;
 use Illuminate\Http\Request;
 
 /**
@@ -14,10 +15,10 @@ class PartnerNotificationController extends Controller
 {
     public function index(Request $request)
     {
-        $notifications = Notification::where('user_id', $request->user()->id)
-            ->where(function($q) {
-                $q->whereNull('data->hide_in_app')->orWhere('data->hide_in_app', false);
-            })
+        $query = NotificationInbox::visible(NotificationInbox::forUser($request->user()->id));
+        NotificationInbox::inPeriod($query, NotificationInbox::period($request));
+
+        $notifications = $query
             ->orderByDesc('created_at')
             ->limit((int) $request->get('limit', 50))
             ->get();
@@ -33,11 +34,9 @@ class PartnerNotificationController extends Controller
                 'is_read' => (bool) $n->is_read,
                 'created_at' => $n->created_at,
             ])->values(),
-            'unread_count' => Notification::where('user_id', $request->user()->id)
+            // Across the whole inbox, whatever filter is showing.
+            'unread_count' => NotificationInbox::visible(NotificationInbox::forUser($request->user()->id))
                 ->where('is_read', false)
-                ->where(function($q) {
-                    $q->whereNull('data->hide_in_app')->orWhere('data->hide_in_app', false);
-                })
                 ->count(),
         ]);
     }
@@ -60,5 +59,25 @@ class PartnerNotificationController extends Controller
             ->update(['is_read' => true, 'read_at' => now()]);
 
         return response()->json(['message' => 'All marked as read.']);
+    }
+
+    /** Delete one of the signed-in person's own notifications. */
+    public function destroy(Request $request, $id)
+    {
+        $deleted = NotificationInbox::dismissOne(NotificationInbox::forUser($request->user()->id), (string) $id);
+
+        if (! $deleted) {
+            return response()->json(['message' => 'Notification not found.'], 404);
+        }
+
+        return response()->json(['message' => 'Notification deleted.']);
+    }
+
+    /** Delete several: given ids, everything in a period, or everything (`all`). */
+    public function destroyMany(Request $request)
+    {
+        $deleted = NotificationInbox::dismiss(NotificationInbox::forUser($request->user()->id), $request);
+
+        return response()->json(['message' => 'Notifications deleted.', 'deleted' => $deleted]);
     }
 }

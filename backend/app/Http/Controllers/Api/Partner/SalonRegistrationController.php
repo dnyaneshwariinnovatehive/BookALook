@@ -68,6 +68,15 @@ class SalonRegistrationController extends Controller
             'cover_photo_index' => 'nullable|integer|min:0',
         ]);
 
+        // Bank details are optional: a salon registers, and can go live,
+        // without them. Checked against the salon being revised, so a blank
+        // account number keeps the one already saved.
+        $bank = app(\App\Services\BankDetailsService::class);
+        $revising = ($isExistingAdmin && $request->filled('salon_id'))
+            ? Salon::where('id', $request->salon_id)->where('admin_id', $authenticatedUser->id)->first()
+            : null;
+        $bankDetails = $bank->validate($request->only(\App\Services\BankDetailsService::FIELDS), $revising);
+
         try {
             DB::beginTransaction();
 
@@ -191,6 +200,10 @@ class SalonRegistrationController extends Controller
                     'preferred_commercial_model' => $preferredModel,
                     'requested_commission_percentage' => $requestedComm,
                 ]);
+            }
+
+            if ($bankDetails !== []) {
+                $bank->apply($salon, $bankDetails, $adminUser);
             }
 
             // 5. Store Photos if provided

@@ -86,6 +86,8 @@ Route::prefix('customer')->group(function () {
         Route::get('/notifications', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'index']);
         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markAllRead']);
         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'markRead']);
+        Route::post('/notifications/delete', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'destroyMany']);
+        Route::delete('/notifications/{id}', [\App\Http\Controllers\Api\Customer\NotificationController::class, 'destroy']);
 
         // Push notification devices. register/unregister are the two the app
         // calls on launch and sign-out; activity is the cheap "still here" on
@@ -161,6 +163,10 @@ Route::prefix('superadmin')->group(function () {
         // Salon Directory API (Unprotected for now)
         Route::get('/salons', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'index']);
         Route::get('/salons/{id}', [\App\Http\Controllers\Api\SuperAdmin\SalonController::class, 'show']);
+        // Where a salon's settlements are paid. ?reveal=1 shows the full
+        // account number, and is audited.
+        Route::get('/salons/{id}/bank-details', [\App\Http\Controllers\Api\SuperAdmin\SalonBankDetailsController::class, 'show']);
+        Route::put('/salons/{id}/bank-details', [\App\Http\Controllers\Api\SuperAdmin\SalonBankDetailsController::class, 'update']);
         Route::get('/salons/{id}/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'forSalon']);
         Route::get('/salons/{salonId}/staff/{providerId}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminStaffController::class, 'show']);
         // The directory is the only surface that holds partner-app salons, which
@@ -348,6 +354,8 @@ Route::prefix('partner')->group(function () {
         Route::get('/notifications', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'index']);
         Route::post('/notifications/read-all', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markAllRead']);
         Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'markRead']);
+        Route::post('/notifications/delete', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'destroyMany']);
+        Route::delete('/notifications/{id}', [\App\Http\Controllers\Api\Partner\PartnerNotificationController::class, 'destroy']);
 
         // Push notification devices, and the preferences behind them. The Partner
         // App gets its own set of paths rather than sharing the customer's, so
@@ -370,6 +378,10 @@ Route::prefix('partner')->group(function () {
         // plan gate on purpose: an unsettled Commission Model month is what locks
         // a salon out, so seeing and paying the bill must always work.
         Route::get('/salons/{salon_id}/payouts', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'salonPayouts']);
+        // The owner's bank details for settlements. Outside the plan gate too:
+        // a salon must be able to say where to be paid whatever its plan.
+        Route::get('/salons/{salon_id}/bank-details', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'show']);
+        Route::put('/salons/{salon_id}/bank-details', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'update'])->middleware('throttle:20,1');
         Route::get('/payment-details', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'paymentDetails']);
         Route::post('/salons/{salon_id}/payouts/{payout_id}/payment', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'submit'])->middleware('throttle:10,1');
         // Postpaid: no money changes hands here, so there is nothing to upload.
@@ -413,6 +425,8 @@ Route::prefix('partner')->group(function () {
         Route::get('/collaborator/notifications', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'notifications']);
         Route::post('/collaborator/notifications/read-all', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'markAllNotificationsRead']);
         Route::post('/collaborator/notifications/{id}/read', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'markNotificationRead']);
+        Route::post('/collaborator/notifications/delete', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'deleteNotifications']);
+        Route::delete('/collaborator/notifications/{id}', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'deleteNotification']);
         Route::get('/collaborator/master-catalog', [\App\Http\Controllers\Api\Partner\CollaboratorController::class, 'masterCatalog']);
         // What a rejected salon already holds, so a correction is an edit and
         // not a retype.

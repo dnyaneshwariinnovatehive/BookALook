@@ -517,3 +517,74 @@
   color: var(--accent-color);
   border-bottom-color: var(--accent-color);
 }
+
+/* Bank details */
+.bankMissing {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--color-danger-bg, rgba(239, 68, 68, 0.1));
+  color: var(--color-danger, #b91c1c);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bankSummary {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.bankNumber {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  margin-right: 0.75rem;
+}
+
+.bankLink {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent-text, var(--accent-color));
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bankLink:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bankFormTitle {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.bankForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.bankField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bankError {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-danger, #b91c1c);
+}
+
+.bankOk {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-success, #15803d);
+}

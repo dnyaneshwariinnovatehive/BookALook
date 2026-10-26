@@ -18,6 +18,9 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   List<SalonWorkingHour> _workingHours = [];
+
+  /// The week as loaded, so a save can tell which days actually changed.
+  List<SalonWorkingHour> _savedHours = [];
   String? _error;
 
   final List<String> _daysOfWeek = [
@@ -37,6 +40,7 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
       if (mounted) {
         setState(() {
           _workingHours = hours;
+          _savedHours = hours.map(_copyHour).toList();
           _isLoading = false;
         });
       }
@@ -47,6 +51,13 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
       });
     }
   }
+
+  SalonWorkingHour _copyHour(SalonWorkingHour h) => SalonWorkingHour(
+        dayOfWeek: h.dayOfWeek,
+        isClosed: h.isClosed,
+        openTime: h.openTime,
+        closeTime: h.closeTime,
+      );
 
   Future<void> _saveWorkingHours() async {
     for (final hour in _workingHours) {
@@ -81,33 +92,40 @@ class _SalonTimingsScreenState extends State<SalonTimingsScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await SalonSettingsApi.updateWorkingHours(widget.salonId, _workingHours);
+      final changes = salonHourChanges(_savedHours, _workingHours);
+      final result = await SalonSettingsApi.updateWorkingHours(widget.salonId, _workingHours);
       if (!mounted) return;
 
-      // New salon hours rarely suit everyone the same way, so offer to sort
-      // each person's shift out now rather than leave it for the staff screen.
-      // A staff list that will not load never blocks the save itself.
+      // Staff on salon hours were moved by the server. Staff on their own
+      // hours are asked about just the days that changed. A staff list that
+      // will not load never blocks the save itself.
       List<StaffMember> staff = const [];
-      try {
-        staff = (await StaffApi.fetchStaff(widget.salonId)).where((s) => s.isActive).toList();
-      } catch (_) {}
-      if (!mounted) return;
+      if (changes.isNotEmpty) {
+        try {
+          staff = (await StaffApi.fetchStaff(widget.salonId)).where((s) => s.isActive).toList();
+        } catch (_) {}
+        if (!mounted) return;
+      }
 
       int? updated;
-      if (staff.isNotEmpty) {
+      if (changes.isNotEmpty && staffHoursSheetNeeded(changes: changes, staff: staff, result: result)) {
         setState(() => _isSaving = false);
         updated = await showStaffHoursReviewSheet(
           context,
           salonId: widget.salonId,
           staff: staff,
-          salonHours: _workingHours,
+          changes: changes,
+          result: result,
         );
         if (!mounted) return;
       }
 
+      final following = staff.where((s) => s.useSalonHours).length;
       final message = (updated ?? 0) > 0
-          ? 'Working hours updated, and $updated staff schedule${updated == 1 ? '' : 's'} changed.'
-          : 'Working hours updated successfully!';
+          ? 'Salon hours saved · $updated staff schedule${updated == 1 ? '' : 's'} updated.'
+          : following > 0
+              ? 'Salon hours saved · $following staff moved to the new hours.'
+              : 'Working hours updated successfully!';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
       Navigator.pop(context);
     } catch (e) {

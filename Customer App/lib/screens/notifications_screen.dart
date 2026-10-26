@@ -7,22 +7,29 @@ import 'reschedule_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/bottom_clearance.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/notification_inbox_controls.dart';
 
 /// The customer's message inbox. A salon-closure notice is actionable: tapping
 /// it goes straight to picking a new slot.
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({Key? key}) : super(key: key);
+  /// Test seam; defaults to the real service.
+  final NotificationService? service;
+
+  const NotificationsScreen({Key? key, this.service}) : super(key: key);
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final NotificationService _service = NotificationService();
+  late final NotificationService _service = widget.service ?? NotificationService();
 
   List<dynamic> _notifications = [];
   bool _isLoading = true;
   String _error = '';
+  NotificationPeriod _period = NotificationPeriod.all;
+  bool _deleting = false;
+  int _restoreTick = 0;
 
   @override
   void initState() {
@@ -32,7 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _load() async {
     try {
-      final data = await _service.fetch();
+      final data = await _service.fetch(period: _period.apiValue);
       if (!mounted) return;
       setState(() {
         _notifications = data['notifications'] ?? [];
@@ -50,6 +57,57 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markAllRead() async {
     await _service.markAllRead();
     _load();
+  }
+
+  void _setPeriod(NotificationPeriod period) {
+    if (period == _period) return;
+    setState(() {
+      _period = period;
+      _isLoading = true;
+      _error = '';
+    });
+    _load();
+  }
+
+  /// Swiped away: gone at once, put back if the server refuses.
+  Future<void> _deleteOne(Map<String, dynamic> notification) async {
+    final index = _notifications.indexOf(notification);
+    setState(() => _notifications.remove(notification));
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _service.delete(notification['id'].toString());
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Notification deleted'), duration: Duration(seconds: 2)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        // A fresh key: the swiped-away row cannot be reused once dismissed.
+        _restoreTick++;
+        _notifications.insert(index.clamp(0, _notifications.length), notification);
+      });
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notification. Try again.')));
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    if (_deleting || _notifications.isEmpty) return;
+    final ok = await confirmDeleteNotifications(context, count: _notifications.length, period: _period);
+    if (!ok || !mounted) return;
+
+    setState(() => _deleting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final deleted = await _service.deleteMany(period: _period.apiValue);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text('$deleted notification${deleted == 1 ? '' : 's'} deleted')));
+      await _load();
+    } catch (_) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(const SnackBar(content: Text('Could not delete the notifications. Try again.')));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
   }
 
   Future<void> _open(Map<String, dynamic> notification) async {
@@ -89,7 +147,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               child: Text('Mark all read',
                   style: GoogleFonts.outfit(fontSize: 13, color: AppTheme.accentColor)),
             ),
+          if (_notifications.isNotEmpty)
+            IconButton(
+              key: const ValueKey('notifications_delete_all'),
+              tooltip: 'Delete notifications',
+              onPressed: _deleting ? null : _deleteAll,
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: NotificationPeriodChips(selected: _period, onChanged: _setPeriod),
+        ),
       ),
       body: _isLoading
           ? SkeletonList(
@@ -114,8 +183,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                         itemCount: _notifications.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) =>
-                            _buildTile(_notifications[index] as Map<String, dynamic>),
+                        itemBuilder: (context, index) {
+                          final n = _notifications[index] as Map<String, dynamic>;
+                          return DeletableNotification(
+                            id: '${n['id']}#$_restoreTick',
+                            onDelete: () => _deleteOne(n),
+                            child: _buildTile(n),
+                          );
+                        },
                       ),
                     ),
     );
@@ -127,7 +202,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           children: [
             Icon(Icons.notifications_none, size: 72, color: context.colors.textTertiary),
             const SizedBox(height: 12),
-            Text('Nothing to catch up on',
+            Text(_period == NotificationPeriod.all ? 'Nothing to catch up on' : 'Nothing from ${_period.label.toLowerCase()}',
                 style: GoogleFonts.outfit(fontSize: 16, color: context.colors.textSecondary)),
           ],
         ),

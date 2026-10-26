@@ -236,8 +236,10 @@ class SalonSettingsController extends Controller
             ];
         }
 
+        $trimmed = [];
+
         try {
-            DB::transaction(function () use ($salon_id, $normalizedHours) {
+            DB::transaction(function () use ($salon_id, $normalizedHours, &$trimmed) {
                 foreach ($normalizedHours as $hour) {
                     SalonWorkingHour::updateOrCreate(
                         [
@@ -278,6 +280,44 @@ class SalonSettingsController extends Controller
                         );
                     }
                 }
+
+                // Staff on their own hours keep them, except where the salon
+                // no longer opens: a shift is cut back to the salon's hours,
+                // and a day the salon is closed becomes a day off. The owner
+                // agreed this happens without asking; the app is told who was
+                // trimmed so it can say so.
+                $customProviders = ServiceProvider::with('user:id,name')
+                    ->where('salon_id', $salon_id)
+                    ->when($hasUseSalonHours, fn ($q) => $q->where('use_salon_hours', false))
+                    ->get();
+
+                foreach ($customProviders as $provider) {
+                    foreach ($normalizedHours as $hour) {
+                        $row = ProviderWorkingHour::where('provider_id', $provider->id)
+                            ->where('day_of_week', $hour['day_of_week'])
+                            ->first();
+
+                        if (! $row || $row->is_weekly_off || ! $row->shift_start || ! $row->shift_end) {
+                            continue;
+                        }
+
+                        $change = $this->fitShiftToSalon($row, $hour);
+
+                        if ($change === null) {
+                            continue;
+                        }
+
+                        $trimmed[] = [
+                            'provider_id' => $provider->id,
+                            'name' => $provider->user?->name ?? 'Staff',
+                            'day_of_week' => $hour['day_of_week'],
+                            'from' => [substr($row->getOriginal('shift_start'), 0, 5), substr($row->getOriginal('shift_end'), 0, 5)],
+                            'to' => $change,
+                        ];
+
+                        $row->save();
+                    }
+                }
             });
         } catch (\Throwable $e) {
             Log::error('Failed to update working hours: ' . $e->getMessage(), [
@@ -290,7 +330,109 @@ class SalonSettingsController extends Controller
             ], 500);
         }
 
-        return response()->json(['message' => 'Working hours updated successfully']);
+        return response()->json([
+            'message' => 'Working hours updated successfully',
+            // Custom shifts cut back to the new salon hours.
+            'trimmed_shifts' => $trimmed,
+            // Bookings already made that now fall outside the salon's hours.
+            // Nothing is moved or cancelled; the owner is warned.
+            'bookings_outside_hours' => $this->bookingsOutsideHours($salon_id, $normalizedHours),
+        ]);
+    }
+
+    /**
+     * Cut a custom shift back so it sits inside the salon's hours for that day.
+     *
+     * Changes [$row] in place. Returns the new [start, end], [null, null] when
+     * the day became a day off, or null when the shift already fitted. A break
+     * that no longer fits inside the shift is dropped.
+     *
+     * @return array{0: ?string, 1: ?string}|null
+     */
+    private function fitShiftToSalon(ProviderWorkingHour $row, array $salonDay): ?array
+    {
+        if ($salonDay['is_closed']) {
+            $row->is_weekly_off = true;
+
+            return [null, null];
+        }
+
+        $open = $salonDay['open_time'];
+        $close = $salonDay['close_time'];
+        $start = $this->clock($row->shift_start);
+        $end = $this->clock($row->shift_end);
+
+        $newStart = max($start, $this->clock($open));
+        $newEnd = min($end, $this->clock($close));
+
+        if ($newStart === $start && $newEnd === $end) {
+            return null;
+        }
+
+        if ($newEnd <= $newStart) {
+            // The whole shift fell outside the new hours.
+            $row->is_weekly_off = true;
+
+            return [null, null];
+        }
+
+        $row->shift_start = $newStart;
+        $row->shift_end = $newEnd;
+
+        if ($row->break_start && $row->break_end
+            && ($this->clock($row->break_start) < $newStart || $this->clock($row->break_end) > $newEnd)) {
+            $row->break_start = null;
+            $row->break_end = null;
+        }
+
+        return [substr($newStart, 0, 5), substr($newEnd, 0, 5)];
+    }
+
+    /** "9:00" / "09:00" / "09:00:00" as a sortable "09:00:00". */
+    private function clock(?string $time): string
+    {
+        return \Carbon\Carbon::parse($time)->format('H:i:s');
+    }
+
+    /**
+     * Upcoming bookings on a day whose new hours no longer cover them.
+     *
+     * @return array<int, array{day_of_week: int, count: int}>
+     */
+    private function bookingsOutsideHours(string $salonId, array $normalizedHours): array
+    {
+        $byDay = collect($normalizedHours)->keyBy('day_of_week');
+
+        $upcoming = \App\Models\Appointment::where('salon_id', $salonId)
+            ->whereDate('appointment_date', '>=', now()->toDateString())
+            ->whereIn('status', ['pending_payment', 'scheduled', 'confirmed'])
+            ->get(['appointment_date', 'start_time', 'end_time']);
+
+        $counts = [];
+
+        foreach ($upcoming as $appointment) {
+            $day = \Carbon\Carbon::parse($appointment->appointment_date)->dayOfWeek;
+            $hours = $byDay->get($day);
+
+            if (! $hours) {
+                continue;
+            }
+
+            $outside = $hours['is_closed']
+                || $this->clock($appointment->start_time) < $this->clock($hours['open_time'])
+                || $this->clock($appointment->end_time) > $this->clock($hours['close_time']);
+
+            if ($outside) {
+                $counts[$day] = ($counts[$day] ?? 0) + 1;
+            }
+        }
+
+        ksort($counts);
+
+        return collect($counts)
+            ->map(fn ($count, $day) => ['day_of_week' => (int) $day, 'count' => $count])
+            ->values()
+            ->all();
     }
 
     /**

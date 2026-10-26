@@ -3,9 +3,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../services/app_version_service.dart';
 import '../services/auth_service.dart';
-import '../services/http_client.dart' show mandatoryUpdateRouteName;
+import '../services/http_client.dart' show loginRouteName, mandatoryUpdateRouteName;
 import 'mandatory_update_screen.dart';
 import 'main_screen.dart';
+import 'phone_screen.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _preloadAuthAndVersion() async {
     final futures = await Future.wait([
-      AuthService.getToken(),
+      _usableToken(),
       AppVersionService.instance.checkUpdate(),
     ]);
 
@@ -61,6 +62,32 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
+  /// Set when the stored session was rejected, so the splash goes straight to
+  /// sign-in instead of opening the app first.
+  bool _sessionExpired = false;
+
+  /// The stored token, checked with the server while the splash plays.
+  ///
+  /// A token the server has stopped accepting used to open the signed-in app,
+  /// which showed the location prompt and then, a moment later, was thrown to
+  /// the login screen by the first request that came back 401. Now the expiry
+  /// is found here and the customer goes to sign-in directly, the same place
+  /// they ended up before, without the flash. If the check cannot reach the
+  /// server the token is kept, so being offline never signs anyone out.
+  Future<String?> _usableToken() async {
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) return null;
+
+    final valid = await AuthService.checkSession(token);
+    if (valid == false) {
+      await AuthService.clearStaleSession();
+      _sessionExpired = true;
+      return null;
+    }
+
+    return token;
+  }
+
   void _navigate() {
     if (!mounted || !_authCheckComplete || !_versionCheckComplete) return;
 
@@ -71,6 +98,20 @@ class _SplashScreenState extends State<SplashScreen>
         PageRouteBuilder(
           settings: const RouteSettings(name: mandatoryUpdateRouteName),
           pageBuilder: (_, __, ___) => MandatoryUpdateScreen(updateInfo: _updateInfo!),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+      return;
+    }
+
+    if (_sessionExpired) {
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          settings: const RouteSettings(name: loginRouteName),
+          pageBuilder: (_, __, ___) => const PhoneScreen(isModal: false, returnIndex: 0),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 500),

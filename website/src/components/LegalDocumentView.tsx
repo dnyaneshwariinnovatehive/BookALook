@@ -81,7 +81,7 @@ export default function LegalDocumentView({ doc }: { doc: LegalDocument }) {
           )}
 
           <Link className="blk-page__back" href="/">
-            ← Back to BooKalook
+            ← Back to BookALook
           </Link>
         </div>
       </div>

@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import {
+  BANK_FIELD_LABELS,
+  EMPTY_BANK_DETAILS,
+  bankDetailsPayload,
+  validateBankDetails,
+  type BankDetailsInput,
+} from '@/lib/bankDetails';
 import StoreBadge from '@/components/site/StoreBadge';
 import {
   CUSTOMER_APP_STORE_URL,
@@ -265,6 +272,10 @@ export default function LandingPage() {
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Optional: where BookALook should send the salon's settlements. Carried to
+  // the salon when it is onboarded; the owner can also add it later in the app.
+  const [bank, setBank] = useState<BankDetailsInput>(EMPTY_BANK_DETAILS);
+  const [bankErrors, setBankErrors] = useState<Partial<Record<keyof BankDetailsInput, string>>>({});
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -355,6 +366,16 @@ export default function LandingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (status === 'submitting') return;
+
+    const problems = validateBankDetails(bank);
+    setBankErrors(problems);
+    if (Object.keys(problems).length > 0) {
+      setStatus('error');
+      setErrorMessage('Please check the bank details, or leave them all empty.');
+      return;
+    }
+
     setStatus('submitting');
     setErrorMessage('');
 
@@ -373,6 +394,9 @@ export default function LandingPage() {
       if (photo) {
         payload.append('photo', photo);
       }
+      Object.entries(bankDetailsPayload(bank)).forEach(([key, value]) => {
+        if (value) payload.append(key, value);
+      });
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/enquiries`, {
         method: 'POST',
@@ -385,6 +409,8 @@ export default function LandingPage() {
       if (response.ok) {
         setStatus('success');
         setFormData({ salon_name: '', owner_name: '', phone: '', state: '', city_id: '', sub_area_id: '', street_address: '', pincode: '', message: '' });
+        setBank(EMPTY_BANK_DETAILS);
+        setBankErrors({});
         setPhoto(null);
         setPhotoPreview(null);
       } else {
@@ -393,6 +419,14 @@ export default function LandingPage() {
         // Laravel returns a field map; its own wording is more use than a
         // generic failure line.
         const firstError = data?.errors ? Object.values(data.errors)[0] : null;
+        if (data?.errors) {
+          const fromServer: Partial<Record<keyof BankDetailsInput, string>> = {};
+          (Object.keys(EMPTY_BANK_DETAILS) as (keyof BankDetailsInput)[]).forEach((k) => {
+            const msg = data.errors[k];
+            if (Array.isArray(msg) && msg.length) fromServer[k] = String(msg[0]);
+          });
+          setBankErrors(fromServer);
+        }
         setErrorMessage(
           Array.isArray(firstError)
             ? String(firstError[0])
@@ -766,6 +800,41 @@ export default function LandingPage() {
                   </label>
                 )}
               </div>
+
+              <details style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '0.75rem 1rem', background: '#fafafa' }} open={Object.keys(bankErrors).length > 0 || undefined}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Bank details for payouts (optional)</summary>
+                <p style={{ margin: '0.5rem 0 0.75rem', fontSize: '0.8rem', color: '#666' }}>
+                  BookALook collects advances from your customers and sends your settlements here. You can skip this and add it later in the BookALook Partner app.
+                </p>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  {(Object.keys(EMPTY_BANK_DETAILS) as (keyof BankDetailsInput)[]).map((key) => (
+                    <div key={key}>
+                      <label htmlFor={key} style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 500, fontSize: '0.9rem' }}>
+                        {BANK_FIELD_LABELS[key]}
+                      </label>
+                      <input
+                        id={key}
+                        name={key}
+                        type="text"
+                        inputMode={key === 'bank_account_number' ? 'numeric' : undefined}
+                        autoComplete="off"
+                        value={bank[key]}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setBank((prev) => ({ ...prev, [key]: value }));
+                          if (bankErrors[key]) setBankErrors((prev) => ({ ...prev, [key]: undefined }));
+                        }}
+                        placeholder={key === 'bank_ifsc' ? 'e.g. HDFC0001234' : key === 'bank_upi_id' ? 'e.g. name@okhdfcbank' : undefined}
+                        aria-invalid={Boolean(bankErrors[key])}
+                        style={{ width: '100%', padding: '0.65rem', border: `1px solid ${bankErrors[key] ? '#c62828' : '#ccc'}`, borderRadius: '8px', textTransform: key === 'bank_ifsc' ? 'uppercase' : undefined }}
+                      />
+                      {bankErrors[key] && (
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#c62828' }}>{bankErrors[key]}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
 
               <button 
                 type="submit" 

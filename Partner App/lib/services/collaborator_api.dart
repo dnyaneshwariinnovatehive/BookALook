@@ -98,10 +98,10 @@ class CollaboratorApi {
   /// Returns an empty inbox on failure, like [alerts]. The bell and the screen
   /// behind it are glanceable; neither may become an error page because a
   /// request failed, and neither is worth a retry queue.
-  static Future<CollaboratorInbox> notifications({int limit = 50}) async {
+  static Future<CollaboratorInbox> notifications({int limit = 50, String? period}) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/notifications?limit=$limit'),
+        Uri.parse('$_baseUrl/notifications?limit=$limit${period == null ? '' : '&period=$period'}'),
         headers: await _headers(),
       );
 
@@ -131,6 +131,24 @@ class CollaboratorApi {
     try {
       await http.post(Uri.parse('$_baseUrl/notifications/$id/read'), headers: await _headers());
     } catch (_) {}
+  }
+
+  /// Delete one notice. Unlike marking read this is not silent: the screen has
+  /// already taken the row away and must put it back if the server said no.
+  static Future<void> deleteNotification(String id) async {
+    final response = await http.delete(Uri.parse('$_baseUrl/notifications/$id'), headers: await _headers());
+    if (response.statusCode != 200) throw Exception('Could not delete the notification.');
+  }
+
+  /// Delete every notice in [period], or all of them. Returns how many.
+  static Future<int> deleteNotifications({String? period}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/notifications/delete'),
+      headers: await _headers(),
+      body: jsonEncode(period == null ? {'all': true} : {'period': period}),
+    );
+    if (response.statusCode != 200) throw Exception('Could not delete the notifications.');
+    return ((_decode(response.body))['deleted'] as num?)?.toInt() ?? 0;
   }
 
   /// Mark the whole inbox read. Same reasoning as above.
