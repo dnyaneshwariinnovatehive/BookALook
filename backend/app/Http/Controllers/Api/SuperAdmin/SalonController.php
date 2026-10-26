@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class SalonController extends Controller
 {
     /** Columns a table header is allowed to sort on. */
-    private const SORTABLE = ['name', 'city', 'admin', 'collaborator', 'status', 'created_at'];
+    private const SORTABLE = ['name', 'city', 'admin', 'collaborator', 'plan', 'status', 'created_at'];
 
     public function index(Request $request)
     {
@@ -23,7 +23,7 @@ class SalonController extends Controller
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $query = \App\Models\Salon::with(['admin', 'city', 'currentSubscription', 'assignedCollaborator:id,name,email']);
+        $query = \App\Models\Salon::with(['admin', 'city', 'currentSubscription.plan:id,name', 'assignedCollaborator:id,name,email']);
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->input('search');
@@ -56,6 +56,13 @@ class SalonController extends Controller
             'city' => fn () => City::query()->select('name')->whereColumn('cities.id', 'salons.city_id')->limit(1),
             'admin' => fn () => User::query()->select('name')->whereColumn('users.id', 'salons.admin_id')->limit(1),
             'collaborator' => fn () => User::query()->select('name')->whereColumn('users.id', 'salons.assigned_collaborator_id')->limit(1),
+            // The active plan's name; salons with none sort together.
+            'plan' => fn () => \App\Models\SubscriptionPlan::query()->select('subscription_plans.name')
+                ->join('salon_subscriptions', 'salon_subscriptions.plan_id', '=', 'subscription_plans.id')
+                ->whereColumn('salon_subscriptions.salon_id', 'salons.id')
+                ->where('salon_subscriptions.status', 'active')
+                ->orderByDesc('salon_subscriptions.start_date')
+                ->limit(1),
         ];
 
         if ($column && in_array($column, ['name', 'status', 'created_at'], true)) {
@@ -90,7 +97,9 @@ class SalonController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $salons->items(),
+            'data' => collect($salons->items())->map(fn (\App\Models\Salon $salon) => $salon->toArray() + [
+                'current_plan' => $this->currentPlan($salon),
+            ])->all(),
             'meta' => [
                 'current_page' => $salons->currentPage(),
                 'last_page' => $salons->lastPage(),
@@ -159,5 +168,31 @@ class SalonController extends Controller
                 : 'Collaborator removed from this salon.',
             'data' => $salon->fresh()->load('assignedCollaborator:id,name,email'),
         ]);
+    }
+
+    /**
+     * The plan the salon is on right now, for the directory: its name, how it
+     * pays, and when it runs out. Null when it has no active plan. A row still
+     * marked active but past its end date (the hourly sweep has not caught it
+     * yet) is reported as lapsed rather than as live.
+     */
+    private function currentPlan(\App\Models\Salon $salon): ?array
+    {
+        $subscription = $salon->currentSubscription;
+
+        if (! $subscription) {
+            return null;
+        }
+
+        $endDate = $subscription->end_date ? \Carbon\Carbon::parse($subscription->end_date)->startOfDay() : null;
+
+        return [
+            'name' => $subscription->plan?->name ?? 'Plan',
+            'billing_type' => $subscription->billing_type,
+            'billing_label' => \App\Support\BillingModel::label($subscription->billing_type),
+            'end_date' => $endDate?->toDateString(),
+            'days_left' => $endDate ? (int) now()->startOfDay()->diffInDays($endDate, false) : null,
+            'lapsed' => $endDate !== null && $endDate->lt(now()->startOfDay()),
+        ];
     }
 }

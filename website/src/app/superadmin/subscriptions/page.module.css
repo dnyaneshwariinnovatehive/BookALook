@@ -569,7 +569,12 @@
 
 /* ---------- Active Plan Card & Tabs in Modal ---------- */
 .modalTabsWrap {
-  margin-bottom: 18px;
+  position: sticky;
+  top: -20px;
+  z-index: 2;
+  margin: -4px 0 18px;
+  padding: 4px 0 8px;
+  background: var(--surface-color);
 }
 
 .activePlanCard {
@@ -738,16 +743,54 @@
 
 .salonModalHead {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
   width: 100%;
-  gap: 16px;
+}
+
+.salonModalAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(123, 50, 236, 0.22);
 }
 
 .salonModalHeadMain {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.salonModalTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--text-heading);
+}
+
+.salonModalSub {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.salonModalSub span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .salonModalHeadPills {
@@ -756,18 +799,6 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
-}
-
-.headCityPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-color);
 }
 
 .sectionFade {
@@ -1137,3 +1168,102 @@
   }
 }
 
+/* ---------- Salon modal: grouped details & compact tables ---------- */
+.detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detailsTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mutedInline {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.slug {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-body);
+}
+
+.aboutText {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-body);
+  white-space: pre-line;
+}
+
+.tableHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.tableHeading span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Tables inside the modal: tighter rows, numbers that line up, and a header
+   that stays put while the rows scroll. */
+.modalTables table {
+  font-size: 13px;
+}
+
+.modalTables th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.modalTables td {
+  vertical-align: middle;
+}
+
+.modalTables .boldNum,
+.modalTables .advanceCol,
+.modalTables .balanceCol {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .detailsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .salonModalAvatar {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+  }
+
+  .salonModalTitle {
+    font-size: 17px;
+  }
+}

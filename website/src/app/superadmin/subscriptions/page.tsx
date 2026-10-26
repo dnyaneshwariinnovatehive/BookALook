@@ -75,7 +75,8 @@ const daysUntil = (ymd?: string | null) => {
 
 const fmtDay = (ymd?: string | null) => {
   if (!ymd) return '—';
-  const [y, m, d] = ymd.split('-').map(Number);
+  // Dates can arrive as a full timestamp; only the day part matters here.
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
@@ -91,6 +92,25 @@ const fmtDateStr = (str?: string | null) => {
   }
 };
 
+/** "no_show" → "No show": every underscore, not just the first. */
+const fmtStatus = (value?: string | null) =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ') : '—';
+
+/** A short, readable reference instead of a 36-character UUID. */
+const shortRef = (id?: string | number | null) => (id ? `#${String(id).slice(0, 8).toUpperCase()}` : '—');
+
+/** "10:30:00" → "10:30 am". */
+const fmtTime = (hms?: string | null) => {
+  if (!hms) return '';
+  const [h, m] = hms.split(':').map(Number);
+  if (Number.isNaN(h)) return '';
+  return new Date(2000, 0, 1, h, m || 0).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+};
+
+const PAYMENT_OPTION_LABEL: Record<string, string> = {
+  advance_only: 'Advance',
+  full_upfront: 'Paid in full',
+};
 
 export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<any[]>([]);
@@ -119,6 +139,8 @@ export default function SubscriptionsPage() {
 
   // Form State for putting a salon on one of the two arrangements
   const [assigningSalon, setAssigningSalon] = useState<any>(null);
+  /** The plan the salon asked for when approving a request; preselected and marked. */
+  const [requestedPlanId, setRequestedPlanId] = useState<string | null>(null);
   const [billingModel, setBillingModel] = useState(SUBSCRIPTION);
   const [commissionPercentage, setCommissionPercentage] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState('');
@@ -164,7 +186,11 @@ export default function SubscriptionsPage() {
     'Content-Type': 'application/json',
   });
 
-  const purchasablePlans = plans.filter((p) => !p.is_commission_plan);
+  // Every active plan can be bought, including the one nominated for the
+  // Commission Model (a salon may pay for it up front). Leaving that plan out
+  // meant a salon asking for it could not be approved on it: the dropdown had
+  // no such option and silently showed a different plan.
+  const purchasablePlans = plans.filter((p) => p.is_active);
 
   const fetchData = async () => {
     try {
@@ -491,8 +517,18 @@ export default function SubscriptionsPage() {
         ? String(salon.commission_percentage)
         : ''
     );
+    setRequestedPlanId(presetPlanId ?? null);
     setSelectedPlanId(presetPlanId ?? purchasablePlans[0]?.id ?? '');
   };
+
+  // The plans offered when assigning: everything on sale, plus the requested
+  // plan if it has since been switched off, so the request can still be honoured.
+  const assignablePlans = useMemo(() => {
+    const requested = requestedPlanId ? plans.find((p) => p.id === requestedPlanId) : undefined;
+    return requested && !purchasablePlans.some((p) => p.id === requested.id)
+      ? [requested, ...purchasablePlans]
+      : purchasablePlans;
+  }, [plans, purchasablePlans, requestedPlanId]);
 
   const handleAssignPlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -578,6 +614,35 @@ export default function SubscriptionsPage() {
     return s.billing_model !== COMMISSION && d !== null && d >= 0 && d <= 7;
   });
   const commissionPlan = plans.find((p) => p.id === commissionPlanId);
+
+  // Requests carry only the plan asked for; the plan the salon is on right now
+  // comes from the salon list, so a request can be read against it.
+  const salonsById = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const s of salons) map[s.id] = s;
+    return map;
+  }, [salons]);
+
+  const currentPlanCell = (salonId?: string) => {
+    const salon = salonId ? salonsById[salonId] : undefined;
+    if (!salon || !salon.current_plan || salon.current_plan === 'None') {
+      return <span className={styles.mutedNote}>No active plan</span>;
+    }
+    const onCommission = salon.billing_model === COMMISSION;
+    const left = onCommission ? null : daysUntil(salon.expiry);
+    return (
+      <>
+        <div className={ui.cellPrimary}>{salon.current_plan}</div>
+        <div className={ui.cellSub}>
+          {onCommission ? 'Commission Model' : salon.expiry ? `until ${fmtDay(salon.expiry)}` : 'Subscription'}
+        </div>
+        {left !== null && left < 0 && <Badge tone="danger" dot={false}>Expired</Badge>}
+        {left !== null && left >= 0 && left <= 7 && (
+          <Badge tone="warning" dot={false}>{left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left`}</Badge>
+        )}
+      </>
+    );
+  };
 
   const planSalonCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -700,6 +765,7 @@ export default function SubscriptionsPage() {
               <thead>
                 <tr>
                   <th>Salon</th>
+                  <th>Current plan</th>
                   <th>Asking for</th>
                   <th>Plan</th>
                   <th>Transaction reference</th>
@@ -722,6 +788,7 @@ export default function SubscriptionsPage() {
                           <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
                         </button>
                       </td>
+                      <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
                       <td>
                         <Badge tone={isCommission ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge>
                       </td>
@@ -742,7 +809,7 @@ export default function SubscriptionsPage() {
                             size="sm"
                             variant="primary"
                             icon="check"
-                            onClick={() => openAssign(req.salon, req.billing_type, isCommission ? undefined : req.plan?.id)}
+                            onClick={() => openAssign(req.salon, req.billing_type, isCommission ? undefined : (req.plan?.id ?? req.subscription_plan_id))}
                           >
                             {isCommission ? 'Set rate & approve' : 'Approve'}
                           </Button>
@@ -804,8 +871,9 @@ export default function SubscriptionsPage() {
               <thead>
                 <tr>
                   <th>Salon</th>
+                  <th>Current plan</th>
                   <th>Arrangement</th>
-                  <th>Plan</th>
+                  <th>Plan paid for</th>
                   <th className={ui.alignRight}>Paid</th>
                   <th>Transaction reference</th>
                   <th>Sent</th>
@@ -827,6 +895,7 @@ export default function SubscriptionsPage() {
                         <Person name={req.salon?.name ?? 'Unknown salon'} size={32} />
                       </button>
                     </td>
+                    <td>{currentPlanCell(req.salon_id ?? req.salon?.id)}</td>
                     <td><Badge tone={req.billing_type === COMMISSION ? 'accent' : 'info'}>{req.billing_label ?? modelLabel(req.billing_type)}</Badge></td>
                     <td>{req.plan?.name || '—'}</td>
                     <td className={ui.alignRight}>
@@ -1050,7 +1119,7 @@ export default function SubscriptionsPage() {
               <tr>
                 <th>Salon</th>
                 <th>Billing model</th>
-                <th>Plan</th>
+                <th>Current plan</th>
                 <th>Rate</th>
                 <th>Access until</th>
                 <th className={ui.alignRight}>Action</th>
@@ -1312,14 +1381,20 @@ export default function SubscriptionsPage() {
           {billingModel === SUBSCRIPTION ? (
             <Field label="Plan to sell them">
               <select className={ui.control} value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)} required>
-                {purchasablePlans.map((p) => (
+                {assignablePlans.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {formatINR(p.price)} ({p.validity_days} days)
+                    {p.id === requestedPlanId ? ' · requested' : ''}
                   </option>
                 ))}
               </select>
-              {purchasablePlans.length === 0 && (
-                <Alert tone="warning">Every plan is nominated for the Commission Model. Create one to sell.</Alert>
+              {requestedPlanId && selectedPlanId !== requestedPlanId && (
+                <Alert tone="warning">
+                  The salon asked for {plans.find((p) => p.id === requestedPlanId)?.name ?? 'a different plan'}. You are giving them a different one.
+                </Alert>
+              )}
+              {assignablePlans.length === 0 && (
+                <Alert tone="warning">No plan is switched on for sale. Create one, or switch one on, to sell it.</Alert>
               )}
             </Field>
           ) : (
@@ -1387,22 +1462,30 @@ export default function SubscriptionsPage() {
         header={
           infoSalon && (
             <div className={styles.salonModalHead}>
+              <div className={styles.salonModalAvatar} aria-hidden>
+                {(infoSalon.name || 'S').trim().charAt(0).toUpperCase()}
+              </div>
               <div className={styles.salonModalHeadMain}>
-                <Person name={infoSalon.name} sub={infoSalon.detail?.admin?.name || infoSalon.owner || 'Salon Owner'} size={44} />
+                <h2 className={styles.salonModalTitle}>{infoSalon.name}</h2>
+                <p className={styles.salonModalSub}>
+                  <span><Icon name="users" size={13} /> {infoSalon.detail?.admin?.name || infoSalon.owner || 'Salon owner'}</span>
+                  {infoSalon.detail?.city?.name && <span><Icon name="pin" size={13} /> {infoSalon.detail.city.name}</span>}
+                  {infoSalon.detail?.created_at && <span><Icon name="calendar" size={13} /> Joined {fmtDateStr(infoSalon.detail.created_at)}</span>}
+                </p>
                 <div className={styles.salonModalHeadPills}>
                   <Badge tone={infoSalon.detail?.status === 'active' ? 'success' : 'neutral'} dot={infoSalon.detail?.status === 'active'}>
-                    {infoSalon.detail?.status ? infoSalon.detail.status.charAt(0).toUpperCase() + infoSalon.detail.status.slice(1) : 'Active'}
+                    {infoSalon.detail?.status ? fmtStatus(infoSalon.detail.status) : 'Loading…'}
                   </Badge>
                   <Badge tone={infoSalon.billing_model === COMMISSION ? 'accent' : 'info'}>
                     {infoSalon.billing_label ?? modelLabel(infoSalon.billing_model)}
                   </Badge>
-                  {infoSalon.current_plan && infoSalon.current_plan !== 'None' && (
-                    <Badge tone="neutral">{infoSalon.current_plan}</Badge>
-                  )}
-                  {infoSalon.detail?.city?.name && (
-                    <span className={styles.headCityPill}>
-                      <Icon name="pin" size={13} /> {infoSalon.detail.city.name}
-                    </span>
+                  {infoSalon.current_plan && infoSalon.current_plan !== 'None' ? (
+                    <Badge tone="neutral">
+                      {infoSalon.current_plan}
+                      {infoSalon.billing_model !== COMMISSION && infoSalon.expiry ? ` · until ${fmtDay(infoSalon.expiry)}` : ''}
+                    </Badge>
+                  ) : (
+                    <Badge tone="warning" dot={false}>No active plan</Badge>
                   )}
                 </div>
               </div>
@@ -1412,7 +1495,7 @@ export default function SubscriptionsPage() {
         footer={<Button variant="primary" onClick={() => setInfoSalon(null)}>Close</Button>}
       >
         {infoSalon && (
-          <div className={styles.salonModalWrapper}>
+          <div className={cx(styles.salonModalWrapper, styles.modalTables)}>
             <div className={styles.modalTabsWrap}>
               <Tabs<SalonInfoTab>
                 value={infoSalonTab}
@@ -1494,26 +1577,43 @@ export default function SubscriptionsPage() {
                     </div>
                   </div>
 
-                  <div className={styles.detailsCard}>
-                    <h4 className={ui.sectionLabel}>Salon Details</h4>
-                    <DescriptionList
-                      items={[
-                        ['Salon Name', infoSalon.name],
-                        ['Slug', infoSalon.detail.slug || '—'],
-                        ['City', infoSalon.detail.city?.name || '—'],
-                        ['Address', infoSalon.detail.address || '—'],
-                        ['Pincode', infoSalon.detail.pincode || '—'],
-                        ['Gender focus', infoSalon.detail.gender_focus || 'Unisex'],
-                        ['Trading arrangement', modelLabel(infoSalon.billing_model)],
-                        ['Current plan', infoSalon.current_plan || 'None'],
-                        ['Assigned collaborator', infoSalon.detail.assigned_collaborator?.name ? (
-                          <span>{infoSalon.detail.assigned_collaborator.name} ({infoSalon.detail.assigned_collaborator.email})</span>
-                        ) : 'Unassigned'],
-                        ['Registered date', infoSalon.detail.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
-                        ...(infoSalon.detail.description ? ([['About / Description', infoSalon.detail.description]] as [string, string][]) : []),
-                      ]}
-                    />
+                  <div className={styles.detailsGrid}>
+                    <div className={styles.detailsCard}>
+                      <h4 className={styles.detailsTitle}><Icon name="pin" size={14} /> Location</h4>
+                      <DescriptionList
+                        variant="clean"
+                        items={[
+                          ['Address', infoSalon.detail.address || '—'],
+                          ['City', infoSalon.detail.city?.name || '—'],
+                          ['Pincode', infoSalon.detail.pincode || '—'],
+                        ]}
+                      />
+                    </div>
+                    <div className={styles.detailsCard}>
+                      <h4 className={styles.detailsTitle}><Icon name="store" size={14} /> Business</h4>
+                      <DescriptionList
+                        variant="clean"
+                        items={[
+                          ['Arrangement', modelLabel(infoSalon.billing_model)],
+                          ['Current plan', infoSalon.current_plan && infoSalon.current_plan !== 'None' ? infoSalon.current_plan : 'No active plan'],
+                          ['Collaborator', infoSalon.detail.assigned_collaborator?.name ? (
+                            <span>
+                              {infoSalon.detail.assigned_collaborator.name}
+                              <span className={styles.mutedInline}> · {infoSalon.detail.assigned_collaborator.email}</span>
+                            </span>
+                          ) : 'Unassigned'],
+                          ['Registered', infoSalon.detail.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
+                          ['Profile link', <code key="slug" className={styles.slug}>{infoSalon.detail.slug || '—'}</code>],
+                        ]}
+                      />
+                    </div>
                   </div>
+                  {infoSalon.detail.description && (
+                    <div className={styles.detailsCard}>
+                      <h4 className={styles.detailsTitle}><Icon name="sparkle" size={14} /> About</h4>
+                      <p className={styles.aboutText}>{infoSalon.detail.description}</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <EmptyState icon="alert" title="Could not load salon details" />
@@ -1569,15 +1669,14 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className={styles.detailsCard}>
-                  <h4 className={ui.sectionLabel}>Account &amp; Ownership Verification</h4>
+                  <h4 className={styles.detailsTitle}><Icon name="store" size={14} /> Account</h4>
                   <DescriptionList
+                    variant="clean"
                     items={[
-                      ['Owner full name', infoSalon.detail?.admin?.name || infoSalon.owner || '—'],
-                      ['Phone number', infoSalon.detail?.admin?.phone || '—'],
-                      ['Email address', infoSalon.detail?.admin?.email || '—'],
-                      ['Associated salon', `${infoSalon.name} (#${infoSalon.id})`],
-                      ['Registered on platform', infoSalon.detail?.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
-                      ['Arrangement with platform', modelLabel(infoSalon.billing_model)],
+                      ['Salon', infoSalon.name],
+                      ['Salon ID', <code key="id" className={styles.slug} title={String(infoSalon.id)}>{shortRef(infoSalon.id)}</code>],
+                      ['On the platform since', infoSalon.detail?.created_at ? fmtDateStr(infoSalon.detail.created_at) : '—'],
+                      ['Arrangement', modelLabel(infoSalon.billing_model)],
                     ]}
                   />
                 </div>
@@ -1634,14 +1733,15 @@ export default function SubscriptionsPage() {
                     />
                   ) : (
                     <div className={styles.historySection}>
-                      <h4 className={ui.sectionLabel}>
-                        Recent Appointments ({infoAppointments.length})
+                      <h4 className={styles.tableHeading}>
+                        Recent appointments
+                        <span>{infoAppointments.length > 15 ? `Latest 15 of ${infoAppointments.length}` : infoAppointments.length}</span>
                       </h4>
                       <div className={ui.tableWrap}>
                         <table className={ui.table}>
                           <thead>
                             <tr>
-                              <th>ID / Date</th>
+                              <th>When</th>
                               <th>Customer</th>
                               <th>Services</th>
                               <th>Provider</th>
@@ -1661,8 +1761,8 @@ export default function SubscriptionsPage() {
                                 <tr key={apt.id}>
                                   <td>
                                     <div className={styles.aptIdCol}>
-                                      <b>#{apt.id}</b>
-                                      <span>{fmtDay(apt.appointment_date)} {apt.start_time ? apt.start_time.slice(0, 5) : ''}</span>
+                                      <b>{fmtDay(apt.appointment_date)}</b>
+                                      <span title={String(apt.id)}>{fmtTime(apt.start_time)} · {shortRef(apt.id)}</span>
                                     </div>
                                   </td>
                                   <td>
@@ -1695,7 +1795,7 @@ export default function SubscriptionsPage() {
                                   </td>
                                   <td>
                                     <Badge tone={appointmentStatusTone(apt.status)} dot={apt.status === 'completed' || apt.status === 'confirmed'}>
-                                      {apt.status ? apt.status.charAt(0).toUpperCase() + apt.status.slice(1).replace('_', ' ') : '—'}
+                                      {fmtStatus(apt.status)}
                                     </Badge>
                                   </td>
                                   <td className={cx(ui.alignRight, styles.boldNum)}>
@@ -1772,8 +1872,9 @@ export default function SubscriptionsPage() {
                     />
                   ) : (
                     <div className={styles.historySection}>
-                      <h4 className={ui.sectionLabel}>
-                        Appointment Financial Ledger ({infoAppointments.length})
+                      <h4 className={styles.tableHeading}>
+                        Billing per appointment
+                        <span>{infoAppointments.length > 15 ? `Latest 15 of ${infoAppointments.length}` : infoAppointments.length}</span>
                       </h4>
                       <div className={ui.tableWrap}>
                         <table className={ui.table}>
@@ -1781,10 +1882,10 @@ export default function SubscriptionsPage() {
                             <tr>
                               <th>Appointment</th>
                               <th>Customer</th>
-                              <th className={ui.alignRight}>Total Bill</th>
-                              <th className={ui.alignRight}>Online Advance</th>
-                              <th className={ui.alignRight}>Counter Balance</th>
-                              <th>Option</th>
+                              <th className={ui.alignRight}>Bill</th>
+                              <th className={ui.alignRight}>Paid online</th>
+                              <th className={ui.alignRight}>Paid at salon</th>
+                              <th>Payment</th>
                               <th>Status</th>
                             </tr>
                           </thead>
@@ -1799,8 +1900,8 @@ export default function SubscriptionsPage() {
                                 <tr key={apt.id}>
                                   <td>
                                     <div className={styles.aptIdCol}>
-                                      <b>#{apt.id}</b>
-                                      <span>{fmtDay(apt.appointment_date)}</span>
+                                      <b>{fmtDay(apt.appointment_date)}</b>
+                                      <span title={String(apt.id)}>{shortRef(apt.id)}</span>
                                     </div>
                                   </td>
                                   <td>
@@ -1816,13 +1917,13 @@ export default function SubscriptionsPage() {
                                     {bal > 0 ? formatINR(bal) : <span className={styles.mutedNote}>—</span>}
                                   </td>
                                   <td>
-                                    <Badge tone="neutral">
-                                      {apt.payment_option ? apt.payment_option.replace('_', ' ') : 'Standard'}
+                                    <Badge tone="neutral" dot={false}>
+                                      {PAYMENT_OPTION_LABEL[apt.payment_option] ?? (apt.payment_option ? fmtStatus(apt.payment_option) : 'Walk-in')}
                                     </Badge>
                                   </td>
                                   <td>
-                                    <Badge tone={appointmentStatusTone(apt.status)}>
-                                      {apt.status ? apt.status.charAt(0).toUpperCase() + apt.status.slice(1).replace('_', ' ') : '—'}
+                                    <Badge tone={appointmentStatusTone(apt.status)} dot={false}>
+                                      {fmtStatus(apt.status)}
                                     </Badge>
                                   </td>
                                 </tr>
@@ -1919,8 +2020,9 @@ export default function SubscriptionsPage() {
                     />
                   ) : (
                     <div className={styles.historySection}>
-                      <h4 className={ui.sectionLabel}>
-                        Payout Settlement Cycles ({infoPayoutsData.payouts.length})
+                      <h4 className={styles.tableHeading}>
+                        Settlement cycles
+                        <span>{infoPayoutsData.payouts.length}</span>
                       </h4>
                       <div className={ui.tableWrap}>
                         <table className={ui.table}>
@@ -1952,14 +2054,14 @@ export default function SubscriptionsPage() {
                                 </td>
                                 <td className={ui.alignRight}>{formatINR(p.gross_amount, 2)}</td>
                                 <td className={cx(ui.alignRight, styles.advanceCol)}>
-                                  {p.commission_deducted > 0 ? `-${formatINR(p.commission_deducted, 2)}` : '—'}
+                                  {p.commission_deducted > 0 ? `− ${formatINR(p.commission_deducted, 2)}` : '—'}
                                 </td>
                                 <td className={cx(ui.alignRight, styles.boldNum)}>
                                   {formatINR(p.net_amount, 2)}
                                 </td>
                                 <td>
                                   <Badge tone={payoutStatusTone(p.status)} dot={p.status === 'distributed'}>
-                                    {p.status ? p.status.charAt(0).toUpperCase() + p.status.slice(1) : '—'}
+                                    {fmtStatus(p.status)}
                                   </Badge>
                                 </td>
                                 <td>
@@ -2080,8 +2182,9 @@ export default function SubscriptionsPage() {
 
                   {/* All Subscription Plans History Table */}
                   <div className={styles.historySection}>
-                    <h4 className={ui.sectionLabel}>
-                      Subscription plans ({infoSubscriptionData?.subscriptions?.length ?? 0})
+                    <h4 className={styles.tableHeading}>
+                      Plan history
+                      <span>{infoSubscriptionData?.subscriptions?.length ?? 0}</span>
                     </h4>
                     {(!infoSubscriptionData?.subscriptions || infoSubscriptionData.subscriptions.length === 0) ? (
                       <EmptyState
@@ -2136,7 +2239,7 @@ export default function SubscriptionsPage() {
                                       }
                                       dot={false}
                                     >
-                                      {sub.status ? sub.status.charAt(0).toUpperCase() + sub.status.slice(1) : '—'}
+                                      {fmtStatus(sub.status)}
                                     </Badge>
                                   </td>
                                 </tr>
@@ -2151,8 +2254,9 @@ export default function SubscriptionsPage() {
                   {/* Payment Submissions Table if any */}
                   {infoSubscriptionData?.payment_requests && infoSubscriptionData.payment_requests.length > 0 && (
                     <div className={styles.historySection}>
-                      <h4 className={cx(ui.sectionLabel, styles.historySectionGap)}>
-                        Payment submissions ({infoSubscriptionData.payment_requests.length})
+                      <h4 className={styles.tableHeading}>
+                        Payments sent for plans
+                        <span>{infoSubscriptionData.payment_requests.length}</span>
                       </h4>
                       <div className={ui.tableWrap}>
                         <table className={ui.table}>
@@ -2191,7 +2295,7 @@ export default function SubscriptionsPage() {
                                 <td className={ui.num}>{fmtDateStr(pr.created_at)}</td>
                                 <td>
                                   <Badge tone={statusTone(pr.status)} dot={false}>
-                                    {pr.status ? pr.status.charAt(0).toUpperCase() + pr.status.slice(1) : '—'}
+                                    {fmtStatus(pr.status)}
                                   </Badge>
                                 </td>
                               </tr>

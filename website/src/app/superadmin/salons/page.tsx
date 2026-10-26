@@ -16,6 +16,17 @@ interface Salon {
   city?: { name: string };
   admin?: { name: string };
   assigned_collaborator?: { id: string; name: string } | null;
+  current_plan?: CurrentPlan | null;
+}
+
+/** The plan the salon is on right now; null when it has none. */
+interface CurrentPlan {
+  name: string;
+  billing_type: 'subscription' | 'commission' | string;
+  billing_label: string;
+  end_date: string | null;
+  days_left: number | null;
+  lapsed: boolean;
 }
 
 interface Collaborator {
@@ -39,6 +50,13 @@ const STATUS_TONE: Record<string, Tone> = {
 };
 
 const formatStatus = (value: string) => value.replace(/_/g, ' ');
+
+/** One line for the CSV and the cell's tooltip. */
+const planSummary = (plan?: CurrentPlan | null) => {
+  if (!plan) return 'No active plan';
+  const until = plan.end_date ? ` until ${formatDate(plan.end_date)}` : '';
+  return `${plan.name} · ${plan.billing_label}${until}${plan.lapsed ? ' (lapsed)' : ''}`;
+};
 
 const formatDate = (value: string) => {
   const d = new Date(value);
@@ -150,6 +168,33 @@ export default function SalonDirectory() {
         header: 'Owner / Admin',
         sortValue: (s) => s.admin?.name,
         render: (s) => s.admin?.name || 'N/A',
+      },
+      {
+        key: 'plan',
+        header: 'Current Plan',
+        sortValue: (s) => s.current_plan?.name,
+        csvValue: (s) => planSummary(s.current_plan),
+        render: (s) => {
+          const plan = s.current_plan;
+          if (!plan) return <span className={styles.planNone}>No active plan</span>;
+
+          const commission = plan.billing_type === 'commission';
+          const soon = !plan.lapsed && plan.days_left !== null && plan.days_left <= 5;
+
+          return (
+            <div className={styles.planCell} title={planSummary(plan)}>
+              <span className={styles.planName}>
+                {plan.name}
+                {plan.lapsed && <Badge tone="danger" dot={false}>Lapsed</Badge>}
+                {soon && <Badge tone="warning" dot={false}>{plan.days_left === 0 ? 'Ends today' : `${plan.days_left}d left`}</Badge>}
+              </span>
+              <span className={styles.planMeta}>
+                {commission ? 'Commission Model' : 'Subscription'}
+                {plan.end_date && ` · until ${formatDate(plan.end_date)}`}
+              </span>
+            </div>
+          );
+        },
       },
       {
         key: 'collaborator',
