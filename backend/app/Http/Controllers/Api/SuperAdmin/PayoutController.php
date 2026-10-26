@@ -110,6 +110,8 @@ class PayoutController extends Controller
             'cycle_label' => PayoutCycle::label($cycleType, $start, $end),
             'cycle_start' => $start->toDateString(),
             'cycle_end' => $end->toDateString(),
+            // Still running: figures are a preview and cannot be approved yet.
+            'cycle_in_progress' => $end->copy()->startOfDay()->gte(Carbon::today()),
             'totals' => [
                 'salons' => (int) $totals->salons,
                 'appointment_revenue' => round((float) $totals->appointment_revenue, 2),

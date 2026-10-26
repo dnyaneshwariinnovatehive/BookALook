@@ -40,6 +40,9 @@ class PayoutLedgerTest extends TestCase
     {
         parent::setUp();
 
+        // The cycles below have all ended: a running cycle cannot be signed off.
+        Carbon::setTestNow('2026-11-05 10:00:00');
+
         $u = substr(bin2hex(random_bytes(6)), 0, 8);
         $this->superadmin = User::create(['id' => (string) Str::uuid(), 'role' => 'superadmin', 'name' => "SA {$u}", 'phone' => '3'.substr((string) crc32($u.'sa'), 0, 9), 'password_hash' => 'x', 'is_active' => true]);
         $this->owner = User::create(['id' => (string) Str::uuid(), 'role' => 'admin', 'name' => "Owner {$u}", 'phone' => '3'.substr((string) crc32($u.'ow'), 0, 9), 'password_hash' => 'x', 'is_active' => true]);
@@ -250,16 +253,55 @@ class PayoutLedgerTest extends TestCase
         $this->assertEquals(200.0, (float) $first->fresh()->net_amount);
     }
 
-    public function test_a_missed_weekly_run_is_picked_up_by_the_next_one(): void
+    public function test_a_missed_weekly_run_is_built_as_its_own_payout(): void
     {
         $this->booking('2026-10-06', 'completed', 1000, 200);
         $this->booking('2026-10-14', 'completed', 1000, 300);
 
-        // Only the later week is ever generated.
+        // Only the later week is ever generated: the missed week still gets
+        // its own payout rather than being folded into this one.
         $this->payouts->generateWeekly(Carbon::parse('2026-10-14'));
 
-        $payout = SalonPayout::where('salon_id', $this->salon->id)->sole();
-        $this->assertEquals(500.0, (float) $payout->net_amount);
+        $payouts = SalonPayout::where('salon_id', $this->salon->id)->orderBy('cycle_start_date')->get();
+        $this->assertCount(2, $payouts);
+        $this->assertSame('2026-10-05', Carbon::parse($payouts[0]->cycle_start_date)->toDateString());
+        $this->assertEquals(200.0, (float) $payouts[0]->net_amount);
+        $this->assertEquals(300.0, (float) $payouts[1]->net_amount);
+    }
+
+    public function test_a_later_week_never_takes_an_open_weeks_bookings(): void
+    {
+        $this->booking('2026-10-13', 'completed', 1000, 200);
+        $this->booking('2026-10-21', 'completed', 1000, 300);
+
+        // Calculated in either order, again and again: each week is its own.
+        foreach (['2026-10-20', '2026-10-13', '2026-10-20', '2026-10-20', '2026-10-13'] as $day) {
+            $this->week($day);
+        }
+
+        $this->assertEquals(200.0, (float) $this->week('2026-10-13')->net_amount);
+        $this->assertEquals(300.0, (float) $this->week('2026-10-20')->net_amount);
+    }
+
+    public function test_a_running_week_is_a_preview_that_cannot_be_approved(): void
+    {
+        Carbon::setTestNow('2026-10-22 10:00:00');
+        $this->booking('2026-10-20', 'completed', 1000, 200);
+
+        $preview = $this->week('2026-10-20');
+        $this->assertEquals(200.0, (float) $preview->net_amount);
+        $this->assertTrue(PayoutService::cycleInProgress($preview));
+
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->postJson("/api/superadmin/payouts/{$preview->id}/approve")
+            ->assertStatus(422);
+        $this->assertSame(PayoutService::STATUS_PENDING, $preview->fresh()->status);
+
+        // Once the week is over it can be signed off.
+        Carbon::setTestNow('2026-10-26 09:00:00');
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->postJson("/api/superadmin/payouts/{$preview->id}/approve")
+            ->assertOk();
     }
 
     public function test_recalculating_never_settles_a_booking_twice(): void

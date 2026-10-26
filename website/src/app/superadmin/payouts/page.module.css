@@ -149,6 +149,26 @@
   font-size: 14px;
 }
 
+.noticeBanner,
+.previewBanner {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.noticeBanner {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-bg, rgba(22, 163, 74, 0.08));
+  color: var(--color-success);
+}
+
+.previewBanner {
+  border: 1px dashed var(--color-warning);
+  background: var(--color-warning-bg, rgba(217, 119, 6, 0.08));
+  color: var(--text-heading);
+}
+
 /* ---------------------------------------------------------- KPIs */
 
 .summaryGrid {

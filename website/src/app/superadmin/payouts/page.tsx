@@ -33,6 +33,8 @@ interface Payout {
   /** The latest screenshot the salon sent for what it owes. */
   payment_submission?: PaymentSubmission | null;
   status: string;
+  /** The cycle has not ended: figures are a preview and cannot be approved yet. */
+  in_progress?: boolean;
   distributed_at: string | null;
   distribution_reference: string | null;
   /** The statement issued for this cycle, present only once the money moved. */
@@ -142,6 +144,8 @@ export default function PayoutsPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [cycleEnd, setCycleEnd] = useState('');
   const [cycleLabel, setCycleLabel] = useState('');
+  const [inProgress, setInProgress] = useState(false);
+  const [notice, setNotice] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -192,6 +196,7 @@ export default function PayoutsPage() {
       setTotals(data.totals);
       setCycleEnd(data.cycle_end);
       setCycleLabel(data.cycle_label);
+      setInProgress(Boolean(data.cycle_in_progress));
       if (data.meta) setMeta(data.meta);
     } catch (e: unknown) {
       if (seq !== listSeq.current) return;
@@ -220,6 +225,7 @@ export default function PayoutsPage() {
   const generate = async () => {
     setBusyId('generate');
     setError('');
+    setNotice('');
     try {
       const res = await fetch('/api/proxy/superadmin/payouts/generate', {
         method: 'POST',
@@ -228,9 +234,10 @@ export default function PayoutsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not calculate the cycle.');
+      setNotice(data.message || 'Cycle calculated.');
       // The new cycle can be shorter than the page we were on.
-      setPage(1);
-      await fetchPayouts();
+      if (page === 1) await fetchPayouts();
+      else setPage(1);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not calculate the cycle.');
     } finally {
@@ -253,8 +260,8 @@ export default function PayoutsPage() {
 
   const confirmGenerate = async () => {
     const ok = await confirm({
-      title: `Rebuild the ${selectedCycleLabel()} cycle?`,
-      body: 'This recalculates the open payouts for this cycle from every booking not yet settled — including late completions and no-show advances. Approved and distributed payouts are never changed. Nothing is paid out by this.',
+      title: `Calculate ${selectedCycleLabel()}?`,
+      body: 'This rebuilds the open payouts for this cycle from the bookings dated inside it, plus any booking completed late after its own cycle was already approved. Earlier weeks that were never calculated get their own payouts. Approved and distributed payouts are never changed, and nothing is paid out by this.',
       confirmLabel: 'Recalculate cycle',
     });
     if (!ok) return;
@@ -372,7 +379,7 @@ export default function PayoutsPage() {
   const kpis = totals
     ? [
         { label: 'Salons in cycle', value: String(totals.salons), hint: needsAction ? `${needsAction} need action on this page` : 'Nothing waiting on this page', tone: 'neutral' },
-        { label: 'Billed by salons', value: money(totals.appointment_revenue), hint: 'Total of all bookings', tone: 'neutral' },
+        { label: 'Billed on app bookings', value: money(totals.appointment_revenue), hint: 'Commission base; walk-ins excluded', tone: 'neutral' },
         { label: 'Advances held', value: money(totals.advances_held), hint: 'Collected online by BookALook', tone: 'info' },
         { label: 'Commission earned', value: money(totals.commission_deducted), hint: cycleType === 'monthly' ? 'On app bookings' : 'Not charged on plans', tone: 'success' },
         { label: 'Still to settle', value: money(totals.net_to_distribute), hint: 'Pending + approved', tone: 'warning' },
@@ -392,7 +399,7 @@ export default function PayoutsPage() {
           </p>
         </div>
         <button className={styles.primaryAction} onClick={confirmGenerate} disabled={busyId === 'generate'}>
-          {busyId === 'generate' ? 'Calculating…' : cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}
+          {busyId === 'generate' ? 'Calculating…' : cycleType === 'monthly' ? 'Calculate selected month' : 'Calculate selected week'}
         </button>
       </header>
 
@@ -446,6 +453,13 @@ export default function PayoutsPage() {
       </div>
 
       {error && <div className={styles.errorBanner} role="alert">{error}</div>}
+      {notice && !error && <div className={styles.noticeBanner} role="status">{notice}</div>}
+      {inProgress && (
+        <div className={styles.previewBanner} role="note">
+          <strong>In progress.</strong> This {cycleType === 'monthly' ? 'month' : 'week'} has not ended, so these figures are a
+          preview of the bookings so far. Payouts can be approved and paid once it is over.
+        </div>
+      )}
 
       {totals && (
         <div className={styles.summaryGrid}>
@@ -476,7 +490,7 @@ export default function PayoutsPage() {
             <div className={styles.emptyTitle}>No payouts for this cycle yet</div>
             <p>
               {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts appear here once the cycle has
-              bookings. Press “{cycleType === 'monthly' ? 'Calculate this month' : 'Calculate this week'}” to build them.
+              bookings. Press “{cycleType === 'monthly' ? 'Calculate selected month' : 'Calculate selected week'}” to build them.
             </p>
           </div>
         ) : (
@@ -501,6 +515,7 @@ export default function PayoutsPage() {
                   const open = p.status !== 'distributed';
                   const paymentPending = open && p.payment_submission?.status === 'pending';
                   const paymentDeclined = open && p.payment_submission?.status === 'rejected';
+                  const preview = open && Boolean(p.in_progress);
                   return (
                     <tr key={p.id} className={paymentPending ? styles.rowAttention : undefined}>
                       <td>
@@ -549,13 +564,19 @@ export default function PayoutsPage() {
                       </td>
                       <td>
                         {statusPill(p.status)}
+                        {preview && <div className={styles.flagMuted}>Preview · cycle running</div>}
                         {paymentPending && <div className={styles.flagWarn}>Payment to verify</div>}
                         {paymentDeclined && <div className={styles.flagMuted}>Last payment declined</div>}
                       </td>
                       <td className={styles.actionsCol}>
                         <div className={styles.rowActions}>
                           {p.status === 'pending' && (
-                            <button className={styles.btnGhost} disabled={busyId === p.id} onClick={() => confirmApprove(p)}>
+                            <button
+                              className={styles.btnGhost}
+                              disabled={busyId === p.id || preview}
+                              title={preview ? 'Available once the cycle has ended' : undefined}
+                              onClick={() => confirmApprove(p)}
+                            >
                               Approve
                             </button>
                           )}
@@ -565,7 +586,12 @@ export default function PayoutsPage() {
                             </button>
                           )}
                           {open && !paymentPending && (
-                            <button className={styles.btnSuccess} disabled={busyId === p.id} onClick={() => confirmDistribute(p)}>
+                            <button
+                              className={styles.btnSuccess}
+                              disabled={busyId === p.id || preview}
+                              title={preview ? 'Available once the cycle has ended' : undefined}
+                              onClick={() => confirmDistribute(p)}
+                            >
                               {owes ? 'Mark collected' : 'Distribute'}
                             </button>
                           )}

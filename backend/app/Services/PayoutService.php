@@ -90,8 +90,16 @@ class PayoutService
             $payout->items()->delete();
             DB::table('payment_refunds')->where('salon_payout_id', $payout->id)->update(['salon_payout_id' => null]);
 
-            $bookingItems = $this->settleBookings($salon, $payout, $end);
+            $bookingItems = $this->settleBookings($salon, $payout, $start, $end);
             $refundItems = $this->settleLateRefunds($salonId, $payout);
+
+            // A cycle with nothing in it is not worth a row: an empty payout
+            // would only sit on the screen as a ₹0 line to approve.
+            if (! $existing && $bookingItems === [] && $refundItems === []) {
+                $payout->delete();
+
+                return $payout;
+            }
 
             $gross = round(array_sum(array_column($bookingItems, 'gross_amount')), 2);
             $commission = round(array_sum(array_column($bookingItems, 'commission_amount')), 2);
@@ -124,8 +132,15 @@ class PayoutService
     public const LEDGER_STATUSES = ['completed', 'cancelled', 'no_show'];
 
     /**
-     * Claim every booking up to the cycle's end that no payout has settled
-     * yet, and write a line for each.
+     * Claim this cycle's bookings, and write a line for each.
+     *
+     * A cycle takes the bookings dated inside it. The only older bookings it
+     * takes are ones its own cycle can no longer settle — that payout is
+     * already approved or paid, so a visit completed late (or a refund decided
+     * late) would otherwise never be paid out. A cycle never takes a booking
+     * whose own cycle is still open: that used to let "this week" swallow
+     * last week's bookings, so every week's figure depended on which one was
+     * calculated first.
      *
      *  - Completed: the salon gets the advance the platform took, less any
      *    refund on it; commission is on the full bill.
@@ -139,21 +154,26 @@ class PayoutService
      *
      * @return array<int, array> the lines written
      */
-    private function settleBookings(?Salon $salon, SalonPayout $payout, Carbon $end): array
+    private function settleBookings(?Salon $salon, SalonPayout $payout, Carbon $start, Carbon $end): array
     {
         if (! $salon) {
             return [];
         }
 
-        $appointments = Appointment::where('salon_id', $salon->id)
-            ->whereIn('status', self::LEDGER_STATUSES)
+        $appointments = $this->unclaimed($salon)
             ->whereDate('appointment_date', '<=', $end->toDateString())
-            ->when($salon->payout_ledger_since, fn ($q) => $q->whereDate('appointment_date', '>=', Carbon::parse($salon->payout_ledger_since)->toDateString()))
-            ->whereNotExists(function ($q) {
-                $q->selectRaw('1')
-                    ->from('salon_payout_items as spi')
-                    ->whereColumn('spi.appointment_id', 'appointments.id')
-                    ->where('spi.kind', SalonPayoutItem::KIND_BOOKING);
+            ->where(function ($q) use ($start, $payout) {
+                $q->whereDate('appointment_date', '>=', $start->toDateString())
+                    // Late: its own cycle is already signed off.
+                    ->orWhereExists(function ($frozen) use ($payout) {
+                        $frozen->selectRaw('1')
+                            ->from('salon_payouts as own')
+                            ->whereColumn('own.salon_id', 'appointments.salon_id')
+                            ->where('own.id', '!=', $payout->id)
+                            ->whereIn('own.status', [self::STATUS_APPROVED, self::STATUS_DISTRIBUTED])
+                            ->whereColumn('own.cycle_start_date', '<=', 'appointments.appointment_date')
+                            ->whereColumn('own.cycle_end_date', '>=', 'appointments.appointment_date');
+                    });
             })
             ->orderBy('appointment_date')
             ->get();
@@ -254,6 +274,52 @@ class PayoutService
         }
 
         return $lines;
+    }
+
+    /** A salon's settle-able bookings that no payout has taken yet. */
+    private function unclaimed(Salon $salon)
+    {
+        return Appointment::where('salon_id', $salon->id)
+            ->whereIn('status', self::LEDGER_STATUSES)
+            ->when($salon->payout_ledger_since, fn ($q) => $q->whereDate('appointment_date', '>=', Carbon::parse($salon->payout_ledger_since)->toDateString()))
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('salon_payout_items as spi')
+                    ->whereColumn('spi.appointment_id', 'appointments.id')
+                    ->where('spi.kind', SalonPayoutItem::KIND_BOOKING);
+            });
+    }
+
+    /**
+     * Earlier cycles a run was never built for, oldest first: cycles before
+     * $before holding unclaimed bookings that no payout covers. Each gets its
+     * own payout rather than being folded into a later one, so every cycle's
+     * figure is that cycle's trading.
+     *
+     * @return array<int, array{0: Carbon, 1: Carbon}>
+     */
+    private function missedCycles(Salon $salon, string $cycleType, Carbon $before): array
+    {
+        $dates = $this->unclaimed($salon)
+            ->whereDate('appointment_date', '<', $before->toDateString())
+            ->whereNotExists(function ($q) {
+                $q->selectRaw('1')
+                    ->from('salon_payouts as own')
+                    ->whereColumn('own.salon_id', 'appointments.salon_id')
+                    ->whereColumn('own.cycle_start_date', '<=', 'appointments.appointment_date')
+                    ->whereColumn('own.cycle_end_date', '>=', 'appointments.appointment_date');
+            })
+            ->distinct()
+            ->pluck('appointment_date');
+
+        $cycles = [];
+        foreach ($dates as $date) {
+            [$s, $e] = PayoutCycle::bounds($cycleType, Carbon::parse($date));
+            $cycles[$s->toDateString()] = [$s, $e];
+        }
+        ksort($cycles);
+
+        return array_values($cycles);
     }
 
     /**
@@ -377,6 +443,8 @@ class PayoutService
                 throw new \RuntimeException('This payout has already been distributed.');
             }
 
+            $this->assertCycleFinished($payout);
+
             // From here the figures are frozen; anything later goes to the
             // next payout.
             $payout->forceFill([
@@ -413,6 +481,8 @@ class PayoutService
             if ($payout->status === self::STATUS_DISTRIBUTED) {
                 throw new \RuntimeException('This payout has already been distributed.');
             }
+
+            $this->assertCycleFinished($payout);
 
             $payout->forceFill([
                 // Recomputed one last time so a late change cannot leave the
@@ -484,6 +554,8 @@ class PayoutService
             // The latest screenshot the salon sent for what it owes, if any.
             'payment_submission' => $this->latestSubmission($payout)?->present(),
             'status' => $payout->status,
+            // Still running: a preview that cannot be approved or paid yet.
+            'in_progress' => self::cycleInProgress($payout),
             'approved_at' => $payout->approved_at,
             'distributed_at' => $payout->distributed_at,
             'distribution_reference' => $payout->distribution_reference,
@@ -571,8 +643,21 @@ class PayoutService
             ->pluck('id');
 
         foreach ($salonIds as $salonId) {
+            $salon = Salon::find($salonId);
+
+            // Weeks (or months) no run was ever built for are built first, as
+            // their own payouts, so nothing is lost and nothing is merged.
+            foreach ($salon ? $this->missedCycles($salon, $cycleType, $start) : [] as [$missedStart, $missedEnd]) {
+                $this->calculate($salonId, $missedStart, $missedEnd, $cycleType);
+            }
+
             $this->calculate($salonId, $start, $end, $cycleType);
         }
+
+        $salonIds = SalonPayout::where('cycle_type', $cycleType)
+            ->whereDate('cycle_start_date', $start->toDateString())
+            ->whereIn('salon_id', $salonIds)
+            ->pluck('salon_id');
 
         return [
             'cycle_type' => $cycleType,
@@ -580,6 +665,26 @@ class PayoutService
             'end' => $end->toDateString(),
             'payouts' => $salonIds->count(),
         ];
+    }
+
+    /**
+     * A cycle still running is a preview: its bookings are not all in yet, so
+     * it cannot be signed off or paid until its last day is over.
+     */
+    public static function cycleInProgress(SalonPayout $payout): bool
+    {
+        return $payout->cycle_end_date !== null
+            && Carbon::parse($payout->cycle_end_date)->startOfDay()->gte(Carbon::today());
+    }
+
+    private function assertCycleFinished(SalonPayout $payout): void
+    {
+        if (self::cycleInProgress($payout)) {
+            throw new \RuntimeException(sprintf(
+                'This cycle runs until %s. It can be approved and paid once it has ended.',
+                Carbon::parse($payout->cycle_end_date)->format('j M Y')
+            ));
+        }
     }
 
     private function net(float $advancesHeld, float $commission, float $refunds, float $walletRedeemed): float

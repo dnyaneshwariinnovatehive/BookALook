@@ -40,6 +40,9 @@ class PayoutDuesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // October has ended, so its payout can be settled.
+        Carbon::setTestNow('2026-11-05 10:00:00');
         Storage::fake('cloudinary');
 
         $u = substr(bin2hex(random_bytes(6)), 0, 8);
