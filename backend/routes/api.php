@@ -382,6 +382,8 @@ Route::prefix('partner')->group(function () {
         // a salon must be able to say where to be paid whatever its plan.
         Route::get('/salons/{salon_id}/bank-details', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'show']);
         Route::put('/salons/{salon_id}/bank-details', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'update'])->middleware('throttle:20,1');
+        Route::post('/salons/{salon_id}/bank-details/copy', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'copy'])->middleware('throttle:20,1');
+        Route::get('/bank-details/saved', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'saved']);
         Route::get('/payment-details', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'paymentDetails']);
         Route::post('/salons/{salon_id}/payouts/{payout_id}/payment', [\App\Http\Controllers\Api\Partner\PayoutDuesController::class, 'submit'])->middleware('throttle:10,1');
         // Postpaid: no money changes hands here, so there is nothing to upload.

@@ -6,14 +6,21 @@ class AdminProviderStatus {
   final AdminProviderValidation setupValidation;
   final int upcomingAppointmentsCount;
 
+  /// Set when the owner's provider profile belongs to another of their
+  /// salons. An owner can be a service provider at one salon only, so this
+  /// salon shows [ProviderElsewhere.message] instead of the switch.
+  final ProviderElsewhere? providerElsewhere;
+
   AdminProviderStatus({
     required this.isProviderEnabled,
     this.provider,
     required this.setupValidation,
     required this.upcomingAppointmentsCount,
+    this.providerElsewhere,
   });
 
   factory AdminProviderStatus.fromJson(Map<String, dynamic> json) {
+    final elsewhere = json['provider_elsewhere'];
     return AdminProviderStatus(
       isProviderEnabled: json['is_provider_enabled'] == true,
       provider: json['provider'] != null
@@ -23,8 +30,49 @@ class AdminProviderStatus {
         (json['setup_validation'] as Map<String, dynamic>?) ?? {},
       ),
       upcomingAppointmentsCount: int.tryParse('${json['upcoming_appointments_count']}') ?? 0,
+      providerElsewhere: elsewhere is Map
+          ? ProviderElsewhere.fromJson(Map<String, dynamic>.from(elsewhere))
+          : null,
     );
   }
+}
+
+/// The other salon where the owner is a service provider.
+class ProviderElsewhere {
+  final String salonId;
+  final String salonName;
+  final bool isActive;
+  final String message;
+
+  const ProviderElsewhere({
+    required this.salonId,
+    required this.salonName,
+    required this.isActive,
+    required this.message,
+  });
+
+  factory ProviderElsewhere.fromJson(Map<String, dynamic> json) {
+    final name = json['salon_name']?.toString() ?? 'another salon';
+    return ProviderElsewhere(
+      salonId: json['salon_id']?.toString() ?? '',
+      salonName: name,
+      isActive: json['is_active'] == true,
+      message: json['message']?.toString() ??
+          'You already work as a service provider at $name. An owner can be a service provider at only one salon.',
+    );
+  }
+}
+
+/// The server refused because the owner is a service provider at another
+/// salon; [message] says which.
+class ProviderElsewhereException implements Exception {
+  final ProviderElsewhere elsewhere;
+  const ProviderElsewhereException(this.elsewhere);
+
+  String get message => elsewhere.message;
+
+  @override
+  String toString() => message;
 }
 
 class AdminProviderValidation {

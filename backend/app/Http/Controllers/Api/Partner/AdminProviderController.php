@@ -43,6 +43,14 @@ class AdminProviderController extends Controller
             ->where('user_id', $targetUser->id)
             ->first();
 
+        // A person has one provider profile, at one salon. When it is tied to
+        // another of the owner's salons, this salon says where instead of
+        // offering the switch — and never shows that salon's profile as its own.
+        $elsewhere = $this->workingElsewhere($provider, $salonId, $salon);
+        if ($provider && $provider->salon_id !== $salonId) {
+            $provider = null;
+        }
+
         // Validation checks
         $hasSalonHours = SalonWorkingHour::where('salon_id', $salonId)
             ->where('is_closed', false)
@@ -103,7 +111,49 @@ class AdminProviderController extends Controller
                 'is_ready_for_booking' => $isReady,
             ],
             'upcoming_appointments_count' => $upcomingCount,
+            'provider_elsewhere' => $elsewhere,
         ]);
+    }
+
+    /**
+     * The other salon that holds the owner's provider profile, when it is
+     * theirs to keep: they work there now, or have served customers there.
+     *
+     * An owner can be a service provider at one salon only. A profile that was
+     * switched off without ever being booked is not holding anything, so it may
+     * move; one with bookings stays, or that salon's history would point at a
+     * provider who now belongs somewhere else.
+     *
+     * @return array{salon_id: string, salon_name: string, is_active: bool, message: string}|null
+     */
+    private function workingElsewhere(?ServiceProvider $provider, string $salonId, Salon $here): ?array
+    {
+        if (! $provider || $provider->salon_id === $salonId) {
+            return null;
+        }
+
+        $active = ! $provider->trashed() && $provider->is_active;
+        $served = Appointment::where('salon_id', $provider->salon_id)
+            ->where(function ($q) use ($provider) {
+                $q->where('appointed_provider_id', $provider->id)
+                  ->orWhere('serving_provider_id', $provider->id);
+            })
+            ->exists();
+
+        if (! $active && ! $served) {
+            return null;
+        }
+
+        $name = Salon::whereKey($provider->salon_id)->value('name') ?? 'another salon';
+
+        return [
+            'salon_id' => $provider->salon_id,
+            'salon_name' => $name,
+            'is_active' => $active,
+            'message' => $active
+                ? "You already work as a service provider at {$name}. An owner can be a service provider at only one salon, so this option is not available at {$here->name}."
+                : "Your service provider profile belongs to {$name}, where you have served customers. An owner can be a service provider at only one salon, so this option is not available at {$here->name}.",
+        ];
     }
 
     /**
@@ -153,12 +203,24 @@ class AdminProviderController extends Controller
 
             $provider = ServiceProvider::withTrashed()
                 ->where('user_id', $targetUser->id)
+                ->lockForUpdate()
                 ->first();
+
+            if ($elsewhere = $this->workingElsewhere($provider, $salonId, $salon)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'error_code' => 'PROVIDER_AT_OTHER_SALON',
+                    'message' => $elsewhere['message'],
+                    'provider_elsewhere' => $elsewhere,
+                ], 409);
+            }
 
             if (! $enabled) {
                 // Disable provider mode safely:
                 // Do not delete rows, foreign keys, working hours or appointment history.
-                if ($provider) {
+                // A profile parked at another salon is not this salon's to touch.
+                if ($provider && $provider->salon_id === $salonId) {
                     $provider->is_active = false;
                     $provider->save();
                 }
@@ -174,6 +236,12 @@ class AdminProviderController extends Controller
             if ($provider) {
                 if ($provider->trashed()) {
                     $provider->restore();
+                }
+                if ($provider->salon_id !== $salonId) {
+                    // An unused profile moving over from another salon: that
+                    // salon's services and hours mean nothing here.
+                    $provider->services()->detach();
+                    ProviderWorkingHour::where('provider_id', $provider->id)->delete();
                 }
                 $provider->salon_id = $salonId;
                 $provider->is_active = true;

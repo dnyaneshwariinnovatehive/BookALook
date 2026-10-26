@@ -7,6 +7,7 @@ import '../../widgets/floating_pill_nav_bar.dart';
 import '../../widgets/tab_navigator.dart';
 import '../subscription_locked_screen.dart';
 import '../../services/salon_access_api.dart';
+import '../../services/wallet_balance.dart';
 import '../../services/auth_service.dart';
 import '../../services/staff_api.dart';
 import 'tabs/provider_profile_tab.dart';
@@ -58,6 +59,7 @@ class _ServiceProviderDashboardState extends State<ServiceProviderDashboard>
   @override
   void initState() {
     super.initState();
+    WalletBalance.clear();
     _provider = Map<String, dynamic>.from(widget.provider);
     WidgetsBinding.instance.addObserver(this);
     _checkAccess();

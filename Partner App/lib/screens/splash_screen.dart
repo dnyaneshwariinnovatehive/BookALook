@@ -7,7 +7,7 @@ import '../services/api_config.dart' show mandatoryUpdateRouteName;
 import '../services/app_version_service.dart';
 import 'mandatory_update_screen.dart';
 import 'phone_screen.dart';
-import 'dashboard/salon_selection_screen.dart';
+import 'dashboard/salon_switching.dart';
 import 'dashboard/service_provider_dashboard.dart';
 import 'dashboard/collaborator_dashboard.dart';
 
@@ -26,6 +26,11 @@ class _SplashScreenState extends State<SplashScreen>
   AppUpdateInfo? _updateInfo;
   bool _authCheckComplete = false;
   bool _versionCheckComplete = false;
+
+  /// An owner's salons as the server has them now, and the one they used
+  /// last — so the app opens straight into it.
+  List<dynamic>? _freshSalons;
+  String? _lastSalonId;
 
   @override
   void initState() {
@@ -51,13 +56,31 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     _cachedToken = prefs.getString('auth_token');
     _cachedAuthStateStr = prefs.getString('auth_state');
-    _authCheckComplete = true;
+
+    // For an owner, re-read the salons while the version is checked: a salon
+    // approved or deactivated since sign-in must open (or not) accordingly.
+    final ownerSalons = _isOwnerSession ? SalonSession.refresh(timeout: const Duration(seconds: 4)) : null;
 
     _updateInfo = await AppVersionService.instance.checkUpdate();
     _versionCheckComplete = true;
 
+    if (ownerSalons != null) {
+      _freshSalons = await ownerSalons;
+      _lastSalonId = await SalonSession.lastSalonId();
+    }
+    _authCheckComplete = true;
+
     if (_controller.isCompleted) {
       _navigate();
+    }
+  }
+
+  bool get _isOwnerSession {
+    if (_cachedToken == null || _cachedToken!.isEmpty || _cachedAuthStateStr == null) return false;
+    try {
+      return jsonDecode(_cachedAuthStateStr!)['role'] == 'admin';
+    } catch (_) {
+      return false;
     }
   }
 
@@ -87,8 +110,10 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (_, __, ___) =>
-                SalonSelectionScreen(salons: response['salons'] ?? []),
+            pageBuilder: (_, __, ___) => SalonSession.homeFor(
+              _freshSalons ?? List<dynamic>.from(response['salons'] ?? const []),
+              lastSalonId: _lastSalonId,
+            ),
             transitionsBuilder: (_, animation, __, child) =>
                 FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 500),

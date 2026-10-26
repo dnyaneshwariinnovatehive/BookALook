@@ -49,8 +49,59 @@ class BankDetailsController extends Controller
     }
 
     /**
+     * "Same as my other salon": copy the account from another salon the same
+     * owner runs. Done here rather than in the app so the full account number
+     * never has to travel to the phone and back.
+     */
+    public function copy(Request $request, string $salonId)
+    {
+        $salon = $this->ownedSalon($request, $salonId);
+
+        if (! $salon) {
+            return response()->json(['message' => 'You can only change bank details for your own salon.'], 403);
+        }
+
+        $request->validate(['from_salon_id' => 'required|string']);
+
+        $source = $this->ownedSalon($request, (string) $request->input('from_salon_id'));
+
+        if (! $source || $source->id === $salon->id) {
+            return response()->json(['message' => 'Choose another of your own salons to copy from.'], 422);
+        }
+
+        if (! $this->bank->hasRequired($source)) {
+            return response()->json([
+                'message' => "{$source->name} does not have complete bank details to copy.",
+            ], 422);
+        }
+
+        $this->bank->apply($salon, $this->bank->valuesOf($source), $request->user());
+
+        return response()->json(
+            ['message' => "Bank details copied from {$source->name}."] + $this->payload($salon->fresh())
+        );
+    }
+
+    /**
+     * The owner's salons with complete bank details, masked — offered as
+     * "Same as my other salon" while registering a new branch, before that
+     * branch has an id of its own.
+     */
+    public function saved(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user || $user->role !== 'admin') {
+            return response()->json(['salons' => []]);
+        }
+
+        return response()->json(['salons' => $this->bank->copyableFor($user->id)]);
+    }
+
+    /**
      * The details, plus whether the Home tab should nag: a live plan and the
-     * transfer fields still missing.
+     * transfer fields still missing. [other_salons] lists the owner's other
+     * salons whose account can be copied here, masked like this one.
      */
     private function payload(Salon $salon): array
     {
@@ -60,6 +111,7 @@ class BankDetailsController extends Controller
         return [
             'bank_details' => $this->bank->present($salon),
             'show_missing_warning' => $planActive && ! $hasRequired,
+            'other_salons' => $this->bank->copyableFor($salon->admin_id, $salon->id),
         ];
     }
 

@@ -240,6 +240,16 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
           });
         }
       }
+    } on ProviderElsewhereException catch (e) {
+      // Became a provider at another salon since this screen loaded: show
+      // the explanation in place of the switch.
+      if (mounted) {
+        setState(() => _isTogglingAdmin = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(duration: const Duration(seconds: 4), content: Text(e.message)),
+        );
+        _fetchAdminStatus();
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isTogglingAdmin = false);
@@ -253,6 +263,59 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
     }
   }
 
+  /// Shown instead of the switch when the owner is a service provider at
+  /// another of their salons.
+  Widget _buildProviderElsewhereCard(ProviderElsewhere elsewhere) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      key: const ValueKey('admin_provider_elsewhere'),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: theme.dividerColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.person_pin, color: theme.colorScheme.onSurface.withOpacity(0.5), size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Service provider at ${elsewhere.salonName}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: isDark ? AppTheme.darkTextHeading : AppTheme.lightTextHeading,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  elsewhere.message,
+                  style: TextStyle(fontSize: 12.5, height: 1.4, color: theme.colorScheme.onSurface.withOpacity(0.65)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAdminProviderCard() {
     if (_isLoadingAdminStatus) {
       return Container(
@@ -263,6 +326,11 @@ class StaffTabState extends State<StaffTab> with SingleTickerProviderStateMixin 
           borderRadius: BorderRadius.circular(16),
         ),
       );
+    }
+
+    final elsewhere = _adminStatus?.providerElsewhere;
+    if (elsewhere != null) {
+      return _buildProviderElsewhereCard(elsewhere);
     }
 
     final theme = Theme.of(context);

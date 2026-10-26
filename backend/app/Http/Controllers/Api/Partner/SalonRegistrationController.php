@@ -77,6 +77,23 @@ class SalonRegistrationController extends Controller
             : null;
         $bankDetails = $bank->validate($request->only(\App\Services\BankDetailsService::FIELDS), $revising);
 
+        // "Same as my other salon": an owner adding a branch can reuse an
+        // account already on file rather than type it again. The values are
+        // copied here, so the full number never goes to the phone.
+        if ($isExistingAdmin && $request->filled('bank_copy_from_salon_id')) {
+            $source = Salon::where('id', (string) $request->input('bank_copy_from_salon_id'))
+                ->where('admin_id', $authenticatedUser->id)
+                ->first();
+
+            if (! $source || ! $bank->hasRequired($source)) {
+                throw ValidationException::withMessages([
+                    'bank_copy_from_salon_id' => 'Choose one of your salons that has complete bank details.',
+                ]);
+            }
+
+            $bankDetails = $bank->valuesOf($source);
+        }
+
         try {
             DB::beginTransaction();
 

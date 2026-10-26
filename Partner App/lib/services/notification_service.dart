@@ -18,11 +18,18 @@ class PartnerNotificationService {
     };
   }
 
-  /// Returns `{notifications: [...], unread_count: n}`.
-  /// [period] narrows to `today`, `yesterday`, `week` or `month`.
-  static Future<Map<String, dynamic>> fetch({int limit = 50, String? period}) async {
+  /// Returns `{notifications: [...], unread_count: n, salons: [...]}`.
+  /// [period] narrows to `today`, `yesterday`, `week` or `month`; [salonId]
+  /// to one of an owner's salons. `salons` lists an owner's salons with their
+  /// unread counts when they have more than one.
+  static Future<Map<String, dynamic>> fetch({int limit = 50, String? period, String? salonId}) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      if (period != null) 'period': period,
+      if (salonId != null) 'salon_id': salonId,
+    };
     final response = await http.get(
-      Uri.parse('$baseUrl/notifications?limit=$limit${period == null ? '' : '&period=$period'}'),
+      Uri.parse('$baseUrl/notifications').replace(queryParameters: query),
       headers: await _getHeaders(),
     );
 
@@ -53,21 +60,26 @@ class PartnerNotificationService {
     if (response.statusCode != 200) throw Exception('Could not delete the notification.');
   }
 
-  /// Delete every notification in [period], or all of them. Returns how many.
-  static Future<int> deleteMany({String? period}) async {
+  /// Delete every notification in [period], or all of them — of one salon
+  /// when [salonId] is given. Returns how many.
+  static Future<int> deleteMany({String? period, String? salonId}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/notifications/delete'),
       headers: await _getHeaders(),
-      body: jsonEncode(period == null ? {'all': true} : {'period': period}),
+      body: jsonEncode({
+        if (period == null) 'all': true else 'period': period,
+        if (salonId != null) 'salon_id': salonId,
+      }),
     );
     if (response.statusCode != 200) throw Exception('Could not delete the notifications.');
     return ((jsonDecode(response.body) as Map)['deleted'] as num?)?.toInt() ?? 0;
   }
 
-  static Future<void> markAllRead() async {
+  static Future<void> markAllRead({String? salonId}) async {
     await http.post(
       Uri.parse('$baseUrl/notifications/read-all'),
       headers: await _getHeaders(),
+      body: jsonEncode({if (salonId != null) 'salon_id': salonId}),
     );
   }
 

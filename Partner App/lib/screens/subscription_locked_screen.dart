@@ -28,10 +28,15 @@ class SubscriptionLockedScreen extends StatelessWidget {
   /// Re-checks after a renewal so the app can let them back in.
   final Future<void> Function() onRecheck;
 
+  /// For an owner with other salons: leave this locked one for another
+  /// branch without logging out. Null hides the button.
+  final VoidCallback? onSwitchSalon;
+
   const SubscriptionLockedScreen({
     super.key,
     required this.access,
     required this.onRecheck,
+    this.onSwitchSalon,
   });
 
   Future<void> _callAdmin(BuildContext context) async {
@@ -156,6 +161,19 @@ class SubscriptionLockedScreen extends StatelessWidget {
                 else
                   ..._staffActions(context),
 
+                if (onSwitchSalon != null) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    key: const ValueKey('locked_switch_salon'),
+                    onPressed: onSwitchSalon,
+                    icon: const Icon(Icons.storefront, size: 18),
+                    label: Text('Switch to another salon', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () => _logout(context),

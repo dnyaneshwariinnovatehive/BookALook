@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'dashboard/collaborator_dashboard.dart';
-import 'dashboard/salon_selection_screen.dart';
+import 'dashboard/salon_switching.dart';
 import 'dashboard/service_provider_dashboard.dart';
 
 /// The screen a signed-in partner lands on, decided by their role.
@@ -13,7 +13,8 @@ import 'dashboard/service_provider_dashboard.dart';
 /// leaving the partner on a screen that does nothing.
 Widget? partnerHomeFor(Map<String, dynamic> response) {
   return switch (response['role']) {
-    'admin' => SalonSelectionScreen(salons: response['salons'] ?? []),
+    // The only salon opens directly; with several, the owner picks one.
+    'admin' => SalonSession.homeFor(List<dynamic>.from(response['salons'] ?? const [])),
     'service_provider' => ServiceProviderDashboard(
         salon: response['salon'] ?? {},
         provider: response['provider'] ?? {},

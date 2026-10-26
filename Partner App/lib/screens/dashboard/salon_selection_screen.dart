@@ -8,11 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../phone_screen.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/logout_confirmation_dialog.dart';
-import '../../services/api_service.dart';
+import 'salon_switching.dart';
 
 class SalonSelectionScreen extends StatefulWidget {
   final List<dynamic> salons;
-  const SalonSelectionScreen({super.key, required this.salons});
+
+  /// Test seam for the fresh list; defaults to the server.
+  final Future<List<dynamic>?> Function()? fetchSalons;
+
+  const SalonSelectionScreen({super.key, required this.salons, this.fetchSalons});
 
   @override
   State<SalonSelectionScreen> createState() => _SalonSelectionScreenState();
@@ -25,23 +29,17 @@ class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
   void initState() {
     super.initState();
     _salons = List<dynamic>.from(widget.salons);
+    // The list passed in may be the one saved at sign-in; a salon approved
+    // since then must not still say "pending" when tapped.
+    _refreshSalons();
   }
 
   Future<void> _refreshSalons() async {
-    final fetched = await ApiService.getMySalons();
+    final fetched = await SalonSession.refresh(fetch: widget.fetchSalons);
     if (fetched != null && mounted) {
       setState(() {
         _salons = fetched;
       });
-      final prefs = await SharedPreferences.getInstance();
-      final authStateStr = prefs.getString('auth_state');
-      if (authStateStr != null) {
-        try {
-          final authState = Map<String, dynamic>.from(jsonDecode(authStateStr));
-          authState['salons'] = fetched;
-          await prefs.setString('auth_state', jsonEncode(authState));
-        } catch (_) {}
-      }
     }
   }
 
@@ -164,7 +162,30 @@ class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
       return;
     }
 
-    // In a real app, you would save the selected salon ID in a state management solution or SharedPreferences
+    if (status == 'deactivated') {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          key: const ValueKey('salon_deactivated_dialog'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Salon Deactivated', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(
+            '${salon['name'] ?? 'This salon'} was deactivated and is no longer shown to customers. '
+            'Contact BookALook support if you want to reopen it.',
+            style: const TextStyle(color: AppTheme.lightTextBody, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK', style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // DashboardScreen remembers this salon, so the next launch opens it.
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -294,6 +315,21 @@ class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
     }
   }
 
+  Widget _statusBadge(String label, Color color) {
+    return Container(
+      key: ValueKey('salon_badge_$label'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -352,6 +388,8 @@ class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
                     final isPending = status == 'pending_approval';
                     final isNeedsCorrection = status == 'needs_correction';
                     final isRejected = status == 'rejected';
+                    final isDeactivated = status == 'deactivated';
+                    final isSuspended = status == 'suspended';
 
                     return InkWell(
                       onTap: () => _selectSalon(context, salon),
@@ -496,6 +534,19 @@ class _SalonSelectionScreenState extends State<SalonSelectionScreen> {
                                             ),
                                           ),
                                         ),
+                                      ],
+                                      if (isSuspended) ...[
+                                        const SizedBox(width: 8),
+                                        _statusBadge(
+                                          'Suspended',
+                                          Theme.of(context).brightness == Brightness.dark
+                                              ? AppTheme.darkDanger
+                                              : AppTheme.lightDanger,
+                                        ),
+                                      ],
+                                      if (isDeactivated) ...[
+                                        const SizedBox(width: 8),
+                                        _statusBadge('Deactivated', Colors.grey.shade600),
                                       ],
                                     ],
                                   ),

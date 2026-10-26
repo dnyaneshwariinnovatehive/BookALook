@@ -7,11 +7,14 @@ import '../widgets/notification_inbox_controls.dart';
 /// The salon owner's inbox. A superadmin warning is the message that matters
 /// most here, so it is rendered as a distinct amber notice rather than a
 /// plain entry — the owner should not be able to scroll past it.
+///
+/// An owner with several salons reads one inbox for all of them: each notice
+/// carries its salon's name, and a second row of capsules narrows to one.
 class NotificationsScreen extends StatefulWidget {
   /// Test seams; default to the real API.
-  final Future<Map<String, dynamic>> Function({String? period})? fetch;
+  final Future<Map<String, dynamic>> Function({String? period, String? salonId})? fetch;
   final Future<void> Function(String id)? delete;
-  final Future<int> Function({String? period})? deleteMany;
+  final Future<int> Function({String? period, String? salonId})? deleteMany;
 
   const NotificationsScreen({super.key, this.fetch, this.delete, this.deleteMany});
 
@@ -24,6 +27,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _isLoading = true;
   String _error = '';
   NotificationPeriod _period = NotificationPeriod.all;
+
+  /// An owner's salons, when they have more than one; empty otherwise.
+  List<NotificationSalon> _salons = const [];
+
+  /// The salon filter; null for every salon.
+  String? _salonId;
   bool _deleting = false;
   int _restoreTick = 0;
 
@@ -39,14 +48,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _load() async {
     try {
-      final data = await (widget.fetch ?? ({String? period}) => PartnerNotificationService.fetch(period: period))(
+      final data = await (widget.fetch ??
+          ({String? period, String? salonId}) => PartnerNotificationService.fetch(period: period, salonId: salonId))(
         period: _period.apiValue,
+        salonId: _salonId,
       );
       if (!mounted) return;
       setState(() {
         _notifications = (data['notifications'] ?? [])
             .map<Map<String, dynamic>>((n) => n as Map<String, dynamic>)
             .toList();
+        _salons = NotificationSalon.listFrom(data['salons']);
+        // The salon filtered on is no longer the owner's: show everything.
+        if (_salonId != null && !_salons.any((s) => s.id == _salonId)) _salonId = null;
         _isLoading = false;
       });
     } catch (e) {
@@ -60,7 +74,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markAllRead() async {
     try {
-      await PartnerNotificationService.markAllRead();
+      await PartnerNotificationService.markAllRead(salonId: _salonId);
     } catch (_) {}
     _load();
   }
@@ -73,6 +87,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _error = '';
     });
     _load();
+  }
+
+  void _setSalon(String? salonId) {
+    if (salonId == _salonId) return;
+    setState(() {
+      _salonId = salonId;
+      _isLoading = true;
+      _error = '';
+    });
+    _load();
+  }
+
+  String? get _selectedSalonName {
+    for (final s in _salons) {
+      if (s.id == _salonId) return s.name;
+    }
+    return null;
   }
 
   /// Swiped away: gone from the list at once, put back if the server refuses.
@@ -98,14 +129,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _deleteAll() async {
     if (_deleting || _notifications.isEmpty) return;
-    final ok = await confirmDeleteNotifications(context, count: _notifications.length, period: _period);
+    final ok = await confirmDeleteNotifications(
+      context,
+      count: _notifications.length,
+      period: _period,
+      salonName: _selectedSalonName,
+    );
     if (!ok || !mounted) return;
 
     setState(() => _deleting = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final deleted = await (widget.deleteMany ?? ({String? period}) => PartnerNotificationService.deleteMany(period: period))(
+      final deleted = await (widget.deleteMany ??
+          ({String? period, String? salonId}) => PartnerNotificationService.deleteMany(period: period, salonId: salonId))(
         period: _period.apiValue,
+        salonId: _salonId,
       );
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(content: Text('$deleted notification${deleted == 1 ? '' : 's'} deleted')));
@@ -158,8 +196,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: NotificationPeriodChips(selected: _period, onChanged: _setPeriod),
+          preferredSize: Size.fromHeight(_salons.isEmpty ? 48 : 92),
+          child: Column(
+            children: [
+              if (_salons.isNotEmpty)
+                NotificationSalonChips(salons: _salons, selected: _salonId, onChanged: _setSalon),
+              NotificationPeriodChips(selected: _period, onChanged: _setPeriod),
+            ],
+          ),
         ),
       ),
       body: _isLoading
@@ -204,7 +248,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? AppTheme.darkTextLight
                   : AppTheme.lightTextLight),
           const SizedBox(height: 12),
-          Text(_period == NotificationPeriod.all ? 'No messages yet' : 'Nothing from ${_period.label.toLowerCase()}',
+          Text(
+              [
+                _period == NotificationPeriod.all ? 'No messages yet' : 'Nothing from ${_period.label.toLowerCase()}',
+                if (_selectedSalonName != null) 'for $_selectedSalonName',
+              ].join(' '),
               style: TextStyle(
                   fontSize: 16,
                   color: theme.brightness == Brightness.dark
@@ -222,6 +270,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final isWarning = _warningTypes.contains(type);
     final accent = isDark ? AppTheme.darkWarning : AppTheme.lightWarning;
     final accentBg = isDark ? AppTheme.darkWarningBg : AppTheme.lightWarningBg;
+    // Only an owner with several salons needs telling which one; when the
+    // inbox is already narrowed to one, the filter says it.
+    final salonName = notification['salon_name']?.toString();
+    final showSalon = _salons.isNotEmpty && _salonId == null && salonName != null && salonName.isNotEmpty;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -272,6 +324,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
               ],
             ),
+            if (showSalon) ...[
+              const SizedBox(height: 8),
+              NotificationSalonTag(key: ValueKey('notification_salon_tag_${notification['id']}'), name: salonName),
+            ],
             const SizedBox(height: 8),
             Text(
               notification['message'] ?? '',

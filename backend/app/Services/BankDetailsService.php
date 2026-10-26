@@ -193,6 +193,40 @@ class BankDetailsService
         $this->apply($salon, $values, $actor);
     }
 
+    /**
+     * The stored values, ready for [apply] onto another salon — for an owner
+     * reusing one account across their branches.
+     *
+     * @return array<string, ?string>
+     */
+    public function valuesOf(Model $source): array
+    {
+        $values = [];
+        foreach (self::FIELDS as $field) {
+            $values[$field] = $source->{$field};
+        }
+
+        return $values;
+    }
+
+    /**
+     * An owner's salons whose account could be copied to another branch, as
+     * [present] shows them, with the salon's id and name.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function copyableFor(string $ownerId, ?string $exceptSalonId = null): array
+    {
+        return Salon::where('admin_id', $ownerId)
+            ->when($exceptSalonId, fn ($q) => $q->where('id', '!=', $exceptSalonId))
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Salon $salon) => $this->hasRequired($salon))
+            ->map(fn (Salon $salon) => ['salon_id' => $salon->id, 'salon_name' => $salon->name] + $this->present($salon))
+            ->values()
+            ->all();
+    }
+
     /** Whether everything a bank transfer needs is on file. */
     public function hasRequired(Model $target): bool
     {

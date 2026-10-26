@@ -181,7 +181,7 @@ class _AdminRegistrationScreenState extends State<AdminRegistrationScreen> {
           Step1OwnerDetails(onNext: _nextStep, onCancel: _previousStep, phone: widget.phone, initialData: widget.initialData, isExistingAdmin: widget.isExistingAdmin),
           Step2SalonDetails(onNext: _nextStep, onBack: _previousStep, initialData: widget.initialData),
           // Optional: a salon registers and goes live without it.
-          StepBankDetails(onNext: _nextStep, onBack: _previousStep),
+          StepBankDetails(onNext: _nextStep, onBack: _previousStep, offerSaved: widget.isExistingAdmin),
           Step3Terms(onSubmit: _nextStep, onBack: _previousStep, isLoading: _isLoading),
         ],
       ),

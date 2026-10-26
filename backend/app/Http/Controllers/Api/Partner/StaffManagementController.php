@@ -15,8 +15,33 @@ use Illuminate\Support\Facades\Validator;
 
 class StaffManagementController extends Controller
 {
-    public function index($salonId)
+    /**
+     * Staff records, pay terms and leave belong to the salon's owner. Without
+     * this, anyone signed in — another salon's owner, a stylist, even a
+     * customer — could read or change them by knowing a salon id.
+     */
+    private function denyUnlessOwner(Request $request, string $salonId)
     {
+        $user = $request->user();
+
+        if ($user?->role === 'superadmin') {
+            return null;
+        }
+
+        if ($user?->role === 'admin'
+            && \App\Models\Salon::where('id', $salonId)->where('admin_id', $user->id)->exists()) {
+            return null;
+        }
+
+        return response()->json(['message' => 'Only the salon owner can manage its staff.'], 403);
+    }
+
+    public function index(Request $request, $salonId)
+    {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         $salon = \App\Models\Salon::find($salonId);
         $adminId = $salon?->admin_id;
 
@@ -38,6 +63,10 @@ class StaffManagementController extends Controller
 
     public function store(Request $request, $salonId)
     {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'phone' => 'required|string|unique:users',
@@ -134,6 +163,10 @@ class StaffManagementController extends Controller
 
     public function update(Request $request, $salonId, $staffId)
     {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         $provider = ServiceProvider::where('salon_id', $salonId)->findOrFail($staffId);
         $user = $provider->user;
 
@@ -222,8 +255,12 @@ class StaffManagementController extends Controller
         }
     }
 
-    public function destroy($salonId, $staffId)
+    public function destroy(Request $request, $salonId, $staffId)
     {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         try {
             DB::beginTransaction();
             $provider = ServiceProvider::where('salon_id', $salonId)->findOrFail($staffId);
@@ -256,8 +293,12 @@ class StaffManagementController extends Controller
         }
     }
 
-    public function getLeaves($salonId)
+    public function getLeaves(Request $request, $salonId)
     {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         // Get all providers for this salon
         $providerIds = ServiceProvider::where('salon_id', $salonId)->pluck('id');
 
@@ -368,6 +409,10 @@ class StaffManagementController extends Controller
 
     public function updateLeaveStatus(Request $request, $salonId, $leaveId)
     {
+        if ($denied = $this->denyUnlessOwner($request, $salonId)) {
+            return $denied;
+        }
+
         $validator = Validator::make($request->all(), [
             'status' => 'required|in:approved,rejected',
         ]);

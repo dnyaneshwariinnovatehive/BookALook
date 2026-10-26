@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../services/bank_details_api.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/bank_details_fields.dart';
+import '../../../widgets/same_bank_as_other_salon.dart';
 
 /// The salon owner's bank details: where BookALook sends their settlements.
 ///
@@ -15,8 +16,9 @@ class BankDetailsScreen extends StatefulWidget {
   /// Test seams; default to the real API.
   final Future<BankDetailsStatus> Function(String salonId)? load;
   final Future<BankDetailsStatus> Function(String salonId, Map<String, String> fields)? save;
+  final Future<BankDetailsStatus> Function(String salonId, String fromSalonId)? copyFrom;
 
-  const BankDetailsScreen({super.key, required this.salonId, this.load, this.save});
+  const BankDetailsScreen({super.key, required this.salonId, this.load, this.save, this.copyFrom});
 
   @override
   State<BankDetailsScreen> createState() => _BankDetailsScreenState();
@@ -27,6 +29,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   final _fields = BankDetailsControllers();
 
   BankDetails _saved = const BankDetails();
+  List<OtherSalonBank> _others = const [];
   bool _loading = true;
   bool _saving = false;
   bool _dirty = false;
@@ -55,6 +58,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       if (!mounted) return;
       setState(() {
         _saved = status.details;
+        _others = status.otherSalons;
         _fields.fillFrom(status.details);
         _dirty = false;
         _loading = false;
@@ -127,6 +131,53 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         SnackBar(
           backgroundColor: Colors.green.shade700,
           content: Text(replacing ? 'Bank details updated.' : 'Bank details saved.'),
+        ),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _formError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  /// "Same as my other salon": pick a branch, confirm, and the server copies
+  /// its account here.
+  Future<void> _copyFromOther() async {
+    if (_saving || _others.isEmpty) return;
+    final source = _others.length == 1 ? _others.first : await pickOtherSalonBank(context, _others);
+    if (source == null || !mounted) return;
+
+    final replacing = _saved.hasRequired;
+    final ok = await _confirm(
+      title: replacing ? "Replace with ${source.salonName}'s details?" : "Use ${source.salonName}'s bank details?",
+      message: '${replacing ? 'Your saved details (${describeBankAccount(_saved)}) will be replaced. ' : ''}'
+          'Settlements for this salon will go to ${describeBankAccount(source.details)}, '
+          'the same account as ${source.salonName}.',
+      confirmLabel: replacing ? 'Replace' : 'Use these details',
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() {
+      _saving = true;
+      _formError = null;
+    });
+    try {
+      final status = await (widget.copyFrom ?? BankDetailsApi.copyFrom)(widget.salonId, source.salonId);
+      if (!mounted) return;
+      setState(() {
+        _saved = status.details;
+        _others = status.otherSalons;
+        _fields.fillFrom(status.details);
+        _dirty = false;
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green.shade700,
+          content: Text('Bank details copied from ${source.salonName}.'),
         ),
       );
       Navigator.pop(context, true);
@@ -224,6 +275,17 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
               ],
             ),
           ),
+          if (_others.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SameBankAsOtherSalonButton(onPressed: _saving ? null : _copyFromOther),
+            const SizedBox(height: 4),
+            Center(
+              child: Text(
+                'or enter the details below',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           BankDetailsFields(
             controllers: _fields,

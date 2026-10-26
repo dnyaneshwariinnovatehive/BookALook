@@ -59,8 +59,19 @@ class AdminProviderApi {
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
       return AdminProviderStatus.fromJson(jsonResponse);
-    } else {
-      throw Exception('Failed to update admin provider mode: ${response.body}');
     }
+    if (response.statusCode == 409) {
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['provider_elsewhere'] is Map) {
+          throw ProviderElsewhereException(
+            ProviderElsewhere.fromJson(Map<String, dynamic>.from(body['provider_elsewhere'])),
+          );
+        }
+      } on FormatException {
+        // Fall through to the generic error.
+      }
+    }
+    throw Exception('Failed to update admin provider mode: ${response.body}');
   }
 }

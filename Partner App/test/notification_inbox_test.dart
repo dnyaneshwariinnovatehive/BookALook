@@ -32,7 +32,7 @@ void main() {
       final asked = <String?>[];
       await tester.pumpWidget(MaterialApp(
         home: NotificationsScreen(
-          fetch: ({String? period}) async {
+          fetch: ({String? period, String? salonId}) async {
             asked.add(period);
             return {'notifications': [n('1', period ?? 'everything')], 'unread_count': 1};
           },
@@ -58,7 +58,7 @@ void main() {
       final deleted = <String>[];
       await tester.pumpWidget(MaterialApp(
         home: NotificationsScreen(
-          fetch: ({String? period}) async => {'notifications': [n('1', 'First'), n('2', 'Second')], 'unread_count': 2},
+          fetch: ({String? period, String? salonId}) async => {'notifications': [n('1', 'First'), n('2', 'Second')], 'unread_count': 2},
           delete: (id) async => deleted.add(id),
         ),
       ));
@@ -76,7 +76,7 @@ void main() {
       await sized(tester);
       await tester.pumpWidget(MaterialApp(
         home: NotificationsScreen(
-          fetch: ({String? period}) async => {'notifications': [n('1', 'First')], 'unread_count': 1},
+          fetch: ({String? period, String? salonId}) async => {'notifications': [n('1', 'First')], 'unread_count': 1},
           delete: (id) async => throw Exception('no'),
         ),
       ));
@@ -94,8 +94,8 @@ void main() {
       final deletedPeriods = <String?>[];
       await tester.pumpWidget(MaterialApp(
         home: NotificationsScreen(
-          fetch: ({String? period}) async => {'notifications': [n('1', 'First')], 'unread_count': 1},
-          deleteMany: ({String? period}) async {
+          fetch: ({String? period, String? salonId}) async => {'notifications': [n('1', 'First')], 'unread_count': 1},
+          deleteMany: ({String? period, String? salonId}) async {
             deletedPeriods.add(period);
             return 1;
           },

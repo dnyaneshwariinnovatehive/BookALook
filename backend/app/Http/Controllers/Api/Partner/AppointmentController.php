@@ -43,7 +43,12 @@ class AppointmentController extends Controller
             } else {
                 return response()->json(['message' => 'You are not a registered service provider at this salon.'], 403);
             }
-        } elseif (!in_array($user->role, ['admin', 'superadmin'])) {
+        } elseif ($user->role === 'admin') {
+            // An owner sees their own salons' bookings, not another owner's.
+            if ($denied = $this->denyUnlessSalonStaff($request, $salon_id)) {
+                return $denied;
+            }
+        } elseif ($user->role !== 'superadmin') {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 

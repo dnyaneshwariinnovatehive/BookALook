@@ -15,6 +15,7 @@ import 'tabs/more_tab.dart';
 import '../../widgets/animated_staff_icon.dart';
 import '../../widgets/tab_loading_overlay.dart';
 import '../../utils/app_haptics.dart';
+import 'salon_switching.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> salonData;
@@ -41,6 +42,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final GlobalKey<ServicesTabState> _servicesKey = GlobalKey<ServicesTabState>();
 
   bool _isTabLoading = false;
+
+  /// How many salons the owner has; a locked salon offers "Switch salon"
+  /// when there is another to go to.
+  int _salonCount = 0;
   String _loadingMessage = '';
   int _loadingTab = -1;
   int? _targetTabIndex;
@@ -167,6 +172,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // The coin pill is global: never show the previous salon's (or the
+    // previous account's) balance while this one loads.
+    WalletBalance.clear();
+    SalonSession.remember(widget.salonData['id']?.toString() ?? '');
+    SalonSession.cachedSalons().then((salons) {
+      if (mounted) setState(() => _salonCount = salons.length);
+    });
     _checkAccess();
     _buildTabs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -326,7 +338,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       return LockedSalonScope(
         salonId: widget.salonData['id'].toString(),
-        child: SubscriptionLockedScreen(access: _access!, onRecheck: _checkAccess),
+        child: SubscriptionLockedScreen(
+          access: _access!,
+          onRecheck: _checkAccess,
+          onSwitchSalon: _salonCount > 1 ? () => SalonSession.openPicker(context) : null,
+        ),
       );
     }
 

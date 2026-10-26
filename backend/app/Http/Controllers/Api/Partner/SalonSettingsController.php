@@ -539,10 +539,18 @@ class SalonSettingsController extends Controller
             ], 422);
         }
 
-        // Check for upcoming appointments
+        // Check for upcoming appointments. Bookings are stored as scheduled /
+        // in_progress — this used to look for 'pending' and 'confirmed', which
+        // no booking ever has, so a salon could close on customers who had
+        // paid. A booking waiting for the customer to pick a new time counts
+        // whatever its old date.
         $hasUpcomingAppointments = Appointment::where('salon_id', $salon->id)
-            ->whereIn('status', ['pending', 'confirmed'])
-            ->where('appointment_date', '>=', \Carbon\Carbon::today())
+            ->where(function ($q) {
+                $q->where(function ($live) {
+                    $live->whereIn('status', ['scheduled', 'in_progress'])
+                        ->whereDate('appointment_date', '>=', \Carbon\Carbon::today()->toDateString());
+                })->orWhere('status', 'awaiting_reschedule');
+            })
             ->exists();
 
         if ($hasUpcomingAppointments && !$request->boolean('force_close_schedule')) {

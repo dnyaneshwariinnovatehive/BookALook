@@ -35,11 +35,12 @@ final class PushPayload
     public static function fromNotification(\App\Models\Notification $notification): self
     {
         $data = is_array($notification->data) ? $notification->data : [];
+        $title = isset($data['push_title']) ? (string) $data['push_title'] : (string) $notification->title;
 
         return new self(
             notificationId: (string) $notification->id,
             type: (string) $notification->type,
-            title: isset($data['push_title']) ? (string) $data['push_title'] : (string) $notification->title,
+            title: self::withSalonName($notification, $title),
             message: isset($data['push_message']) ? (string) $data['push_message'] : (string) $notification->message,
             data: $data,
             action: $notification->action,
@@ -47,6 +48,31 @@ final class PushPayload
             salonId: $notification->related_salon_id,
             imageUrl: isset($data['push_image_url']) ? (string) $data['push_image_url'] : (isset($data['image_url']) ? (string) $data['image_url'] : null),
         );
+    }
+
+    /**
+     * An owner with several salons gets one stream of pushes, so each one
+     * names its salon: "Glow Baner · New booking". Left alone for everyone
+     * else, and when the title already names the salon.
+     */
+    private static function withSalonName(\App\Models\Notification $notification, string $title): string
+    {
+        if (! $notification->related_salon_id || ! $notification->user_id) {
+            return $title;
+        }
+
+        $role = \App\Models\User::whereKey($notification->user_id)->value('role');
+        if ($role !== 'admin'
+            || \App\Models\Salon::where('admin_id', $notification->user_id)->count() < 2) {
+            return $title;
+        }
+
+        $salon = \App\Models\Salon::whereKey($notification->related_salon_id)->value('name');
+        if (! $salon || mb_stripos($title, $salon) !== false) {
+            return $title;
+        }
+
+        return "{$salon} · {$title}";
     }
 
     /**
