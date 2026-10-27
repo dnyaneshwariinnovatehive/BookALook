@@ -33,6 +33,8 @@ Route::prefix('customer')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [CustomerAuthController::class, 'logout']);
         Route::get('/profile', [CustomerAuthController::class, 'profile']);
+        // Where the customer stands against the cancellation / no-show limits.
+        Route::get('/booking-standing', [\App\Http\Controllers\Api\Customer\BookingStandingController::class, 'show']);
         Route::put('/profile/update', [CustomerAuthController::class, 'updateProfile']);
         // A new phone number is a new login, so it is verified with an OTP first.
         Route::post('/profile/phone/send-otp', [\App\Http\Controllers\Api\AccountPhoneController::class, 'sendCode'])->middleware('throttle:5,1');
@@ -301,6 +303,7 @@ Route::prefix('superadmin')->group(function () {
         // value and its booking behaviour without touching the records.
         Route::get('/customers', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCustomerController::class, 'index']);
         Route::get('/customers/{id}', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCustomerController::class, 'show']);
+        Route::post('/customers/{id}/reset-booking-standing', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminCustomerController::class, 'resetBookingStanding']);
 
         // Complaints, and the two things that can be done about one.
         Route::get('/complaints', [\App\Http\Controllers\Api\SuperAdmin\ComplaintController::class, 'index']);
@@ -324,6 +327,8 @@ Route::prefix('superadmin')->group(function () {
         // Platform Reporting
         Route::get('/reports/overview', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'overview']);
         Route::get('/reports/dashboard', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'dashboard']);
+        // What BookALook itself earns: plan payments and settled commission.
+        Route::get('/reports/platform-revenue', [\App\Http\Controllers\Api\SuperAdmin\PlatformRevenueController::class, 'show']);
         Route::get('/reports/salons', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'salons']);
         Route::get('/reports/cities', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'cities']);
         Route::get('/reports/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'subAreas']);

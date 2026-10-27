@@ -249,32 +249,34 @@ class CartDuplicatePreventionTest extends TestCase
         }
     }
 
-    public function test_direct_combo_items_remain_unaffected(): void
+    public function test_a_combo_is_also_limited_to_quantity_one(): void
     {
-        // Add direct combo package
-        $response = $this->actingAs($this->customer, 'sanctum')
+        // Asking for two is refused.
+        $this->actingAs($this->customer, 'sanctum')
             ->postJson("/api/customer/salons/{$this->salon->id}/cart/items", [
                 'combo_id' => $this->combo->id,
                 'quantity' => 2,
-            ]);
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['quantity']);
 
-        $response->assertStatus(200);
-        $cart = $response->json('cart');
+        // Added, then added again: still one line of one.
+        foreach ([1, 2] as $_) {
+            $this->actingAs($this->customer, 'sanctum')
+                ->postJson("/api/customer/salons/{$this->salon->id}/cart/items", [
+                    'combo_id' => $this->combo->id,
+                ])
+                ->assertStatus(200);
+        }
 
-        $this->assertCount(1, $cart['items']);
-        $this->assertSame($this->combo->id, $cart['items'][0]['combo_id']);
-        $this->assertNull($cart['items'][0]['service_id']);
-        $this->assertEquals(2, $cart['items'][0]['quantity']);
+        $item = CartItem::where('combo_id', $this->combo->id)->sole();
+        $this->assertEquals(1, $item->quantity);
 
-        // Update direct combo quantity
-        $item = CartItem::where('combo_id', $this->combo->id)->first();
-        $updateRes = $this->actingAs($this->customer, 'sanctum')
-            ->patchJson("/api/customer/cart/items/{$item->id}", [
-                'quantity' => 3,
-            ]);
-
-        $updateRes->assertStatus(200);
-        $this->assertEquals(3, $item->fresh()->quantity);
+        // Raising it is refused too.
+        $this->actingAs($this->customer, 'sanctum')
+            ->patchJson("/api/customer/cart/items/{$item->id}", ['quantity' => 3])
+            ->assertStatus(422);
+        $this->assertEquals(1, $item->fresh()->quantity);
     }
 
     public function test_database_unique_index_prevents_duplicate_service_lines_in_same_cart(): void

@@ -594,6 +594,81 @@ const APP_TONE: Record<string, Tone> = {
   awaiting_reschedule: 'warning',
 };
 
+interface Standing {
+  restricted: boolean;
+  action: 'block' | 'full_payment' | 'warn' | null;
+  message: string | null;
+  releases_on: string | null;
+  cancellations: { count: number; limit: number; mode: string };
+  no_shows: { count: number; limit: number; mode: string };
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  block: 'Bookings blocked',
+  full_payment: 'Must pay in full',
+  warn: 'Warned',
+};
+
+/**
+ * Where the customer stands against the cancellation and no-show limits in
+ * Platform Policy, with a way to clear their record and lift a restriction.
+ */
+function BookingStandingCard({ customerId, initial }: { customerId: string; initial: Standing }) {
+  const [standing, setStanding] = useState<Standing>(initial);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+
+  const line = (label: string, x: { count: number; limit: number; mode: string }) =>
+    x.limit > 0
+      ? `${label}: ${x.count} of ${x.limit} ${x.mode === 'consecutive' ? 'in a row' : 'in total'}`
+      : `${label}: ${x.count} (no limit set)`;
+
+  const reset = async () => {
+    if (!window.confirm('Clear this customer\'s cancellation and no-show record? Only what happens from now will count.')) return;
+    setBusy(true);
+    setNote('');
+    try {
+      const res = await fetch(`/api/proxy/superadmin/customers/${customerId}/reset-booking-standing`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message || 'Could not clear the record.');
+      setStanding(json.booking_standing);
+      setNote(json.message);
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Could not clear the record.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={cx(styles.standingCard, standing.restricted && styles.standingRestricted)}>
+      <div className={styles.standingHead}>
+        <div>
+          <b>Booking standing</b>
+          {standing.restricted && standing.action ? (
+            <Badge tone={standing.action === 'warn' ? 'warning' : 'danger'} dot={false}>{ACTION_LABEL[standing.action]}</Badge>
+          ) : (
+            <Badge tone="success" dot={false}>In good standing</Badge>
+          )}
+        </div>
+        {(standing.restricted || standing.cancellations.count > 0 || standing.no_shows.count > 0) && (
+          <Button size="sm" variant="soft" onClick={reset} disabled={busy}>
+            {busy ? 'Clearing…' : 'Clear record'}
+          </Button>
+        )}
+      </div>
+      <p className={styles.standingLines}>
+        {line('Cancellations', standing.cancellations)} · {line('No-shows', standing.no_shows)}
+      </p>
+      {standing.restricted && standing.message && <p className={styles.standingMsg}>{standing.message}</p>}
+      {standing.restricted && !standing.releases_on && (
+        <p className={styles.standingMsg}>This lifts only when you clear it.</p>
+      )}
+      {note && <p className={styles.standingNote}>{note}</p>}
+    </div>
+  );
+}
+
 function DetailPanel({ detail }: { detail: any }) {
   const c = detail.customer;
   const [tab, setTab] = useState<'appointments' | 'reviews'>('appointments');
@@ -622,6 +697,7 @@ function DetailPanel({ detail }: { detail: any }) {
 
   return (
     <>
+      {detail.booking_standing && <BookingStandingCard customerId={c.id} initial={detail.booking_standing} />}
       <div className={styles.profileStats}>
         <div className={cx(styles.profileStat, styles.profileStatAccent)}>
           <span>Lifetime value</span>

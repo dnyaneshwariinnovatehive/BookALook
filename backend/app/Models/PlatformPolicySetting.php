@@ -88,6 +88,19 @@ class PlatformPolicySetting extends Model
         
         // Limit on how many combos a salon can create.
         'combos_limit_per_salon' => 10,
+
+        // How many cancellations and no-shows a customer may have before
+        // booking is restricted. See CustomerStandingService. 0 = no limit.
+        'customer_cancellation_limit' => 0,
+        'customer_cancellation_count_mode' => 'total',
+        'customer_no_show_limit' => 0,
+        'customer_no_show_count_mode' => 'total',
+        // block | full_payment | warn
+        'customer_limit_action' => 'block',
+        // How far back "in total" looks, in days. 0 = all time.
+        'customer_limit_window_days' => 90,
+        // Days after the last offence a restriction lifts. 0 = only SuperAdmin.
+        'customer_limit_release_days' => 30,
         // Where salons pay BookALook — for a plan, and for what a payout says
         // they owe. One QR and UPI ID, set by SuperAdmin; blank until set.
         'payment_qr_url' => '',

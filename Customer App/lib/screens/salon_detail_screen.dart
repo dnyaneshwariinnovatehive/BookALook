@@ -709,7 +709,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     final cartItem = _getComboCartItem(comboId);
     if (cartItem == null) return;
 
-    final currentQty = (cartItem['quantity'] as num?)?.toInt() ?? 1;
     final itemId = cartItem['id'].toString();
 
     try {
@@ -718,7 +717,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
         widget.salonId,
         itemId,
         comboId: comboId,
-        newQuantity: currentQty - 1,
+        // Removes it outright, even from an older basket holding two.
+        newQuantity: 0,
       );
 
       if (!mounted) return;
@@ -1699,7 +1699,7 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        comboQty > 1 ? 'Selected ($comboQty)' : 'Selected',
+                        'Selected',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1781,25 +1781,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
                       color: AppTheme.accentColor,
                     ),
                   ),
-                  if (comboQty > 1)
-                    Text(
-                      'Total: ₹${(_toDouble(combo['price']) * comboQty).toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: context.colors.textSecondary,
-                      ),
-                    ),
                 ],
               ),
+              // A combo is booked once per visit, like a service: added or
+              // not, never a count.
               if (isComboSelected)
-                _quantityStepper(
-                  quantity: comboQty,
-                  onIncrement: () => _addToCart(
-                    comboId: comboId,
-                    label: combo['name'] ?? 'Package',
-                  ),
-                  onDecrement: () =>
+                _addedButton(
+                  inFlight: false,
+                  onRemove: () =>
                       _decrementCombo(comboId, combo['name'] ?? 'Package'),
                 )
               else
@@ -2584,62 +2573,6 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _quantityStepper({
-    required int quantity,
-    required VoidCallback onIncrement,
-    required VoidCallback onDecrement,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.accentColor,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.accentColor.withValues(alpha: 0.25),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            borderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(14),
-            ),
-            onTap: onDecrement,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              child: Icon(Icons.remove, size: 18, color: Colors.white),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '$quantity',
-              style: GoogleFonts.outfit(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          InkWell(
-            borderRadius: const BorderRadius.horizontal(
-              right: Radius.circular(14),
-            ),
-            onTap: onIncrement,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              child: Icon(Icons.add, size: 18, color: Colors.white),
-            ),
-          ),
-        ],
       ),
     );
   }

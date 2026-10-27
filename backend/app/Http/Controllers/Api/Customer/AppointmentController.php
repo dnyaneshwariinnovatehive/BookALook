@@ -170,6 +170,18 @@ class AppointmentController extends Controller
         }
 
         $user = $request->user();
+
+        // Too many cancellations or no-shows: SuperAdmin decides whether that
+        // blocks booking or only means paying in full (handled below).
+        $standing = app(\App\Services\CustomerStandingService::class)->standing($user);
+        if ($standing['restricted'] && $standing['action'] === \App\Services\CustomerStandingService::ACTION_BLOCK) {
+            return response()->json([
+                'message' => $standing['message'],
+                'booking_restricted' => true,
+                'standing' => $standing,
+            ], 403);
+        }
+
         $cart = $this->activeCart($request, $salon_id);
 
         if (!$cart || $cart->items->isEmpty()) {
@@ -263,6 +275,9 @@ class AppointmentController extends Controller
             // Past the same-day change threshold the customer loses advance-only
             // and must pay the whole amount upfront for that date.
             $requirement = $this->policy->paymentRequirement($user->id, $request->date);
+            if ($standing['restricted'] && $standing['action'] === \App\Services\CustomerStandingService::ACTION_FULL_PAYMENT) {
+                $requirement['full_upfront'] = true;
+            }
             $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
 
             $appointment = new Appointment([

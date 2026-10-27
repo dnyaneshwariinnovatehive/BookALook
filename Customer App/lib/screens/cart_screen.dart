@@ -447,56 +447,6 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Future<void> _incrementItem(Map<String, dynamic> item) async {
-    final salonId = _cart?['salon_id']?.toString();
-    if (salonId == null || _isAdding) return;
-
-    final serviceId = item['service_id']?.toString();
-    final comboId = item['combo_id']?.toString();
-    if (serviceId != null) return; // Individual services cannot be incremented
-
-    setState(() => _isAdding = true);
-    try {
-      AppHaptics.lightImpact();
-      if (comboId != null) {
-        final resCart = await _cartService.addCombo(salonId, comboId, quantity: 1);
-        final replaced = resCart?['_replaced_services'] as List?;
-        if (replaced != null && replaced.isNotEmpty && mounted) {
-          final msg = resCart?['_message'] as String? ?? 'Replaced individual services with combo!';
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        msg,
-                        style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13.5),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: const Color(0xFF16A34A),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            );
-        }
-      }
-      await _loadCart();
-      if (mounted) setState(() => _actionError = null);
-    } catch (e) {
-      AppHaptics.error();
-      _showError(describeError(e, fallback: 'Could not update item quantity.'));
-    } finally {
-      if (mounted) setState(() => _isAdding = false);
-    }
-  }
-
   Future<void> _decrementItem(Map<String, dynamic> item) async {
     final salonId = _cart?['salon_id']?.toString();
     if (salonId == null || _isAdding) return;
@@ -742,7 +692,10 @@ class _CartScreenState extends State<CartScreen> {
                   );
                 },
               ),
-              if (isCombo)
+              // Combos are one each now. The stepper stays only for an older
+              // basket that still holds more than one, so it can be brought
+              // back down.
+              if (isCombo && quantity > 1)
                 Container(
                   decoration: BoxDecoration(
                     color: context.colors.surfaceMuted,
@@ -777,21 +730,6 @@ class _CartScreenState extends State<CartScreen> {
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: context.colors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _isAdding ? null : () => _incrementItem(item),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          child: Icon(
-                            Icons.add,
-                            size: 18,
-                            color: AppTheme.accentColor,
                           ),
                         ),
                       ),

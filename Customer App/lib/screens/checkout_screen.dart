@@ -7,10 +7,13 @@ import '../services/appointment_service.dart';
 import '../services/cart_service.dart';
 import '../services/audience_service.dart';
 import '../utils/app_haptics.dart';
+import '../utils/time_window.dart';
 import '../widgets/initials_avatar.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
+import '../widgets/slot_time_info_button.dart';
+import '../widgets/booking_standing_banner.dart';
 
 /// Granularity of the booking grid the API returns. Mirrors
 /// `AvailabilityService::SLOT_MINUTES` on the server.
@@ -83,6 +86,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadProviders();
     _loadCart();
+    _appointmentService.fetchBookingStanding().then((standing) {
+      if (mounted) setState(() => _standing = standing);
+    });
   }
 
   Future<void> _loadCart() async {
@@ -493,13 +499,64 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (payment['is_demo'] == true) {
         if (!mounted) return;
+        // The slot being paid for, start to finish — from the booking the
+        // server made, else worked out from the chosen start and duration.
+        final appointment = response['appointment'] is Map
+            ? Map<String, dynamic>.from(response['appointment'] as Map)
+            : const <String, dynamic>{};
+        final start = appointment['start_time']?.toString() ?? _selectedTime;
+        final end = appointment['end_time']?.toString() ??
+            addMinutesToClock(_selectedTime, _totalDuration);
+        final window = formatTimeWindow(start, end);
+        final dayLabel = DateFormat('EEE, d MMM yyyy').format(_selectedDate);
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (dialogContext) => AlertDialog(
             title: Text('Demo Payment'),
-            content: Text(
-              'Simulate a successful payment for ₹${payment['amount']}?',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  key: const ValueKey('pay_dialog_time'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule, size: 20, color: AppTheme.accentColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              dayLabel,
+                              style: GoogleFonts.outfit(fontSize: 12.5, color: context.colors.textSecondary),
+                            ),
+                            Text(
+                              window,
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: context.colors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Simulate a successful payment for ₹${payment['amount']}?',
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -609,6 +666,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// the Pay button; a hint about a greyed-out provider, date or slot sits
   /// under that section and is replaced by the next tap.
   String? _bookingError;
+
+  /// The customer's record against the cancellation / no-show limits.
+  Map<String, dynamic>? _standing;
   String? _slotsError;
   String? _providerHint;
   String? _dateHint;
@@ -767,7 +827,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     const SizedBox(height: 32),
 
-                    _sectionTitle('3. Select Time'),
+                    Row(
+                      children: [
+                        _sectionTitle('3. Select Time'),
+                        SlotTimeInfoButton(
+                          durationMinutes: _totalDuration,
+                          selectedStart: _selectedTime,
+                        ),
+                      ],
+                    ),
                     if (_totalDuration > 0) ...[
                       const SizedBox(height: 4),
                       Text(
@@ -1696,6 +1764,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            BookingStandingBanner(standing: _standing),
             if (_bookingError != null) ...[
               InlineStatus(
                 message: _bookingError!,

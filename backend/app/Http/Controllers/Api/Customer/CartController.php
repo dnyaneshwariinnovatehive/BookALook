@@ -223,12 +223,14 @@ class CartController extends Controller
             ], 409);
         }
 
-        // For individual services, enforce quantity 1
-        if ($request->filled('service_id') && $request->has('quantity') && (int) $request->quantity > 1) {
+        // One of each: a service or a combo is booked once per visit.
+        if ($request->has('quantity') && (int) $request->quantity > 1) {
+            $what = $request->filled('combo_id') ? 'A combo' : 'An individual service';
+
             return response()->json([
-                'message' => 'Individual services can only be added with quantity 1.',
+                'message' => "{$what} can only be added once.",
                 'errors' => [
-                    'quantity' => ['The quantity for an individual service must always be 1.']
+                    'quantity' => ['The quantity must always be 1.']
                 ]
             ], 422);
         }
@@ -371,7 +373,9 @@ class CartController extends Controller
                 ->first();
 
             if ($existingItem) {
-                $existingItem->quantity += $request->get('quantity', 1);
+                // Already in the basket: adding again changes nothing but the
+                // provider choice — a combo is never more than one.
+                $existingItem->quantity = 1;
                 $existingItem->preferred_provider_id = $request->preferred_provider_id;
                 $existingItem->is_any_available = $request->boolean('is_any_available', false);
                 $existingItem->save();
@@ -382,7 +386,7 @@ class CartController extends Controller
                     'combo_id' => $request->combo_id,
                     'preferred_provider_id' => $request->preferred_provider_id,
                     'is_any_available' => $request->boolean('is_any_available', false),
-                    'quantity' => $request->get('quantity', 1)
+                    'quantity' => 1
                 ]);
             }
 
@@ -430,12 +434,14 @@ class CartController extends Controller
             return response()->json(['message' => 'Cart item not found.'], 404);
         }
 
-        // For individual service items, reject quantity > 1
-        if ($item->service_id !== null && (int) $request->quantity > 1) {
+        // Services and combos alike are one each.
+        if ((int) $request->quantity > 1) {
             return response()->json([
-                'message' => 'Individual services cannot have a quantity greater than 1.',
+                'message' => $item->combo_id !== null
+                    ? 'A combo can only be added once.'
+                    : 'Individual services cannot have a quantity greater than 1.',
                 'errors' => [
-                    'quantity' => ['The quantity for an individual service must be 1.']
+                    'quantity' => ['The quantity must be 1.']
                 ]
             ], 422);
         }

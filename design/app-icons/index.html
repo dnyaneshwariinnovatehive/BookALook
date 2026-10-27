@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookALook — App icon explorations</title>
+<style>
+  :root {
+    --accent: #9C54F2; --accent-text: #7B32EC; --ink: #21143A; --muted: #6E6681;
+    --bg: #F6F5FA; --surface: #fff; --border: #ECE9F2; --soft: #F3EBFE;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 32px 40px 8px; }
+  header h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 760px; line-height: 1.5; }
+  .controls { display: flex; flex-wrap: wrap; gap: 20px 32px; padding: 18px 40px; position: sticky; top: 0; background: rgba(246,245,250,.92); backdrop-filter: blur(8px); z-index: 5; border-bottom: 1px solid var(--border); }
+  .ctl label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .seg { display: inline-flex; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: none; padding: 7px 12px; border-radius: 7px; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .seg button.on { background: var(--soft); color: var(--accent-text); font-weight: 600; }
+  .swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); }
+  .layout { display: grid; grid-template-columns: 1fr 380px; gap: 28px; padding: 24px 40px 60px; align-items: start; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px; cursor: pointer; transition: box-shadow .15s, border-color .15s, transform .15s; }
+  .card:hover { box-shadow: 0 8px 24px rgba(33,20,58,.08); transform: translateY(-1px); }
+  .card.sel { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(156,84,242,.22); }
+  .card .num { font-size: 11px; font-weight: 700; color: var(--accent-text); letter-spacing: .08em; }
+  .card h3 { margin: 2px 0 4px; font-size: 16px; }
+  .card p { margin: 0 0 14px; font-size: 13px; color: var(--muted); line-height: 1.45; min-height: 38px; }
+  .pair { display: flex; gap: 16px; align-items: flex-end; }
+  .pair figure { margin: 0; text-align: center; }
+  .pair figcaption { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .icon { display: block; border-radius: 22.37%; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 4px 12px rgba(33,20,58,.10); }
+  .icon.circle { border-radius: 50%; }
+  .sizes { display: flex; gap: 10px; align-items: flex-end; margin-left: auto; }
+  .sizes .icon { box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  aside { position: sticky; top: 96px; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 4px; }
+  aside .chosen { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+  .phones { display: flex; gap: 14px; }
+  .phone { flex-shrink: 0; width: 183px; border-radius: 30px; padding: 10px; background: #0d0b12; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .screen { border-radius: 22px; height: 360px; padding: 34px 12px 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 58px; gap: 4px 4px; align-content: start; }
+  .screen.light { background: linear-gradient(160deg, #FCE9F1 0%, #E8DDFB 45%, #D6E6FB 100%); }
+  .screen.dark { background: linear-gradient(160deg, #1D1630 0%, #0F1424 60%, #23122A 100%); }
+  .app { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .app .ph { width: 34px; height: 34px; border-radius: 22.37%; }
+  .app span { font-size: 7.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .screen.light span { color: #2b2335; } .screen.dark span { color: #e9e5f2; }
+  .big { display: flex; gap: 16px; margin-top: 18px; }
+  .big figure { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+  .note { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 16px; }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } aside { position: static; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>BookALook — "B" lettermark icons</h1>
+  <p>16 lettermarks built only from <b>B</b> or <b>b</b>, the way the best-known brands work (Facebook's f, Booking.com's B., Beats' b, Pinterest's P). Each card shows the <b>Customer</b> and <b>Partner</b> apps as a pair: the same letter, told apart by colour. Use the toggles to restyle every icon at once, and click a card to see it on a home screen.</p>
+</header>
+
+<div class="controls">
+  <div class="ctl"><label>Customer style</label><div class="seg" id="cust"></div></div>
+  <div class="ctl"><label>Partner style</label><div class="seg" id="part"></div></div>
+  <div class="ctl"><label>Partner badge</label><div class="seg" id="badge"></div></div>
+  <div class="ctl"><label>Mask</label><div class="seg" id="mask"></div></div>
+</div>
+
+<div class="layout">
+  <div class="grid" id="grid"></div>
+  <aside>
+    <h2>Home-screen preview</h2>
+    <div class="chosen" id="chosen"></div>
+    <div class="phones">
+      <div class="phone"><div class="screen light" id="phL"></div></div>
+      <div class="phone"><div class="screen dark" id="phD"></div></div>
+    </div>
+    <div class="big" id="big"></div>
+    <div class="note">Icons are drawn full-bleed on a 100×100 grid, the way the App Store and Play Store want them. iOS and Android apply their own corner masks.</div>
+  </aside>
+</div>
+
+<script>
+// ---------- palettes ----------
+const CUSTOMER = {
+  gradient: { label: 'Purple gradient', bg: ['#AD6CF7', '#7130E4'], fg: '#FFFFFF', sub: '#E4CFFF', gloss: true },
+  flat:     { label: 'Flat purple',     bg: ['#9C54F2', '#9C54F2'], fg: '#FFFFFF', sub: '#DCC4FC' },
+  light:    { label: 'White',           bg: ['#FFFFFF', '#F3EBFE'], fg: '#8A3FEF', sub: '#C7A2F8' },
+};
+const PARTNER = {
+  ink:   { label: 'Deep ink',  bg: ['#33205C', '#140B26'], fg: '#B98AFF', sub: '#FFFFFF', gloss: true },
+  black: { label: 'Black',     bg: ['#1C1824', '#09080D'], fg: '#FFFFFF', sub: '#A866F6' },
+  lilac: { label: 'Lilac',     bg: ['#F3EAFF', '#DCC6FD'], fg: '#2B1B4D', sub: '#8A3FEF' },
+  gold:  { label: 'Ink + gold', bg: ['#2E1D52', '#120A22'], fg: '#F2B84B', sub: '#FFFFFF', gloss: true },
+};
+const BADGES = { none: 'None', dot: 'Dot', check: 'Check', bar: 'Bar' };
+const MASKS = { squircle: 'Rounded', circle: 'Circle' };
+
+let state = { cust: 'gradient', part: 'ink', badge: 'none', mask: 'squircle', sel: 'bdot' };
+let uid = 0;
+
+// ---------- geometry helpers ----------
+const spark = (cx, cy, r, fill) => {
+  const k = r * 0.14;
+  return `<path fill="${fill}" d="M${cx} ${cy - r} Q${cx + k} ${cy - k} ${cx + r} ${cy} Q${cx + k} ${cy + k} ${cx} ${cy + r} Q${cx - k} ${cy + k} ${cx - r} ${cy} Q${cx - k} ${cy - k} ${cx} ${cy - r}Z"/>`;
+};
+// mask: white = keep, black = cut
+const masked = (id, keep, cuts) =>
+  `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/>${cuts}</mask><g mask="url(#${id})">${keep}</g>`;
+
+// Heavy lowercase b, glyph box 24..79 × 15..84 (centre 51.5, 49.5)
+const bLower = (fill, hole) =>
+  `<rect x="24" y="15" width="15" height="69" rx="7.5" fill="${fill}"/><circle cx="55" cy="60" r="24" fill="${fill}"/><circle cx="55" cy="60" r="10.5" fill="${hole}"/>`;
+const placeB = (cx, cy, s, inner) => `<g transform="translate(${cx} ${cy}) scale(${s}) translate(-51.5 -49.5)">${inner}</g>`;
+
+// Heavy capital B, glyph box 26..80 × 16..84 (centre 53, 50)
+const B_OUT = 'M26 16H55C68 16 76 24 76 34C76 41 72 46 67 48C75 50 80 57 80 65C80 76 71 84 58 84H26Z';
+const B_TOP = 'M40 28H53C59 28 62 31 62 35.5C62 40 59 43 53 43H40Z';
+const B_BOT = 'M40 55H56C63 55 66 58.5 66 63C66 68 63 72 56 72H40Z';
+const bigB = (fill, cuts = true) =>
+  `<path d="${B_OUT}" fill="${fill}" stroke="${fill}" stroke-width="3" stroke-linejoin="round"/>` +
+  (cuts ? `<path d="${B_TOP}" fill="#000"/><path d="${B_BOT}" fill="#000"/>` : '');
+
+// ---------- marks ----------
+const MARKS = [
+  { key: 'bdot', name: 'b. (Full stop)', desc: 'A heavy lowercase b with a full stop, the way Booking.com and Behance work: confident, simple, and easy to own.',
+    draw: (p, id) => masked(id, `<g transform="translate(-5 1)">${bLower(p.fg, '#000')}</g>`, `<g transform="translate(-5 1)"><circle cx="55" cy="60" r="10.5" fill="#000"/></g>`) + `<circle cx="82" cy="78" r="6.5" fill="${p.sub}"/>` },
+
+  { key: 'blockb', name: 'Block b', desc: 'A b cut out of a rounded square, built the same way as the "A" block in your wordmark, so it ties straight back to the logo.',
+    draw: (p, id) => masked(id, `<rect x="20" y="20" width="60" height="60" rx="13" fill="${p.fg}"/>`, placeB(50, 50, .62, bLower('#000', '#fff'))) },
+
+  { key: 'badge', name: 'Badge b', desc: 'A b inside a solid circle, like the Beats logo. Bold, and reads as a badge at tiny sizes.',
+    draw: (p, id) => masked(id, `<circle cx="50" cy="50" r="32" fill="${p.fg}"/>`, placeB(51, 50, .66, bLower('#000', '#fff'))) },
+
+  { key: 'mono', name: 'Monoline b', desc: 'One even, rounded stroke, in the spirit of Airbnb and Bumble. Friendly, light, and very modern.',
+    draw: (p) => `<g fill="none" stroke="${p.fg}" stroke-width="11" stroke-linecap="round"><path d="M33 18V62"/><circle cx="50" cy="62" r="17"/></g>` + spark(73, 24, 8, p.sub) },
+
+  { key: 'squareb', name: 'Soft-square b', desc: 'A b with a squarer, rounded-rectangle bowl, like many fintech and tech brands. Feels techy and dependable.',
+    draw: (p, id) => masked(id, `<rect x="22" y="14" width="15" height="70" rx="7.5" fill="${p.fg}"/><rect x="28" y="38" width="52" height="46" rx="19" fill="${p.fg}"/>`, `<rect x="40" y="51" width="27" height="20" rx="8.5" fill="#000"/>`) },
+
+  { key: 'boldB', name: 'Bold B', desc: 'A heavy capital B with tight counters. Strong and timeless, the way Bolt, Bentley and Bitcoin use their B.',
+    draw: (p, id) => masked(id, `<g transform="translate(-3 0)">${bigB(p.fg, false)}</g>`, `<g transform="translate(-3 0)"><path d="${B_TOP}" fill="#000"/><path d="${B_BOT}" fill="#000"/></g>`) },
+
+  { key: 'bstar', name: 'B + Spark', desc: 'The Bold B with a sparkle at its corner, the "fresh look" moment. Adds beauty without losing the letter.',
+    draw: (p, id) => masked(id, `<g transform="translate(48 54) scale(.86) translate(-53 -50)">${bigB(p.fg, false)}</g>`, `<g transform="translate(48 54) scale(.86) translate(-53 -50)"><path d="${B_TOP}" fill="#000"/><path d="${B_BOT}" fill="#000"/></g>`) + spark(80, 21, 9, p.sub) },
+
+  { key: 'sparkB', name: 'Sparkle-counter B', desc: 'The B\'s top hole is a sparkle instead of a plain shape: a hidden detail people notice later, like the FedEx arrow.',
+    draw: (p, id) => masked(id, `<g transform="translate(-3 0)">${bigB(p.fg, false)}</g>`, `<g transform="translate(-3 0)">${spark(51.5, 35.5, 11, '#000')}<path d="${B_BOT}" fill="#000"/></g>`) },
+
+  { key: 'splitB', name: 'Split B', desc: 'A Bold B with one thin diagonal cut, borrowed from the cuts in your wordmark\'s "A".',
+    draw: (p, id) => masked(id, `<g transform="translate(-3 0)">${bigB(p.fg, false)}</g>`, `<g transform="translate(-3 0)"><path d="${B_TOP}" fill="#000"/><path d="${B_BOT}" fill="#000"/></g><line x1="18" y1="80" x2="84" y2="22" stroke="#000" stroke-width="4"/>`) },
+
+  { key: 'twinO', name: 'Twin-O B', desc: 'A B made from a stem and the two chunky O rings in "BOOK" and "LOOK". Playful, and clearly yours.',
+    draw: (p, id) => masked(id, `<g transform="translate(2 0)"><rect x="22" y="14" width="14" height="71" rx="7" fill="${p.fg}"/><circle cx="50" cy="32" r="18" fill="${p.fg}"/><circle cx="53" cy="64" r="21" fill="${p.fg}"/></g>`,
+      `<g transform="translate(2 0)"><circle cx="50" cy="32" r="7.5" fill="#000"/><circle cx="53" cy="64" r="9" fill="#000"/></g>`) },
+
+  { key: 'duotone', name: 'Duotone b', desc: 'The stem and bowl in two tones that overlap, like a folded ribbon. Gives a gentle 3D feel, like newer Google and Microsoft marks.',
+    draw: (p, id) => masked(id, `<circle cx="55" cy="60" r="24" fill="${p.sub}" transform="translate(-4 0)"/>`, `<circle cx="51" cy="60" r="10.5" fill="#000"/>`)
+      + `<rect x="20" y="15" width="15" height="69" rx="7.5" fill="${p.fg}"/>` },
+
+  { key: 'fast', name: 'Fast b', desc: 'A slanted b with speed lines: "No waiting, just booking" in one glance.',
+    draw: (p, id) => masked(id, `<g transform="translate(9 0) skewX(-10)">${placeB(58, 50, .9, bLower(p.fg, p.fg))}</g>`,
+        `<g transform="translate(9 0) skewX(-10)">${placeB(58, 50, .9, `<circle cx="55" cy="60" r="10.5" fill="#000"/>`)}</g>`)
+      + `<g stroke="${p.sub}" stroke-width="5" stroke-linecap="round"><line x1="12" y1="44" x2="24" y2="44"/><line x1="8" y1="56" x2="22" y2="56"/><line x1="13" y1="68" x2="22" y2="68"/></g>` },
+
+  { key: 'mirror', name: 'Mirror b', desc: 'The b\'s bowl is an oval salon mirror with a glint inside. A letter first, with "salon" as a bonus.',
+    draw: (p, id) => masked(id, `<rect x="22" y="15" width="15" height="69" rx="7.5" fill="${p.fg}"/><ellipse cx="55" cy="58" rx="22" ry="26" fill="${p.fg}"/>`, `<ellipse cx="55" cy="58" rx="11" ry="15" fill="#000"/>`) + spark(57, 54, 5.5, p.sub) },
+
+  { key: 'scissors', name: 'Scissor b', desc: 'The stem is a scissor blade and the bowl is the finger ring. Says "hair salon" without losing the b.',
+    draw: (p, id) => masked(id, `<path d="M24 62V27Q24 15 39 10V62Z" fill="${p.fg}"/><circle cx="56" cy="62" r="21" fill="${p.fg}"/>`, `<circle cx="56" cy="62" r="10.5" fill="#000"/>`) + `<circle cx="31.5" cy="50" r="3.4" fill="${p.sub}"/>` },
+
+  { key: 'bookmark', name: 'Bookmark b', desc: 'A b cut out of a bookmark: "Book" twice over. A shape people already link with saving and booking.',
+    draw: (p, id) => masked(id, `<path fill="${p.fg}" d="M30 14H70a6 6 0 0 1 6 6V86L50 70 24 86V20a6 6 0 0 1 6-6Z"/>`, placeB(50, 41, .5, bLower('#000', '#fff'))) },
+
+  { key: 'bubble', name: 'Chat b', desc: 'A b in a speech bubble, like Messenger: booking as a quick conversation with your salon.',
+    draw: (p, id) => masked(id, `<rect x="16" y="15" width="68" height="60" rx="18" fill="${p.fg}"/><path d="M27 70L24 88 46 73Z" fill="${p.fg}"/>`, placeB(50, 45, .6, bLower('#000', '#fff'))) },
+];
+
+// ---------- rendering ----------
+function badge(p) {
+  const b = state.badge;
+  if (b === 'none') return '';
+  if (b === 'dot') return `<circle cx="84" cy="16" r="7" fill="${p.sub}"/>`;
+  if (b === 'bar') return `<rect x="30" y="88" width="40" height="4.5" rx="2.25" fill="${p.sub}"/>`;
+  return `<circle cx="82" cy="18" r="10" fill="${p.sub}"/><polyline points="77.5,18 80.8,21.3 86.5,15" fill="none" stroke="${p.bg[1]}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function svg(mark, p, size, isPartner) {
+  const id = 'i' + (++uid);
+  const gloss = p.gloss ? `<radialGradient id="${id}h" cx=".2" cy="0" r="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></radialGradient>` : '';
+  return `<svg class="icon ${state.mask === 'circle' ? 'circle' : ''}" width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.bg[0]}"/><stop offset="1" stop-color="${p.bg[1]}"/></linearGradient>${gloss}</defs>
+    <rect width="100" height="100" fill="url(#${id}g)"/>${p.gloss ? `<rect width="100" height="100" fill="url(#${id}h)"/>` : ''}
+    ${mark.draw(p, id + 'm')}${isPartner ? badge(p) : ''}</svg>`;
+}
+
+function seg(elId, opts, key, swatch) {
+  const el = document.getElementById(elId);
+  el.innerHTML = Object.entries(opts).map(([k, v]) => {
+    const label = typeof v === 'string' ? v : v.label;
+    const sw = swatch && typeof v === 'object' ? `<i class="swatch" style="background:linear-gradient(135deg,${v.bg[0]},${v.bg[1]})"></i>` : '';
+    return `<button data-k="${k}" class="${state[key] === k ? 'on' : ''}">${sw}${label}</button>`;
+  }).join('');
+  el.onclick = e => { const b = e.target.closest('button'); if (!b) return; state[key] = b.dataset.k; render(); };
+}
+
+const FILLER = [['#34C759', 'Phone'], ['#0A84FF', 'Mail'], ['#FF9F0A', 'Photos'], ['#FF375F', 'Music'], ['#5E5CE6', 'Maps'], ['#64D2FF', 'Weather'], ['#30D158', 'WhatsApp'], ['#FF453A', 'YouTube'], ['#8E8E93', 'Settings'], ['#FFD60A', 'Notes'], ['#BF5AF2', 'Podcasts'], ['#0A84FF', 'Pay'], ['#FF6B35', 'Swiggy'], ['#AC8E68', 'Wallet']];
+
+function render() {
+  uid = 0;
+  seg('cust', CUSTOMER, 'cust', true);
+  seg('part', PARTNER, 'part', true);
+  seg('badge', BADGES, 'badge');
+  seg('mask', MASKS, 'mask');
+  const c = CUSTOMER[state.cust], pp = PARTNER[state.part];
+
+  document.getElementById('grid').innerHTML = MARKS.map((m, i) => `
+    <div class="card ${state.sel === m.key ? 'sel' : ''}" data-k="${m.key}">
+      <div class="num">${String(i + 1).padStart(2, '0')}</div>
+      <h3>${m.name}</h3>
+      <p>${m.desc}</p>
+      <div class="pair">
+        <figure>${svg(m, c, 104)}<figcaption>Customer</figcaption></figure>
+        <figure>${svg(m, pp, 104, true)}<figcaption>Partner</figcaption></figure>
+        <div class="sizes">${svg(m, c, 40)}${svg(m, c, 24)}</div>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('.card').forEach(el => el.onclick = () => { state.sel = el.dataset.k; render(); });
+
+  const m = MARKS.find(x => x.key === state.sel);
+  document.getElementById('chosen').textContent = `${String(MARKS.indexOf(m) + 1).padStart(2, '0')} · ${m.name}`;
+  const ph = () => {
+    const apps = FILLER.map(([col, n]) => `<div class="app"><div class="ph" style="background:linear-gradient(135deg,${col},${col}cc)"></div><span>${n}</span></div>`);
+    apps.splice(5, 0, `<div class="app">${svg(m, c, 34)}<span>BookALook</span></div>`);
+    apps.splice(10, 0, `<div class="app">${svg(m, pp, 34, true)}<span>BAL Partner</span></div>`);
+    return apps.join('');
+  };
+  document.getElementById('phL').innerHTML = ph();
+  document.getElementById('phD').innerHTML = ph();
+  document.getElementById('big').innerHTML = `<figure>${svg(m, c, 150)}<div>BookALook</div></figure><figure>${svg(m, pp, 150, true)}<div>BookALook Partner</div></figure>`;
+}
+render();
+</script>
+</body>
+</html>

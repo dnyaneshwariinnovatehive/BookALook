@@ -317,8 +317,12 @@ class SuperAdminCustomerController extends Controller
             ])
             ->all();
 
+        $standing = app(\App\Services\CustomerStandingService::class)->standing(\App\Models\User::findOrFail($id));
+
         return response()->json([
             'success' => true,
+            // Against the cancellation and no-show limits in Platform Policy.
+            'booking_standing' => $standing,
             'customer' => [
                 'id'         => $user->id,
                 'name'       => $user->name,
@@ -406,5 +410,32 @@ class SuperAdminCustomerController extends Controller
         }
 
         return $trend;
+    }
+
+    /**
+     * Clear a customer's cancellation and no-show record, lifting any booking
+     * restriction. Only what happens from now counts again.
+     */
+    public function resetBookingStanding(Request $request, string $id)
+    {
+        $customer = \App\Models\User::where('role', 'customer')->findOrFail($id);
+        $service = app(\App\Services\CustomerStandingService::class);
+        $before = $service->standing($customer);
+
+        $service->reset($customer);
+
+        \App\Services\AuditLogger::record(
+            action: \App\Models\AuditLog::POLICY_UPDATED,
+            entity: $customer,
+            label: "Booking record cleared for {$customer->name}",
+            before: ['restricted' => $before['restricted'], 'cancellations' => $before['cancellations']['count'], 'no_shows' => $before['no_shows']['count']],
+            after: ['restricted' => false, 'cancellations' => 0, 'no_shows' => 0],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$customer->name} can book normally again.",
+            'booking_standing' => $service->standing($customer->fresh()),
+        ]);
     }
 }

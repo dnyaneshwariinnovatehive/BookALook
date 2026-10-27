@@ -1,0 +1,304 @@
+/* The BookALook revenue tab. Cards, KPIs and charts reuse the dashboard's own
+   styles; these are only the pieces the tab adds. */
+
+.errorBox {
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--color-danger-border, var(--color-danger));
+  background: var(--color-danger-bg, transparent);
+  color: var(--color-danger);
+  font-size: 14px;
+}
+
+.allTime {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--text-body);
+  font-size: 13px;
+}
+
+.allTime b {
+  color: var(--text-heading);
+}
+
+.allTime svg {
+  color: var(--accent-color);
+}
+
+.sep {
+  color: var(--text-muted);
+}
+
+.donutWrap {
+  position: relative;
+}
+
+.donutCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donutCenter b {
+  font-size: 20px;
+  color: var(--text-heading);
+}
+
+.donutCenter span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.legendList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legendList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.legendName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-heading);
+  font-weight: 600;
+}
+
+.legendCount {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legendList b {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.legendList em {
+  font-style: normal;
+  font-size: 12px;
+  min-width: 36px;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.rankList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rankList li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rank {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent-color);
+  background: var(--accent-soft);
+}
+
+.rankMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rankTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.rankTop a,
+.rankTop span {
+  font-weight: 700;
+  color: var(--text-heading);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankTop a:hover {
+  color: var(--accent-color);
+}
+
+.rankTop b {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+  white-space: nowrap;
+}
+
+.stackBar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2, var(--bg-color));
+}
+
+.stackBar span {
+  display: block;
+  height: 100%;
+}
+
+.rankSub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cityChart {
+  height: 300px;
+}
+
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recentList li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.recentList li:last-child {
+  border-bottom: none;
+}
+
+.recentIcon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2, var(--bg-color));
+}
+
+.recentMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recentMain b {
+  font-size: 13.5px;
+  color: var(--text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentMain span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.recentAmount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.recentAmount b {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.recentAmount span {
+  font-size: 11.5px;
+  color: var(--color-warning);
+}
+
+/* ---------- tabs on the dashboard ---------- */
+
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  align-self: flex-start;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--text-heading);
+}
+
+.tabActive {
+  background: var(--accent-gradient, var(--accent-color));
+  color: #fff;
+}
+
+.tabActive:hover {
+  color: #fff;
+}

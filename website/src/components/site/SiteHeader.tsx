@@ -14,12 +14,12 @@ import Link from 'next/link';
  * scrolled to nothing.
  */
 
-// [PLACEHOLDER] No Pricing section exists yet — this nav item scrolls to the
-// salon section until a dedicated pricing section is added.
+// Written for salon owners first; customers still have their own section.
 const NAV_LINKS = [
+  { href: '/#features', label: 'Features' },
+  { href: '/#pricing', label: 'Pricing' },
+  { href: '/#get-started', label: 'Get started' },
   { href: '/#for-customers', label: 'Customers' },
-  { href: '/#for-salons', label: 'For Salons' },
-  { href: '/#for-salons', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ' },
 ];
 
@@ -37,10 +37,8 @@ export default function SiteHeader() {
             </Link>
           ))}
         </nav>
-        {/* [PLACEHOLDER] Points at the customer-badge section for now; swap to the real
-            store listing URL once the Customer App listing is live. */}
-        <Link className="blk-btn blk-btn--gold blk-btn--sm" href="/#for-customers">
-          Get the App
+        <Link className="blk-btn blk-btn--gold blk-btn--sm" href="/#enquiry-section">
+          Register your salon
         </Link>
       </div>
     </header>

@@ -9,6 +9,8 @@ import {
   type BankDetailsInput,
 } from '@/lib/bankDetails';
 import StoreBadge from '@/components/site/StoreBadge';
+import PricingSection from './PricingSection';
+import s from './landing.module.css';
 import {
   CUSTOMER_APP_STORE_URL,
   CUSTOMER_PLAY_STORE_URL,
@@ -17,97 +19,107 @@ import {
 } from '@/lib/site-links';
 
 /* ============================================================================
-   BOOKALOOK LANDING CONTENT — added sections
-   Static frontend content only. The existing salon enquiry form (see below)
-   is a fixed anchor point and is intentionally left byte-for-byte untouched.
+   BOOKALOOK LANDING — written for salon owners, the people who buy plans.
+   Customers still have their own section further down: they are why an owner
+   joins. The salon enquiry form is kept as it was and only framed here.
 
-   The header and footer now live in `../layout.tsx` and `StoreBadge`/the store
-   URLs in `@/components/site/StoreBadge` and `@/lib/site-links`, so this file
-   is only the page body.
+   The header and footer live in `../layout.tsx`, and the store URLs in
+   `@/lib/site-links`, so this file is only the page body.
    ============================================================================ */
 
-const CUSTOMER_STEPS = [
-  { title: 'Discover', desc: 'Browse verified salons and services near you.' },
-  { title: 'Book', desc: 'Pick a salon, service, and time that suits you.' },
-  { title: 'Pay Advance', desc: 'Pay a small advance securely to lock your slot.' },
-  { title: 'QR Check-in', desc: 'Show your QR code at the salon to check in.' },
-  { title: 'Enjoy', desc: 'Walk out happy — no waiting, no confusion.' },
+/** What owners stop losing, and what replaces it. */
+const GAINS = [
+  {
+    pain: 'No-shows and last-minute ghosts',
+    title: 'Advance payments hold every slot',
+    desc: 'Customers pay a small advance to book, so they turn up. If they do not, the advance is yours.',
+  },
+  {
+    pain: 'Empty chairs on weekday afternoons',
+    title: 'New customers find you in the app',
+    desc: 'Your salon, services and live free slots are listed for customers searching nearby, every hour of the day.',
+  },
+  {
+    pain: 'Registers, calls and WhatsApp chaos',
+    title: 'One app runs the whole salon',
+    desc: 'Bookings, walk-ins, staff hours, billing, payouts and reports — on your phone, for every branch.',
+  },
 ];
 
-const CUSTOMER_FLOW = [
-  {
-    icon: 'search',
-    title: 'Discover Top Salons',
-    desc: 'Browse rated stylists, view service menus, and transparent upfront costs.',
-  },
-  {
-    icon: 'check-calendar',
-    title: 'Reserve & Secure Slot',
-    desc: 'Pick your preferred date and time, and place a small guaranteed deposit.',
-  },
-  {
-    icon: 'qr',
-    title: 'Check In Instantly',
-    desc: 'Walk in, scan your instant QR code, and bypass the waiting lounge straight to the chair.',
-  },
+const OWNER_FEATURES = [
+  { icon: 'check-calendar', title: 'Online bookings, no double-booking', desc: 'Real-time availability per stylist, so a slot is only ever sold once.' },
+  { icon: 'lock', title: 'Secure advance payments', desc: 'Advances are collected online and adjusted against the final bill.' },
+  { icon: 'users', title: 'Staff, hours and leave', desc: 'Shifts, breaks and leave per person. Change salon hours and staff follow.' },
+  { icon: 'bag', title: 'Walk-ins and billing', desc: 'Add walk-ins, add services mid-visit, collect payment and send invoices.' },
+  { icon: 'qr', title: 'QR check-in', desc: 'Customers scan at the door; you know who is in the chair and when.' },
+  { icon: 'chat', title: 'Booking updates on WhatsApp', desc: 'Confirmations and reminders go to customers automatically.' },
+  { icon: 'trend', title: 'Revenue insights', desc: 'See busy hours, best services and quiet stylists — and what to do next.' },
+  { icon: 'wallet', title: 'Payouts and reward coins', desc: 'Online advances paid to your bank, plus coins you can put towards your plan.' },
+];
+
+const START_STEPS = [
+  { title: 'Send the form below', desc: 'Two minutes: your salon, area and contact. Bank details are optional.' },
+  { title: 'We verify your salon', desc: 'Our team checks the details, usually with a quick visit or call.' },
+  { title: 'Pick your plan', desc: 'A monthly plan, or the Commission Model. Use your welcome coins towards it.' },
+  { title: 'Go live and take bookings', desc: 'Set up services and staff in the Partner App and start receiving bookings.' },
 ];
 
 const SALON_ROLES = [
   {
-    icon: 'bag',
-    title: 'Admin',
-    role: 'Salon Owner',
-    desc: 'Register your salon, manage staff and services, and track revenue and payouts.',
+    tag: 'Salon owner',
+    title: 'Run every branch',
+    desc: 'Bookings, staff, services, payouts and reports for each of your salons — switch between branches in one tap.',
   },
   {
-    icon: 'clock',
-    title: 'Service Provider',
-    role: 'Staff',
-    desc: 'Manage your schedule, handle walk-ins, and track your earnings.',
+    tag: 'Stylists & staff',
+    title: 'Their day, on their phone',
+    desc: 'Each stylist sees their own appointments, checks customers in, adds walk-ins and requests leave.',
   },
   {
-    icon: 'users',
-    title: 'Collaborator',
-    role: 'Field Partner',
-    desc: 'Onboard salons on the ground and earn through subscription commissions.',
+    tag: 'Collaborator',
+    title: 'Help on the ground',
+    desc: 'A BookALook field partner helps you get set up and stays your point of contact.',
   },
 ];
 
-// [PLACEHOLDER] Partnership step wording — confirmed with the business team if
-// these need adjustment. Kept at 4 steps as spec'd.
-const PARTNER_STEPS = [
-  { title: 'Tell us about your salon', desc: 'Register online, or submit the enquiry form right on this page.' },
-  { title: 'Get verified', desc: 'Our team confirms your salon with an on-ground visit or review.' },
-  { title: 'Get approved', desc: 'You are approved and your salon goes live on BookALook.' },
-  { title: 'Manage everything', desc: 'Run staff, services, bookings, and payouts from the Partner App.' },
+const CUSTOMER_FLOW = [
+  { icon: 'search', title: 'They find you', desc: 'Customers browse verified salons by area, service and rating.' },
+  { icon: 'check-calendar', title: 'They book and pay an advance', desc: 'A real slot with a real stylist, confirmed instantly on WhatsApp.' },
+  { icon: 'qr', title: 'They walk straight in', desc: 'A QR check-in at your door — no waiting bench, no confusion.' },
 ];
 
-const WHY_FEATURES = [
-  { icon: 'check-calendar', title: 'No double-booking', desc: 'Real-time availability means every slot is reserved once.' },
-  { icon: 'lock', title: 'Secure advance payments', desc: 'Advances are held securely and applied to your bill.' },
-  { icon: 'chat', title: 'WhatsApp booking updates', desc: 'Instant confirmations and reminders, right on WhatsApp.' },
-  { icon: 'wallet', title: 'Wallet rewards for salons', desc: 'Earn wallet credits on every completed booking.' },
-  { icon: 'shield', title: 'Verified salons', desc: 'Every salon is checked before it goes live.' },
-  { icon: 'qr', title: 'QR check-in', desc: 'Customers verify in seconds at the door with a QR code.' },
+const CUSTOMER_FACTS = [
+  { value: '₹0', label: 'Booking fee for customers', accent: true },
+  { value: '24×7', label: 'Book any time, even after you close' },
+  { value: '1 tap', label: 'QR check-in at the salon' },
+  { value: 'Instant', label: 'WhatsApp confirmation and reminder' },
 ];
 
-// [PLACEHOLDER] FAQ answers are provisional copy — replace with final wording.
+// [PLACEHOLDER] FAQ answers are provisional copy — confirm with the business team.
 const FAQ_ITEMS = [
   {
-    q: 'Is it free for salons to list?',
-    a: 'Yes — getting your salon listed on BookALook is free. You can go live, receive bookings, and manage services without paying anything. Optional paid features and plans are always shown clearly before you choose, so there are no hidden charges.',
+    q: 'How much does BookALook cost my salon?',
+    a: 'Choose a monthly Subscription Plan (the current plans and prices are shown above, straight from our system), or the Commission Model, where there is no monthly fee and you pay an agreed percentage on app bookings only. Walk-ins are never charged commission.',
   },
   {
-    q: 'How does the advance payment work?',
-    a: 'When a customer books, they pay a small advance — usually a percentage of the service price — to confirm the slot. The secure payment is held and adjusted against the final bill at the salon, so no one pays twice for the same appointment.',
+    q: 'How do the customer advances reach me?',
+    a: 'Customers pay their advance online when they book. BookALook holds it and pays it out to your bank: weekly for plan salons, monthly for Commission Model salons (after the commission for that month). The rest of the bill is paid to you at the counter.',
   },
   {
-    q: 'What happens if I need to cancel?',
-    a: 'Refunds depend on the salon\u2019s cancellation policy, which is always shown before you book. Cancel within the window and you\u2019re refunded automatically. If the salon cancels, you\u2019re refunded in full — every time.',
+    q: 'What if a customer does not show up?',
+    a: 'The advance they paid is kept as compensation for the lost slot and reaches you in your payout. Your cancellation window is shown to customers before they book.',
+  },
+  {
+    q: 'Can my staff use it, and do I need a separate app?',
+    a: 'One Partner App serves everyone. You log in as the owner; each stylist logs in with their own number and sees only their own work. If you run more than one salon, you switch between them in the same app.',
+  },
+  {
+    q: 'Do I need bank details to register?',
+    a: 'No. You can register and go live without them, and add them later from the Partner App. They are only needed before your first payout.',
   },
   {
     q: 'How do I become a Collaborator?',
-    a: 'Collaborators are field partners who onboard salons in their area and earn commissions on subscriptions. To get started, submit the enquiry form on this page or email us at hello@bookalook.in, and our team will walk you through everything.',
+    a: 'Collaborators are field partners who help salons in their area join and stay supported. Email hello@bookalook.in and our team will walk you through it.',
   },
 ];
 
@@ -117,22 +129,9 @@ const FAQ_ITEMS = [
 // API) before going live. Keep 5+ per lane so the marquee never shows a gap.
 const REVIEW_LANES = [
   {
-    id: 'customers',
-    role: 'Customer',
-    dir: 'right',
-    reviews: [
-      { name: 'Ananya Rao', meta: 'Bengaluru', rating: 5, text: 'Booked a haircut at 11am, walked in at 11am. No token, no waiting on a bench, no “sir, please wait five minutes”. This is how it should always have been.' },
-      { name: 'Rohit Menon', meta: 'Hyderabad', rating: 5, text: 'The QR check-in is the part I did not expect to love. One scan and I was in the chair. My barber was impressed too.' },
-      { name: 'Sneha Kulkarni', meta: 'Pune', rating: 4, text: 'Loved that I could see the real price before confirming. The advance adjusted off my final bill exactly as promised, so nobody made me pay twice.' },
-      { name: 'Imran Shaikh', meta: 'Mumbai', rating: 5, text: 'Got an instant WhatsApp confirmation and a reminder an hour before. First salon booking app that did not leave me guessing.' },
-      { name: 'Divya Iyer', meta: 'Chennai', rating: 5, text: 'I found a verified salon in under two minutes and booked a colouring slot for the same evening. Weekend evenings are finally not a lottery.' },
-      { name: 'Karthik Nair', meta: 'Kochi', rating: 4, text: 'Booked for my parents and they loved it. The address and directions were right there in the app, so we did not lose time looking for the shop.' },
-    ],
-  },
-  {
     id: 'admins',
     role: 'Salon Admin',
-    dir: 'left',
+    dir: 'right',
     reviews: [
       { name: 'Farhan Qureshi', meta: 'Owner, Velvet Scissors · Bengaluru', rating: 5, text: 'My no-show rate dropped from almost 30 percent to under 5. People who pay an advance and hold a QR code actually turn up.' },
       { name: 'Neha Bansal', meta: 'Owner, The Glow Studio · Delhi', rating: 5, text: 'I run three chairs across two floors. Managing staff schedules, services and payouts from one app replaced a wall of registers and a lot of arguments.' },
@@ -140,6 +139,19 @@ const REVIEW_LANES = [
       { name: 'Priya Menon', meta: 'Owner, Trim & Co · Kochi', rating: 4, text: 'Wallet credits on every completed booking are a nice touch. Support answered on WhatsApp within minutes, twice.' },
       { name: 'Sameer Joshi', meta: 'Owner, Urban Polish · Pune', rating: 5, text: 'The QR check-in means I know exactly who is in my salon and when. My clients feel looked after and my billing matches the floor exactly.' },
       { name: 'Zoya Ahmed', meta: 'Owner, Aura Beauty Lounge · Mumbai', rating: 5, text: 'I can finally see, slot by slot, which of my stylists is underbooked. I moved clients across teams and revenue followed within a fortnight.' },
+    ],
+  },
+  {
+    id: 'customers',
+    role: 'Customer',
+    dir: 'left',
+    reviews: [
+      { name: 'Ananya Rao', meta: 'Bengaluru', rating: 5, text: 'Booked a haircut at 11am, walked in at 11am. No token, no waiting on a bench, no “sir, please wait five minutes”. This is how it should always have been.' },
+      { name: 'Rohit Menon', meta: 'Hyderabad', rating: 5, text: 'The QR check-in is the part I did not expect to love. One scan and I was in the chair. My barber was impressed too.' },
+      { name: 'Sneha Kulkarni', meta: 'Pune', rating: 4, text: 'Loved that I could see the real price before confirming. The advance adjusted off my final bill exactly as promised, so nobody made me pay twice.' },
+      { name: 'Imran Shaikh', meta: 'Mumbai', rating: 5, text: 'Got an instant WhatsApp confirmation and a reminder an hour before. First salon booking app that did not leave me guessing.' },
+      { name: 'Divya Iyer', meta: 'Chennai', rating: 5, text: 'I found a verified salon in under two minutes and booked a colouring slot for the same evening. Weekend evenings are finally not a lottery.' },
+      { name: 'Karthik Nair', meta: 'Kochi', rating: 4, text: 'Booked for my parents and they loved it. The address and directions were right there in the app, so we did not lose time looking for the shop.' },
     ],
   },
   {
@@ -207,55 +219,11 @@ function Icon({ name, className }: { name: string; className?: string }) {
       return <svg {...common}><path d="M5 3v18" /><path d="M5 3h12" /><path d="M5 7h10M5 11h12M5 15h10M5 19h12" /></svg>;
     case 'bell':
       return <svg {...common}><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2.4h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>;
+    case 'trend':
+      return <svg {...common}><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>;
     default:
       return <svg {...common}><circle cx="12" cy="12" r="9" /></svg>;
   }
-}
-
-// [PLACEHOLDER] Decorative QR placeholder for the download banner. It is NOT
-// scannable — replace with a real QR generated from the live store URL once the
-// Customer App listings go live.
-function QrPlaceholder() {
-  const size = 13;
-  const cells: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
-  const set = (r: number, c: number, on: boolean) => {
-    cells[r][c] = on;
-  };
-  const finder = (r: number, c: number) => {
-    for (let i = 0; i < 7; i++) {
-      for (let j = 0; j < 7; j++) {
-        const edge = i === 0 || i === 6 || j === 0 || j === 6;
-        const core = i >= 2 && i <= 4 && j >= 2 && j <= 4;
-        set(r + i, c + j, edge || core);
-      }
-    }
-    if (r + 7 < size && c + 4 < size) set(r + 7, c + 4, true);
-    if (r + 4 < size && c + 7 < size) set(r + 4, c + 7, true);
-  };
-  finder(0, 0);
-  finder(0, size - 7);
-  finder(size - 7, 0);
-  let h = 0;
-  for (let k = 0; k < 'bookalook'.length; k++) h = (h * 31 + 'bookalook'.charCodeAt(k)) >>> 0;
-  const rand = () => {
-    h = (h * 1664525 + 1013904223) >>> 0;
-    return h / 4294967296;
-  };
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (cells[r][c] || (r < 9 && c < 9)) continue;
-      set(r, c, rand() > 0.5);
-    }
-  }
-  return (
-    <div className="blk-download__qr" role="img" aria-label="QR code placeholder for the app download">
-      {cells.map((row, r) => (
-        <span className="blk-download__qr-row" key={r}>
-          {row.map((on, c) => <i className={on ? 'is-on' : ''} key={c} />)}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 export default function LandingPage() {
@@ -440,519 +408,474 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="landing-container">
-      {/* ============ HERO ============ */}
-      <section id="top" className="blk-hero">
-        <div className="blk-hero__bgi" aria-hidden="true">
-          <Icon name="scissors" />
-          <Icon name="comb" />
-          <Icon name="spark" />
-          <Icon name="scissors" />
-          <Icon name="spark" />
-        </div>
-        <div className="blk-hero__grid">
-          <div className="blk-hero__content">
-            <p className="blk-hero__eyebrow">BookALook – Salon Appointments, Done Right</p>
-            <h1 className="blk-hero__title">
-              No waiting. <br />
-              <span className="blk-hero__title-gold">Just booking.</span>
+    <main className={s.page}>
+      {/* ============ HERO — for salon owners ============ */}
+      <section id="top" className={s.hero}>
+        <div className={`${s.container} ${s.heroGrid}`}>
+          <div>
+            <p className={s.kicker}><Icon name="scissors" className={s.kickerIcon} /> For salon owners</p>
+            <h1 className={s.heroTitle}>
+              Fill every chair.<br />
+              <em>Get paid before they arrive.</em>
             </h1>
-            <p className="blk-hero__sub">
-              Browse top-rated salons, secure your slot with an advance, and check in with a tap.
-              Zero wait times, guaranteed.
+            <p className={s.heroSub}>
+              BookALook brings new customers to your salon, takes an advance with every booking so they turn up,
+              and gives you one app to run bookings, staff, billing and payouts.
             </p>
-            <div className="blk-hero__ctas">
-              {/* [PLACEHOLDER] No booking flow on the landing page yet — points at the
-                  customer section until the app's booking experience is linked. */}
-              <a className="blk-btn blk-btn--warm" href="#for-customers">
-                Book an Appointment <Icon name="arrow" />
+            <div className={s.heroCtas}>
+              <a className={`${s.btn} ${s.btnPrimary}`} href="#enquiry-section">
+                Register your salon <Icon name="arrow" />
               </a>
-              <a className="blk-btn blk-btn--ghost" href="#enquiry-section">Register Your Salon</a>
+              <a className={`${s.btn} ${s.btnSoft}`} href="#pricing">See plans &amp; pricing</a>
             </div>
-            <div className="blk-hero__proof">
-              {/* [PLACEHOLDER] Review figure is provisional marketing copy — replace
-                  with the real verified rating once live. */}
-              <p className="blk-hero__rating">
-                <span className="blk-hero__stars" aria-hidden="true">★★★★★</span>
-                <span>4.9/5 from 1,200+ bookings</span>
-              </p>
-              <ul className="blk-hero__pills">
-                <li><Icon name="check" /> Instant QR Check-in</li>
-                <li><Icon name="check" /> Verified Salons</li>
-                <li><Icon name="check" /> Secure Advance</li>
-              </ul>
+            <ul className={s.heroChecks}>
+              <li><Icon name="check" /> Advance with every booking</li>
+              <li><Icon name="check" /> Live in days, not weeks</li>
+              <li><Icon name="check" /> Welcome coins for new salons</li>
+            </ul>
+            <div className={s.trustRow}>
+              <span className={s.avatars} aria-hidden="true">
+                <span>A</span><span>R</span><span>S</span><span>I</span>
+              </span>
+              <span>
+                <span className={s.stars} aria-hidden="true">★★★★★</span>{' '}
+                Customers love booking this way — <b>and they book your empty slots.</b>
+              </span>
             </div>
           </div>
-          <figure className="blk-phone" aria-label="BookALook app preview">
-            <div className="blk-phone__frame">
-              <div className="blk-phone__screen">
-                <div className="blk-phone__statusbar">
-                  <span>9:41</span>
-                  <span aria-hidden="true">●●●</span>
+
+          {/* The Partner App home, as an owner sees it. Illustrative figures. */}
+          <figure className={s.mock} aria-label="Partner App preview: today's bookings and revenue">
+            <div className={`${s.toast} ${s.toastTop}`} aria-hidden="true">
+              <span><Icon name="check-calendar" /></span>
+              <div><b>New booking</b><small>Ananya · Hair spa · 4:30 PM</small></div>
+            </div>
+            <div className={s.mockCard}>
+              <div className={s.mockTop}>
+                <div className={s.mockSalon}>
+                  <span>G</span>
+                  <div><b>Glow Studio</b><small>Today, Wednesday</small></div>
                 </div>
-                <div className="blk-phone__appbar">
-                  <span className="blk-phone__brand">Book<span>ALook</span></span>
-                  <span className="blk-phone__bell"><Icon name="bell" /></span>
-                </div>
-                <div className="blk-phone__search">
-                  <Icon name="search" />
-                  <span>Find a salon, service, or stylist</span>
-                </div>
-                <div className="blk-phone__chips">
-                  <span className="blk-phone__chip is-on">Haircut</span>
-                  <span className="blk-phone__chip">Facial</span>
-                  <span className="blk-phone__chip">Manicure</span>
-                </div>
-                <div className="blk-phone__card">
-                  <p className="blk-phone__card-label">Your Next Appointment</p>
-                  <p className="blk-phone__card-name">Irren Atelier</p>
-                  <p className="blk-phone__card-meta">Today · 6:30 PM · Haircut + Conditioning</p>
-                  <div className="blk-phone__card-row">
-                    <span className="blk-phone__card-conf">Confirmed</span>
-                    <span className="blk-phone__card-btn">View QR</span>
-                  </div>
-                </div>
-                <div className="blk-phone__cal">
-                  <p className="blk-phone__cal-label">This week</p>
-                  <div className="blk-phone__cal-days">
-                    <span className="blk-phone__day"><b>Mon</b><i>12</i></span>
-                    <span className="blk-phone__day"><b>Tue</b><i>13</i></span>
-                    <span className="blk-phone__day is-on"><b>Wed</b><i>14</i></span>
-                    <span className="blk-phone__day"><b>Thu</b><i>15</i></span>
-                    <span className="blk-phone__day"><b>Fri</b><i>16</i></span>
-                  </div>
-                </div>
+                <span className={s.mockLive}>● Open</span>
               </div>
+              <div className={s.mockStats}>
+                <div className={s.mockStat}><small>Bookings</small><b>18</b><i>+6 online</i></div>
+                <div className={s.mockStat}><small>Revenue</small><b>₹14.2k</b><i>+22%</i></div>
+                <div className={s.mockStat}><small>No-shows</small><b>0</b><i>advance paid</i></div>
+              </div>
+              <div className={s.mockChart} aria-hidden="true">
+                {[38, 52, 44, 70, 64, 92, 80].map((h, i) => (
+                  <span key={i} className={i === 5 ? s.on : undefined} style={{ height: `${h}%` }} />
+                ))}
+              </div>
+              <div className={s.mockDays} aria-hidden="true">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              </div>
+              <ul className={s.mockList}>
+                <li><span className={s.mockTime}>11:00</span><div><b>Rohit M.</b><small>Haircut · Vikram</small></div><em>Checked in</em></li>
+                <li><span className={s.mockTime}>12:30</span><div><b>Sneha K.</b><small>Facial · Meera</small></div><em>Advance paid</em></li>
+              </ul>
+            </div>
+            <div className={s.toast} aria-hidden="true">
+              <span><Icon name="wallet" /></span>
+              <div><b>Payout sent</b><small>₹8,450 to your bank</small></div>
             </div>
           </figure>
         </div>
       </section>
 
-      {/* ============ WHAT IS BOOKALOOK ============ */}
-      <section id="what-is-bookalook" className="blk-whatis">
-        <div className="blk-container">
-          <p className="blk-section-kicker">What is BookALook</p>
-          <h2 className="blk-section-title">Salon appointments without the waiting room</h2>
-          <p className="blk-whatis__text">
-            BookALook is an online appointment platform that connects customers with local salons and
-            barbershops. Customers browse real salons near them, choose a service and a time, pay a small
-            advance to lock it in, and check in with a QR code when they arrive. For salons, it is the same
-            platform — one place to manage bookings, staff, and payments instead of juggling calls and walk-ins.
-          </p>
-        </div>
-      </section>
-
-      {/* ============ HOW IT WORKS — CUSTOMER JOURNEY ============ */}
-      <section id="how-it-works" className="blk-journey">
-        <div className="blk-container">
-          <p className="blk-section-kicker">How it works</p>
-          <h2 className="blk-section-title">From browse to done in five steps</h2>
-          <p className="blk-section-sub">The BookALook customer journey stays quick end to end.</p>
-          <ol className="blk-steps">
-            {CUSTOMER_STEPS.map((step, i) => (
-              <li className="blk-step" key={step.title}>
-                <div className="blk-step__circle">{i + 1}</div>
-                <div className="blk-step__text">
-                  <p className="blk-step__title">{step.title}</p>
-                  <p className="blk-step__desc">{step.desc}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* ============ FOR CUSTOMERS ============ */}
-      <section id="for-customers" className="blk-customers">
-        <div className="blk-container">
-          <p className="blk-section-kicker blk-pill">For Customers</p>
-          <h2 className="blk-section-title">Your next haircut, booked in a minute</h2>
-          <div className="blk-csteps">
-            {CUSTOMER_FLOW.map((step, i) => (
-              <article className="blk-cstep" key={step.title}>
-                <span className="blk-cstep__icon"><Icon name={step.icon} /></span>
-                <p className="blk-cstep__tag">Step {String(i + 1).padStart(2, '0')}</p>
-                <h3 className="blk-cstep__title">{step.title}</h3>
-                <p className="blk-cstep__desc">{step.desc}</p>
+      {/* ============ WHAT CHANGES ============ */}
+      <section id="why-bookalook" className={s.section}>
+        <div className={`${s.container} ${s.center}`}>
+          <p className={s.kicker}>Why salons switch</p>
+          <h2 className={s.title}>Less chasing. More chairs filled.</h2>
+          <div className={s.gainGrid}>
+            {GAINS.map((g) => (
+              <article className={s.gainCard} key={g.title} style={{ textAlign: 'left' }}>
+                <span className={s.gainPain}>{g.pain}</span>
+                <h3>{g.title}</h3>
+                <p>{g.desc}</p>
               </article>
             ))}
           </div>
-          <div className="blk-download">
-            <div className="blk-download__info">
-              <p className="blk-download__head">Get the BookALook app today</p>
-              <p className="blk-download__sub">Scan to install on iOS &amp; Android</p>
-              {/* [PLACEHOLDER] Customer App store listing URLs — replace when listings go live. */}
-              <div className="blk-badges blk-download__badges">
-                <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
-                <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
-              </div>
-            </div>
-            <QrPlaceholder />
+        </div>
+      </section>
+
+      {/* ============ FEATURES ============ */}
+      <section id="features" className={`${s.section} ${s.sectionTint}`}>
+        <div className={s.container}>
+          <p className={s.kicker}>Everything in the Partner App</p>
+          <h2 className={s.title}>Built for how a salon actually runs</h2>
+          <p className={s.lead}>From the first booking of the morning to the payout at the end of the week.</p>
+          <div className={s.featureGrid}>
+            {OWNER_FEATURES.map((f) => (
+              <article className={s.feature} key={f.title}>
+                <span className={s.featureIcon}><Icon name={f.icon} /></span>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="enquiry-section" className="enquiry-section" style={{ padding: '0 2rem 4rem 2rem', width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <div style={{ maxWidth: '600px', width: '100%', background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>Partner With Us</h2>
-          <p style={{ textAlign: 'center', color: '#666', marginBottom: '2rem' }}>Fill out the form below and our team will get in touch to onboard your salon.</p>
-          
-          {status === 'success' ? (
-            <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-              Thank you! Your enquiry has been submitted successfully. Our team will contact you soon.
+      {/* ============ PRICING (live plans) ============ */}
+      <PricingSection />
+
+      {/* ============ GET STARTED + ENQUIRY ============ */}
+      <section id="get-started" className={`${s.section} ${s.sectionTint}`}>
+        <div className={`${s.container} ${s.startGrid}`}>
+          <div>
+            <p className={s.kicker}>Get started</p>
+            <h2 className={s.title}>Your salon on BookALook in four steps</h2>
+            <ol className={s.steps}>
+              {START_STEPS.map((step, i) => (
+                <li key={step.title}>
+                  <span className={s.stepNum}>{i + 1}</span>
+                  <div><b>{step.title}</b><p>{step.desc}</p></div>
+                </li>
+              ))}
+            </ol>
+            <p className={s.startNote}>
+              <b>Prefer to do it yourself?</b> Download the Partner App and register your salon from your phone.
+            </p>
+            <div className={s.badges}>
+              <StoreBadge store="google" url={PARTNER_PLAY_STORE_URL} label="Google Play" />
+              <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {status === 'error' && (
-                <div style={{ padding: '0.75rem', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', fontSize: '0.9rem' }}>
-                  {errorMessage}
+          </div>
+
+          <div id="enquiry-section" className={`enquiry-section ${s.formWrap}`}>
+            <div style={{ maxWidth: '600px', width: '100%', background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+              <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>Partner With Us</h2>
+              <p style={{ textAlign: 'center', color: '#666', marginBottom: '2rem' }}>Fill out the form below and our team will get in touch to onboard your salon.</p>
+          
+              {status === 'success' ? (
+                <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', color: '#2e7d32', borderRadius: '8px', textAlign: 'center', fontWeight: 'bold' }}>
+                  Thank you! Your enquiry has been submitted successfully. Our team will contact you soon.
                 </div>
-              )}
-              
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Salon Name *</label>
-                <input 
-                  type="text" 
-                  name="salon_name" 
-                  required 
-                  value={formData.salon_name} 
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Owner Name *</label>
-                <input 
-                  type="text" 
-                  name="owner_name" 
-                  required 
-                  value={formData.owner_name} 
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Phone Number *</label>
-                <input 
-                  type="tel" 
-                  name="phone" 
-                  required 
-                  value={formData.phone} 
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>State *</label>
-                <select
-                  name="state"
-                  required
-                  value={formData.state}
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
-                >
-                  <option value="">Select your state</option>
-                  {states.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City *</label>
-                <select
-                  name="city_id"
-                  required
-                  disabled={!formData.state}
-                  value={formData.city_id}
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
-                >
-                  <option value="">
-                    {!formData.state ? 'Choose a state first' : 'Select your city'}
-                  </option>
-                  {filteredCities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Area *</label>
-                <select
-                  name="sub_area_id"
-                  required
-                  disabled={!formData.city_id || loadingAreas}
-                  value={formData.sub_area_id}
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
-                >
-                  <option value="">
-                    {!formData.city_id
-                      ? 'Choose a city first'
-                      : loadingAreas
-                        ? 'Loading areas…'
-                        : subAreas.length === 0
-                          ? 'No areas listed for this city yet'
-                          : 'Select your area'}
-                  </option>
-                  {subAreas.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-                <p style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#777' }}>
-                  Helps us send someone who already works near you.
-                </p>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Street Address *</label>
-                <textarea
-                  name="street_address"
-                  required
-                  rows={2}
-                  value={formData.street_address}
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Pincode *</label>
-                <input
-                  type="text"
-                  name="pincode"
-                  required
-                  value={formData.pincode}
-                  onChange={handleInputChange}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Message (Optional)</label>
-                <textarea 
-                  name="message" 
-                  rows={3} 
-                  value={formData.message} 
-                  onChange={handleInputChange}
-                  placeholder="Tell us anything else about your salon..."
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
-                ></textarea>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Salon Photo (Optional)</label>
-                {photoPreview ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '8px', background: '#fafafa' }}>
-                    <img 
-                      src={photoPreview} 
-                      alt="Salon preview" 
-                      style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #eee' }} 
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {photo?.name}
-                      </p>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
-                        {(photo ? (photo.size / (1024 * 1024)).toFixed(2) : 0)} MB
-                      </p>
+              ) : (
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {status === 'error' && (
+                    <div style={{ padding: '0.75rem', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', fontSize: '0.9rem' }}>
+                      {errorMessage}
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={handleRemovePhoto}
-                      style={{ background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
-                    >
-                      Remove
-                    </button>
+                  )}
+              
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Salon Name *</label>
+                    <input 
+                      type="text" 
+                      name="salon_name" 
+                      required 
+                      value={formData.salon_name} 
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    />
                   </div>
-                ) : (
-                  <label 
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Owner Name *</label>
+                    <input 
+                      type="text" 
+                      name="owner_name" 
+                      required 
+                      value={formData.owner_name} 
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Phone Number *</label>
+                    <input 
+                      type="tel" 
+                      name="phone" 
+                      required 
+                      value={formData.phone} 
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>State *</label>
+                    <select
+                      name="state"
+                      required
+                      value={formData.state}
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                    >
+                      <option value="">Select your state</option>
+                      {states.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>City *</label>
+                    <select
+                      name="city_id"
+                      required
+                      disabled={!formData.state}
+                      value={formData.city_id}
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                    >
+                      <option value="">
+                        {!formData.state ? 'Choose a state first' : 'Select your city'}
+                      </option>
+                      {filteredCities.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Area *</label>
+                    <select
+                      name="sub_area_id"
+                      required
+                      disabled={!formData.city_id || loadingAreas}
+                      value={formData.sub_area_id}
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px', background: 'white' }}
+                    >
+                      <option value="">
+                        {!formData.city_id
+                          ? 'Choose a city first'
+                          : loadingAreas
+                            ? 'Loading areas…'
+                            : subAreas.length === 0
+                              ? 'No areas listed for this city yet'
+                              : 'Select your area'}
+                      </option>
+                      {subAreas.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                    <p style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#777' }}>
+                      Helps us send someone who already works near you.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Street Address *</label>
+                    <textarea
+                      name="street_address"
+                      required
+                      rows={2}
+                      value={formData.street_address}
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Pincode *</label>
+                    <input
+                      type="text"
+                      name="pincode"
+                      required
+                      value={formData.pincode}
+                      onChange={handleInputChange}
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Message (Optional)</label>
+                    <textarea 
+                      name="message" 
+                      rows={3} 
+                      value={formData.message} 
+                      onChange={handleInputChange}
+                      placeholder="Tell us anything else about your salon..."
+                      style={{ width: '100%', padding: '0.75rem', border: '1px solid #ccc', borderRadius: '8px' }}
+                    ></textarea>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Salon Photo (Optional)</label>
+                    {photoPreview ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', border: '1px solid #ddd', borderRadius: '8px', background: '#fafafa' }}>
+                        <img 
+                          src={photoPreview} 
+                          alt="Salon preview" 
+                          style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #eee' }} 
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {photo?.name}
+                          </p>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
+                            {(photo ? (photo.size / (1024 * 1024)).toFixed(2) : 0)} MB
+                          </p>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={handleRemovePhoto}
+                          style={{ background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <label 
+                        style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          padding: '1.25rem', 
+                          border: '2px dashed #ccc', 
+                          borderRadius: '8px', 
+                          cursor: 'pointer', 
+                          background: '#fafafa',
+                          transition: 'border-color 0.2s',
+                        }}
+                      >
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '0.5rem' }}>
+                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                          <circle cx="9" cy="9" r="2" />
+                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                        </svg>
+                        <span style={{ fontSize: '0.9rem', color: '#333', fontWeight: 500 }}>Click to upload a salon photo</span>
+                        <span style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>PNG, JPG, or WebP up to 5MB</span>
+                        <input 
+                          type="file" 
+                          accept="image/png,image/jpeg,image/webp" 
+                          onChange={handlePhotoChange} 
+                          style={{ display: 'none' }} 
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  <details style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '0.75rem 1rem', background: '#fafafa' }} open={Object.keys(bankErrors).length > 0 || undefined}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Bank details for payouts (optional)</summary>
+                    <p style={{ margin: '0.5rem 0 0.75rem', fontSize: '0.8rem', color: '#666' }}>
+                      BookALook collects advances from your customers and sends your settlements here. You can skip this and add it later in the BookALook Partner app.
+                    </p>
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      {(Object.keys(EMPTY_BANK_DETAILS) as (keyof BankDetailsInput)[]).map((key) => (
+                        <div key={key}>
+                          <label htmlFor={key} style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 500, fontSize: '0.9rem' }}>
+                            {BANK_FIELD_LABELS[key]}
+                          </label>
+                          <input
+                            id={key}
+                            name={key}
+                            type="text"
+                            inputMode={key === 'bank_account_number' ? 'numeric' : undefined}
+                            autoComplete="off"
+                            value={bank[key]}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setBank((prev) => ({ ...prev, [key]: value }));
+                              if (bankErrors[key]) setBankErrors((prev) => ({ ...prev, [key]: undefined }));
+                            }}
+                            placeholder={key === 'bank_ifsc' ? 'e.g. HDFC0001234' : key === 'bank_upi_id' ? 'e.g. name@okhdfcbank' : undefined}
+                            aria-invalid={Boolean(bankErrors[key])}
+                            style={{ width: '100%', padding: '0.65rem', border: `1px solid ${bankErrors[key] ? '#c62828' : '#ccc'}`, borderRadius: '8px', textTransform: key === 'bank_ifsc' ? 'uppercase' : undefined }}
+                          />
+                          {bankErrors[key] && (
+                            <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#c62828' }}>{bankErrors[key]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+
+                  <button 
+                    type="submit" 
+                    disabled={status === 'submitting'}
                     style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      padding: '1.25rem', 
-                      border: '2px dashed #ccc', 
+                      padding: '1rem', 
+                      backgroundColor: status === 'submitting' ? '#9c27b088' : '#9c27b0', 
+                      color: 'white', 
+                      border: 'none', 
                       borderRadius: '8px', 
-                      cursor: 'pointer', 
-                      background: '#fafafa',
-                      transition: 'border-color 0.2s',
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                      cursor: status === 'submitting' ? 'not-allowed' : 'pointer',
+                      marginTop: '1rem'
                     }}
                   >
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '0.5rem' }}>
-                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                      <circle cx="9" cy="9" r="2" />
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                    </svg>
-                    <span style={{ fontSize: '0.9rem', color: '#333', fontWeight: 500 }}>Click to upload a salon photo</span>
-                    <span style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.2rem' }}>PNG, JPG, or WebP up to 5MB</span>
-                    <input 
-                      type="file" 
-                      accept="image/png,image/jpeg,image/webp" 
-                      onChange={handlePhotoChange} 
-                      style={{ display: 'none' }} 
-                    />
-                  </label>
-                )}
-              </div>
-
-              <details style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '0.75rem 1rem', background: '#fafafa' }} open={Object.keys(bankErrors).length > 0 || undefined}>
-                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Bank details for payouts (optional)</summary>
-                <p style={{ margin: '0.5rem 0 0.75rem', fontSize: '0.8rem', color: '#666' }}>
-                  BookALook collects advances from your customers and sends your settlements here. You can skip this and add it later in the BookALook Partner app.
-                </p>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {(Object.keys(EMPTY_BANK_DETAILS) as (keyof BankDetailsInput)[]).map((key) => (
-                    <div key={key}>
-                      <label htmlFor={key} style={{ display: 'block', marginBottom: '0.35rem', fontWeight: 500, fontSize: '0.9rem' }}>
-                        {BANK_FIELD_LABELS[key]}
-                      </label>
-                      <input
-                        id={key}
-                        name={key}
-                        type="text"
-                        inputMode={key === 'bank_account_number' ? 'numeric' : undefined}
-                        autoComplete="off"
-                        value={bank[key]}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setBank((prev) => ({ ...prev, [key]: value }));
-                          if (bankErrors[key]) setBankErrors((prev) => ({ ...prev, [key]: undefined }));
-                        }}
-                        placeholder={key === 'bank_ifsc' ? 'e.g. HDFC0001234' : key === 'bank_upi_id' ? 'e.g. name@okhdfcbank' : undefined}
-                        aria-invalid={Boolean(bankErrors[key])}
-                        style={{ width: '100%', padding: '0.65rem', border: `1px solid ${bankErrors[key] ? '#c62828' : '#ccc'}`, borderRadius: '8px', textTransform: key === 'bank_ifsc' ? 'uppercase' : undefined }}
-                      />
-                      {bankErrors[key] && (
-                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#c62828' }}>{bankErrors[key]}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </details>
-
-              <button 
-                type="submit" 
-                disabled={status === 'submitting'}
-                style={{ 
-                  padding: '1rem', 
-                  backgroundColor: status === 'submitting' ? '#9c27b088' : '#9c27b0', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  cursor: status === 'submitting' ? 'not-allowed' : 'pointer',
-                  marginTop: '1rem'
-                }}
-              >
-                {status === 'submitting' ? 'Submitting...' : 'Submit Enquiry'}
-              </button>
-            </form>
-          )}
+                    {status === 'submitting' ? 'Submitting...' : 'Submit Enquiry'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ============ FOR SALON BUSINESSES ============ */}
-      <section id="for-salons" className="blk-salons">
-        <div className="blk-container">
-          <p className="blk-section-kicker">For Salon Businesses</p>
-          <h2 className="blk-section-title">One app. Three ways to run your business.</h2>
-          <div className="blk-salons__cards">
-            {SALON_ROLES.map((role) => (
-              <article className="blk-salons__card" key={role.title}>
-                <span className="blk-salons__card-icon"><Icon name={role.icon} /></span>
-                <h3 className="blk-salons__card-title">{role.title}</h3>
-                <p className="blk-salons__card-role">{role.role}</p>
-                <p className="blk-salons__card-desc">{role.desc}</p>
+      {/* ============ ONE APP, WHOLE TEAM ============ */}
+      <section id="for-salons" className={s.section}>
+        <div className={`${s.container} ${s.center}`}>
+          <p className={s.kicker}>One app for the whole team</p>
+          <h2 className={s.title}>You, your stylists, and us — in the same app</h2>
+          <div className={s.roleGrid} style={{ textAlign: 'left' }}>
+            {SALON_ROLES.map((r) => (
+              <article className={s.role} key={r.tag}>
+                <small>{r.tag}</small>
+                <h3>{r.title}</h3>
+                <p>{r.desc}</p>
               </article>
             ))}
           </div>
-          {/* [PLACEHOLDER] Partner App store listing URLs — this is a SEPARATE app from the
-              Customer App, so it needs its own badges (not a repeat of section 5's links). */}
-          <div className="blk-badges blk-badges--center">
-            <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
+          <div className={s.badges}>
             <StoreBadge store="google" url={PARTNER_PLAY_STORE_URL} label="Google Play" />
-          </div>
-          <p className="blk-salons__hint">The Partner App — one download for owners, staff, and collaborators.</p>
-        </div>
-      </section>
-
-      {/* ============ HOW IT WORKS — FOR PARTNERSHIP (distinct step flow) ============ */}
-      <section id="partners" className="blk-partnership">
-        <div className="blk-container">
-          <p className="blk-section-kicker">How it works — For Salon Owners</p>
-          <h2 className="blk-section-title">Getting your salon on BookALook</h2>
-          <p className="blk-partnership__sub">
-            A separate, simpler flow: you are not booking a service — you are joining the platform as a partner.
-          </p>
-          <ol className="blk-psteps">
-            {PARTNER_STEPS.map((step, i) => (
-              <li className="blk-pstep" key={step.title}>
-                <div className="blk-pstep__badge"><span>{i + 1}</span></div>
-                <div className="blk-pstep__text">
-                  <p className="blk-pstep__title">{step.title}</p>
-                  <p className="blk-pstep__desc">{step.desc}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="blk-partnership__cta">
-            <a className="blk-btn blk-btn--gold" href="#enquiry-section">Start with the enquiry form</a>
+            <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
           </div>
         </div>
       </section>
 
-      {/* ============ WHY BOOKALOOK ============ */}
-      <section id="why-bookalook" className="blk-why">
-        <div className="blk-container">
-          <p className="blk-section-kicker">Why BookALook</p>
-          <h2 className="blk-section-title">Built so both sides actually enjoy it</h2>
-          <div className="blk-why__grid">
-            {WHY_FEATURES.map((feature) => (
-              <article className="blk-why__card" key={feature.title}>
-                <span className="blk-why__icon"><Icon name={feature.icon} /></span>
-                <h3 className="blk-why__title">{feature.title}</h3>
-                <p className="blk-why__desc">{feature.desc}</p>
-              </article>
-            ))}
+      {/* ============ CUSTOMERS — why owners can count on them ============ */}
+      <section id="for-customers" className={s.customers}>
+        <div className={`${s.container} ${s.custGrid}`}>
+          <div>
+            <p className={s.kicker}>Your customers love it</p>
+            <h2 className={s.title}>Customers already book their salon this way</h2>
+            <p className={s.lead}>
+              The BookALook customer app makes booking your salon easier than calling it — which is why they come back.
+            </p>
+            <ol className={s.custSteps}>
+              {CUSTOMER_FLOW.map((step) => (
+                <li key={step.title}>
+                  <span><Icon name={step.icon} /></span>
+                  <div><b>{step.title}</b><p>{step.desc}</p></div>
+                </li>
+              ))}
+            </ol>
+            <div className={s.badges}>
+              <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
+              <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* ============ FAQ ============ */}
-      <section id="faq" className="blk-faq">
-        <div className="blk-container">
-          <p className="blk-section-kicker">FAQ</p>
-          <h2 className="blk-section-title">Questions, answered</h2>
-          <div className="blk-faq__list">
-            {FAQ_ITEMS.map((item) => (
-              <details className="blk-faq__item" key={item.q}>
-                {/* [PLACEHOLDER] FAQ answer copy below is provisional — replace with final wording. */}
-                <summary className="blk-faq__q">{item.q}</summary>
-                <p className="blk-faq__a">{item.a}</p>
-              </details>
+          <div className={s.custStats}>
+            {CUSTOMER_FACTS.map((f) => (
+              <div className={`${s.custStat} ${f.accent ? s.custStatAccent : ''}`} key={f.label}>
+                <b>{f.value}</b>
+                <span>{f.label}</span>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* ============ REVIEWS ============ */}
-      {/* Three horizontal lanes, choreographed like a cut between shots:
-          Act 1 customers drift left→right, Act 2 admins drift right→left,
-          Act 3 service providers drift left→right again. Each lane duplicates
-          its card set so the loop is seamless. */}
+      {/* Three horizontal lanes: owners first, then their customers, then the
+          stylists. Each lane duplicates its card set so the loop is seamless. */}
       <section id="reviews" className="blk-reviews">
         <div className="blk-container">
           <p className="blk-section-kicker">Reviews</p>
-          <h2 className="blk-section-title">Three sides of the same booking</h2>
+          <h2 className="blk-section-title">Owners, customers and stylists on BookALook</h2>
           <p className="blk-section-sub">
-            What customers, salon admins, and the people doing the work have to say.
+            What salon owners, their customers, and the people doing the work have to say.
           </p>
         </div>
 
@@ -991,6 +914,35 @@ export default function LandingPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ============ FAQ ============ */}
+      <section id="faq" className={s.section}>
+        <div className={`${s.container} ${s.center}`}>
+          <p className={s.kicker}>FAQ</p>
+          <h2 className={s.title}>Questions salon owners ask us</h2>
+          <div className={s.faqList} style={{ textAlign: 'left' }}>
+            {FAQ_ITEMS.map((item) => (
+              <details className={s.faqItem} key={item.q}>
+                <summary>{item.q}</summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ CLOSING ============ */}
+      <section className={s.closing}>
+        <div className={s.container}>
+          <div className={s.closingCard}>
+            <div>
+              <h2>Ready to fill your empty slots?</h2>
+              <p>Register in two minutes. Our team takes it from there.</p>
+            </div>
+            <a className={s.btn} href="#enquiry-section">Register your salon <Icon name="arrow" /></a>
+          </div>
         </div>
       </section>
     </main>

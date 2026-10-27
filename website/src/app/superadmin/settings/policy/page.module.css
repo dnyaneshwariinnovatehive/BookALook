@@ -432,3 +432,34 @@
   color: var(--text-body);
   opacity: 0.85;
 }
+
+/* Two cards on one tab sit apart. */
+.section + .section {
+  margin-top: 1.25rem;
+}
+
+/* Customer cancellation & no-show limits: pairs of dropdowns side by side. */
+.limitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .limitGrid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.limitGrid .select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.limitSummary {
+  margin: 0.5rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text-heading);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}

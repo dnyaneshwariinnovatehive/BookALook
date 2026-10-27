@@ -81,6 +81,14 @@ class SettingsController extends Controller
             'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
             'whatsapp_salon_deactivated_enabled' => 'sometimes|boolean',
             'combos_limit_per_salon' => 'sometimes|integer|min:0|max:100',
+            // Customer booking limits. One rule for every customer.
+            'customer_cancellation_limit' => 'sometimes|integer|min:0|max:50',
+            'customer_cancellation_count_mode' => 'sometimes|in:consecutive,total',
+            'customer_no_show_limit' => 'sometimes|integer|min:0|max:50',
+            'customer_no_show_count_mode' => 'sometimes|in:consecutive,total',
+            'customer_limit_action' => 'sometimes|in:block,full_payment,warn',
+            'customer_limit_window_days' => 'sometimes|integer|min:0|max:3650',
+            'customer_limit_release_days' => 'sometimes|integer|min:0|max:3650',
             // Shown next to the payment QR. Blank is allowed: the QR alone is enough.
             'payment_upi_id' => 'sometimes|nullable|string|max:100',
             'payment_payee_name' => 'sometimes|nullable|string|max:150',
@@ -110,6 +118,10 @@ class SettingsController extends Controller
             'marketing_quiet_hours_end' => 'Hour of day (0-23) before which marketing messages are held',
             'marketing_daily_cap_per_salon' => 'Most marketing messages one salon may send in a day, whatever its plan allows for the month. 0 removes the cap',
             'combos_limit_per_salon' => 'Maximum number of service combos a salon can create.',
+            'customer_cancellation_limit' => 'Cancellations a customer may make before booking is restricted. 0 = no limit',
+            'customer_no_show_limit' => 'No-shows a customer may have before booking is restricted. 0 = no limit',
+            'customer_limit_window_days' => 'Days the "in total" count looks back over. 0 = all time',
+            'customer_limit_release_days' => 'Days after the last offence a booking restriction lifts. 0 = only when SuperAdmin clears it',
         ];
 
         // Not an integer like the rest — a coin can be worth paise.
@@ -203,6 +215,9 @@ class SettingsController extends Controller
         }
 
         $textSettings = [
+            'customer_cancellation_count_mode' => 'Whether cancellations are counted in a row (consecutive) or in total',
+            'customer_no_show_count_mode' => 'Whether no-shows are counted in a row (consecutive) or in total',
+            'customer_limit_action' => 'What happens when a customer reaches a limit: block, full_payment or warn',
             'payment_upi_id' => 'UPI ID salons pay BookALook to, shown beside the payment QR.',
             'payment_payee_name' => 'Name the payment QR pays, so the salon can check it before paying.',
         ];

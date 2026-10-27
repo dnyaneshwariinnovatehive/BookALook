@@ -190,7 +190,10 @@ const TAB_LABELS: Record<PolicyTab, string> = {
 /** Which form fields belong to which tab, so a badge can find them. */
 const TAB_FIELDS: Record<PolicyTab, (keyof FormState)[]> = {
   catalog: ['combosLimit'],
-  bookings: ['cancelCutoff', 'rescheduleCutoff', 'startEarly'],
+  bookings: [
+    'cancelCutoff', 'rescheduleCutoff', 'startEarly',
+    'cancelLimit', 'cancelMode', 'noShowLimit', 'noShowMode', 'limitAction', 'limitWindow', 'limitRelease',
+  ],
   subscriptions: ['warningDays', 'reminderHour', 'graceDays'],
   coins: ['coinValue', 'welcomeBonusCoins'],
   payments: ['paymentUpiId', 'paymentPayeeName'],
@@ -229,6 +232,54 @@ interface FormState {
   waSalonClosure: boolean;
   waSalonDeactivated: boolean;
   combosLimit: string;
+  // Customer booking limits — one rule for every customer.
+  cancelLimit: string;
+  cancelMode: string;
+  noShowLimit: string;
+  noShowMode: string;
+  limitAction: string;
+  limitWindow: string;
+  limitRelease: string;
+}
+
+/** "0" means no limit, so it reads "Off". */
+const LIMIT_OPTIONS = [
+  { value: '0', label: 'Off — no limit' },
+  ...Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+];
+
+const MODE_OPTIONS = [
+  { value: 'total', label: 'In total' },
+  { value: 'consecutive', label: 'Consecutively (in a row)' },
+];
+
+const ACTION_OPTIONS = [
+  { value: 'block', label: 'Block new bookings' },
+  { value: 'full_payment', label: 'Require full payment upfront' },
+  { value: 'warn', label: 'Only warn the customer' },
+];
+
+const WINDOW_OPTIONS = [
+  { value: '30', label: 'Last 30 days' },
+  { value: '60', label: 'Last 60 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: '180', label: 'Last 6 months' },
+  { value: '365', label: 'Last 12 months' },
+  { value: '0', label: 'All time' },
+];
+
+const RELEASE_OPTIONS = [
+  { value: '7', label: '7 days after the last one' },
+  { value: '15', label: '15 days after the last one' },
+  { value: '30', label: '30 days after the last one' },
+  { value: '60', label: '60 days after the last one' },
+  { value: '90', label: '90 days after the last one' },
+  { value: '0', label: 'Never — only when superadmin clears it' },
+];
+
+/** A dropdown that keeps a stored value visible even if it is not a preset. */
+function withCurrent(options: { value: string; label: string }[], current: string) {
+  return options.some((o) => o.value === current) ? options : [...options, { value: current, label: current }];
 }
 
 const EMPTY: FormState = {
@@ -253,6 +304,13 @@ const EMPTY: FormState = {
   waSalonClosure: true,
   waSalonDeactivated: true,
   combosLimit: '10',
+  cancelLimit: '0',
+  cancelMode: 'total',
+  noShowLimit: '0',
+  noShowMode: 'total',
+  limitAction: 'block',
+  limitWindow: '90',
+  limitRelease: '30',
 };
 
 export default function PlatformPolicyPage() {
@@ -354,6 +412,13 @@ export default function PlatformPolicyPage() {
         waSalonClosure: s.whatsapp_salon_closure_enabled ?? true,
         waSalonDeactivated: s.whatsapp_salon_deactivated_enabled ?? true,
         combosLimit: String(s.combos_limit_per_salon ?? 10),
+        cancelLimit: String(s.customer_cancellation_limit ?? 0),
+        cancelMode: String(s.customer_cancellation_count_mode ?? 'total'),
+        noShowLimit: String(s.customer_no_show_limit ?? 0),
+        noShowMode: String(s.customer_no_show_count_mode ?? 'total'),
+        limitAction: String(s.customer_limit_action ?? 'block'),
+        limitWindow: String(s.customer_limit_window_days ?? 90),
+        limitRelease: String(s.customer_limit_release_days ?? 30),
       };
 
       setSaved(next);
@@ -367,7 +432,8 @@ export default function PlatformPolicyPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   // ------------------------------------------------------------- validation
@@ -445,6 +511,13 @@ export default function PlatformPolicyPage() {
       whatsapp_salon_closure_enabled: state.waSalonClosure,
       whatsapp_salon_deactivated_enabled: state.waSalonDeactivated,
       combos_limit_per_salon: Number(state.combosLimit),
+      customer_cancellation_limit: Number(state.cancelLimit),
+      customer_cancellation_count_mode: state.cancelMode,
+      customer_no_show_limit: Number(state.noShowLimit),
+      customer_no_show_count_mode: state.noShowMode,
+      customer_limit_action: state.limitAction,
+      customer_limit_window_days: Number(state.limitWindow),
+      customer_limit_release_days: Number(state.limitRelease),
     }),
     []
   );
@@ -616,6 +689,76 @@ export default function PlatformPolicyPage() {
             onChange={(d) => set('startEarly', d)}
             error={errors.startEarly}
           />
+        </section>
+        )}
+
+        {tab === 'bookings' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Customer cancellation &amp; no-show limits</h2>
+          <p className={styles.sectionHint}>
+            One rule for every customer, counted across all salons. Only cancellations the customer makes
+            count — never a salon cancelling or a reschedule.
+          </p>
+
+          <div className={styles.limitGrid}>
+            <Field label="Cancellations allowed" hint="Once a customer reaches this many, the action below applies.">
+              <select className={styles.select} value={form.cancelLimit} onChange={(e) => set('cancelLimit', e.target.value)}>
+                {withCurrent(LIMIT_OPTIONS, form.cancelLimit).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Count cancellations" hint="In a row resets after every completed visit.">
+              <select className={styles.select} value={form.cancelMode} disabled={form.cancelLimit === '0'} onChange={(e) => set('cancelMode', e.target.value)}>
+                {MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="No-shows allowed" hint="Booked, never turned up, marked No-show by the salon.">
+              <select className={styles.select} value={form.noShowLimit} onChange={(e) => set('noShowLimit', e.target.value)}>
+                {withCurrent(LIMIT_OPTIONS, form.noShowLimit).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Count no-shows" hint="In a row resets after every completed visit.">
+              <select className={styles.select} value={form.noShowMode} disabled={form.noShowLimit === '0'} onChange={(e) => set('noShowMode', e.target.value)}>
+                {MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <Field
+            label="When a customer reaches a limit"
+            hint={form.limitAction === 'full_payment'
+              ? 'Needs online payments switched on. If they are off, choose Block instead.'
+              : form.limitAction === 'block'
+                ? 'They see why, and when it lifts, when they try to book.'
+                : 'They can still book; the app tells them where they stand.'}
+          >
+            <select className={styles.select} value={form.limitAction} onChange={(e) => set('limitAction', e.target.value)}>
+              {ACTION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+
+          <div className={styles.limitGrid}>
+            <Field label="“In total” looks back over" hint="Older cancellations and no-shows stop counting.">
+              <select className={styles.select} value={form.limitWindow} onChange={(e) => set('limitWindow', e.target.value)}>
+                {withCurrent(WINDOW_OPTIONS, form.limitWindow).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Restriction lifts" hint="Superadmin can always clear a customer from the Customers page.">
+              <select className={styles.select} value={form.limitRelease} onChange={(e) => set('limitRelease', e.target.value)}>
+                {withCurrent(RELEASE_OPTIONS, form.limitRelease).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          <p className={styles.limitSummary}>
+            {form.cancelLimit === '0' && form.noShowLimit === '0'
+              ? 'Limits are off: customers can cancel and miss appointments without any restriction.'
+              : `${[
+                  form.cancelLimit !== '0' ? `${form.cancelLimit} cancellation${form.cancelLimit === '1' ? '' : 's'} ${form.cancelMode === 'consecutive' ? 'in a row' : 'in total'}` : '',
+                  form.noShowLimit !== '0' ? `${form.noShowLimit} no-show${form.noShowLimit === '1' ? '' : 's'} ${form.noShowMode === 'consecutive' ? 'in a row' : 'in total'}` : '',
+                ].filter(Boolean).join(' or ')} → ${ACTION_OPTIONS.find((o) => o.value === form.limitAction)?.label.toLowerCase()}, ${
+                  form.limitRelease === '0' ? 'until superadmin clears it' : `lifting ${form.limitRelease} days after the last one`
+                }.`}
+          </p>
         </section>
         )}
 

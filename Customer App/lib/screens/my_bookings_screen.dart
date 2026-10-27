@@ -17,6 +17,7 @@ import '../utils/error_text.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/skeleton.dart';
 import '../utils/bottom_clearance.dart';
+import '../utils/time_window.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -1108,7 +1109,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                                   ),
                                 ),
                                 Text(
-                                  booking['start_time'] ?? '',
+                                  formatTimeWindow(booking['start_time']?.toString(), booking['end_time']?.toString()),
+                                  key: const ValueKey('booking_time_range'),
                                   style: GoogleFonts.outfit(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -1491,7 +1493,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
 
     final when = [
       if (date != null) DateFormat('EEE, d MMM yyyy').format(date),
-      _historyTime(booking['start_time']?.toString()),
+      formatTimeWindow(booking['start_time']?.toString(), booking['end_time']?.toString()),
     ].where((p) => p.isNotEmpty).join(' · ');
 
     Future<void> openDetails() async {
@@ -1634,15 +1636,6 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   /// "10:30:00" → "10:30 AM"; anything unreadable is shown as it came.
-  String _historyTime(String? raw) {
-    if (raw == null || raw.isEmpty) return '';
-    final parts = raw.split(':');
-    final h = int.tryParse(parts.first);
-    final m = parts.length > 1 ? int.tryParse(parts[1]) : 0;
-    if (h == null || m == null) return raw;
-    return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
-  }
-
   /// The bottom of a history card. A completed visit not yet rated gets a bold
   /// "Rate your experience" button; once rated, the same button becomes "View
   /// invoice" (when there is one) with the rating beside it. "Report issue"

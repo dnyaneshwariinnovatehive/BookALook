@@ -2093,3 +2093,97 @@ html {
     scroll-margin-top: 120px;
   }
 }
+
+/* ===========================================================================
+   COLOUR PALETTE 4 — the public site (header, footer, buttons, reviews, legal
+   pages). Primary #9850F1 · Secondary #EEE3FD · Background #FCFAFF ·
+   Text #18151D. Placed last so it wins over the older gold-on-cream rules
+   above without rewriting them.
+   =========================================================================== */
+.blk-site {
+  --p4-primary: #9850F1;
+  --p4-primary-dark: #7B35D6;
+  --p4-secondary: #EEE3FD;
+  --p4-bg: #FCFAFF;
+  --p4-text: #18151D;
+  --p4-muted: #5E5770;
+  --p4-line: rgba(152, 80, 241, 0.16);
+  background: var(--p4-bg);
+  color: var(--p4-text);
+}
+
+.blk-site .blk-header {
+  background: rgba(252, 250, 255, 0.9);
+  border-bottom: 1px solid var(--p4-line);
+}
+.blk-site .blk-header__link { color: var(--p4-text); }
+.blk-site .blk-header__link:hover { color: var(--p4-primary); }
+.blk-site .blk-header__link::after { background: var(--p4-primary); }
+
+.blk-site .blk-btn--gold,
+.blk-site .blk-btn--warm {
+  background: var(--p4-primary);
+  color: #FFFFFF;
+  box-shadow: 0 10px 24px rgba(152, 80, 241, 0.3);
+}
+.blk-site .blk-btn--gold:hover,
+.blk-site .blk-btn--warm:hover {
+  background: var(--p4-primary-dark);
+  box-shadow: 0 14px 30px rgba(152, 80, 241, 0.38);
+}
+.blk-site .blk-btn--ghost,
+.blk-site .blk-btn--outline {
+  background: var(--p4-secondary);
+  color: var(--p4-primary-dark);
+  border: 1px solid transparent;
+}
+.blk-site .blk-btn--ghost:hover,
+.blk-site .blk-btn--outline:hover {
+  background: #E3D2FC;
+}
+
+.blk-site .blk-reviews { background: var(--p4-bg); }
+.blk-site .blk-reviews__card {
+  border-color: var(--p4-line);
+  box-shadow: 0 10px 26px rgba(24, 21, 29, 0.05);
+}
+.blk-site .blk-reviews__lane:hover .blk-reviews__card { box-shadow: 0 18px 40px rgba(152, 80, 241, 0.14); }
+.blk-site .blk-reviews__role { color: var(--p4-primary); }
+.blk-site .blk-reviews__stars { color: rgba(24, 21, 29, 0.15); }
+.blk-site .blk-reviews__stars .is-on { color: #F5A524; }
+.blk-site .blk-reviews__text { color: var(--p4-muted); }
+.blk-site .blk-reviews__by { border-top-color: var(--p4-line); }
+.blk-site .blk-reviews__avatar { background: var(--p4-primary); color: #FFFFFF; }
+.blk-site .blk-reviews__name { color: var(--p4-text); }
+
+.blk-site .blk-section-kicker { color: var(--p4-primary); }
+.blk-site .blk-section-title { color: var(--p4-text); }
+.blk-site .blk-section-sub { color: var(--p4-muted); }
+
+.blk-site .blk-footer { background: var(--p4-text); color: #F4EFFC; }
+.blk-site .blk-footer__tag,
+.blk-site .blk-footer__head { color: #C9A6FA; }
+.blk-site .blk-footer__link,
+.blk-site .blk-footer__social a { color: #CFC6DE; }
+.blk-site .blk-footer__link:hover,
+.blk-site .blk-footer__social a:hover { color: #FFFFFF; }
+.blk-site .blk-footer__bottom { border-top-color: rgba(201, 166, 250, 0.2); color: #8E86A0; }
+
+.blk-site .blk-page { background: var(--p4-bg); }
+.blk-site .blk-page__standfirst { color: var(--p4-muted); }
+.blk-site .blk-page__body { border-color: var(--p4-line); color: #3D3648; }
+.blk-site .blk-page__body a { color: var(--p4-primary-dark); }
+.blk-site .blk-reviews .blk-section-title {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+.blk-site .blk-reviews .blk-section-kicker {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--p4-secondary);
+  color: var(--p4-primary-dark);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}

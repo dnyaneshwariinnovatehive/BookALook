@@ -248,6 +248,25 @@ class AppointmentService {
       throw Exception(error['message'] ?? 'Failed to generate QR');
     }
   }
+  /// Where the customer stands against the platform's cancellation and
+  /// no-show limits. Null when it cannot be read — checkout carries on.
+  Future<Map<String, dynamic>?> fetchBookingStanding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null) return null;
+      final response = await http.get(
+        Uri.parse('$baseUrl/customer/booking-standing'),
+        headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+      );
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      return body is Map && body['standing'] is Map ? Map<String, dynamic>.from(body['standing']) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> demoPay(String id) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

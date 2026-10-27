@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "website", "run", "dev"],
+      "env": { "NEXT_PUBLIC_BACKEND_URL": "https://api.bookalook.in" },
+      "port": 3000
+    }
+  ]
+}

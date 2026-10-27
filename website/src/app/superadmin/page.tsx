@@ -6,9 +6,12 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import Icon, { type IconName } from '@/components/admin/Icon';
+import Icon from '@/components/admin/Icon';
 import { useChartPalette } from '@/lib/theme';
 import styles from './dashboard.module.css';
+import { EmptyState, KpiCard } from './DashboardParts';
+import RevenueTab from './RevenueTab';
+import rev from './revenue.module.css';
 // --- SKELETON PLACEHOLDERS ---
 const SKELETON_ROWS = [1, 2, 3];
 
@@ -122,6 +125,9 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  // Overview is the marketplace; Revenue is what BookALook itself earns.
+  const [tab, setTab] = useState<'overview' | 'revenue'>('overview');
+  const [revenueRefresh, setRevenueRefresh] = useState(0);
 
   const fetchDashboard = async () => {
     const params = new URLSearchParams({ from, to, granularity });
@@ -179,6 +185,7 @@ export default function AdminDashboard() {
 
   const handleManualRefresh = async () => {
     setRefreshing(true);
+    setRevenueRefresh((n) => n + 1);
     try {
       await fetchDashboard();
     } catch (error) {
@@ -273,6 +280,25 @@ export default function AdminDashboard() {
         </button>
       </header>
 
+      <div className={rev.tabs} role="tablist" aria-label="Dashboard view">
+        {([
+          { key: 'overview', label: 'Marketplace overview', icon: 'dashboard' },
+          { key: 'revenue', label: 'BookALook revenue', icon: 'rupee' },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`${rev.tab} ${tab === t.key ? rev.tabActive : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            <Icon name={t.icon} size={16} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {/* CONTROLS BAR */}
       <div className={styles.controlsBar}>
         <div className={styles.controlsGroup}>
@@ -340,6 +366,10 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {tab === 'revenue' ? (
+        <RevenueTab from={from} to={to} granularity={granularity} rangeLabel={rangeLabel} refreshKey={revenueRefresh} />
+      ) : (
+      <>
       {/* KPI GRID */}
       <div className={styles.kpiGrid}>
         <KpiCard
@@ -639,71 +669,13 @@ export default function AdminDashboard() {
           )}
         </section>
       </div>
+      </>
+      )}
     </div>
   );
 }
 
 // --- PRESENTATIONAL PIECES ---
-
-const TONES = {
-  violet: styles.toneViolet,
-  teal: styles.toneTeal,
-  amber: styles.toneAmber,
-  blue: styles.toneBlue,
-} as const;
-
-function KpiCard({
-  href, label, icon, tone, loading, value, delta, sub,
-}: {
-  href?: string;
-  label: string;
-  icon: IconName;
-  tone: keyof typeof TONES;
-  loading: boolean;
-  value: string;
-  delta?: { pct: number; dir: 'up' | 'down' | 'flat' };
-  sub: string;
-}) {
-  const body = (
-    <>
-      <div className={styles.kpiHeader}>
-        <span className={`${styles.kpiIcon} ${TONES[tone]}`}><Icon name={icon} size={20} /></span>
-        {href && <Icon name="arrowRight" size={16} className={styles.kpiArrow} />}
-      </div>
-      <div className={styles.kpiLabel}>{label}</div>
-      {loading ? (
-        <div className={`${styles.skeleton} ${styles.skeletonValue}`} />
-      ) : (
-        <div className={styles.kpiValue}>{value}</div>
-      )}
-      <div className={styles.kpiTrend}>
-        {delta && !loading && (
-          <span className={`${styles.deltaChip} ${delta.dir === 'up' ? styles.deltaUp : delta.dir === 'down' ? styles.deltaDown : styles.deltaFlat}`}>
-            {delta.dir !== 'flat' && <Icon name={delta.dir === 'up' ? 'trendUp' : 'trendDown'} size={13} strokeWidth={2.2} />}
-            {delta.pct}%
-          </span>
-        )}
-        <span className={styles.trendSub}>{sub}</span>
-      </div>
-    </>
-  );
-
-  return href ? (
-    <Link href={href} className={`${styles.kpiCard} ${styles.clickableCard}`}>{body}</Link>
-  ) : (
-    <div className={styles.kpiCard}>{body}</div>
-  );
-}
-
-function EmptyState({ icon, title, hint }: { icon: IconName; title: string; hint: string }) {
-  return (
-    <div className={styles.empty}>
-      <span className={styles.emptyIcon}><Icon name={icon} size={20} /></span>
-      <div className={styles.emptyTitle}>{title}</div>
-      <div className={styles.emptyHint}>{hint}</div>
-    </div>
-  );
-}
 
 function SkeletonRows() {
   return (
