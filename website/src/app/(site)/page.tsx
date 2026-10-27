@@ -97,6 +97,28 @@ const STICKERS = [
 
 const HERO_WORDS = ['haircut', 'facial', 'manicure', 'hair spa', 'beard trim', 'bridal look'];
 
+/** The two rows of the hero ticker; they scroll in opposite directions. */
+const TICKER_ROWS = [
+  [
+    { icon: 'scissors', label: 'Haircut' },
+    { icon: 'spark', label: 'Facial' },
+    { icon: 'hand', label: 'Manicure' },
+    { icon: 'droplet', label: 'Hair spa' },
+    { icon: 'brush', label: 'Makeup' },
+    { icon: 'crown', label: 'Bridal' },
+  ],
+  [
+    { icon: 'razor', label: 'Beard trim' },
+    { icon: 'palette', label: 'Hair colour' },
+    { icon: 'leaf', label: 'Spa' },
+    { icon: 'comb', label: 'Styling' },
+    { icon: 'hand', label: 'Pedicure' },
+    { icon: 'spark', label: 'Clean-up' },
+  ],
+];
+
+const HERO_TRUST = ['Verified salons', 'Live free slots', 'QR check-in', '₹0 booking fee'];
+
 /** "What's waiting for you on the app?" — tiles around the phone. */
 const APP_FEATURES = [
   { emoji: '⏱️', title: 'Live free slots', desc: 'See exactly when your stylist is free.' },
@@ -266,6 +288,20 @@ function Icon({ name, className }: { name: string; className?: string }) {
       return <svg {...common}><path d="M5 3v18" /><path d="M5 3h12" /><path d="M5 7h10M5 11h12M5 15h10M5 19h12" /></svg>;
     case 'bell':
       return <svg {...common}><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2.4h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>;
+    case 'droplet':
+      return <svg {...common}><path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z" /></svg>;
+    case 'brush':
+      return <svg {...common}><path d="m14.5 4.5 5 5L11 18l-5-5z" /><path d="M6 13c-2 0-3 1.5-3 3.5S2 20 2 20s4 0 5.5-1.5S9 15 9 15" /></svg>;
+    case 'leaf':
+      return <svg {...common}><path d="M5 19c0-8 6-14 15-14 0 9-6 15-14 15" /><path d="M5 19 13 11" /></svg>;
+    case 'crown':
+      return <svg {...common}><path d="m3 8 4 4 5-6 5 6 4-4-2 11H5z" /></svg>;
+    case 'palette':
+      return <svg {...common}><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-2 0-.6-.3-1-.6-1.4-.3-.4-.4-.8-.4-1.2 0-1 .8-1.4 1.8-1.4H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z" /><circle cx="7.5" cy="11" r="1" /><circle cx="10" cy="7" r="1" /><circle cx="14.5" cy="7" r="1" /></svg>;
+    case 'hand':
+      return <svg {...common}><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12" /><path d="M11 11V4.5a1.5 1.5 0 0 1 3 0V12" /><path d="M14 11.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-.5A6.5 6.5 0 0 1 5 17.8L3.5 14a1.5 1.5 0 0 1 2.6-1.4L8 15" /></svg>;
+    case 'razor':
+      return <svg {...common}><rect x="4" y="3" width="16" height="6" rx="1.5" /><path d="M12 9v12" /><path d="M8 6h8" /></svg>;
     case 'trend':
       return <svg {...common}><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>;
     default:
@@ -462,34 +498,53 @@ export default function LandingPage() {
       <section id="top" className={s.cHero}>
         <div className={s.cHeroGlow} aria-hidden="true" />
         <div className={s.cHeroGrid} aria-hidden="true" />
-        {STICKERS.slice(0, 6).map((st, i) => (
-          <Parallax key={st.label} speed={[-0.35, 0.25, -0.2, 0.3, -0.28, 0.18][i]} rotate={[1, -1, 1, -1, 1, -1][i]} className={`${s.cSticker} ${s[`cSticker${i}`]}`}>
-            <span className={s.cStickerInner} style={{ animationDelay: `${i * -1.3}s` }}>
-              <span className={s.cStickerEmoji}>{st.emoji}</span>
-              <span className={s.cStickerLabel}>{st.label}</span>
-            </span>
-          </Parallax>
-        ))}
 
-        <div className={s.cHeroContent}>
-          <p className={s.cHeroBrand}>Book<span>A</span>Look</p>
-          <h1 className={s.cHeroTitle}>
-            Your next <span className={s.cHeroAccent}><RotatingWord words={HERO_WORDS} /></span>,<br />
-            booked in a minute.
-          </h1>
-          <p className={s.cHeroSub}>
-            Discover verified salons near you, pick a live free slot and walk straight in with a QR code. No calls. No waiting.
-          </p>
-          <div className={s.cHeroBadges}>
-            <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
-            <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
+        <Parallax speed={0.14} className={s.cHeroLayer}>
+          <div className={s.cHeroContent}>
+            <p className={s.cHeroEyebrow}><span className={s.cHeroDot} aria-hidden="true" /> Salon booking, minus the waiting</p>
+            <h1 className={s.cHeroTitle}>
+              Your next <span className={s.cHeroAccent}><RotatingWord words={HERO_WORDS} /></span>,<br />
+              booked in a minute.
+            </h1>
+            <p className={s.cHeroSub}>
+              Find a verified salon near you, pick a live free slot and walk straight in with a QR code. No calls. No waiting.
+            </p>
+            <div className={s.cHeroBadges}>
+              <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
+              <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
+            </div>
+            <ul className={s.cHeroTrust}>
+              {HERO_TRUST.map((t) => (
+                <li key={t}><Icon name="check" /> {t}</li>
+              ))}
+            </ul>
           </div>
-          <a className={s.cHeroOwner} href="#for-salons">Own a salon? Grow with BookALook →</a>
+        </Parallax>
+
+        {/* Services you can book, drifting past in two rows. */}
+        <div className={s.cTicker} aria-label="Services you can book on BookALook">
+          {TICKER_ROWS.map((row, r) => (
+            <div key={r} className={`${s.cLane} ${r % 2 ? s.cLaneReverse : ''}`}>
+              {[0, 1].map((copy) => (
+                <div key={copy} className={s.cLaneSet} aria-hidden={copy === 1}>
+                  {row.map((item) => (
+                    <span key={`${copy}-${item.label}`} className={s.cChip}>
+                      <span className={s.cChipIcon}><Icon name={item.icon} /></span>
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
 
-        <a className={s.cScroll} href="#better-looks" aria-label="Scroll down">
-          Scroll down <span aria-hidden="true">⌄</span>
-        </a>
+        <div className={s.cHeroFoot}>
+          <a className={s.cHeroOwner} href="#for-salons">Own a salon? Grow with BookALook →</a>
+          <a className={s.cScroll} href="#better-looks" aria-label="Scroll down">
+            Scroll <span aria-hidden="true">⌄</span>
+          </a>
+        </div>
       </section>
 
       {/* ============ BETTER LOOKS — floating stickers ============ */}
