@@ -13,8 +13,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
+/**
+ * First-time customer offers, as SuperAdmin sees them.
+ *
+ * Offers are a salon's own: each salon creates them for itself from the
+ * Partner App. SuperAdmin oversees them here — every salon's offers, named by
+ * the salon that made them — and can pause or remove one that breaks the
+ * rules, but does not create or edit them. The platform-wide offers this page
+ * used to create are retired and can no longer be switched back on.
+ */
 class FirstTimeOfferController extends Controller
 {
+    private const SALON_ONLY = 'First-time offers are created by salons for their own salon, from the Partner App. SuperAdmin can pause or remove an offer, but not create or edit one.';
+
     /**
      * Authorize that the current authenticated user has administrator privileges.
      */
@@ -41,7 +52,14 @@ class FirstTimeOfferController extends Controller
             return $authError;
         }
 
-        $query = FirstTimeOffer::withCount(['serviceTemplates', 'participatingSalons', 'redemptions']);
+        $query = FirstTimeOffer::with('salon:id,name')
+            ->withCount(['serviceTemplates', 'participatingSalons', 'redemptions']);
+
+        if ($request->filled('salon_id')) {
+            $request->query('salon_id') === 'platform'
+                ? $query->whereNull('salon_id')
+                : $query->where('salon_id', $request->query('salon_id'));
+        }
 
         if ($request->filled('scope')) {
             $query->where('scope', $request->query('scope'));
@@ -61,6 +79,9 @@ class FirstTimeOfferController extends Controller
             return array_merge($offer->toArray(), [
                 'is_valid_now' => $offer->isCurrentlyValid(),
                 'is_limit_reached' => $offer->isRedemptionLimitReached(),
+                // Which salon made it; null for the retired platform offers.
+                'created_by_salon' => $offer->salon ? ['id' => $offer->salon->id, 'name' => $offer->salon->name] : null,
+                'is_retired_platform_offer' => $offer->salon_id === null,
             ]);
         });
 
@@ -126,6 +147,7 @@ class FirstTimeOfferController extends Controller
         }
 
         $offer = FirstTimeOffer::with([
+            'salon:id,name',
             'serviceTemplates.category:id,name',
             'participatingSalons.city:id,name',
         ])
@@ -157,72 +179,7 @@ class FirstTimeOfferController extends Controller
             return $authError;
         }
 
-        if ($request->has('flat_booking_cap') && ! $request->filled('max_discount_cap')) {
-            $request->merge(['max_discount_cap' => $request->input('flat_booking_cap')]);
-        }
-        if ($request->has('min_total_subtotal') && ! $request->filled('min_total_booking_subtotal')) {
-            $request->merge(['min_total_booking_subtotal' => $request->input('min_total_subtotal')]);
-        }
-
-        $rules = FirstTimeOffer::validationRules($request->all());
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $offer = DB::transaction(function () use ($request) {
-            $offerData = $request->only([
-                'name',
-                'description',
-                'scope',
-                'discount_type',
-                'discount_value',
-                'max_discount_cap',
-                'min_service_price',
-                'min_eligible_subtotal',
-                'min_total_booking_subtotal',
-                'is_active',
-                'starts_at',
-                'ends_at',
-                'max_redemptions',
-            ]);
-
-            // Set default caps if not provided
-            if (! isset($offerData['max_discount_cap']) || $offerData['max_discount_cap'] === null) {
-                if ($offerData['discount_type'] === FirstTimeOffer::TYPE_PERCENTAGE) {
-                    $offerData['max_discount_cap'] = (float) PlatformPolicySetting::value('first_time_discount_default_percentage_cap', 500.0);
-                } elseif ($offerData['discount_type'] === FirstTimeOffer::TYPE_FLAT) {
-                    $offerData['max_discount_cap'] = (float) PlatformPolicySetting::value('first_time_discount_default_flat_cap', 1000.0);
-                }
-            }
-
-            $offer = FirstTimeOffer::create($offerData);
-
-            // Attach explicitly selected service templates (unique)
-            $templateIds = array_values(array_unique($request->input('service_template_ids', [])));
-            $offer->serviceTemplates()->attach($templateIds);
-
-            // Attach participating salons (if scope is new_to_salon or explicitly provided)
-            if ($request->has('salon_ids') && is_array($request->input('salon_ids'))) {
-                $salonIds = array_values(array_unique($request->input('salon_ids')));
-                if (! empty($salonIds)) {
-                    $offer->participatingSalons()->attach($salonIds);
-                }
-            }
-
-            return $offer;
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'First-time customer offer created successfully.',
-            'data' => $offer->fresh(['serviceTemplates', 'participatingSalons']),
-        ], 201);
+        return response()->json(['success' => false, 'message' => self::SALON_ONLY], 403);
     }
 
     /**
@@ -234,68 +191,7 @@ class FirstTimeOfferController extends Controller
             return $authError;
         }
 
-        $offer = FirstTimeOffer::find($id);
-
-        if (! $offer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Offer not found',
-            ], 404);
-        }
-
-        if ($request->has('flat_booking_cap') && ! $request->filled('max_discount_cap')) {
-            $request->merge(['max_discount_cap' => $request->input('flat_booking_cap')]);
-        }
-        if ($request->has('min_total_subtotal') && ! $request->filled('min_total_booking_subtotal')) {
-            $request->merge(['min_total_booking_subtotal' => $request->input('min_total_subtotal')]);
-        }
-
-        $rules = FirstTimeOffer::validationRules($request->all());
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        DB::transaction(function () use ($offer, $request) {
-            $offerData = $request->only([
-                'name',
-                'description',
-                'scope',
-                'discount_type',
-                'discount_value',
-                'max_discount_cap',
-                'min_service_price',
-                'min_eligible_subtotal',
-                'min_total_booking_subtotal',
-                'is_active',
-                'starts_at',
-                'ends_at',
-                'max_redemptions',
-            ]);
-
-            $offer->update($offerData);
-
-            // Sync service templates
-            $templateIds = array_values(array_unique($request->input('service_template_ids', [])));
-            $offer->serviceTemplates()->sync($templateIds);
-
-            // Sync participating salons
-            $salonIds = $request->has('salon_ids') && is_array($request->input('salon_ids'))
-                ? array_values(array_unique($request->input('salon_ids')))
-                : [];
-            $offer->participatingSalons()->sync($salonIds);
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Offer updated successfully.',
-            'data' => $offer->fresh(['serviceTemplates', 'participatingSalons']),
-        ]);
+        return response()->json(['success' => false, 'message' => self::SALON_ONLY], 403);
     }
 
     /**
@@ -319,6 +215,13 @@ class FirstTimeOfferController extends Controller
         $targetActive = $request->has('is_active')
             ? filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN)
             : ! $offer->is_active;
+
+        if ($targetActive && $offer->salon_id === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Platform-wide offers are retired. Offers now belong to salons, which create them in the Partner App.',
+            ], 422);
+        }
 
         if ($targetActive) {
             // Completeness check before activation

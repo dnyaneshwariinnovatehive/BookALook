@@ -95,314 +95,88 @@ class FirstTimeOfferManagementTest extends TestCase
             ->assertJsonPath('data.participating_salons.0.id', $this->salonA->id);
     }
 
-    public function test_3_authorized_superadmin_can_create_a_valid_percentage_offer(): void
+    public function test_3_superadmin_can_no_longer_create_or_edit_offers(): void
     {
-        $payload = [
-            'name' => 'Summer Welcome 25%',
-            'description' => '25% off for first timers',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 25.0,
-            'max_discount_cap' => 400.0,
-            'min_service_price' => 150.0,
-            'min_eligible_subtotal' => 300.0,
-            'min_total_booking_subtotal' => 500.0,
-            'is_active' => true,
-            'service_template_ids' => [$this->templateA->id, $this->templateB->id],
-        ];
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->postJson('/api/superadmin/offers', [
+                'name' => 'Platform offer',
+                'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
+                'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
+                'discount_value' => 20,
+                'service_template_ids' => [$this->templateA->id],
+            ])
+            ->assertStatus(403)
+            ->assertJsonPath('success', false);
+        $this->assertDatabaseMissing('first_time_offers', ['name' => 'Platform offer']);
 
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
-
-        $response->assertStatus(201)
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.name', 'Summer Welcome 25%')
-            ->assertJsonPath('data.discount_value', '25.00')
-            ->assertJsonPath('data.max_discount_cap', '400.00');
-
-        $this->assertDatabaseHas('first_time_offers', [
-            'name' => 'Summer Welcome 25%',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-        ]);
+        $offer = $this->createOffer(['name' => 'Salon owned']);
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->putJson("/api/superadmin/offers/{$offer->id}", ['name' => 'Renamed by superadmin'])
+            ->assertStatus(403);
+        $this->assertSame('Salon owned', $offer->fresh()->name);
     }
 
-    public function test_4_authorized_superadmin_can_create_a_valid_flat_offer(): void
+    public function test_4_the_list_names_the_salon_that_made_each_offer(): void
     {
-        $payload = [
-            'name' => 'Flat 150 Off First Visit',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
-            'discount_type' => FirstTimeOffer::TYPE_FLAT,
-            'discount_value' => 150.0,
-            'max_discount_cap' => 600.0,
-            'is_active' => true,
-            'service_template_ids' => [$this->templateA->id],
-            'salon_ids' => [$this->salonA->id],
-        ];
+        $this->createOffer(['name' => 'Alpha welcome', 'salon_id' => $this->salonA->id]);
+        $this->createOffer(['name' => 'Old platform deal', 'salon_id' => null, 'is_active' => false]);
 
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
+        $rows = collect($this->actingAs($this->superadmin, 'sanctum')
+            ->getJson('/api/superadmin/offers')
+            ->assertOk()
+            ->json('data'))->keyBy('name');
 
-        $response->assertStatus(201)
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.discount_value', '150.00')
-            ->assertJsonPath('data.max_discount_cap', '600.00');
-
-        $this->assertDatabaseHas('first_time_offers', [
-            'name' => 'Flat 150 Off First Visit',
-            'discount_type' => FirstTimeOffer::TYPE_FLAT,
-        ]);
-    }
-
-    public function test_5_invalid_eligibility_scope_is_rejected(): void
-    {
-        $payload = [
-            'name' => 'Invalid Scope Offer',
-            'scope' => 'invalid_scope_name',
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 20.0,
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
-
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['scope']);
-    }
-
-    public function test_6_invalid_discount_type_is_rejected(): void
-    {
-        $payload = [
-            'name' => 'Invalid Type Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => 'bogus_type',
-            'discount_value' => 20.0,
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
-
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['discount_type']);
-    }
-
-    public function test_7_percentage_outside_configured_limits_is_rejected(): void
-    {
-        // Platform policy: min 5%, max 50%
-        $payloadOver = [
-            'name' => 'Too High Percentage',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 55.0, // > 50
-            'service_template_ids' => [$this->templateA->id],
-        ];
+        $this->assertSame('Salon Alpha', $rows['Alpha welcome']['created_by_salon']['name']);
+        $this->assertFalse($rows['Alpha welcome']['is_retired_platform_offer']);
+        $this->assertNull($rows['Old platform deal']['created_by_salon']);
+        $this->assertTrue($rows['Old platform deal']['is_retired_platform_offer']);
 
         $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payloadOver)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['discount_value']);
-
-        $payloadUnder = [
-            'name' => 'Too Low Percentage',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 2.0, // < 5
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payloadUnder)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['discount_value']);
+            ->getJson("/api/superadmin/offers?salon_id={$this->salonA->id}")
+            ->assertJsonCount(1, 'data');
     }
 
-    public function test_8_flat_amount_outside_configured_limits_is_rejected(): void
+    public function test_5_superadmin_can_pause_and_delete_a_salons_offer(): void
     {
-        // Platform policy: min ₹1, max ₹1,000
-        $payloadOver = [
-            'name' => 'Too High Flat',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_FLAT,
-            'discount_value' => 1200.0, // > 1000
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payloadOver)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['discount_value']);
-
-        $payloadUnder = [
-            'name' => 'Zero Flat',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_FLAT,
-            'discount_value' => 0.0, // < 1
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payloadUnder)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['discount_value']);
-    }
-
-    public function test_9_caps_above_platform_limits_are_rejected(): void
-    {
-        // Platform ceiling cap is ₹5,000
-        $payload = [
-            'name' => 'Excessive Cap Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 30.0,
-            'max_discount_cap' => 6000.0, // > 5000
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['max_discount_cap']);
-    }
-
-    public function test_10_invalid_minimum_conditions_are_rejected(): void
-    {
-        $payload = [
-            'name' => 'Negative Min Spend',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 20.0,
-            'min_service_price' => -50.0, // Negative not allowed
-            'service_template_ids' => [$this->templateA->id],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['min_service_price']);
-    }
-
-    public function test_11_nonexistent_service_template_ids_are_rejected(): void
-    {
-        $fakeTemplateId = (string) Str::uuid();
-
-        $payload = [
-            'name' => 'Nonexistent Template Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 20.0,
-            'service_template_ids' => [$fakeTemplateId],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['service_template_ids.0']);
-    }
-
-    public function test_12_nonexistent_salon_ids_are_rejected(): void
-    {
-        $fakeSalonId = (string) Str::uuid();
-
-        $payload = [
-            'name' => 'Nonexistent Salon Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 20.0,
-            'service_template_ids' => [$this->templateA->id],
-            'salon_ids' => [$fakeSalonId],
-        ];
-
-        $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['salon_ids.0']);
-    }
-
-    public function test_13_duplicate_service_and_salon_selections_are_handled_safely(): void
-    {
-        $payload = [
-            'name' => 'Duplicate Selection Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 20.0,
-            // Duplicate templates and salons in input
-            'service_template_ids' => [$this->templateA->id, $this->templateA->id],
-            'salon_ids' => [$this->salonA->id, $this->salonA->id],
-        ];
-
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
-
-        $response->assertStatus(201);
-        $offerId = $response->json('data.id');
-        $offer = FirstTimeOffer::find($offerId);
-
-        // Assert exactly one pivot record was created without duplicate key error
-        $this->assertCount(1, $offer->serviceTemplates);
-        $this->assertCount(1, $offer->participatingSalons);
-    }
-
-    public function test_14_service_and_salon_mappings_persist_correctly(): void
-    {
-        $payload = [
-            'name' => 'Full Mapped Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
-            'discount_type' => FirstTimeOffer::TYPE_FLAT,
-            'discount_value' => 100.0,
-            'service_template_ids' => [$this->templateA->id, $this->templateB->id],
-            'salon_ids' => [$this->salonA->id, $this->salonB->id],
-        ];
-
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->postJson('/api/superadmin/offers', $payload);
-
-        $response->assertStatus(201);
-        $offer = FirstTimeOffer::find($response->json('data.id'));
-
-        $this->assertCount(2, $offer->serviceTemplates);
-        $this->assertCount(2, $offer->participatingSalons);
-    }
-
-    public function test_15_updating_an_offer_does_not_delete_redemption_history(): void
-    {
-        $offer = $this->createOffer();
+        $offer = $this->createOffer(['salon_id' => $this->salonA->id]);
         $offer->serviceTemplates()->attach($this->templateA->id);
 
-        // Simulate an existing redemption
-        $redemption = FirstTimeOfferRedemption::create([
-            'offer_id' => $offer->id,
-            'customer_id' => $this->customer->id,
-            'salon_id' => $this->salonA->id,
-            'status' => FirstTimeOfferRedemption::STATUS_COMMITTED,
-            'active_entitlement_key' => $offer->makeEntitlementKey($this->customer->id),
-            'scope' => $offer->scope,
-            'discount_amount' => 50.0,
-            'reserved_at' => Carbon::now(),
-            'committed_at' => Carbon::now(),
-        ]);
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->postJson("/api/superadmin/offers/{$offer->id}/toggle-active", ['is_active' => false])
+            ->assertOk();
+        $this->assertFalse((bool) $offer->fresh()->is_active);
 
-        $updatePayload = [
-            'name' => 'Renamed Offer',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 30.0,
-            'service_template_ids' => [$this->templateB->id], // Switch template
-        ];
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->deleteJson("/api/superadmin/offers/{$offer->id}")
+            ->assertOk();
+        $this->assertSoftDeleted('first_time_offers', ['id' => $offer->id]);
+    }
 
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson("/api/superadmin/offers/{$offer->id}", $updatePayload);
+    public function test_6_a_retired_platform_offer_cannot_be_switched_back_on(): void
+    {
+        $offer = $this->createOffer(['salon_id' => null, 'is_active' => false]);
+        $offer->serviceTemplates()->attach($this->templateA->id);
 
-        $response->assertStatus(200);
+        $this->actingAs($this->superadmin, 'sanctum')
+            ->postJson("/api/superadmin/offers/{$offer->id}/toggle-active", ['is_active' => true])
+            ->assertStatus(422);
+        $this->assertFalse((bool) $offer->fresh()->is_active);
+    }
 
-        // Assert redemption record remains intact
-        $this->assertDatabaseHas('first_time_offer_redemptions', [
-            'id' => $redemption->id,
-            'offer_id' => $offer->id,
-            'status' => FirstTimeOfferRedemption::STATUS_COMMITTED,
-        ]);
-        $this->assertSame(1, $offer->fresh()->redemptions()->count());
+    public function test_7_an_offer_only_applies_at_the_salon_that_made_it(): void
+    {
+        $offer = $this->createOffer(['salon_id' => $this->salonA->id, 'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM]);
+        $offer->serviceTemplates()->attach($this->templateA->id);
+        $platform = $this->createOffer(['salon_id' => null, 'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM]);
+        $platform->serviceTemplates()->attach($this->templateA->id);
+
+        $service = app(\App\Services\CustomerOfferEligibilityService::class);
+        $atA = $service->getEligibleOffersForCustomerAndSalon($this->customer, $this->salonA->id)->pluck('id');
+        $atB = $service->getEligibleOffersForCustomerAndSalon($this->customer, $this->salonB->id)->pluck('id');
+
+        $this->assertContains($offer->id, $atA);
+        $this->assertNotContains($platform->id, $atA, 'retired platform offers never apply');
+        $this->assertNotContains($offer->id, $atB);
     }
 
     public function test_16_invalid_or_incomplete_offers_cannot_be_activated(): void
@@ -466,34 +240,6 @@ class FirstTimeOfferManagementTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_20_invalid_update_requests_do_not_leave_partially_updated_configuration(): void
-    {
-        $offer = $this->createOffer([
-            'name' => 'Original Name',
-            'discount_value' => 20.0,
-        ]);
-        $offer->serviceTemplates()->attach($this->templateA->id);
-
-        // Submit invalid update with non-existent template ID
-        $invalidPayload = [
-            'name' => 'Changed Name Should Rollback',
-            'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
-            'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,
-            'discount_value' => 30.0,
-            'service_template_ids' => [(string) Str::uuid()], // Non-existent
-        ];
-
-        $response = $this->actingAs($this->superadmin, 'sanctum')
-            ->putJson("/api/superadmin/offers/{$offer->id}", $invalidPayload);
-
-        $response->assertStatus(422);
-
-        // Assert database retained original values
-        $this->assertSame('Original Name', $offer->fresh()->name);
-        $this->assertSame('20.00', (string) $offer->fresh()->discount_value);
-        $this->assertTrue($offer->fresh()->serviceTemplates->contains($this->templateA->id));
-    }
-
     // --- Helpers ---
 
     private function createUser(string $role): User
@@ -526,6 +272,7 @@ class FirstTimeOfferManagementTest extends TestCase
     private function createOffer(array $overrides = []): FirstTimeOffer
     {
         return FirstTimeOffer::create(array_merge([
+            'salon_id' => $this->salonA->id,
             'name' => 'Standard Offer ' . Str::random(5),
             'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
             'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,

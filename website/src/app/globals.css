@@ -2187,3 +2187,7 @@ html {
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   letter-spacing: 0.02em;
 }
+/* Phones: the landing page itself is the menu; a two-row nav only crowds it. */
+@media (max-width: 640px) {
+  .blk-site .blk-header__nav { display: none; }
+}

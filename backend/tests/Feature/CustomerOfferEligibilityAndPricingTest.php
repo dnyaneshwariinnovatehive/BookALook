@@ -906,6 +906,8 @@ class CustomerOfferEligibilityAndPricingTest extends TestCase
     private function createOffer(array $attributes = [], array $templateIds = [], array $salonIds = []): FirstTimeOffer
     {
         $offer = FirstTimeOffer::create(array_merge([
+            // Offers belong to a salon now; the first participating salon, else the main one.
+            'salon_id' => $salonIds[0] ?? $this->salonA->id,
             'name' => 'Test Offer ' . Str::random(5),
             'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
             'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,

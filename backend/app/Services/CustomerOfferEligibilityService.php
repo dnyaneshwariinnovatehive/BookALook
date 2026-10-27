@@ -236,9 +236,9 @@ class CustomerOfferEligibilityService
             ->where(function ($q) use ($now) {
                 $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
             })
-            ->where(function ($q) use ($salonId) {
-                $q->whereNull('salon_id')->orWhere('salon_id', $salonId);
-            })
+            // Offers belong to the salon that made them and apply there only.
+            // The old platform-wide offers (no salon) are retired.
+            ->where('salon_id', $salonId)
             ->get();
 
         return $candidates->filter(function (FirstTimeOffer $offer) use ($customer, $salonId) {

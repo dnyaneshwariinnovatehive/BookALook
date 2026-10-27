@@ -14,12 +14,12 @@ import Link from 'next/link';
  * scrolled to nothing.
  */
 
-// Written for salon owners first; customers still have their own section.
+// Customers first; salon owners have their own section further down.
 const NAV_LINKS = [
-  { href: '/#features', label: 'Features' },
-  { href: '/#pricing', label: 'Pricing' },
-  { href: '/#get-started', label: 'Get started' },
-  { href: '/#for-customers', label: 'Customers' },
+  { href: '/#app', label: 'The app' },
+  { href: '/#how-it-works', label: 'How it works' },
+  { href: '/#download', label: 'Download' },
+  { href: '/#for-salons', label: 'For salons' },
   { href: '/#faq', label: 'FAQ' },
 ];
 
@@ -37,8 +37,8 @@ export default function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <Link className="blk-btn blk-btn--gold blk-btn--sm" href="/#enquiry-section">
-          Register your salon
+        <Link className="blk-btn blk-btn--gold blk-btn--sm" href="/#download">
+          Get the app
         </Link>
       </div>
     </header>

@@ -1145,21 +1145,25 @@ class FirstTimeOfferLifecycleTest extends TestCase
             'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
         ], [$this->templateA->id]);
 
-        $salonOffer = $this->createOffer([
+        // Each salon's own "new to this salon" offer.
+        $salonAOffer = $this->createOffer([
             'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
-        ], [$this->templateA->id], [$this->salonA->id, $this->salonB->id]);
+        ], [$this->templateA->id], [$this->salonA->id]);
+        $salonBOffer = $this->createOffer([
+            'scope' => FirstTimeOffer::SCOPE_NEW_TO_SALON,
+        ], [$this->templateA->id], [$this->salonB->id]);
 
         // Prior booking at Salon A
         $this->createAppointment($customer, $this->salonA, 'completed');
 
         $service = app(CustomerOfferEligibilityService::class);
 
-        // Platform offer: booking anywhere disqualifies
+        // "New to BookALook": booking anywhere disqualifies
         $this->assertFalse($service->isCustomerEligibleForOffer($customer, $platformOffer, $this->salonB->id));
 
-        // Salon offer: booking at Salon A disqualifies for Salon A, but NOT for Salon B
-        $this->assertFalse($service->isCustomerEligibleForOffer($customer, $salonOffer, $this->salonA->id));
-        $this->assertTrue($service->isCustomerEligibleForOffer($customer, $salonOffer, $this->salonB->id));
+        // "New to this salon": a visit to Salon A rules out Salon A's offer, not Salon B's
+        $this->assertFalse($service->isCustomerEligibleForOffer($customer, $salonAOffer, $this->salonA->id));
+        $this->assertTrue($service->isCustomerEligibleForOffer($customer, $salonBOffer, $this->salonB->id));
     }
 
     public function test_same_phone_reregistration_does_not_trivially_restore_consumed_eligibility(): void
@@ -1677,6 +1681,8 @@ class FirstTimeOfferLifecycleTest extends TestCase
     private function createOffer(array $attributes = [], array $templateIds = [], array $salonIds = []): FirstTimeOffer
     {
         $offer = FirstTimeOffer::create(array_merge([
+            // Offers belong to a salon now; the first participating salon, else the main one.
+            'salon_id' => $salonIds[0] ?? $this->salonA->id,
             'name' => 'Test Offer '.Str::random(5),
             'scope' => FirstTimeOffer::SCOPE_NEW_TO_PLATFORM,
             'discount_type' => FirstTimeOffer::TYPE_PERCENTAGE,

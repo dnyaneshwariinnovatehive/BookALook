@@ -10,6 +10,7 @@ import {
 } from '@/lib/bankDetails';
 import StoreBadge from '@/components/site/StoreBadge';
 import PricingSection from './PricingSection';
+import { CountUp, Parallax, QrCode, Reveal, RotatingWord, useOrigin } from './motion';
 import s from './landing.module.css';
 import {
   CUSTOMER_APP_STORE_URL,
@@ -82,17 +83,63 @@ const SALON_ROLES = [
   },
 ];
 
-const CUSTOMER_FLOW = [
-  { icon: 'search', title: 'They find you', desc: 'Customers browse verified salons by area, service and rating.' },
-  { icon: 'check-calendar', title: 'They book and pay an advance', desc: 'A real slot with a real stylist, confirmed instantly on WhatsApp.' },
-  { icon: 'qr', title: 'They walk straight in', desc: 'A QR check-in at your door — no waiting bench, no confusion.' },
+/** The floating "stickers" that drift with the scroll, Zomato-style. */
+const STICKERS = [
+  { emoji: '✂️', label: 'Haircut' },
+  { emoji: '💅', label: 'Nails' },
+  { emoji: '💆', label: 'Facial' },
+  { emoji: '🧖', label: 'Spa' },
+  { emoji: '🧔', label: 'Beard' },
+  { emoji: '💇', label: 'Hair colour' },
+  { emoji: '💄', label: 'Makeup' },
+  { emoji: '🪮', label: 'Styling' },
 ];
 
-const CUSTOMER_FACTS = [
-  { value: '₹0', label: 'Booking fee for customers', accent: true },
-  { value: '24×7', label: 'Book any time, even after you close' },
-  { value: '1 tap', label: 'QR check-in at the salon' },
-  { value: 'Instant', label: 'WhatsApp confirmation and reminder' },
+const HERO_WORDS = ['haircut', 'facial', 'manicure', 'hair spa', 'beard trim', 'bridal look'];
+
+/** "What's waiting for you on the app?" — tiles around the phone. */
+const APP_FEATURES = [
+  { emoji: '⏱️', title: 'Live free slots', desc: 'See exactly when your stylist is free.' },
+  { emoji: '🔒', title: 'Small advance', desc: 'Pay a little to lock your slot. The rest at the salon.' },
+  { emoji: '📲', title: 'QR check-in', desc: 'Scan at the door and walk straight in.' },
+  { emoji: '💬', title: 'WhatsApp updates', desc: 'Confirmation and a reminder before you go.' },
+  { emoji: '🎁', title: 'First-visit offers', desc: 'Welcome discounts at salons new to you.' },
+  { emoji: '⭐', title: 'Real ratings', desc: 'Reviews from people who actually visited.' },
+  { emoji: '👨‍👩‍👧', title: 'Book for family', desc: 'Book for your partner, parents or kids.' },
+  { emoji: '❤️', title: 'Favourites', desc: 'Rebook your go-to salon in two taps.' },
+];
+
+const CUSTOMER_STATS = [
+  { prefix: '₹', to: 0, suffix: '', label: 'booking fee', icon: '🏷️' },
+  { prefix: '', to: 24, suffix: '×7', label: 'book any time', icon: '🕒' },
+  { prefix: '', to: 100, suffix: '%', label: 'salons verified', icon: '✅' },
+  { prefix: '', to: 1, suffix: '-tap', label: 'QR check-in', icon: '📲' },
+];
+
+const CUSTOMER_STEPS = [
+  { emoji: '🔍', title: 'Find a salon', desc: 'Browse verified salons by area, service, price and rating.' },
+  { emoji: '🗓️', title: 'Pick a time', desc: 'Choose your stylist and a live free slot. Pay a small advance.' },
+  { emoji: '✨', title: 'Walk in, look great', desc: 'Show your QR at the door. No waiting bench, no confusion.' },
+];
+
+// [PLACEHOLDER] Customer FAQ answers are provisional copy — confirm with the business team.
+const CUSTOMER_FAQ = [
+  {
+    q: 'Does BookALook charge customers a booking fee?',
+    a: 'No. You pay the salon’s price. A small part of it is paid online as an advance to hold your slot, and the rest at the salon.',
+  },
+  {
+    q: 'What if I need to cancel or reschedule?',
+    a: 'You can cancel or reschedule from the app up to the salon’s cutoff time, shown before you book. Refunds follow the cancellation policy; if the salon cancels, you get your advance back.',
+  },
+  {
+    q: 'How does QR check-in work?',
+    a: 'Every booking has a QR code in the app. Show it at the salon and they check you in — no names to spell out, no token numbers.',
+  },
+  {
+    q: 'Can I book for someone else?',
+    a: 'Yes. Choose “someone else” at checkout and add their name, so the salon knows who to expect.',
+  },
 ];
 
 // [PLACEHOLDER] FAQ answers are provisional copy — confirm with the business team.
@@ -129,22 +176,9 @@ const FAQ_ITEMS = [
 // API) before going live. Keep 5+ per lane so the marquee never shows a gap.
 const REVIEW_LANES = [
   {
-    id: 'admins',
-    role: 'Salon Admin',
-    dir: 'right',
-    reviews: [
-      { name: 'Farhan Qureshi', meta: 'Owner, Velvet Scissors · Bengaluru', rating: 5, text: 'My no-show rate dropped from almost 30 percent to under 5. People who pay an advance and hold a QR code actually turn up.' },
-      { name: 'Neha Bansal', meta: 'Owner, The Glow Studio · Delhi', rating: 5, text: 'I run three chairs across two floors. Managing staff schedules, services and payouts from one app replaced a wall of registers and a lot of arguments.' },
-      { name: 'Arjun Reddy', meta: 'Owner, Royal Bridal · Hyderabad', rating: 5, text: 'Being listed was free and I was live in four days. On peak wedding season we filled slots that used to stay empty at 3pm on a weekday.' },
-      { name: 'Priya Menon', meta: 'Owner, Trim & Co · Kochi', rating: 4, text: 'Wallet credits on every completed booking are a nice touch. Support answered on WhatsApp within minutes, twice.' },
-      { name: 'Sameer Joshi', meta: 'Owner, Urban Polish · Pune', rating: 5, text: 'The QR check-in means I know exactly who is in my salon and when. My clients feel looked after and my billing matches the floor exactly.' },
-      { name: 'Zoya Ahmed', meta: 'Owner, Aura Beauty Lounge · Mumbai', rating: 5, text: 'I can finally see, slot by slot, which of my stylists is underbooked. I moved clients across teams and revenue followed within a fortnight.' },
-    ],
-  },
-  {
     id: 'customers',
     role: 'Customer',
-    dir: 'left',
+    dir: 'right',
     reviews: [
       { name: 'Ananya Rao', meta: 'Bengaluru', rating: 5, text: 'Booked a haircut at 11am, walked in at 11am. No token, no waiting on a bench, no “sir, please wait five minutes”. This is how it should always have been.' },
       { name: 'Rohit Menon', meta: 'Hyderabad', rating: 5, text: 'The QR check-in is the part I did not expect to love. One scan and I was in the chair. My barber was impressed too.' },
@@ -152,6 +186,19 @@ const REVIEW_LANES = [
       { name: 'Imran Shaikh', meta: 'Mumbai', rating: 5, text: 'Got an instant WhatsApp confirmation and a reminder an hour before. First salon booking app that did not leave me guessing.' },
       { name: 'Divya Iyer', meta: 'Chennai', rating: 5, text: 'I found a verified salon in under two minutes and booked a colouring slot for the same evening. Weekend evenings are finally not a lottery.' },
       { name: 'Karthik Nair', meta: 'Kochi', rating: 4, text: 'Booked for my parents and they loved it. The address and directions were right there in the app, so we did not lose time looking for the shop.' },
+    ],
+  },
+  {
+    id: 'admins',
+    role: 'Salon Admin',
+    dir: 'left',
+    reviews: [
+      { name: 'Farhan Qureshi', meta: 'Owner, Velvet Scissors · Bengaluru', rating: 5, text: 'My no-show rate dropped from almost 30 percent to under 5. People who pay an advance and hold a QR code actually turn up.' },
+      { name: 'Neha Bansal', meta: 'Owner, The Glow Studio · Delhi', rating: 5, text: 'I run three chairs across two floors. Managing staff schedules, services and payouts from one app replaced a wall of registers and a lot of arguments.' },
+      { name: 'Arjun Reddy', meta: 'Owner, Royal Bridal · Hyderabad', rating: 5, text: 'Being listed was free and I was live in four days. On peak wedding season we filled slots that used to stay empty at 3pm on a weekday.' },
+      { name: 'Priya Menon', meta: 'Owner, Trim & Co · Kochi', rating: 4, text: 'Wallet credits on every completed booking are a nice touch. Support answered on WhatsApp within minutes, twice.' },
+      { name: 'Sameer Joshi', meta: 'Owner, Urban Polish · Pune', rating: 5, text: 'The QR check-in means I know exactly who is in my salon and when. My clients feel looked after and my billing matches the floor exactly.' },
+      { name: 'Zoya Ahmed', meta: 'Owner, Aura Beauty Lounge · Mumbai', rating: 5, text: 'I can finally see, slot by slot, which of my stylists is underbooked. I moved clients across teams and revenue followed within a fortnight.' },
     ],
   },
   {
@@ -245,6 +292,8 @@ export default function LandingPage() {
   const [bank, setBank] = useState<BankDetailsInput>(EMPTY_BANK_DETAILS);
   const [bankErrors, setBankErrors] = useState<Partial<Record<keyof BankDetailsInput, string>>>({});
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [faqFor, setFaqFor] = useState<'customers' | 'owners'>('customers');
+  const origin = useOrigin();
   const [errorMessage, setErrorMessage] = useState('');
 
   // City and area are picked, never typed. Typed cities left this table holding
@@ -409,123 +458,262 @@ export default function LandingPage() {
 
   return (
     <main className={s.page}>
-      {/* ============ HERO — for salon owners ============ */}
-      <section id="top" className={s.hero}>
-        <div className={`${s.container} ${s.heroGrid}`}>
-          <div>
-            <p className={s.kicker}><Icon name="scissors" className={s.kickerIcon} /> For salon owners</p>
-            <h1 className={s.heroTitle}>
-              Fill every chair.<br />
-              <em>Get paid before they arrive.</em>
-            </h1>
-            <p className={s.heroSub}>
-              BookALook brings new customers to your salon, takes an advance with every booking so they turn up,
-              and gives you one app to run bookings, staff, billing and payouts.
-            </p>
-            <div className={s.heroCtas}>
-              <a className={`${s.btn} ${s.btnPrimary}`} href="#enquiry-section">
-                Register your salon <Icon name="arrow" />
-              </a>
-              <a className={`${s.btn} ${s.btnSoft}`} href="#pricing">See plans &amp; pricing</a>
+      {/* ============ HERO — for customers ============ */}
+      <section id="top" className={s.cHero}>
+        <div className={s.cHeroGlow} aria-hidden="true" />
+        <div className={s.cHeroGrid} aria-hidden="true" />
+        {STICKERS.slice(0, 6).map((st, i) => (
+          <Parallax key={st.label} speed={[-0.35, 0.25, -0.2, 0.3, -0.28, 0.18][i]} rotate={[1, -1, 1, -1, 1, -1][i]} className={`${s.cSticker} ${s[`cSticker${i}`]}`}>
+            <span className={s.cStickerInner} style={{ animationDelay: `${i * -1.3}s` }}>
+              <span className={s.cStickerEmoji}>{st.emoji}</span>
+              <span className={s.cStickerLabel}>{st.label}</span>
+            </span>
+          </Parallax>
+        ))}
+
+        <div className={s.cHeroContent}>
+          <p className={s.cHeroBrand}>Book<span>A</span>Look</p>
+          <h1 className={s.cHeroTitle}>
+            Your next <span className={s.cHeroAccent}><RotatingWord words={HERO_WORDS} /></span>,<br />
+            booked in a minute.
+          </h1>
+          <p className={s.cHeroSub}>
+            Discover verified salons near you, pick a live free slot and walk straight in with a QR code. No calls. No waiting.
+          </p>
+          <div className={s.cHeroBadges}>
+            <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
+            <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
+          </div>
+          <a className={s.cHeroOwner} href="#for-salons">Own a salon? Grow with BookALook →</a>
+        </div>
+
+        <a className={s.cScroll} href="#better-looks" aria-label="Scroll down">
+          Scroll down <span aria-hidden="true">⌄</span>
+        </a>
+      </section>
+
+      {/* ============ BETTER LOOKS — floating stickers ============ */}
+      <section id="better-looks" className={s.cFloat}>
+        {STICKERS.slice(2).map((st, i) => (
+          <Parallax key={st.label} speed={[0.3, -0.25, 0.22, -0.32, 0.26, -0.2][i]} rotate={[-1.5, 1.5, -1, 1, -1.5, 1][i]} className={`${s.cFloatItem} ${s[`cFloatItem${i}`]}`}>
+            <span className={s.cFloatCircle}>{st.emoji}</span>
+          </Parallax>
+        ))}
+        <Reveal className={s.cFloatText}>
+          <h2>Better looks for <em>more people</em></h2>
+          <p>
+            BookALook helps you find a great salon, see real prices and free slots, and turn up to a chair that is
+            ready for you.
+          </p>
+        </Reveal>
+      </section>
+
+      {/* ============ STATS STRIP ============ */}
+      <section className={s.cStatsWrap}>
+        <div className={s.container}>
+          <Reveal variant="zoom" className={s.cStats}>
+            {CUSTOMER_STATS.map((st) => (
+              <div className={s.cStat} key={st.label}>
+                <b><CountUp to={st.to} prefix={st.prefix} suffix={st.suffix} /></b>
+                <span>{st.label}</span>
+                <i aria-hidden="true">{st.icon}</i>
+              </div>
+            ))}
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ============ WHAT'S WAITING ON THE APP ============ */}
+      <section id="app" className={s.cApp}>
+        <div className={`${s.container} ${s.center}`}>
+          <Reveal>
+            <h2 className={s.cAppTitle}>What’s waiting for you<br />on the app?</h2>
+            <p className={s.lead}>Everything you need to book a salon the way you would book a cab.</p>
+          </Reveal>
+          <div className={s.cAppStage}>
+            <div className={s.cAppCol}>
+              {APP_FEATURES.slice(0, 4).map((f, i) => (
+                <Reveal key={f.title} variant="left" delay={i * 90} className={s.cAppTile}>
+                  <span className={s.cAppEmoji}>{f.emoji}</span>
+                  <div><b>{f.title}</b><p>{f.desc}</p></div>
+                </Reveal>
+              ))}
             </div>
-            <ul className={s.heroChecks}>
-              <li><Icon name="check" /> Advance with every booking</li>
-              <li><Icon name="check" /> Live in days, not weeks</li>
-              <li><Icon name="check" /> Welcome coins for new salons</li>
-            </ul>
-            <div className={s.trustRow}>
-              <span className={s.avatars} aria-hidden="true">
-                <span>A</span><span>R</span><span>S</span><span>I</span>
-              </span>
-              <span>
-                <span className={s.stars} aria-hidden="true">★★★★★</span>{' '}
-                Customers love booking this way — <b>and they book your empty slots.</b>
-              </span>
+
+            <Parallax speed={-0.08} className={s.cPhoneWrap}>
+              <div className={s.cPhone} aria-label="BookALook customer app preview" role="img">
+                <div className={s.cPhoneNotch} />
+                <div className={s.cPhoneScreen}>
+                  <p className={s.cPhoneHello}>Hi Ananya 👋</p>
+                  <div className={s.cPhoneSearch}>🔍 Search haircut, facial, spa…</div>
+                  <div className={s.cPhoneChips}>
+                    <span className={s.on}>Haircut</span><span>Facial</span><span>Nails</span>
+                  </div>
+                  <div className={s.cPhoneCard}>
+                    <small>Your next appointment</small>
+                    <b>Glow Studio · Baner</b>
+                    <span>Today · 6:30 – 7:15 PM</span>
+                    <div><em>Confirmed</em><strong>Show QR</strong></div>
+                  </div>
+                  <div className={s.cPhoneSalon}><span>💈</span><div><b>Urban Trim</b><small>★ 4.7 · 1.2 km</small></div><i>Book</i></div>
+                  <div className={s.cPhoneSalon}><span>🌸</span><div><b>Aura Lounge</b><small>★ 4.8 · 2.0 km</small></div><i>Book</i></div>
+                </div>
+              </div>
+            </Parallax>
+
+            <div className={s.cAppCol}>
+              {APP_FEATURES.slice(4).map((f, i) => (
+                <Reveal key={f.title} variant="right" delay={i * 90} className={s.cAppTile}>
+                  <span className={s.cAppEmoji}>{f.emoji}</span>
+                  <div><b>{f.title}</b><p>{f.desc}</p></div>
+                </Reveal>
+              ))}
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* The Partner App home, as an owner sees it. Illustrative figures. */}
-          <figure className={s.mock} aria-label="Partner App preview: today's bookings and revenue">
-            <div className={`${s.toast} ${s.toastTop}`} aria-hidden="true">
-              <span><Icon name="check-calendar" /></span>
-              <div><b>New booking</b><small>Ananya · Hair spa · 4:30 PM</small></div>
-            </div>
-            <div className={s.mockCard}>
-              <div className={s.mockTop}>
-                <div className={s.mockSalon}>
-                  <span>G</span>
-                  <div><b>Glow Studio</b><small>Today, Wednesday</small></div>
-                </div>
-                <span className={s.mockLive}>● Open</span>
-              </div>
-              <div className={s.mockStats}>
-                <div className={s.mockStat}><small>Bookings</small><b>18</b><i>+6 online</i></div>
-                <div className={s.mockStat}><small>Revenue</small><b>₹14.2k</b><i>+22%</i></div>
-                <div className={s.mockStat}><small>No-shows</small><b>0</b><i>advance paid</i></div>
-              </div>
-              <div className={s.mockChart} aria-hidden="true">
-                {[38, 52, 44, 70, 64, 92, 80].map((h, i) => (
-                  <span key={i} className={i === 5 ? s.on : undefined} style={{ height: `${h}%` }} />
+      {/* ============ HOW IT WORKS ============ */}
+      <section id="how-it-works" className={s.section}>
+        <div className={`${s.container} ${s.center}`}>
+          <Reveal>
+            <p className={s.kicker}>How it works</p>
+            <h2 className={s.title}>Three taps to your next look</h2>
+          </Reveal>
+          <ol className={s.cSteps}>
+            {CUSTOMER_STEPS.map((step, i) => (
+              <Reveal as="li" key={step.title} delay={i * 140} className={s.cStep}>
+                <span className={s.cStepEmoji}>{step.emoji}</span>
+                <small>Step {i + 1}</small>
+                <b>{step.title}</b>
+                <p>{step.desc}</p>
+              </Reveal>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ============ REVIEWS ============ */}
+      <section id="reviews" className="blk-reviews">
+        <div className="blk-container">
+          <p className="blk-section-kicker">Reviews</p>
+          <h2 className="blk-section-title">Loved by customers, trusted by salons</h2>
+          <p className="blk-section-sub">What customers, salon owners and stylists say about BookALook.</p>
+        </div>
+        <div className="blk-reviews__stage">
+          {REVIEW_LANES.map((lane, laneIndex) => (
+            <div className="blk-reviews__lane" key={lane.id} style={{ animationDelay: `${laneIndex * 0.14}s` }}>
+              <div
+                className={`blk-reviews__track blk-reviews__track--${lane.dir}`}
+                style={{ animationDuration: `${[52, 62, 56][laneIndex]}s`, animationDelay: `${laneIndex * -7}s` }}
+              >
+                {[0, 1].map((copy) => (
+                  <div className="blk-reviews__set" key={copy} aria-hidden={copy === 1}>
+                    {lane.reviews.map((review) => (
+                      <article className="blk-reviews__card" key={`${copy}-${review.name}`}>
+                        <p className="blk-reviews__role">{lane.role}</p>
+                        <span className="blk-reviews__stars" role="img" aria-label={`Rated ${review.rating} out of 5`}>
+                          <span className="is-on" aria-hidden="true">{'★'.repeat(review.rating)}</span>
+                          <span aria-hidden="true">{'★'.repeat(5 - review.rating)}</span>
+                        </span>
+                        <p className="blk-reviews__text">{review.text}</p>
+                        <div className="blk-reviews__by">
+                          <span className="blk-reviews__avatar" aria-hidden="true">{review.name.charAt(0)}</span>
+                          <span className="blk-reviews__who">
+                            <span className="blk-reviews__name">{review.name}</span>
+                            <span className="blk-reviews__meta">{review.meta}</span>
+                          </span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 ))}
               </div>
-              <div className={s.mockDays} aria-hidden="true">
-                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ============ DOWNLOAD — QR like Zomato ============ */}
+      <section id="download" className={s.cDownloadWrap}>
+        <div className={s.container}>
+          <Reveal variant="zoom" className={s.cDownload}>
+            <div className={s.cDownloadText}>
+              <h2>Download the app now!</h2>
+              <p>Book salons near you in a minute — free on Android and iPhone.</p>
+              <div className={s.cHeroBadges}>
+                <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
+                <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
               </div>
-              <ul className={s.mockList}>
-                <li><span className={s.mockTime}>11:00</span><div><b>Rohit M.</b><small>Haircut · Vikram</small></div><em>Checked in</em></li>
-                <li><span className={s.mockTime}>12:30</span><div><b>Sneha K.</b><small>Facial · Meera</small></div><em>Advance paid</em></li>
-              </ul>
             </div>
-            <div className={s.toast} aria-hidden="true">
-              <span><Icon name="wallet" /></span>
-              <div><b>Payout sent</b><small>₹8,450 to your bank</small></div>
-            </div>
-          </figure>
+            <Parallax speed={-0.1} className={s.cQrPhone}>
+              <div className={s.cQrPhoneScreen}>
+                <div className={s.cPhoneNotch} />
+                <p>Scan the QR code to<br />download the app</p>
+                <QrCode value={`${origin}/download?app=customer`} size={150} label="QR code to download the BookALook app" />
+              </div>
+            </Parallax>
+          </Reveal>
         </div>
       </section>
 
-      {/* ============ WHAT CHANGES ============ */}
-      <section id="why-bookalook" className={s.section}>
-        <div className={`${s.container} ${s.center}`}>
-          <p className={s.kicker}>Why salons switch</p>
-          <h2 className={s.title}>Less chasing. More chairs filled.</h2>
-          <div className={s.gainGrid}>
+      {/* ======================================================================
+          FOR SALON OWNERS — a little further down
+          ====================================================================== */}
+      <section id="for-salons" className={s.oBand}>
+        {STICKERS.slice(0, 3).map((st, i) => (
+          <Parallax key={st.label} speed={[0.25, -0.3, 0.2][i]} rotate={[1, -1, 1][i]} className={`${s.oSticker} ${s[`oSticker${i}`]}`}>
+            <span>{st.emoji}</span>
+          </Parallax>
+        ))}
+        <div className={`${s.container} ${s.oBandGrid}`}>
+          <Reveal variant="left">
+            <p className={s.oKicker}>For salon owners &amp; barbers</p>
+            <h2 className={s.oTitle}>Fill every chair.<br /><em>Get paid before they arrive.</em></h2>
+            <p className={s.oLead}>
+              New customers find you in the app, pay an advance with every booking so they turn up, and you run
+              bookings, staff, billing and payouts from one Partner App.
+            </p>
+            <div className={s.heroCtas}>
+              <a className={`${s.btn} ${s.btnPrimary}`} href="#enquiry-section">Register your salon <Icon name="arrow" /></a>
+              <a className={`${s.btn} ${s.oBtnGhost}`} href="#pricing">See plans &amp; pricing</a>
+            </div>
+          </Reveal>
+          <Reveal variant="right" className={s.oGainList}>
             {GAINS.map((g) => (
-              <article className={s.gainCard} key={g.title} style={{ textAlign: 'left' }}>
-                <span className={s.gainPain}>{g.pain}</span>
-                <h3>{g.title}</h3>
+              <div className={s.oGain} key={g.title}>
+                <span className={s.oPain}>{g.pain}</span>
+                <b>{g.title}</b>
                 <p>{g.desc}</p>
-              </article>
+              </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* ============ FEATURES ============ */}
       <section id="features" className={`${s.section} ${s.sectionTint}`}>
         <div className={s.container}>
-          <p className={s.kicker}>Everything in the Partner App</p>
-          <h2 className={s.title}>Built for how a salon actually runs</h2>
-          <p className={s.lead}>From the first booking of the morning to the payout at the end of the week.</p>
+          <Reveal>
+            <p className={s.kicker}>Everything in the Partner App</p>
+            <h2 className={s.title}>Built for how a salon actually runs</h2>
+          </Reveal>
           <div className={s.featureGrid}>
-            {OWNER_FEATURES.map((f) => (
-              <article className={s.feature} key={f.title}>
+            {OWNER_FEATURES.map((f, i) => (
+              <Reveal as="article" key={f.title} delay={(i % 4) * 80} className={s.feature}>
                 <span className={s.featureIcon}><Icon name={f.icon} /></span>
                 <h3>{f.title}</h3>
                 <p>{f.desc}</p>
-              </article>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ============ PRICING (live plans) ============ */}
       <PricingSection />
 
-      {/* ============ GET STARTED + ENQUIRY ============ */}
       <section id="get-started" className={`${s.section} ${s.sectionTint}`}>
         <div className={`${s.container} ${s.startGrid}`}>
-          <div>
+          <Reveal variant="left">
             <p className={s.kicker}>Get started</p>
             <h2 className={s.title}>Your salon on BookALook in four steps</h2>
             <ol className={s.steps}>
@@ -536,14 +724,18 @@ export default function LandingPage() {
                 </li>
               ))}
             </ol>
-            <p className={s.startNote}>
-              <b>Prefer to do it yourself?</b> Download the Partner App and register your salon from your phone.
-            </p>
-            <div className={s.badges}>
-              <StoreBadge store="google" url={PARTNER_PLAY_STORE_URL} label="Google Play" />
-              <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
+            <div className={s.oQrCard}>
+              <QrCode value={`${origin}/download?app=partner`} size={96} label="QR code to download the BookALook Partner app" />
+              <div>
+                <b>Prefer your phone?</b>
+                <p>Scan to get the Partner App and register your salon yourself.</p>
+                <div className={s.badges}>
+                  <StoreBadge store="google" url={PARTNER_PLAY_STORE_URL} label="Google Play" />
+                  <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
+                </div>
+              </div>
             </div>
-          </div>
+          </Reveal>
 
           <div id="enquiry-section" className={`enquiry-section ${s.formWrap}`}>
             <div style={{ maxWidth: '600px', width: '100%', background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
@@ -813,117 +1005,47 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ============ ONE APP, WHOLE TEAM ============ */}
-      <section id="for-salons" className={s.section}>
+      <section className={s.section}>
         <div className={`${s.container} ${s.center}`}>
-          <p className={s.kicker}>One app for the whole team</p>
-          <h2 className={s.title}>You, your stylists, and us — in the same app</h2>
+          <Reveal>
+            <p className={s.kicker}>One app for the whole team</p>
+            <h2 className={s.title}>You, your stylists, and us — in the same app</h2>
+          </Reveal>
           <div className={s.roleGrid} style={{ textAlign: 'left' }}>
-            {SALON_ROLES.map((r) => (
-              <article className={s.role} key={r.tag}>
+            {SALON_ROLES.map((r, i) => (
+              <Reveal as="article" key={r.tag} delay={i * 110} className={s.role}>
                 <small>{r.tag}</small>
                 <h3>{r.title}</h3>
                 <p>{r.desc}</p>
-              </article>
+              </Reveal>
             ))}
           </div>
-          <div className={s.badges}>
-            <StoreBadge store="google" url={PARTNER_PLAY_STORE_URL} label="Google Play" />
-            <StoreBadge store="apple" url={PARTNER_APP_STORE_URL} label="App Store" />
-          </div>
-        </div>
-      </section>
-
-      {/* ============ CUSTOMERS — why owners can count on them ============ */}
-      <section id="for-customers" className={s.customers}>
-        <div className={`${s.container} ${s.custGrid}`}>
-          <div>
-            <p className={s.kicker}>Your customers love it</p>
-            <h2 className={s.title}>Customers already book their salon this way</h2>
-            <p className={s.lead}>
-              The BookALook customer app makes booking your salon easier than calling it — which is why they come back.
-            </p>
-            <ol className={s.custSteps}>
-              {CUSTOMER_FLOW.map((step) => (
-                <li key={step.title}>
-                  <span><Icon name={step.icon} /></span>
-                  <div><b>{step.title}</b><p>{step.desc}</p></div>
-                </li>
-              ))}
-            </ol>
-            <div className={s.badges}>
-              <StoreBadge store="google" url={CUSTOMER_PLAY_STORE_URL} label="Google Play" />
-              <StoreBadge store="apple" url={CUSTOMER_APP_STORE_URL} label="App Store" />
-            </div>
-          </div>
-          <div className={s.custStats}>
-            {CUSTOMER_FACTS.map((f) => (
-              <div className={`${s.custStat} ${f.accent ? s.custStatAccent : ''}`} key={f.label}>
-                <b>{f.value}</b>
-                <span>{f.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============ REVIEWS ============ */}
-      {/* Three horizontal lanes: owners first, then their customers, then the
-          stylists. Each lane duplicates its card set so the loop is seamless. */}
-      <section id="reviews" className="blk-reviews">
-        <div className="blk-container">
-          <p className="blk-section-kicker">Reviews</p>
-          <h2 className="blk-section-title">Owners, customers and stylists on BookALook</h2>
-          <p className="blk-section-sub">
-            What salon owners, their customers, and the people doing the work have to say.
-          </p>
-        </div>
-
-        <div className="blk-reviews__stage">
-          {REVIEW_LANES.map((lane, laneIndex) => (
-            <div
-              className="blk-reviews__lane"
-              key={lane.id}
-              style={{ animationDelay: `${laneIndex * 0.14}s` }}
-            >
-              <div
-                className={`blk-reviews__track blk-reviews__track--${lane.dir}`}
-                style={{ animationDuration: `${[52, 62, 56][laneIndex]}s`, animationDelay: `${laneIndex * -7}s` }}
-              >
-                {[0, 1].map((copy) => (
-                  <div className="blk-reviews__set" key={copy} aria-hidden={copy === 1}>
-                    {lane.reviews.map((review) => (
-                      <article className="blk-reviews__card" key={`${copy}-${review.name}`}>
-                        <p className="blk-reviews__role">{lane.role}</p>
-                        <span className="blk-reviews__stars" role="img" aria-label={`Rated ${review.rating} out of 5`}>
-                          <span className="is-on" aria-hidden="true">{'★'.repeat(review.rating)}</span>
-                          <span aria-hidden="true">{'★'.repeat(5 - review.rating)}</span>
-                        </span>
-                        <p className="blk-reviews__text">{review.text}</p>
-                        <div className="blk-reviews__by">
-                          <span className="blk-reviews__avatar" aria-hidden="true">{review.name.charAt(0)}</span>
-                          <span className="blk-reviews__who">
-                            <span className="blk-reviews__name">{review.name}</span>
-                            <span className="blk-reviews__meta">{review.meta}</span>
-                          </span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 
       {/* ============ FAQ ============ */}
-      <section id="faq" className={s.section}>
+      <section id="faq" className={`${s.section} ${s.sectionTint}`}>
         <div className={`${s.container} ${s.center}`}>
-          <p className={s.kicker}>FAQ</p>
-          <h2 className={s.title}>Questions salon owners ask us</h2>
+          <Reveal>
+            <p className={s.kicker}>FAQ</p>
+            <h2 className={s.title}>Questions, answered</h2>
+          </Reveal>
+          <div className={s.faqTabs} role="tablist" aria-label="Questions for">
+            {(['customers', 'owners'] as const).map((who) => (
+              <button
+                key={who}
+                type="button"
+                role="tab"
+                aria-selected={faqFor === who}
+                className={`${s.faqTab} ${faqFor === who ? s.faqTabOn : ''}`}
+                onClick={() => setFaqFor(who)}
+              >
+                {who === 'customers' ? 'For customers' : 'For salon owners'}
+              </button>
+            ))}
+          </div>
           <div className={s.faqList} style={{ textAlign: 'left' }}>
-            {FAQ_ITEMS.map((item) => (
+            {(faqFor === 'customers' ? CUSTOMER_FAQ : FAQ_ITEMS).map((item) => (
               <details className={s.faqItem} key={item.q}>
                 <summary>{item.q}</summary>
                 <p>{item.a}</p>
@@ -934,15 +1056,18 @@ export default function LandingPage() {
       </section>
 
       {/* ============ CLOSING ============ */}
-      <section className={s.closing}>
+      <section className={`${s.closing} ${s.closingTop}`}>
         <div className={s.container}>
-          <div className={s.closingCard}>
+          <Reveal variant="zoom" className={s.closingCard}>
             <div>
-              <h2>Ready to fill your empty slots?</h2>
-              <p>Register in two minutes. Our team takes it from there.</p>
+              <h2>Your chair is waiting.</h2>
+              <p>Get the app and book your next salon visit in a minute.</p>
             </div>
-            <a className={s.btn} href="#enquiry-section">Register your salon <Icon name="arrow" /></a>
-          </div>
+            <div className={s.closingActions}>
+              <a className={s.btn} href="#download">Get the app</a>
+              <a className={`${s.btn} ${s.closingGhost}`} href="#for-salons">I own a salon</a>
+            </div>
+          </Reveal>
         </div>
       </section>
     </main>
