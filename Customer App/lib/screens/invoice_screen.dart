@@ -10,6 +10,7 @@ import '../utils/error_text.dart';
 import '../utils/bottom_clearance.dart';
 import '../widgets/feedback_states.dart';
 import '../widgets/invoice_loader.dart';
+import '../widgets/invoice_scroll_cue.dart';
 
 /// Shows a booking's invoice on screen and lets the customer keep a copy.
 ///
@@ -48,6 +49,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   String? _saveProblem;
   bool _saveFallback = false;
 
+  /// Where the customer is on the page, fed by the page itself.
+  InvoiceScrollState _scroll = const InvoiceScrollState();
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +64,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       ..addJavaScriptChannel(
         'InvoiceActions',
         onMessageReceived: (_) => _save(),
+      )
+      ..addJavaScriptChannel(
+        'InvoiceScroll',
+        onMessageReceived: (message) {
+          final next = InvoiceScrollState.parse(message.message, alreadyMoved: _scroll.moved);
+          if (next == null || !mounted) return;
+          setState(() => _scroll = next);
+        },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -107,6 +119,21 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           if (window.__invoiceBridged) return;
           window.__invoiceBridged = true;
           window.print = function () { window.InvoiceActions.postMessage('print'); };
+
+          // Report how far down the page is, so the app can show that there
+          // is more below. Measured here in CSS pixels on both platforms.
+          var queued = false;
+          function report() {
+            queued = false;
+            var doc = document.documentElement;
+            var max = Math.max(0, doc.scrollHeight - window.innerHeight);
+            window.InvoiceScroll.postMessage(Math.round(window.scrollY) + ',' + Math.round(max));
+          }
+          function soon() { if (!queued) { queued = true; requestAnimationFrame(report); } }
+          window.addEventListener('scroll', soon, { passive: true });
+          window.addEventListener('resize', soon);
+          window.addEventListener('load', soon);
+          report();
         })();
       ''');
     } catch (_) {
@@ -192,6 +219,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       _error = '';
     });
     _documentHtml = null;
+    _scroll = const InvoiceScrollState();
 
     try {
       await _controller.loadRequest(Uri.parse(widget.url.trim()));
@@ -273,7 +301,16 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           padding: EdgeInsets.only(bottom: bottomClearance(context)),
           child: WebViewWidget(controller: _controller),
         ),
-        
+
+        if (!_showLoader)
+          Positioned.fill(
+            child: InvoiceScrollCue(
+              state: _scroll,
+              bottomInset: bottomClearance(context),
+              onScrollForMe: _scrollForMe,
+            ),
+          ),
+
         Positioned.fill(
           child: IgnorePointer(
             ignoring: !_showLoader,
@@ -298,6 +335,15 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _scrollForMe() async {
+    try {
+      await _controller.runJavaScript(
+          "window.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' });");
+    } catch (_) {
+      // Only a shortcut; the page still scrolls by hand.
+    }
   }
 
   Widget _buildError() {

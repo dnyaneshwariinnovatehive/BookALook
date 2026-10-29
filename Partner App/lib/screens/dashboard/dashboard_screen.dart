@@ -142,6 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         salonName: widget.salonData['name']?.toString() ?? '',
         planName: _access?.planName,
         daysRemaining: _access?.daysRemaining,
+        dues: _access?.dues,
       ),
       AppointmentsTab(
         key: _appointmentsKey,

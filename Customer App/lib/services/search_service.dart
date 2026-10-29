@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:customer_app/services/http_client.dart' as http;
 
+import 'audience_service.dart';
 import 'location_service.dart';
 
 /// One search across services and salons.
@@ -19,11 +20,14 @@ class CustomerSearchService {
 
   static Future<SearchResults> search(String query, {String? categoryId}) async {
     final cityId = LocationService.instance.city?.id;
+    // The gender picked this session narrows search like everything else.
+    final gender = await AudienceService.browsingApiParam();
 
     final uri = Uri.parse('$_baseUrl/customer/search').replace(queryParameters: {
       'q': query,
       if (cityId != null) 'city_id': cityId,
       if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
+      'gender': ?gender,
     });
 
     final response = await http.get(uri, headers: {'Accept': 'application/json'});

@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/location_service.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../services/salon_service.dart';
+import '../services/audience_service.dart';
 import 'salon_detail_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_text.dart';
@@ -46,7 +47,8 @@ class _SalonListScreenState extends State<SalonListScreen> {
     try {
       final response = await _salonService.fetchSalons(
         search: widget.initialSearch,
-        gender: widget.initialGender,
+        gender: AudienceService.apiParam(widget.initialGender) ??
+            (widget.initialGender == null ? await AudienceService.browsingApiParam() : null),
         categoryId: widget.initialCategoryId,
       );
       if (!mounted) return;

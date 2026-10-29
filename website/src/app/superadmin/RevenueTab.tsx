@@ -11,6 +11,7 @@ import { useChartPalette } from '@/lib/theme';
 import styles from './dashboard.module.css';
 import rev from './revenue.module.css';
 import { EmptyState, KpiCard } from './DashboardParts';
+import MonthlyLedger from './MonthlyLedger';
 
 interface Totals {
   total: number;
@@ -328,6 +329,9 @@ export default function RevenueTab({ from, to, granularity, rangeLabel, refreshK
           )}
         </section>
       </div>
+
+      {/* MONTH BY MONTH */}
+      <MonthlyLedger refreshKey={refreshKey} />
 
       {/* RECENT */}
       <section className={styles.card}>

@@ -42,6 +42,9 @@ class CommissionService
      */
     public const GRACE_DAYS_KEY = 'commission_settlement_grace_days';
 
+    /** The end date a Commission Model arrangement carries: none, in effect. */
+    public const OPEN_END = '2099-12-31';
+
     /** ------------------------------------------------------------- the plan */
 
     public function plan(): ?SubscriptionPlan
@@ -182,11 +185,10 @@ class CommissionService
                 // Nothing was paid for it, so there is no price to snapshot.
                 'plan_price_snapshot' => 0,
                 'start_date' => Carbon::today(),
-                // Nothing has been settled yet, so the salon is covered for the
-                // month it is joining in and no further. Passing today would
-                // read as "this month is already paid for" and hand it a free
-                // extra month.
-                'end_date' => $this->accessEndFrom(Carbon::today()->subMonthNoOverflow()->startOfMonth()),
+                // Open-ended. A commission salon pays after the fact, so access
+                // is decided by what it owes (CommissionDuesService), not by a
+                // date running out.
+                'end_date' => self::OPEN_END,
                 'status' => 'active',
             ]);
 

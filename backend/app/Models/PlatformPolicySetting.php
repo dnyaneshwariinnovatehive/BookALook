@@ -65,6 +65,23 @@ class PlatformPolicySetting extends Model
         // loses access. The month's payout lands on the 1st and someone has to
         // work through the queue; a salon should not be shut for that.
         'commission_settlement_grace_days' => 7,
+        // What happens to a Commission Model salon that has not paid what it
+        // owes. See CommissionDuesService: each step on or off, and how many
+        // days after the due date it starts. Dues below the minimum are left.
+        'commission_dues_min_amount' => 200,
+        'commission_dues_reminder_enabled' => true,
+        'commission_dues_reminder_before_days' => 3,
+        'commission_dues_reminder_every_days' => 3,
+        'commission_dues_banner_enabled' => true,
+        'commission_dues_banner_days' => 0,
+        'commission_dues_force_advance_enabled' => true,
+        'commission_dues_force_advance_days' => 3,
+        'commission_dues_deduct_enabled' => true,
+        'commission_dues_deduct_days' => 3,
+        'commission_dues_stop_bookings_enabled' => true,
+        'commission_dues_stop_bookings_days' => 10,
+        'commission_dues_full_lock_enabled' => true,
+        'commission_dues_full_lock_days' => 20,
 
         // Where a scanned salon QR code lands. Held as a setting rather than an
         // env var because the address changes when the platform moves host, and

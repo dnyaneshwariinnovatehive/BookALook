@@ -80,6 +80,30 @@ class SalonAccessService
             );
         }
 
+        // A Commission Model salon trades until its unpaid dues reach the
+        // steps SuperAdmin set: a full lock shuts it like a lapsed plan, and
+        // "stop bookings" keeps the Partner App open but stops customers
+        // booking. Settling lifts both on the next read.
+        $bookingsPaused = false;
+        $daysRemaining = (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false);
+
+        if (BillingModel::isCommission($model)) {
+            $dues = app(CommissionDuesService::class)->state($salon);
+
+            if (in_array(CommissionDuesService::STEP_FULL_LOCK, $dues['actions'], true)) {
+                return $this->blocked(
+                    self::REASON_COMMISSION_UNSETTLED,
+                    'This salon is not taking online bookings at the moment.',
+                    expiredOn: $dues['due_date'],
+                    model: $model,
+                );
+            }
+
+            $bookingsPaused = in_array(CommissionDuesService::STEP_STOP_BOOKINGS, $dues['actions'], true);
+            // Open-ended: a commission salon has no plan running out.
+            $daysRemaining = null;
+        }
+
         return [
             'is_active' => true,
             'reason' => null,
@@ -87,8 +111,18 @@ class SalonAccessService
             'billing_model' => $model,
             'subscription' => $subscription,
             'expired_on' => null,
-            'days_remaining' => (int) Carbon::today()->diffInDays(Carbon::parse($subscription->end_date), false),
+            'days_remaining' => $daysRemaining,
+            'bookings_paused' => $bookingsPaused,
         ];
+    }
+
+    /**
+     * Whether customers can book this salon: trading, and not paused for
+     * unpaid commission. The Partner App goes by `is_active` alone.
+     */
+    public static function takesBookings(array $status): bool
+    {
+        return $status['is_active'] && ! ($status['bookings_paused'] ?? false);
     }
 
     /** Convenience for callers that only have an id. */
@@ -186,6 +220,10 @@ class SalonAccessService
             'pending_request' => $formatRequestSummary($pendingRequest),
             'latest_rejected_request' => $formatRequestSummary($latestRejected),
             'reason' => $status['reason'],
+            // What the salon owes BookALook and which steps are in force, for
+            // the owner's banner and lock screen. Owner-facing; amounts only.
+            'dues' => $salon->isOnCommissionModel() ? $this->duesSummary($salon) : null,
+            'bookings_paused' => $status['bookings_paused'] ?? false,
             'expired_on' => $status['expired_on'],
             'days_remaining' => $status['days_remaining'],
             'billing_model' => $status['billing_model'],
@@ -205,6 +243,23 @@ class SalonAccessService
                 'name' => $admin->name,
                 'phone' => $admin->phone,
             ] : null,
+        ];
+    }
+
+    private function duesSummary(Salon $salon): array
+    {
+        $state = app(CommissionDuesService::class)->state($salon);
+
+        return [
+            'owed' => $state['owed'],
+            'due_date' => $state['due_date'],
+            'days_overdue' => $state['days_overdue'],
+            'under_review' => $state['under_review'],
+            'actions' => $state['actions'],
+            'stage' => $state['stage'],
+            'stage_label' => $state['stage'] ? CommissionDuesService::LABELS[$state['stage']] : null,
+            'message' => $state['stage'] ? CommissionDuesService::stepMessage($state['stage'], $state['owed']) : null,
+            'next' => $state['next'],
         ];
     }
 
@@ -234,6 +289,7 @@ class SalonAccessService
             'subscription' => null,
             'expired_on' => $expiredOn,
             'days_remaining' => null,
+            'bookings_paused' => false,
         ];
     }
 }

@@ -183,6 +183,38 @@ class CategoryFilteredExploreTest extends TestCase
         $this->assertContains($nailsSalon->id, $offeredBy);
     }
 
+    public function test_search_follows_the_gender_the_customer_is_browsing_for(): void
+    {
+        [$unisex, $city] = $this->givenSalonInItsOwnCity();
+        [$menOnly] = $this->givenSalonInItsOwnCity($city);
+        $menOnly->update(['gender_focus' => 'Men Only', 'name' => 'Haircut Gents Club']);
+        $unisex->update(['name' => 'Haircut Studio']);
+
+        [$hair] = $this->givenHairAndNails();
+        $this->givenService($unisex, $hair, name: 'Haircut');
+        $this->givenService($menOnly, $hair, name: 'Haircut');
+
+        $women = $this->getJson("/api/customer/search?q=haircut&city_id={$city->id}&gender=women")->assertStatus(200)->json();
+        $this->assertContains($unisex->id, collect($women['services'])->pluck('salon.id'));
+        $this->assertNotContains($menOnly->id, collect($women['services'])->pluck('salon.id'));
+        $this->assertNotContains($menOnly->id, collect($women['salons'])->pluck('id'));
+
+        $men = $this->getJson("/api/customer/search?q=haircut&city_id={$city->id}&gender=men")->assertStatus(200)->json();
+        $this->assertContains($menOnly->id, collect($men['services'])->pluck('salon.id'));
+
+        $everyone = $this->getJson("/api/customer/search?q=haircut&city_id={$city->id}")->assertStatus(200)->json();
+        $this->assertContains($menOnly->id, collect($everyone['services'])->pluck('salon.id'));
+    }
+
+    public function test_the_directory_names_the_city_centre_it_resolved(): void
+    {
+        [, $city] = $this->givenSalonInItsOwnCity();
+        $city->forceFill(['latitude' => 18.5204, 'longitude' => 73.8567])->save();
+
+        $body = $this->getJson("/api/customer/salons?city_id={$city->id}")->assertStatus(200)->json();
+        $this->assertEquals(18.5204, (float) $body['city']['latitude']);
+    }
+
     public function test_a_search_refuses_a_category_that_does_not_exist(): void
     {
         [, $city] = $this->givenSalonInItsOwnCity();

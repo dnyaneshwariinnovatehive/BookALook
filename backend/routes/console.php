@@ -25,6 +25,11 @@ Schedule::command('app:reconcile-pending-refunds')->everyTenMinutes()->withoutOv
 // only on the 1st. Nothing here moves money — it prepares the figures.
 Schedule::command('app:generate-payouts')->dailyAt('04:00')->withoutOverlapping();
 
+// Commission Model salons that owe BookALook: reminders on the days SuperAdmin
+// set, and a notice when a stricter step starts. The steps themselves apply
+// live. Mid-morning, after the night's payouts have been generated.
+Schedule::command('app:enforce-commission-dues')->dailyAt('10:30')->withoutOverlapping();
+
 // Shortly after midnight, transition any untouched appointments from the previous
 // day into a no-show state.
 Schedule::command('app:mark-no-shows')->dailyAt('00:05')->withoutOverlapping();

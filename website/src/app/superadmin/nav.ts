@@ -31,6 +31,8 @@ export const navGroups: NavGroup[] = [
       { name: 'Subscriptions', path: '/superadmin/subscriptions', icon: 'crown', keywords: 'plans billing commission' },
       { name: 'Wallet Schemes', path: '/superadmin/wallet-schemes', icon: 'coins', keywords: 'coins rewards' },
       { name: 'Payouts & Distribution', path: '/superadmin/payouts', icon: 'wallet', keywords: 'settlements money' },
+      { name: 'Overdue Salons', path: '/superadmin/commission-dues', icon: 'clock', keywords: 'commission dues unpaid owes overdue grace lock collections' },
+      { name: 'Salon Requests', path: '/superadmin/salon-requests', icon: 'message', keywords: 'support contact messages settlement query payout request help' },
     ],
   },
   {

@@ -76,14 +76,16 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   void initState() {
     super.initState();
     LocationService.instance.addListener(_onCityChanged);
+    AudienceService.changes.addListener(_onAudienceChanged);
     _loadForProfileAudience();
     _loadFavourites();
   }
 
-  /// Start out showing what is meant for the customer — a woman sees Unisex
-  /// and Women Only — with a chip that says so and lets her see everything.
+  /// Start out showing what is meant for the customer — the gender picked
+  /// this session, else their profile's: a woman sees Unisex and Women Only —
+  /// with a chip that says so and lets her see everything.
   Future<void> _loadForProfileAudience() async {
-    final gender = await AudienceService.profileGender();
+    final gender = await AudienceService.browsingGender();
     if (!mounted) return;
     setState(() => _selectedGender = AudienceService.focusFilterFor(gender));
     await _loadSalons();
@@ -92,13 +94,24 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
+    AudienceService.changes.removeListener(_onAudienceChanged);
     _searchController.dispose();
     super.dispose();
   }
 
+  /// The list is scoped to the city (and sorted by distance), so a new city
+  /// or a fresh position is a fresh fetch, not just a repaint of the header.
   void _onCityChanged() {
     if (!mounted) return;
-    setState(() {});
+    _loadSalons();
+  }
+
+  void _onAudienceChanged() {
+    if (!mounted) return;
+    final next = AudienceService.focusFilterFor(AudienceService.browsingGenderNow);
+    if (AudienceService.apiParam(next) == AudienceService.apiParam(_selectedGender)) return;
+    setState(() => _selectedGender = next);
+    _loadSalons();
   }
 
   Future<void> _loadSalons() async {
@@ -514,6 +527,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
                           _selectedGender = tempGender;
                         });
                         Navigator.pop(ctx);
+                        AudienceService.choose(tempGender);
                         // The server decides which services are for whom, so
                         // a different audience is a fresh fetch.
                         if (audienceChanged) _loadSalons();
@@ -583,6 +597,7 @@ class _CategorySalonsScreenState extends State<CategorySalonsScreen> {
           TextButton(
             onPressed: () {
               setState(() => _selectedGender = 'All');
+              AudienceService.choose('All');
               _loadSalons();
             },
             child: Text('Show all', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),

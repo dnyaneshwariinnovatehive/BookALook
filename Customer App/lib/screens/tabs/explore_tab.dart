@@ -6,6 +6,8 @@ import '../../services/appointment_service.dart';
 import '../salon_detail_screen.dart';
 import '../../services/cart_service.dart';
 import '../../services/location_service.dart';
+import '../../services/audience_service.dart';
+import '../../widgets/audience_banner.dart';
 import '../../widgets/city_picker_sheet.dart';
 import '../cart_screen.dart';
 import '../search_screen.dart';
@@ -60,11 +62,14 @@ class ExploreTabState extends State<ExploreTab> {
     super.initState();
     _bootstrap();
     LocationService.instance.addListener(_onCityChanged);
+    // The gender picked on Home or a category page holds here too.
+    AudienceService.changes.addListener(_onCityChanged);
   }
 
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
+    AudienceService.changes.removeListener(_onCityChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -176,7 +181,10 @@ class ExploreTabState extends State<ExploreTab> {
 
   Future<void> _loadSalons() async {
     try {
-      final response = await _salonService.fetchSalons(categoryId: _categoryId);
+      final response = await _salonService.fetchSalons(
+        categoryId: _categoryId,
+        gender: await AudienceService.browsingApiParam(),
+      );
       final salons = response['salons'] ?? [];
       final globalCart = await _cartService.getGlobalCart();
 
@@ -313,6 +321,7 @@ class ExploreTabState extends State<ExploreTab> {
               children: [
                 SizedBox(height: 16),
                 _buildHeader(),
+                const AudienceBanner(padding: EdgeInsets.fromLTRB(20, 8, 12, 0)),
                 if (_categoryId != null) ...[
                   SizedBox(height: 16),
                   _buildCategoryFilterBanner(),

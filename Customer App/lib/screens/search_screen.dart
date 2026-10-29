@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../services/audience_service.dart';
 import '../services/search_service.dart';
+import '../widgets/audience_banner.dart';
 import '../models/category.dart';
 import '../theme/app_theme.dart';
 import 'salon_detail_screen.dart';
@@ -58,6 +60,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _controller.text = widget.initialQuery;
+    AudienceService.changes.addListener(_onAudienceChanged);
 
     if (widget.initialQuery.trim().length >= 2) {
       _run(widget.initialQuery);
@@ -69,10 +72,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    AudienceService.changes.removeListener(_onAudienceChanged);
     _debounce?.cancel();
     _controller.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  /// "Show all" on the banner, or a filter elsewhere: answer again for the
+  /// new audience.
+  void _onAudienceChanged() {
+    if (!mounted) return;
+    if (_controller.text.trim().length >= 2) _run(_controller.text);
   }
 
   void _onChanged(String value) {
@@ -153,14 +164,13 @@ class _SearchScreenState extends State<SearchScreen> {
         titleSpacing: 0,
         title: _searchField(),
       ),
-      body: widget.categoryId == null
-          ? _body()
-          : Column(
-              children: [
-                _scopeStrip(),
-                Expanded(child: _body()),
-              ],
-            ),
+      body: Column(
+        children: [
+          if (widget.categoryId != null) _scopeStrip(),
+          const AudienceBanner(padding: EdgeInsets.fromLTRB(16, 2, 8, 0)),
+          Expanded(child: _body()),
+        ],
+      ),
     );
   }
 

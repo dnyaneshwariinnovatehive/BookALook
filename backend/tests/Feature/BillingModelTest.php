@@ -87,7 +87,9 @@ class BillingModelTest extends TestCase
         [$salon, $superAdmin, $provider] = $this->fixture();
         $this->onCommissionModel($salon, 10.0);
 
-        [$start, $end] = $this->thisMonth();
+        // Last month: a payout can only be approved once its cycle has ended.
+        $start = Carbon::today()->subMonthNoOverflow()->startOfMonth();
+        $end = $start->copy()->endOfMonth();
         $this->givenCompleted($salon, $provider, 5000, 1000, $start);
         app(PayoutService::class)->calculate($salon->id, $start, $end);
 
@@ -109,7 +111,9 @@ class BillingModelTest extends TestCase
         [$salon, $superAdmin, $provider] = $this->fixture();
         $this->onCommissionModel($salon, 10.0);
 
-        [$start, $end] = $this->thisMonth();
+        // Last month: a payout can only be approved once its cycle has ended.
+        $start = Carbon::today()->subMonthNoOverflow()->startOfMonth();
+        $end = $start->copy()->endOfMonth();
         $this->givenCompleted($salon, $provider, 5000, 1000, $start);
 
         $payouts = app(PayoutService::class);
@@ -144,6 +148,9 @@ class BillingModelTest extends TestCase
 
         $payouts = app(PayoutService::class);
         $settled = $payouts->calculate($salon->id, $start, $end);
+        // A payout can only be approved once its cycle has ended.
+        // The 1st of next month, so the new rate below covers that whole cycle.
+        Carbon::setTestNow($end->copy()->addDay()->setTime(9, 0));
         $payouts->markDistributed($payouts->approve($settled, $superAdmin), $superAdmin, 'NEFT-2');
 
         app(CommissionService::class)->setRate($salon->fresh(), 25.0, $superAdmin, 'New deal.');
@@ -160,6 +167,8 @@ class BillingModelTest extends TestCase
 
         $this->assertEquals(25.0, (float) $next->commission_percentage_snapshot);
         $this->assertEquals(1000.0, (float) $next->commission_deducted);
+
+        Carbon::setTestNow();
     }
 
     public function test_a_subscription_salon_has_no_rate_to_set(): void
@@ -177,98 +186,63 @@ class BillingModelTest extends TestCase
 
     // ------------------------------------------------------------ the window
 
-    public function test_settling_a_month_buys_the_salon_the_next_one(): void
+    public function test_the_commission_model_has_no_end_date_to_run_out(): void
     {
         [$salon, $superAdmin, $provider] = $this->fixture();
         $this->onCommissionModel($salon, 10.0);
 
-        $commission = app(CommissionService::class);
-        $before = SalonSubscription::where('salon_id', $salon->id)->latest('start_date')->first();
+        $subscription = SalonSubscription::where('salon_id', $salon->id)->latest('start_date')->first();
+        // Access is decided by unpaid dues (CommissionDuesService), not a date.
+        $this->assertSame(CommissionService::OPEN_END, Carbon::parse($subscription->end_date)->toDateString());
 
-        // Joining buys the month joined in and nothing more.
-        [$thisMonth] = $this->thisMonth();
-        $this->assertSame(
-            $commission->accessEndFrom($thisMonth->copy()->subMonthNoOverflow())->toDateString(),
-            Carbon::parse($before->end_date)->toDateString()
-        );
-
-        // Settling that month buys the one after it. In practice the run lands
-        // on the 1st; the mechanic is the same whenever it is settled.
-        $this->givenCompleted($salon, $provider, 3000, 1000, $thisMonth);
-
+        // Settling a month leaves it open-ended rather than resetting a window.
+        $lastMonth = Carbon::today()->subMonthNoOverflow()->startOfMonth();
+        $this->givenCompleted($salon, $provider, 3000, 1000, $lastMonth);
         $payouts = app(PayoutService::class);
-        $payout = $payouts->calculate($salon->id, $thisMonth, $thisMonth->copy()->endOfMonth());
+        $payout = $payouts->calculate($salon->id, $lastMonth, $lastMonth->copy()->endOfMonth());
         $payouts->markDistributed($payouts->approve($payout, $superAdmin), $superAdmin, 'NEFT-3');
 
-        $this->assertSame(
-            $commission->accessEndFrom($thisMonth)->toDateString(),
-            Carbon::parse($before->fresh()->end_date)->toDateString()
-        );
+        $this->assertSame(CommissionService::OPEN_END, Carbon::parse($subscription->fresh()->end_date)->toDateString());
+        $this->assertTrue(app(SalonAccessService::class)->status($salon->fresh())['is_active']);
     }
 
-    public function test_settling_an_old_month_late_cannot_shorten_the_window(): void
-    {
-        [$salon, $superAdmin, $provider] = $this->fixture();
-        $this->onCommissionModel($salon, 10.0);
-
-        [$thisMonth] = $this->thisMonth();
-        $payouts = app(PayoutService::class);
-
-        // Settle this month first, then an older one out of order.
-        $this->givenCompleted($salon, $provider, 3000, 1000, $thisMonth);
-        $current = $payouts->calculate($salon->id, $thisMonth, $thisMonth->copy()->endOfMonth());
-        $payouts->markDistributed($payouts->approve($current, $superAdmin), $superAdmin, 'NEFT-A');
-
-        $earned = Carbon::parse(
-            SalonSubscription::where('salon_id', $salon->id)->latest('start_date')->first()->end_date
-        );
-
-        $old = $thisMonth->copy()->subMonthsNoOverflow(2);
-        $this->givenCompleted($salon, $provider, 1000, 200, $old);
-        $stale = $payouts->calculate($salon->id, $old, $old->copy()->endOfMonth());
-        $payouts->markDistributed($payouts->approve($stale, $superAdmin), $superAdmin, 'NEFT-B');
-
-        $this->assertSame(
-            $earned->toDateString(),
-            Carbon::parse(
-                SalonSubscription::where('salon_id', $salon->id)->latest('start_date')->first()->end_date
-            )->toDateString()
-        );
-    }
-
-    public function test_an_unsettled_month_takes_the_salon_offline(): void
+    public function test_dues_left_unpaid_past_the_lock_step_take_the_salon_offline(): void
     {
         [$salon] = $this->fixture();
         $this->onCommissionModel($salon, 10.0);
 
-        // Push the window back past the grace the platform allows.
-        SalonSubscription::where('salon_id', $salon->id)
-            ->update(['end_date' => Carbon::yesterday()->toDateString()]);
+        // A month the salon owes on, closed long enough ago to be past every step.
+        $this->owedPayout($salon, 1000, Carbon::today()->subMonthsNoOverflow(3)->startOfMonth());
 
         $status = app(SalonAccessService::class)->status($salon->fresh());
 
         $this->assertFalse($status['is_active']);
-        // Not "renew your plan" — there is nothing to renew on a postpaid model.
+        // Not "renew your plan" - there is nothing to renew on a postpaid model.
         $this->assertSame(SalonAccessService::REASON_COMMISSION_UNSETTLED, $status['reason']);
         $this->assertSame(BillingModel::COMMISSION, $status['billing_model']);
     }
 
-    public function test_settling_brings_a_locked_out_salon_back(): void
+    public function test_paying_the_dues_brings_a_locked_out_salon_back(): void
     {
-        [$salon, $superAdmin, $provider] = $this->fixture();
+        [$salon, $superAdmin] = $this->fixture();
         $this->onCommissionModel($salon, 10.0);
 
-        $lastMonth = Carbon::today()->subMonthNoOverflow()->startOfMonth();
-        $this->givenCompleted($salon, $provider, 2000, 500, $lastMonth);
+        $payout = $this->owedPayout($salon, 1000, Carbon::today()->subMonthsNoOverflow(3)->startOfMonth());
+        $this->assertFalse(app(SalonAccessService::class)->status($salon->fresh())['is_active']);
 
-        SalonSubscription::where('salon_id', $salon->id)->update([
-            'end_date' => Carbon::yesterday()->toDateString(),
-            'status' => 'expired',
-        ]);
+        app(PayoutService::class)->markDistributed($payout, $superAdmin, 'UPI-4');
 
-        $payouts = app(PayoutService::class);
-        $payout = $payouts->calculate($salon->id, $lastMonth, $lastMonth->copy()->endOfMonth());
-        $payouts->markDistributed($payouts->approve($payout, $superAdmin), $superAdmin, 'NEFT-4');
+        $this->assertTrue(app(SalonAccessService::class)->status($salon->fresh())['is_active']);
+    }
+
+    public function test_money_the_salon_is_owed_never_locks_it(): void
+    {
+        [$salon] = $this->fixture();
+        $this->onCommissionModel($salon, 10.0);
+
+        // BookALook owes this one and has not paid it yet: that is BookALook's
+        // to settle, not a reason to shut the salon.
+        $this->owedPayout($salon, -800, Carbon::today()->subMonthsNoOverflow(3)->startOfMonth());
 
         $this->assertTrue(app(SalonAccessService::class)->status($salon->fresh())['is_active']);
     }
@@ -460,6 +434,17 @@ class BillingModelTest extends TestCase
     }
 
     /** @return array{0: Carbon, 1: Carbon} */
+    private function owedPayout(Salon $salon, float $owes, Carbon $monthStart): SalonPayout
+    {
+        return SalonPayout::create([
+            'salon_id' => $salon->id, 'cycle_type' => PayoutCycle::MONTHLY, 'billing_type' => BillingModel::COMMISSION,
+            'cycle_start_date' => $monthStart->toDateString(), 'cycle_end_date' => $monthStart->copy()->endOfMonth()->toDateString(),
+            'status' => 'pending', 'gross_amount' => max(0, -$owes), 'appointment_revenue' => 0, 'appointments_count' => 0,
+            'commission_deducted' => max(0, $owes), 'refund_adjustment' => 0, 'wallet_redeemed_amount' => 0,
+            'net_amount' => -$owes,
+        ]);
+    }
+
     private function thisMonth(): array
     {
         $start = Carbon::today()->startOfMonth();

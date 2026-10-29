@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Support\GenderFocus;
+
 use App\Models\Combo;
 use App\Models\Salon;
 use App\Models\ServiceCategory;
@@ -124,7 +126,7 @@ class SearchService
      *
      * @return array<string, mixed>
      */
-    public function search(string $query, ?string $cityId, int $limit = 20, ?string $categoryId = null): array
+    public function search(string $query, ?string $cityId, int $limit = 20, ?string $categoryId = null, ?string $audience = null): array
     {
         $query = trim($query);
 
@@ -136,8 +138,8 @@ class SearchService
         $categories = $this->matchCategories($query);
 
         return [
-            'services' => $this->servicesFor($templates, $cityId, $limit, $categoryId),
-            'salons' => $this->matchSalons($query, $cityId, $limit, $categoryId),
+            'services' => $this->servicesFor($templates, $cityId, $limit, $categoryId, $audience),
+            'salons' => $this->matchSalons($query, $cityId, $limit, $categoryId, $audience),
             'categories' => $categories,
             // Only offered when nothing matched cleanly — a correction shown
             // above results the customer can already see is just noise.
@@ -197,7 +199,7 @@ class SearchService
      * @param  array<string, int>  $templates
      * @return array<int, array<string, mixed>>
      */
-    private function servicesFor(array $templates, ?string $cityId, int $limit, ?string $categoryId = null): array
+    private function servicesFor(array $templates, ?string $cityId, int $limit, ?string $categoryId = null, ?string $audience = null): array
     {
         if ($templates === []) {
             return [];
@@ -218,6 +220,11 @@ class SearchService
                 $categoryId && ! $this->isSentinel($categoryId),
                 fn ($q) => $q->where('t.category_id', $categoryId)
             )
+            // Same rule as the directory: the salon and the service both have
+            // to be for this audience (Unisex counts for everyone).
+            ->when($audience, fn ($q) => $q
+                ->whereIn(DB::raw("coalesce(s.gender_focus, 'Unisex')"), GenderFocus::visibleTo($audience))
+                ->whereIn(DB::raw("coalesce(sv.gender_focus, 'Unisex')"), GenderFocus::visibleTo($audience)))
             ->select([
                 'sv.id as service_id',
                 'sv.price',
@@ -263,12 +270,13 @@ class SearchService
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function matchSalons(string $query, ?string $cityId, int $limit, ?string $categoryId = null): array
+    private function matchSalons(string $query, ?string $cityId, int $limit, ?string $categoryId = null, ?string $audience = null): array
     {
         $salons = Salon::query()
             ->where('status', 'active')
             ->when($cityId, fn ($q) => $q->where('city_id', $cityId))
-            ->when($categoryId, fn ($q) => $q->providingCategory($categoryId))
+            ->when($audience, fn ($q) => $q->whereIn(DB::raw("coalesce(gender_focus, 'Unisex')"), GenderFocus::visibleTo($audience)))
+            ->when($categoryId, fn ($q) => $q->providingCategory($categoryId, $audience))
             ->with('subArea:id,name')
             ->get(['id', 'name', 'slug', 'address', 'avg_rating', 'review_count', 'sub_area_id']);
 

@@ -57,7 +57,7 @@ class PublicSalonController extends Controller
                 // A salon whose plan has lapsed still gets a page — somebody is
                 // standing in front of it — but the page does not promise a
                 // booking it cannot take.
-                'is_bookable' => $status['is_active'],
+                'is_bookable' => SalonAccessService::takesBookings($status),
             ],
             'deep_link' => $this->links->deepLink($salon),
             'android_intent_link' => $this->links->androidIntentLink($salon),

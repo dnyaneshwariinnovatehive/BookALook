@@ -152,6 +152,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkAppUpdates();
+      // They may have moved, or switched location on in Settings meanwhile.
+      LocationService.instance.refreshPosition();
     }
   }
 
@@ -166,7 +168,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (!mounted) return;
 
     final hasPerm = await LocationService.instance.hasPermission();
-    if (hasPerm) return;
+    if (hasPerm) {
+      // Already allowed: renew the saved fix quietly so distances are from
+      // where they are today, not where they were when they last opened it.
+      await LocationService.instance.restore();
+      await LocationService.instance.refreshPosition();
+      return;
+    }
 
     final hasPrompted = await LocationService.instance
         .hasPromptedInitialLocation();

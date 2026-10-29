@@ -216,7 +216,7 @@ class CartController extends Controller
         // A salon that cannot serve bookings right now (plan lapsed, commission
         // unsettled, suspended) should not fill a basket the customer can never
         // check out.
-        if (! app(\App\Services\SalonAccessService::class)->isActive($salon_id)) {
+        if (! \App\Services\SalonAccessService::takesBookings(app(\App\Services\SalonAccessService::class)->statusForId($salon_id))) {
             return response()->json([
                 'message' => 'This salon is not taking bookings right now. Please choose another salon.',
                 'salon_unavailable' => true,

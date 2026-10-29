@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -71,22 +72,73 @@ class LocationService extends ChangeNotifier {
   static String get _baseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
 
-  static const _latKey = 'last_latitude';
-  static const _lngKey = 'last_longitude';
+  /// Where the device really was at its last fix. Kept apart from the city
+  /// so choosing a city never overwrites it: the old single pair was replaced
+  /// by the city centre on every pick, including right after "Use my
+  /// location", so distances were measured from the middle of town.
+  static const _deviceLatKey = 'device_latitude';
+  static const _deviceLngKey = 'device_longitude';
+
+  /// The pre-split keys. They may hold a city centre, so they are not trusted.
+  static const _legacyLatKey = 'last_latitude';
+  static const _legacyLngKey = 'last_longitude';
+
+  /// Beyond this from the chosen city's centre, the device is somewhere else
+  /// and the customer is browsing that city from afar.
+  static const double nearCityKm = 60;
 
   ServiceCity? _city;
+
+  /// True while [_city] is only the server's guess (its busiest market), not
+  /// something the customer chose or their position decided.
+  bool _cityIsGuess = false;
   bool _loaded = false;
-  double? _lat;
-  double? _lng;
+  double? _deviceLat;
+  double? _deviceLng;
 
   ServiceCity? get city => _city;
   bool get hasCity => _city != null;
 
-  /// The last known position, or null when the customer has never shared one.
-  /// Used to sort the directory by distance; everything still works without it.
-  double? get latitude => _lat;
-  double? get longitude => _lng;
-  bool get hasPosition => _lat != null && _lng != null;
+  /// The point distances are measured from: the device's own fix while it is
+  /// in (or near) the chosen city, else the chosen city's centre — someone in
+  /// Pune browsing Mumbai wants Mumbai salons ordered from Mumbai, not "150
+  /// km" on every card. Null when neither is known; everything still works,
+  /// ordered by rating instead.
+  double? get latitude => _origin()?.$1;
+  double? get longitude => _origin()?.$2;
+  bool get hasPosition => _origin() != null;
+
+  /// Whether [latitude]/[longitude] are a real fix rather than a city centre.
+  bool get usingDevicePosition {
+    final o = _origin();
+    return o != null && o.$1 == _deviceLat && o.$2 == _deviceLng;
+  }
+
+  (double, double)? _origin() {
+    final cityLat = _city?.latitude;
+    final cityLng = _city?.longitude;
+    final hasDevice = _deviceLat != null && _deviceLng != null;
+
+    if (hasDevice && (cityLat == null || cityLng == null)) {
+      return (_deviceLat!, _deviceLng!);
+    }
+    if (hasDevice && distanceKm(_deviceLat!, _deviceLng!, cityLat!, cityLng!) <= nearCityKm) {
+      return (_deviceLat!, _deviceLng!);
+    }
+    if (cityLat != null && cityLng != null) return (cityLat, cityLng);
+    return null;
+  }
+
+  /// Great-circle distance in kilometres.
+  static double distanceKm(double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371.0;
+    double rad(double d) => d * math.pi / 180;
+    final dLat = rad(lat2 - lat1);
+    final dLng = rad(lng2 - lng1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * r * math.asin(math.min(1, math.sqrt(a)));
+  }
 
   /// What the header shows before anything is chosen.
   String get label => _city?.name ?? 'Select location';
@@ -106,8 +158,10 @@ class LocationService extends ChangeNotifier {
 
       // Kept so a returning customer gets distance ordering on the first
       // screen, before any fresh fix has come back.
-      _lat = prefs.getDouble(_latKey);
-      _lng = prefs.getDouble(_lngKey);
+      _deviceLat = prefs.getDouble(_deviceLatKey);
+      _deviceLng = prefs.getDouble(_deviceLngKey);
+      await prefs.remove(_legacyLatKey);
+      await prefs.remove(_legacyLngKey);
 
       notifyListeners();
     } catch (e) {
@@ -121,12 +175,10 @@ class LocationService extends ChangeNotifier {
   /// switching city should not wait on the network, and a failed sync must not
   /// leave the screen showing a city they did not pick.
   Future<void> setCity(ServiceCity city) async {
+    // The city's centre is read from the city itself when it is needed; the
+    // device's own fix is left alone.
     _city = city;
-    if (city.latitude != null && city.longitude != null) {
-      _lat = city.latitude;
-      _lng = city.longitude;
-      await _rememberPosition(city.latitude!, city.longitude!);
-    }
+    _cityIsGuess = false;
     notifyListeners();
 
     try {
@@ -210,12 +262,10 @@ class LocationService extends ChangeNotifier {
   void adoptResolvedCity(Map<String, dynamic>? resolved) {
     if (resolved == null || _city != null) return;
 
-    _city = ServiceCity(
-      id: resolved['id'].toString(),
-      name: resolved['name'] ?? '',
-      state: resolved['state'] ?? '',
-      salonCount: 0,
-    );
+    _city = ServiceCity.fromJson({'salon_count': 0, ...resolved});
+    // Without a position the server could only pick its busiest market; with
+    // one it picked the customer's own. Only the first is worth revisiting.
+    _cityIsGuess = !hasPosition;
     notifyListeners();
   }
 
@@ -227,7 +277,7 @@ class LocationService extends ChangeNotifier {
   /// refused, or the fix timed out. Every caller treats that as "carry on
   /// without it": location makes the list better, it never gates it, and a
   /// customer who says no must still be able to book.
-  Future<Position?> currentPosition() async {
+  Future<Position?> currentPosition({bool ask = true}) async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         return null;
@@ -235,7 +285,7 @@ class LocationService extends ChangeNotifier {
 
       var permission = await Geolocator.checkPermission();
 
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied && ask) {
         permission = await Geolocator.requestPermission();
       }
 
@@ -283,16 +333,61 @@ class LocationService extends ChangeNotifier {
   }
 
   Future<void> _rememberPosition(double lat, double lng) async {
-    _lat = lat;
-    _lng = lng;
+    final before = (latitude, longitude);
+    final moved = _deviceLat == null ||
+        _deviceLng == null ||
+        distanceKm(_deviceLat!, _deviceLng!, lat, lng) > 0.3;
+
+    _deviceLat = lat;
+    _deviceLng = lng;
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(_latKey, lat);
-      await prefs.setDouble(_lngKey, lng);
+      await prefs.setDouble(_deviceLatKey, lat);
+      await prefs.setDouble(_deviceLngKey, lng);
     } catch (e) {
       debugPrint('Could not save the position: $e');
     }
+
+    // A city the server only guessed gives way to the one this position is
+    // in: the next directory fetch sends the fix without a city, and the
+    // server answers with (and the app adopts) the customer's own market.
+    if (_cityIsGuess) {
+      _city = null;
+      _cityIsGuess = false;
+      notifyListeners();
+      return;
+    }
+
+    // Lists sorted by distance re-sort only for a real move, not GPS jitter.
+    if (moved && (latitude, longitude) != before) notifyListeners();
+  }
+
+  /// Refresh the device's position without ever prompting.
+  ///
+  /// The saved fix used to be read once and never renewed, so someone who
+  /// moved across town kept seeing distances from where they were last week.
+  /// Called at launch and when the app comes back to the foreground; does
+  /// nothing unless location access was already granted.
+  Future<void> refreshPosition() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      if (!await hasPermission()) return;
+      await currentPosition(ask: false);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  bool _refreshing = false;
+
+  @visibleForTesting
+  void debugSet({ServiceCity? city, double? deviceLat, double? deviceLng, bool cityIsGuess = false}) {
+    _city = city;
+    _cityIsGuess = cityIsGuess;
+    _deviceLat = deviceLat;
+    _deviceLng = deviceLng;
   }
 
   /// Find the customer's market from a fix, and switch to it.

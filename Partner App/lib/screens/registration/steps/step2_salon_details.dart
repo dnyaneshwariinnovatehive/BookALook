@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
-import '../../../services/salon_location_api.dart';
+import '../../../widgets/device_location_prompt.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../services/api_service.dart';
 import '../../../widgets/sub_area_dropdown.dart';
@@ -147,21 +147,27 @@ class _Step2SalonDetailsState extends State<Step2SalonDetails> {
   Future<void> _useCurrentLocation() async {
     setState(() => _locating = true);
 
-    final position = await SalonLocationApi.devicePosition();
+    final messenger = ScaffoldMessenger.of(context);
+    void say(String text) => messenger.showSnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2500), content: Text(text)));
+
+    // GPS off is explained and retried on return from Settings, and a failure
+    // keeps any position already captured.
+    final position = await captureDevicePosition(context, onMessage: say);
 
     if (!mounted) return;
 
     setState(() {
       _locating = false;
-      _latitude = position?.latitude;
-      _longitude = position?.longitude;
+      if (position != null) {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), 
-      content: Text(position == null
-          ? 'Could not read your location. You can add it later from More > Salon Location.'
-          : 'Location captured. Nearby customers will see you at the right distance.'),
-    ));
+    if (position != null) {
+      say('Location captured. Nearby customers will see you at the right distance.');
+    }
   }
 
   void _submit() {

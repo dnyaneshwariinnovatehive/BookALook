@@ -95,6 +95,8 @@ class _HomeTabState extends State<HomeTab> {
     _fetchAlerts();
     // Another screen can change the city; the header has to follow it.
     LocationService.instance.addListener(_onCityChanged);
+    // A gender picked on any screen holds everywhere until the app closes.
+    AudienceService.changes.addListener(_onAudienceChanged);
 
     _bookAgainScrollController = ScrollController();
     _startBookAgainTimer();
@@ -103,6 +105,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void dispose() {
     LocationService.instance.removeListener(_onCityChanged);
+    AudienceService.changes.removeListener(_onAudienceChanged);
     _searchController.dispose();
     _bookAgainTimer?.cancel();
     _bookAgainScrollController?.dispose();
@@ -138,12 +141,23 @@ class _HomeTabState extends State<HomeTab> {
   /// moment later in front of the customer.
   Future<void> _bootstrap() async {
     await LocationService.instance.restore();
-    // Browse for themselves by default. The filter button then reads
-    // "Women", and one tap on All shows everything.
-    final gender = await AudienceService.profileGender();
+    // Browse for whoever was picked this session, else for themselves. The
+    // filter button then reads "Women", and one tap on All shows everything.
+    final gender = await AudienceService.browsingGender();
     if (!mounted) return;
     setState(() => _selectedGender = AudienceService.homeFilterFor(gender));
     _fetchBanners();
+    _fetchRecommendedSalons();
+  }
+
+  void _onAudienceChanged() {
+    if (!mounted) return;
+    final next = AudienceService.homeFilterFor(AudienceService.browsingGenderNow);
+    if (next == _selectedGender) return;
+    setState(() {
+      _selectedGender = next;
+      _isLoadingRecommended = true;
+    });
     _fetchRecommendedSalons();
   }
 
@@ -159,16 +173,9 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Let the customer change market, and reload what that changes.
   Future<void> _pickCity() async {
-    final changed = await showCityPicker(context);
-
-    if (changed && mounted) {
-      setState(() {
-        _isLoadingBanners = true;
-        _isLoadingRecommended = true;
-      });
-      _fetchBanners();
-      _fetchRecommendedSalons();
-    }
+    // A new city reaches [_onCityChanged] through the LocationService
+    // listener; reloading here as well fetched everything twice.
+    await showCityPicker(context);
   }
 
   /// Fetch recommended salons prioritizing nearby and top-rated salons.
@@ -418,6 +425,9 @@ class _HomeTabState extends State<HomeTab> {
                       if (changed) _isLoadingRecommended = true;
                     });
                     Navigator.pop(context);
+                    // Remembered for the session, so every other screen
+                    // follows; this one reloads itself.
+                    AudienceService.choose(tempGender);
                     if (changed) _fetchRecommendedSalons();
                   },
                   style: ElevatedButton.styleFrom(

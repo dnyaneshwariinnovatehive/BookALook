@@ -24,6 +24,8 @@ import 'staff/admin_provider_config_sheet.dart';
 import '../../../utils/lifecycle_poller.dart';
 import '../../../services/bank_details_api.dart';
 import '../more/bank_details_screen.dart';
+import '../../../services/salon_access_api.dart';
+import '../../../widgets/commission_dues_banner.dart';
 
 class HomeTab extends StatefulWidget {
   final String salonId;
@@ -31,12 +33,16 @@ class HomeTab extends StatefulWidget {
   final String? planName;
   final int? daysRemaining;
 
+  /// Overdue commission, for a Commission Model salon. Null otherwise.
+  final CommissionDues? dues;
+
   const HomeTab({
     super.key,
     required this.salonId,
     this.salonName = '',
     this.planName,
     this.daysRemaining,
+    this.dues,
   });
 
   @override
@@ -436,6 +442,10 @@ class HomeTabState extends State<HomeTab> {
                      crossAxisAlignment: CrossAxisAlignment.start,
                      children: [
                        _buildHeader(isDark),
+                       if (widget.dues != null && widget.dues!.showBanner) ...[
+                         const SizedBox(height: 16),
+                         CommissionDuesBanner(dues: widget.dues!, salonId: widget.salonId),
+                       ],
                        if (widget.daysRemaining != null && widget.daysRemaining! <= 7) ...[
                          const SizedBox(height: 16),
                          Container(

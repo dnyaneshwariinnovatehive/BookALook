@@ -175,12 +175,13 @@ function DurationField({
 
 // ---------------------------------------------------------------------- tabs
 
-type PolicyTab = 'catalog' | 'bookings' | 'subscriptions' | 'coins' | 'payments' | 'links' | 'whatsapp';
+type PolicyTab = 'catalog' | 'bookings' | 'subscriptions' | 'dues' | 'coins' | 'payments' | 'links' | 'whatsapp';
 
 const TAB_LABELS: Record<PolicyTab, string> = {
   catalog: 'Services',
   bookings: 'Bookings',
   subscriptions: 'Subscriptions',
+  dues: 'Commission dues',
   coins: 'Coins',
   payments: 'Payments',
   links: 'Links & QR',
@@ -194,7 +195,11 @@ const TAB_FIELDS: Record<PolicyTab, (keyof FormState)[]> = {
     'cancelCutoff', 'rescheduleCutoff', 'startEarly',
     'cancelLimit', 'cancelMode', 'noShowLimit', 'noShowMode', 'limitAction', 'limitWindow', 'limitRelease',
   ],
-  subscriptions: ['warningDays', 'reminderHour', 'graceDays'],
+  subscriptions: ['warningDays', 'reminderHour'],
+  dues: [
+    'graceDays', 'duesMin', 'duesRemBefore', 'duesRemEvery',
+    'duesBannerDays', 'duesAdvanceDays', 'duesDeductDays', 'duesStopDays', 'duesLockDays',
+  ],
   coins: ['coinValue', 'welcomeBonusCoins'],
   payments: ['paymentUpiId', 'paymentPayeeName'],
   links: ['publicWebUrl', 'androidAppUrl', 'iosAppUrl', 'androidApkUrl'],
@@ -240,7 +245,33 @@ interface FormState {
   limitAction: string;
   limitWindow: string;
   limitRelease: string;
+  // What happens to a Commission Model salon that has not paid what it owes.
+  duesMin: string;
+  duesRemOn: boolean;
+  duesRemBefore: string;
+  duesRemEvery: string;
+  duesBannerOn: boolean;
+  duesBannerDays: string;
+  duesAdvanceOn: boolean;
+  duesAdvanceDays: string;
+  duesDeductOn: boolean;
+  duesDeductDays: string;
+  duesStopOn: boolean;
+  duesStopDays: string;
+  duesLockOn: boolean;
+  duesLockDays: string;
 }
+
+type DuesStepKey = 'Banner' | 'Advance' | 'Deduct' | 'Stop' | 'Lock';
+
+/** The steps after the due date, mildest first, as the Policy form shows them. */
+const DUES_STEPS: { key: DuesStepKey; title: string; hint: string }[] = [
+  { key: 'Banner', title: 'Warning banner', hint: 'A red strip in the Partner App with the amount and a Pay now button. Blocks nothing.' },
+  { key: 'Advance', title: 'Customers pay the full amount online', hint: 'BookALook collects the whole price at booking, so what the salon owes can be recovered from it.' },
+  { key: 'Deduct', title: 'Deduct from payouts', hint: 'Overdue dues are taken off the next money BookALook pays the salon.' },
+  { key: 'Stop', title: 'Stop new online bookings', hint: 'Customers cannot book the salon. Existing bookings go ahead and the Partner App keeps working.' },
+  { key: 'Lock', title: 'Full lock', hint: 'The Partner App locks for everyone and the salon is unavailable to customers.' },
+];
 
 /** "0" means no limit, so it reads "Off". */
 const LIMIT_OPTIONS = [
@@ -309,6 +340,20 @@ const EMPTY: FormState = {
   noShowLimit: '0',
   noShowMode: 'total',
   limitAction: 'block',
+  duesMin: '200',
+  duesRemOn: true,
+  duesRemBefore: '3',
+  duesRemEvery: '3',
+  duesBannerOn: true,
+  duesBannerDays: '0',
+  duesAdvanceOn: true,
+  duesAdvanceDays: '3',
+  duesDeductOn: true,
+  duesDeductDays: '3',
+  duesStopOn: true,
+  duesStopDays: '10',
+  duesLockOn: true,
+  duesLockDays: '20',
   limitWindow: '90',
   limitRelease: '30',
 };
@@ -419,6 +464,20 @@ export default function PlatformPolicyPage() {
         limitAction: String(s.customer_limit_action ?? 'block'),
         limitWindow: String(s.customer_limit_window_days ?? 90),
         limitRelease: String(s.customer_limit_release_days ?? 30),
+        duesMin: String(s.commission_dues_min_amount ?? 200),
+        duesRemOn: s.commission_dues_reminder_enabled ?? true,
+        duesRemBefore: String(s.commission_dues_reminder_before_days ?? 3),
+        duesRemEvery: String(s.commission_dues_reminder_every_days ?? 3),
+        duesBannerOn: s.commission_dues_banner_enabled ?? true,
+        duesBannerDays: String(s.commission_dues_banner_days ?? 0),
+        duesAdvanceOn: s.commission_dues_force_advance_enabled ?? true,
+        duesAdvanceDays: String(s.commission_dues_force_advance_days ?? 3),
+        duesDeductOn: s.commission_dues_deduct_enabled ?? true,
+        duesDeductDays: String(s.commission_dues_deduct_days ?? 3),
+        duesStopOn: s.commission_dues_stop_bookings_enabled ?? true,
+        duesStopDays: String(s.commission_dues_stop_bookings_days ?? 10),
+        duesLockOn: s.commission_dues_full_lock_enabled ?? true,
+        duesLockDays: String(s.commission_dues_full_lock_days ?? 20),
       };
 
       setSaved(next);
@@ -460,6 +519,14 @@ export default function PlatformPolicyPage() {
     if (!wholeNumber(form.graceDays) || Number(form.graceDays) > 60) {
       out.graceDays = 'Enter a whole number of days, 0 to 60.';
     }
+
+    if (!wholeNumber(form.duesMin)) out.duesMin = 'Enter a whole number of rupees.';
+    (['duesRemBefore', 'duesRemEvery'] as const).forEach((key) => {
+      if (!wholeNumber(form[key]) || Number(form[key]) > 30) out[key] = 'Enter 0 to 30 days.';
+    });
+    (['duesBannerDays', 'duesAdvanceDays', 'duesDeductDays', 'duesStopDays', 'duesLockDays'] as const).forEach((key) => {
+      if (!wholeNumber(form[key]) || Number(form[key]) > 365) out[key] = 'Enter 0 to 365 days.';
+    });
 
     if (!wholeNumber(form.welcomeBonusCoins)) {
       out.welcomeBonusCoins = 'Enter a whole number of coins, or 0 to switch the bonus off.';
@@ -518,6 +585,20 @@ export default function PlatformPolicyPage() {
       customer_limit_action: state.limitAction,
       customer_limit_window_days: Number(state.limitWindow),
       customer_limit_release_days: Number(state.limitRelease),
+      commission_dues_min_amount: Number(state.duesMin),
+      commission_dues_reminder_enabled: state.duesRemOn,
+      commission_dues_reminder_before_days: Number(state.duesRemBefore),
+      commission_dues_reminder_every_days: Number(state.duesRemEvery),
+      commission_dues_banner_enabled: state.duesBannerOn,
+      commission_dues_banner_days: Number(state.duesBannerDays),
+      commission_dues_force_advance_enabled: state.duesAdvanceOn,
+      commission_dues_force_advance_days: Number(state.duesAdvanceDays),
+      commission_dues_deduct_enabled: state.duesDeductOn,
+      commission_dues_deduct_days: Number(state.duesDeductDays),
+      commission_dues_stop_bookings_enabled: state.duesStopOn,
+      commission_dues_stop_bookings_days: Number(state.duesStopDays),
+      commission_dues_full_lock_enabled: state.duesLockOn,
+      commission_dues_full_lock_days: Number(state.duesLockDays),
     }),
     []
   );
@@ -805,24 +886,127 @@ export default function PlatformPolicyPage() {
             </select>
           </Field>
 
-          <Field
-            label="Commission settlement grace period"
-            error={errors.graceDays}
-            hint="Days after a month closes before a Commission Model salon with an unsettled bill loses access."
-          >
-            <div className={styles.suffixRow}>
-              <input
-                className={`${styles.input} ${errors.graceDays ? styles.inputError : ''}`}
-                type="number"
-                min="0"
-                max="60"
-                inputMode="numeric"
-                value={form.graceDays}
-                onChange={(e) => set('graceDays', e.target.value)}
-              />
-              <span className={styles.suffix}>days</span>
+        </section>
+        )}
+
+        {tab === 'dues' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Commission dues</h2>
+          <p className={styles.sectionHint}>
+            What happens to a Commission Model salon that has not paid what it owes BookALook — usually
+            because advances were not collected. Each step starts a number of days after the due date and
+            lifts on its own the moment the salon pays. You can override any salon from Overdue Salons.
+          </p>
+
+          <div className={styles.limitGrid}>
+            <Field
+              label="Payment due"
+              error={errors.graceDays}
+              hint="Days after a month closes before its commission is due."
+            >
+              <div className={styles.suffixRow}>
+                <input
+                  className={cx(styles.input, errors.graceDays && styles.inputError)}
+                  type="number" min="0" max="60" inputMode="numeric"
+                  value={form.graceDays}
+                  onChange={(e) => set('graceDays', e.target.value)}
+                />
+                <span className={styles.suffix}>days</span>
+              </div>
+            </Field>
+            <Field
+              label="Ignore dues below"
+              error={errors.duesMin}
+              hint="Smaller amounts never trigger a step."
+            >
+              <div className={styles.suffixRow}>
+                <span className={styles.suffix}>₹</span>
+                <input
+                  className={cx(styles.input, errors.duesMin && styles.inputError)}
+                  type="number" min="0" inputMode="numeric"
+                  value={form.duesMin}
+                  onChange={(e) => set('duesMin', e.target.value)}
+                />
+              </div>
+            </Field>
+          </div>
+
+          <div className={styles.duesStep}>
+            <label className={styles.duesToggle}>
+              <input type="checkbox" className={styles.checkbox} checked={form.duesRemOn}
+                onChange={(e) => set('duesRemOn', e.target.checked)} />
+              <span>
+                <b>Reminders</b>
+                <small>Push and in-app message to the owner.</small>
+              </span>
+            </label>
+            <div className={styles.duesDays}>
+              <div className={styles.suffixRow}>
+                <input
+                  className={cx(styles.input, errors.duesRemBefore && styles.inputError)}
+                  type="number" min="0" max="30" inputMode="numeric" disabled={!form.duesRemOn}
+                  value={form.duesRemBefore}
+                  onChange={(e) => set('duesRemBefore', e.target.value)}
+                  aria-label="Days before the due date"
+                />
+                <span className={styles.suffix}>days before due, then every</span>
+                <input
+                  className={cx(styles.input, errors.duesRemEvery && styles.inputError)}
+                  type="number" min="0" max="30" inputMode="numeric" disabled={!form.duesRemOn}
+                  value={form.duesRemEvery}
+                  onChange={(e) => set('duesRemEvery', e.target.value)}
+                  aria-label="Days between reminders"
+                />
+                <span className={styles.suffix}>days</span>
+              </div>
             </div>
-          </Field>
+          </div>
+
+          {DUES_STEPS.map((step) => {
+            const onKey = `dues${step.key}On` as keyof FormState;
+            const daysKey = `dues${step.key}Days` as keyof FormState;
+            const on = form[onKey] as boolean;
+            return (
+              <div key={step.key} className={cx(styles.duesStep, !on && styles.duesStepOff)}>
+                <label className={styles.duesToggle}>
+                  <input type="checkbox" className={styles.checkbox} checked={on}
+                    onChange={(e) => set(onKey, e.target.checked as never)} />
+                  <span>
+                    <b>{step.title}</b>
+                    <small>{step.hint}</small>
+                  </span>
+                </label>
+                <div className={styles.duesDays}>
+                  <div className={styles.suffixRow}>
+                    <span className={styles.suffix}>from day</span>
+                    <input
+                      className={cx(styles.input, errors[daysKey] && styles.inputError)}
+                      type="number" min="0" max="365" inputMode="numeric" disabled={!on}
+                      value={form[daysKey] as string}
+                      onChange={(e) => set(daysKey, e.target.value as never)}
+                      aria-label={`${step.title}: days after the due date`}
+                    />
+                    <span className={styles.suffix}>after due</span>
+                  </div>
+                  {errors[daysKey] && <p className={styles.error}>{errors[daysKey]}</p>}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className={styles.limitSummary}>
+            {(() => {
+              const grace = Number(form.graceDays) || 0;
+              const parts = [`A month's commission is due ${grace} day${grace === 1 ? '' : 's'} after it closes`];
+              if (form.duesRemOn) parts.push(`reminders from ${form.duesRemBefore} days before`);
+              const timeline = DUES_STEPS
+                .filter((st) => form[`dues${st.key}On` as keyof FormState])
+                .map((st) => ({ day: Number(form[`dues${st.key}Days` as keyof FormState]) || 0, title: st.title.toLowerCase() }))
+                .sort((a, b) => a.day - b.day)
+                .map((st) => (st.day === 0 ? `on the due date: ${st.title}` : `day ${st.day}: ${st.title}`));
+              return `${parts.join('; ')}${timeline.length ? `; ${timeline.join('; ')}` : '; no other steps'}.`;
+            })()}
+          </div>
         </section>
         )}
 

@@ -4,9 +4,33 @@
     {
       "name": "website",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "website", "run", "dev"],
-      "env": { "NEXT_PUBLIC_BACKEND_URL": "https://api.bookalook.in" },
+      "runtimeArgs": [
+        "--prefix",
+        "website",
+        "run",
+        "dev"
+      ],
+      "env": {
+        "NEXT_PUBLIC_BACKEND_URL": "https://api.bookalook.in"
+      },
       "port": 3000
+    },
+    {
+      "name": "website-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "website",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3001"
+      ],
+      "env": {
+        "NEXT_PUBLIC_BACKEND_URL": "http://127.0.0.1:8010"
+      },
+      "port": 3001
     }
   ]
 }

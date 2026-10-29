@@ -120,7 +120,8 @@ class PayoutService
                 'commission_deducted' => $commission,
                 'refund_adjustment' => $refunds,
                 'wallet_redeemed_amount' => $walletRedeemed,
-                'net_amount' => $this->net($gross, $commission, $refunds, $walletRedeemed),
+                // Dues moved in or out by recovery stay with the payout.
+                'net_amount' => $this->net($gross, $commission, $refunds, $walletRedeemed, (float) ($payout->dues_adjustment ?? 0)),
                 'calculated_at' => now(),
             ])->save();
 
@@ -484,6 +485,10 @@ class PayoutService
 
             $this->assertCycleFinished($payout);
 
+            // Money BookALook is about to pay the salon first clears what the
+            // salon owes, when SuperAdmin's dues steps have reached "deduct".
+            $this->recoverDuesInto($payout, $actor);
+
             $payout->forceFill([
                 // Recomputed one last time so a late change cannot leave the
                 // distributed figure disagreeing with its own components.
@@ -491,7 +496,8 @@ class PayoutService
                     (float) $payout->gross_amount,
                     (float) $payout->commission_deducted,
                     (float) $payout->refund_adjustment,
-                    (float) $payout->wallet_redeemed_amount
+                    (float) $payout->wallet_redeemed_amount,
+                    (float) ($payout->dues_adjustment ?? 0)
                 ),
                 'status' => self::STATUS_DISTRIBUTED,
                 'distributed_by' => $actor->id,
@@ -543,6 +549,9 @@ class PayoutService
             'commission_deducted' => (float) $payout->commission_deducted,
             'refund_adjustment' => (float) $payout->refund_adjustment,
             'wallet_redeemed_amount' => (float) $payout->wallet_redeemed_amount,
+            // Overdue commission moved between this salon's payouts: negative
+            // where it was deducted, positive where it cleared dues.
+            'dues_adjustment' => (float) ($payout->dues_adjustment ?? 0),
             'net_amount' => (float) $payout->net_amount,
             // Which way the money moves. A Commission Model salon whose
             // commission is more than the advances held owes the difference;
@@ -687,10 +696,79 @@ class PayoutService
         }
     }
 
-    private function net(float $advancesHeld, float $commission, float $refunds, float $walletRedeemed): float
+    private function net(float $advancesHeld, float $commission, float $refunds, float $walletRedeemed, float $duesAdjustment = 0): float
     {
         // Coins settled against commission give that much back to the salon.
-        return round($advancesHeld - $commission - $refunds + $walletRedeemed, 2);
+        // Dues recovery moves money between the salon's own payouts: taken
+        // off one BookALook owes, paid onto one the salon owes.
+        return round($advancesHeld - $commission - $refunds + $walletRedeemed + $duesAdjustment, 2);
+    }
+
+    /**
+     * Use what BookALook owes the salon on this payout to clear what the salon
+     * owes on earlier ones, oldest first. Only once the dues ladder has
+     * reached "deduct from payouts", and never against a payout whose payment
+     * proof is waiting to be checked. A payout cleared in full is settled with
+     * a reference saying where the money came from.
+     */
+    private function recoverDuesInto(SalonPayout $payout, User $actor): void
+    {
+        $salon = Salon::find($payout->salon_id);
+
+        if (! $salon || ! $salon->isOnCommissionModel()) {
+            return;
+        }
+
+        $available = $this->net(
+            (float) $payout->gross_amount,
+            (float) $payout->commission_deducted,
+            (float) $payout->refund_adjustment,
+            (float) $payout->wallet_redeemed_amount,
+            (float) ($payout->dues_adjustment ?? 0)
+        );
+
+        $dues = app(CommissionDuesService::class);
+
+        if ($available <= 0 || ! $dues->has($salon, CommissionDuesService::STEP_DEDUCT)) {
+            return;
+        }
+
+        $label = PayoutCycle::label($payout->cycle_type, Carbon::parse($payout->cycle_start_date), Carbon::parse($payout->cycle_end_date));
+        $recovered = 0.0;
+
+        foreach ($dues->owedPayouts($salon->id) as $owed) {
+            if ($owed->id === $payout->id || $available <= 0) {
+                continue;
+            }
+            if ($owed->paymentSubmissions->contains('status', \App\Models\PayoutPaymentSubmission::STATUS_PENDING)) {
+                continue;
+            }
+
+            $take = round(min($available, abs((float) $owed->net_amount)), 2);
+            if ($take <= 0) {
+                continue;
+            }
+
+            $owed->forceFill([
+                'dues_adjustment' => round((float) $owed->dues_adjustment + $take, 2),
+                'net_amount' => round((float) $owed->net_amount + $take, 2),
+                'notes' => trim(($owed->notes ? $owed->notes . "\n" : '') . sprintf('₹%s recovered from the %s payout.', number_format($take, 2), $label)),
+            ])->save();
+
+            $available = round($available - $take, 2);
+            $recovered = round($recovered + $take, 2);
+
+            if (abs((float) $owed->net_amount) < 0.01) {
+                $this->markDistributed($owed, $actor, 'Recovered from ' . $label, 'Cleared from money BookALook owed the salon.');
+            }
+        }
+
+        if ($recovered > 0) {
+            $payout->forceFill([
+                'dues_adjustment' => round((float) ($payout->dues_adjustment ?? 0) - $recovered, 2),
+                'notes' => trim(($payout->notes ? $payout->notes . "\n" : '') . sprintf('₹%s of overdue commission deducted.', number_format($recovered, 2))),
+            ])->save();
+        }
     }
 
 }

@@ -464,8 +464,11 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
                       ),
                       const SizedBox(height: 12),
                       _buildDetailRow(
-                        _onCommissionModel ? 'Access until' : 'Expiry Date',
-                        _formatDate(_subscription!['end_date'], relative: true),
+                        _onCommissionModel ? 'Access' : 'Expiry Date',
+                        // Open-ended: only unpaid commission can restrict it.
+                        _onCommissionModel
+                            ? 'Ongoing'
+                            : _formatDate(_subscription!['end_date'], relative: true),
                         colorScheme,
                       ),
                       if (_subscription!['plan'] != null) ...[
@@ -506,8 +509,9 @@ class _SubscriptionBillingScreenState extends State<SubscriptionBillingScreen>
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'There is nothing to renew. Your access extends each time '
-                          'BookALook settles your month\u2019s commission.',
+                          'There is nothing to renew. Pay each month\u2019s commission '
+                          'by its due date to keep taking bookings \u2014 overdue '
+                          'commission can pause online bookings or lock the salon.',
                           style: TextStyle(
                             color: colorScheme.onSurfaceVariant,
                             height: 1.4,

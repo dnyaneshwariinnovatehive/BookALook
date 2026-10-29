@@ -11,10 +11,10 @@ import '../../models/subscription_plan.dart';
 import '../../services/api_service.dart';
 import '../../services/collaborator_api.dart';
 import '../../services/onboarding_draft_store.dart';
-import '../../services/salon_location_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/sub_area_dropdown.dart';
 import '../../widgets/bank_details_fields.dart';
+import '../../widgets/device_location_prompt.dart';
 import 'service_picker_sheet.dart';
 
 /// Building a salon on behalf of an owner, on site.
@@ -823,19 +823,26 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
     );
   }
 
+  /// GPS off or permission refused are walked through (and retried when the
+  /// collaborator comes back from Settings); a failure never wipes a pin that
+  /// was already captured.
   Future<void> _capturePin() async {
     setState(() => _locating = true);
-    final position = await SalonLocationApi.devicePosition();
+    final position = await captureDevicePosition(context, onMessage: _say);
 
     if (!mounted) return;
     setState(() {
       _locating = false;
-      _draft!.latitude = position?.latitude;
-      _draft!.longitude = position?.longitude;
+      if (position != null) {
+        _draft!.latitude = position.latitude;
+        _draft!.longitude = position.longitude;
+      }
     });
 
-    await _persist();
-    if (position == null) _say('Could not read the location. The salon can be pinned later.');
+    if (position != null) {
+      await _persist();
+      _say('Salon pinned.');
+    }
   }
 
   ImageProvider _photoImageProvider(String path) {
@@ -1745,6 +1752,9 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
         ),
       );
 
+  /// Opens the catalog. Each service is priced inline and saved to the draft
+  /// the moment it is added, so the sheet stays open for the next one and a
+  /// dropped app loses nothing.
   Future<void> _addService() async {
     final existingTemplateIds = <String>{};
     final existingCustomIdentities = <String>{};
@@ -1757,7 +1767,7 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
       }
     }
 
-    final service = await showModalBottomSheet<DraftService>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1765,18 +1775,34 @@ class OnboardSalonScreenState extends State<OnboardSalonScreen> {
         initialCategories: _masterCatalogCategories,
         existingTemplateIds: existingTemplateIds,
         existingCustomIdentities: existingCustomIdentities,
+        onSave: _saveService,
+        onRemove: _removeTemplateService,
+        priceOf: (id) => _draft!.services.where((s) => s.templateId == id).firstOrNull?.price,
       ),
     );
+  }
 
-    if (service == null) return;
+  /// Adds a line, or re-prices a catalog line already on the menu, and writes
+  /// the draft to disk. Returns a message when it was not saved.
+  Future<String?> _saveService(DraftService service) async {
+    final services = _draft!.services;
+    final existing = service.templateId == null
+        ? -1
+        : services.indexWhere((s) => s.templateId == service.templateId);
 
-    // Defensive duplicate guard: reject if duplicate slips through
-    if (_isDuplicateService(service)) {
-      _say('This service has already been added to the draft.');
-      return;
+    if (existing >= 0) {
+      setState(() => services[existing].price = service.price);
+    } else {
+      if (_isDuplicateService(service)) return 'This service has already been added to the draft.';
+      setState(() => services.add(service));
     }
 
-    setState(() => _draft!.services.add(service));
+    await _persist();
+    return null;
+  }
+
+  Future<void> _removeTemplateService(String templateId) async {
+    setState(() => _draft!.services.removeWhere((s) => s.templateId == templateId));
     await _persist();
   }
 

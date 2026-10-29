@@ -246,6 +246,19 @@ Route::prefix('superadmin')->group(function () {
 
         // Payout runs: weekly for Subscription Plan salons, monthly for the
         // Commission Model.
+        // Commission Model salons that owe BookALook, and the controls on one.
+        Route::get('/commission-dues', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'index']);
+        Route::post('/commission-dues/{salonId}/extend', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'extend']);
+        Route::post('/commission-dues/{salonId}/pause', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'pause']);
+        Route::post('/commission-dues/{salonId}/stage', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'stage']);
+        Route::post('/commission-dues/{salonId}/remind', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'remind']);
+        Route::post('/commission-dues/{salonId}/record-payment', [\App\Http\Controllers\Api\SuperAdmin\CommissionDuesController::class, 'recordPayment']);
+
+        // What salon owners have written in from the Partner App.
+        Route::get('/salon-requests', [\App\Http\Controllers\Api\SuperAdmin\SalonRequestController::class, 'index']);
+        Route::post('/salon-requests/{id}/reply', [\App\Http\Controllers\Api\SuperAdmin\SalonRequestController::class, 'reply']);
+        Route::post('/salon-requests/{id}/status', [\App\Http\Controllers\Api\SuperAdmin\SalonRequestController::class, 'updateStatus']);
+
         Route::get('/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'index']);
         Route::post('/payouts/generate', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'generate']);
         Route::get('/payouts/{id}', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'show']);
@@ -329,6 +342,7 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/reports/dashboard', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'dashboard']);
         // What BookALook itself earns: plan payments and settled commission.
         Route::get('/reports/platform-revenue', [\App\Http\Controllers\Api\SuperAdmin\PlatformRevenueController::class, 'show']);
+        Route::get('/reports/platform-revenue/monthly', [\App\Http\Controllers\Api\SuperAdmin\PlatformRevenueController::class, 'monthly']);
         Route::get('/reports/salons', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'salons']);
         Route::get('/reports/cities', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'cities']);
         Route::get('/reports/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'subAreas']);
@@ -383,6 +397,11 @@ Route::prefix('partner')->group(function () {
         // plan gate on purpose: an unsettled Commission Model month is what locks
         // a salon out, so seeing and paying the bill must always work.
         Route::get('/salons/{salon_id}/payouts', [\App\Http\Controllers\Api\Partner\PayrollController::class, 'salonPayouts']);
+        // Where the salon stands with BookALook, and writing to it. Outside the
+        // gate for the same reason: the lock screen is where this is needed.
+        Route::get('/salons/{salon_id}/settlement-summary', [\App\Http\Controllers\Api\Partner\SalonSupportController::class, 'settlementSummary']);
+        Route::get('/salons/{salon_id}/support-requests', [\App\Http\Controllers\Api\Partner\SalonSupportController::class, 'index']);
+        Route::post('/salons/{salon_id}/support-requests', [\App\Http\Controllers\Api\Partner\SalonSupportController::class, 'store'])->middleware('throttle:10,1');
         // The owner's bank details for settlements. Outside the plan gate too:
         // a salon must be able to say where to be paid whatever its plan.
         Route::get('/salons/{salon_id}/bank-details', [\App\Http\Controllers\Api\Partner\BankDetailsController::class, 'show']);

@@ -77,6 +77,8 @@ class AuditLog extends Model
     public const PLAN_DELETED = 'plan.deleted';
     public const PAYOUT_APPROVED = 'payout.approved';
     public const PAYOUT_DISTRIBUTED = 'payout.distributed';
+    public const COMMISSION_DUES_CHANGED = 'commission_dues.changed';
+    public const COMMISSION_DUES_PAYMENT = 'commission_dues.payment_recorded';
     public const SALON_BANK_DETAILS_UPDATED = 'salon.bank_details_updated';
     public const SALON_BANK_DETAILS_REVEALED = 'salon.bank_details_revealed';
 
@@ -119,6 +121,10 @@ class AuditLog extends Model
         self::PLAN_DELETED => ['label' => 'Deleted a plan', 'category' => 'Money', 'severity' => 'critical'],
         self::PAYOUT_APPROVED => ['label' => 'Approved a payout', 'category' => 'Money', 'severity' => 'high'],
         self::PAYOUT_DISTRIBUTED => ['label' => 'Distributed a payout', 'category' => 'Money', 'severity' => 'critical'],
+        // Pushing out, pausing or forcing what happens to a salon that owes
+        // commission decides whether it can trade.
+        self::COMMISSION_DUES_CHANGED => ['label' => "Changed a salon's overdue-commission steps", 'category' => 'Money', 'severity' => 'high'],
+        self::COMMISSION_DUES_PAYMENT => ['label' => 'Recorded a commission payment', 'category' => 'Money', 'severity' => 'critical'],
         // Where a salon's money is sent. Changing it is how a settlement goes
         // astray, so it stands out as much as moving the money itself.
         self::SALON_BANK_DETAILS_UPDATED => ['label' => "Changed a salon's bank details", 'category' => 'Money', 'severity' => 'critical'],

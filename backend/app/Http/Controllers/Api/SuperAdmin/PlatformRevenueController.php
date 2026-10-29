@@ -264,4 +264,193 @@ class PlatformRevenueController extends Controller
             ->values()
             ->all();
     }
+
+    /**
+     * Month-by-month ledger: what BookALook earned each month, and from which
+     * salon, plus money still on its way (open commission, plan renewals due).
+     */
+    public function monthly(Request $request)
+    {
+        $request->validate(['months' => 'nullable|integer|in:3,6,12,24']);
+        $count = (int) $request->input('months', 12);
+
+        $now = Carbon::now();
+        $end = $now->copy()->endOfMonth();
+        $start = $now->copy()->startOfMonth()->subMonthsNoOverflow($count - 1);
+
+        $all = $this->entries(null, null);
+        // When each salon first paid BookALook, for "new paying salons".
+        $firstPaid = $all->where('amount', '>', 0)->groupBy('salon_id')
+            ->map(fn ($g) => $g->min('at')->format('Y-m'));
+
+        $entries = $all->filter(fn ($e) => $e['at']->between($start, $end))->values();
+        $byMonth = $entries->groupBy(fn ($e) => $e['at']->format('Y-m'));
+
+        $months = [];
+        $cursor = $start->copy();
+        $prevTotal = null;
+        while ($cursor->lte($end)) {
+            $key = $cursor->format('Y-m');
+            $g = $byMonth->get($key, collect());
+            $total = round($g->sum('amount'), 2);
+            $payers = $g->where('amount', '>', 0)->pluck('salon_id')->unique();
+            $months[] = [
+                'key' => $key,
+                'label' => $cursor->format('M Y'),
+                'subscriptions' => round($g->where('kind', 'subscription')->sum('amount'), 2),
+                'commission' => round($g->where('kind', 'commission')->sum('amount'), 2),
+                'total' => $total,
+                'coins' => round($g->sum('coins'), 2),
+                'payments' => $g->count(),
+                'paying_salons' => $payers->count(),
+                'new_paying_salons' => $payers->filter(fn ($id) => ($firstPaid[$id] ?? null) === $key)->count(),
+                'growth_pct' => $prevTotal ? round((($total - $prevTotal) / $prevTotal) * 100, 1) : null,
+                'is_current' => $key === $now->format('Y-m'),
+            ];
+            $prevTotal = $total;
+            $cursor->addMonthNoOverflow();
+        }
+
+        $current = $this->currentBilling();
+
+        $salons = $entries->groupBy('salon_id')->map(function ($g, $id) use ($current, $firstPaid) {
+            $first = $g->first();
+
+            return [
+                'id' => (string) $id,
+                'name' => $first['salon'],
+                'city' => $first['city'],
+                'billing' => $current[$id] ?? null,
+                'subscriptions' => round($g->where('kind', 'subscription')->sum('amount'), 2),
+                'commission' => round($g->where('kind', 'commission')->sum('amount'), 2),
+                'total' => round($g->sum('amount'), 2),
+                'coins' => round($g->sum('coins'), 2),
+                'payments' => $g->count(),
+                'active_months' => $g->map(fn ($e) => $e['at']->format('Y-m'))->unique()->count(),
+                'first_paid' => $firstPaid[$id] ?? null,
+                'months' => $g->groupBy(fn ($e) => $e['at']->format('Y-m'))->map(fn ($m) => [
+                    'subscriptions' => round($m->where('kind', 'subscription')->sum('amount'), 2),
+                    'commission' => round($m->where('kind', 'commission')->sum('amount'), 2),
+                    'total' => round($m->sum('amount'), 2),
+                    'coins' => round($m->sum('coins'), 2),
+                    'items' => $m->sortBy('at')->values()->map(fn ($e) => [
+                        'kind' => $e['kind'],
+                        'label' => $e['label'],
+                        'amount' => $e['amount'],
+                        'coins' => $e['coins'],
+                        'at' => $e['at']->toIso8601String(),
+                    ])->all(),
+                ])->all(),
+            ];
+        })->sortByDesc('total')->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'range' => ['from' => $start->toDateString(), 'to' => $end->toDateString(), 'months' => $count],
+            'months' => $months,
+            'salons' => $salons,
+            'insights' => $this->insights($all, $months, $now),
+            'pending_by_salon' => $this->pendingBySalon(),
+            'upcoming_renewals' => $this->upcomingRenewals($now),
+        ]);
+    }
+
+    /** The billing each salon is on today: its live plan, or Commission Model. */
+    private function currentBilling(): array
+    {
+        return DB::table('salon_subscriptions as ss')
+            ->leftJoin('subscription_plans as p', 'p.id', '=', 'ss.plan_id')
+            ->where('ss.status', 'active')
+            ->whereDate('ss.end_date', '>=', Carbon::today()->toDateString())
+            ->orderBy('ss.end_date')
+            ->get(['ss.salon_id', 'ss.billing_type', 'p.name as plan'])
+            ->mapWithKeys(fn ($r) => [(string) $r->salon_id => $r->billing_type === 'commission' ? 'Commission Model' : ($r->plan ?? 'Plan')])
+            ->all();
+    }
+
+    private function insights(Collection $all, array $months, Carbon $now): array
+    {
+        $full = array_values(array_filter($months, fn ($m) => ! $m['is_current']));
+        $best = collect($months)->sortByDesc('total')->first();
+        $lastThree = array_slice($full, -3);
+
+        // This month so far against last month up to the same day.
+        $lastStart = $now->copy()->subMonthNoOverflow()->startOfMonth();
+        $lastSamePoint = $lastStart->copy()->addDays(min($now->day, $lastStart->daysInMonth) - 1)->setTimeFrom($now);
+        $mtd = round($all->filter(fn ($e) => $e['at']->between($now->copy()->startOfMonth(), $now))->sum('amount'), 2);
+        $lastMtd = round($all->filter(fn ($e) => $e['at']->between($lastStart, $lastSamePoint))->sum('amount'), 2);
+
+        // Salons who paid in at least two of the months shown.
+        $keys = array_column($months, 'key');
+        $perSalon = $all->filter(fn ($e) => $e['amount'] > 0 && in_array($e['at']->format('Y-m'), $keys, true))
+            ->groupBy('salon_id')
+            ->map(fn ($g) => $g->map(fn ($e) => $e['at']->format('Y-m'))->unique()->count());
+
+        $cash = array_sum(array_column($months, 'total'));
+        $coins = array_sum(array_column($months, 'coins'));
+
+        return [
+            'month_to_date' => $mtd,
+            'last_month_same_point' => $lastMtd,
+            'average_month' => count($full) ? round(array_sum(array_column($full, 'total')) / count($full), 2) : 0,
+            'best_month' => $best && $best['total'] > 0 ? ['label' => $best['label'], 'total' => $best['total']] : null,
+            'annual_run_rate' => count($lastThree) ? round(array_sum(array_column($lastThree, 'total')) / count($lastThree) * 12, 2) : 0,
+            'paying_salons' => $perSalon->count(),
+            'repeat_salons' => $perSalon->filter(fn ($n) => $n >= 2)->count(),
+            'coins_share_pct' => $cash + $coins > 0 ? round($coins / ($cash + $coins) * 100, 1) : 0,
+        ];
+    }
+
+    /** Open commission, salon by salon: earned by BookALook, not yet settled. */
+    private function pendingBySalon(): array
+    {
+        return DB::table('salon_payouts as sp')
+            ->join('salons as s', 's.id', '=', 'sp.salon_id')
+            ->leftJoin('cities as c', 'c.id', '=', 's.city_id')
+            ->whereIn('sp.status', [PayoutService::STATUS_PENDING, PayoutService::STATUS_APPROVED])
+            ->where('sp.commission_deducted', '>', 0)
+            ->groupBy('sp.salon_id', 's.name', 'c.name')
+            ->selectRaw('sp.salon_id, s.name, c.name as city, count(*) as payouts, sum(sp.commission_deducted) as commission, coalesce(sum(sp.wallet_redeemed_amount), 0) as coins, min(sp.cycle_start_date) as oldest')
+            ->get()
+            ->map(fn ($r) => [
+                'id' => (string) $r->salon_id,
+                'name' => $r->name,
+                'city' => $r->city ?? 'No city',
+                'amount' => round(max(0, (float) $r->commission - (float) $r->coins), 2),
+                'payouts' => (int) $r->payouts,
+                'oldest_cycle' => $r->oldest ? Carbon::parse($r->oldest)->toDateString() : null,
+            ])
+            ->filter(fn ($r) => $r['amount'] > 0)
+            ->sortByDesc('amount')
+            ->values()
+            ->all();
+    }
+
+    /** Plan subscriptions ending in the next 30 days: renewal money to expect. */
+    private function upcomingRenewals(Carbon $now): array
+    {
+        $rows = DB::table('salon_subscriptions as ss')
+            ->join('salons as s', 's.id', '=', 'ss.salon_id')
+            ->leftJoin('subscription_plans as p', 'p.id', '=', 'ss.plan_id')
+            ->where('ss.status', 'active')
+            ->where('ss.billing_type', '!=', 'commission')
+            ->whereDate('ss.end_date', '>=', $now->toDateString())
+            ->whereDate('ss.end_date', '<=', $now->copy()->addDays(30)->toDateString())
+            ->orderBy('ss.end_date')
+            ->get(['ss.salon_id', 's.name', 'p.name as plan', 'p.price', 'ss.plan_price_snapshot', 'ss.end_date', 'ss.auto_renew'])
+            ->map(fn ($r) => [
+                'id' => (string) $r->salon_id,
+                'name' => $r->name,
+                'plan' => $r->plan ?? 'Plan',
+                'price' => round((float) ($r->price ?? $r->plan_price_snapshot ?? 0), 2),
+                'end_date' => Carbon::parse($r->end_date)->toDateString(),
+                'auto_renew' => (bool) $r->auto_renew,
+            ]);
+
+        return [
+            'amount' => round($rows->sum('price'), 2),
+            'count' => $rows->count(),
+            'items' => $rows->take(12)->values()->all(),
+        ];
+    }
 }

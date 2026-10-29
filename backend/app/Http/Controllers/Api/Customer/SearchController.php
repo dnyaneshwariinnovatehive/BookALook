@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Combo;
 use App\Models\ServiceCategory;
 use App\Services\SearchService;
+use App\Support\GenderFocus;
 use Illuminate\Http\Request;
 
 /**
@@ -26,6 +27,9 @@ class SearchController extends Controller
             'q' => 'required|string|max:80',
             'city_id' => 'nullable|uuid|exists:cities,id',
             'limit' => 'nullable|integer|min:1|max:50',
+            // Who the customer is browsing for (`men`/`women`), as on the
+            // directory. Missing means everyone.
+            'gender' => 'nullable|string|max:20',
             // Narrows the search to a category the customer is browsing, so a
             // search from inside one cannot answer with services from another.
             'category_id' => ['nullable', 'string', 'max:80', function ($attribute, $value, $fail) {
@@ -44,6 +48,7 @@ class SearchController extends Controller
             $data['city_id'] ?? null,
             (int) ($data['limit'] ?? 20),
             $data['category_id'] ?? null,
+            GenderFocus::fromAudience($data['gender'] ?? null),
         );
 
         return response()->json([

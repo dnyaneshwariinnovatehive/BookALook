@@ -117,6 +117,9 @@ class AppointmentController extends Controller
         // Too many same-day cancellations/reschedules means advance-only no
         // longer applies for that date.
         $requirement = $this->policy->paymentRequirement($request->user()->id, $request->date);
+        if ($this->salonNeedsFullPayment($salon_id)) {
+            $requirement['full_upfront'] = true;
+        }
         $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
 
         return response()->json([
@@ -276,6 +279,11 @@ class AppointmentController extends Controller
             // and must pay the whole amount upfront for that date.
             $requirement = $this->policy->paymentRequirement($user->id, $request->date);
             if ($standing['restricted'] && $standing['action'] === \App\Services\CustomerStandingService::ACTION_FULL_PAYMENT) {
+                $requirement['full_upfront'] = true;
+            }
+            // A Commission Model salon with overdue dues: BookALook takes the
+            // whole amount online, so what it owes can be recovered from it.
+            if ($this->salonNeedsFullPayment($salon_id)) {
                 $requirement['full_upfront'] = true;
             }
             $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
@@ -685,11 +693,21 @@ class AppointmentController extends Controller
      * in. The salon list already greys these out; this stops the API taking
      * the booking anyway.
      */
+    private function salonNeedsFullPayment(string $salonId): bool
+    {
+        $salon = Salon::find($salonId);
+
+        return $salon !== null
+            && app(\App\Services\CommissionDuesService::class)
+                ->has($salon, \App\Services\CommissionDuesService::STEP_FORCE_ADVANCE);
+    }
+
     private function notTakingBookings(string $salonId): ?\Illuminate\Http\JsonResponse
     {
         $status = app(\App\Services\SalonAccessService::class)->statusForId($salonId);
 
-        if ($status['is_active']) {
+        // Also refused while new bookings are paused for unpaid commission.
+        if (\App\Services\SalonAccessService::takesBookings($status)) {
             return null;
         }
 

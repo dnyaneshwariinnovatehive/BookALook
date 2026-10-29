@@ -26,7 +26,7 @@ class FavouriteController extends Controller
                 'name' => $salon->name,
                 'address' => $salon->address,
                 'cover_photo_url' => $salon->cover_photo_url,
-                'is_serviceable' => $status['is_active'],
+                'is_serviceable' => SalonAccessService::takesBookings($status),
                 'unavailable_reason' => $status['message'],
                 'rating' => [
                     'average' => round((float) $salon->avg_rating, 1),

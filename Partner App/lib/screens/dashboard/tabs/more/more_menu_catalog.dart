@@ -28,6 +28,7 @@ import 'package:partner_app/services/wallet_balance.dart';
 import 'package:partner_app/services/push_notification_service.dart';
 import 'package:partner_app/widgets/logout_confirmation_dialog.dart';
 import 'package:partner_app/widgets/push_notification_toggle.dart';
+import 'package:partner_app/screens/contact_bookalook_screen.dart';
 
 enum MenuItemType { screen, action, inlineToggle }
 
@@ -459,6 +460,32 @@ class MoreMenuCatalog {
                 MaterialPageRoute(
                   builder: (_) =>
                       SalonPayoutsScreen(salonId: salonData['id'].toString()),
+                ),
+              );
+            },
+          ),
+          MoreMenuItem(
+            id: 'contact_bookalook',
+            title: 'Contact BookALook',
+            category: 'Payments & payroll',
+            subtitle: 'Ask about a settlement or payout, and read replies',
+            icon: Icons.chat_bubble_outline,
+            iconColor: Colors.deepPurple,
+            keywords: const [
+              'contact',
+              'support',
+              'help',
+              'message',
+              'superadmin',
+              'settlement query',
+              'payout request',
+              'reply',
+            ],
+            onSelect: (ctx, salonData, _) async {
+              await Navigator.push(
+                ctx,
+                MaterialPageRoute(
+                  builder: (_) => ContactBookALookScreen(salonId: salonData['id'].toString()),
                 ),
               );
             },

@@ -75,7 +75,8 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   bool _hoursExpanded = false;
   bool _isServicesExpanded = false;
 
-  /// The viewer's profile gender. Their own services come first; the rest
+  /// Who the customer is browsing for: the gender picked in a filter this
+  /// session, else their profile's. Their services come first; the rest
   /// stay one tap away under "Other services", never hidden, because they
   /// may be booking for someone else.
   String? _viewerGender;
@@ -98,9 +99,10 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
   @override
   void initState() {
     super.initState();
-    AudienceService.profileGender().then((gender) {
+    AudienceService.browsingGender().then((gender) {
       if (mounted && gender != _viewerGender) setState(() => _viewerGender = gender);
     });
+    AudienceService.changes.addListener(_onAudienceChanged);
     final shouldScrollToServices = widget.initialScrollToServices ||
         (widget.categoryId != null && widget.categoryId!.isNotEmpty) ||
         (widget.categoryName != null && widget.categoryName!.isNotEmpty);
@@ -113,8 +115,14 @@ class _SalonDetailScreenState extends State<SalonDetailScreen> {
     CartService.globalCartNotifier.addListener(_onGlobalCartChanged);
   }
 
+  void _onAudienceChanged() {
+    final gender = AudienceService.browsingGenderNow;
+    if (mounted && gender != _viewerGender) setState(() => _viewerGender = gender);
+  }
+
   @override
   void dispose() {
+    AudienceService.changes.removeListener(_onAudienceChanged);
     CartService.globalCartNotifier.removeListener(_onGlobalCartChanged);
     _galleryController.dispose();
     _scrollController.dispose();

@@ -31,6 +31,58 @@ class SalonAccessApi {
   }
 }
 
+/// What a Commission Model salon owes BookALook, and the steps SuperAdmin's
+/// policy has applied because of it. Lifts by itself once the salon pays.
+class CommissionDues {
+  final double owed;
+  final String? dueDate;
+  final int? daysOverdue;
+  final int underReview;
+  final List<String> actions;
+  final String? stage;
+  final String? stageLabel;
+  final String? message;
+  final String? nextLabel;
+  final String? nextOn;
+
+  const CommissionDues({
+    required this.owed,
+    this.dueDate,
+    this.daysOverdue,
+    this.underReview = 0,
+    this.actions = const [],
+    this.stage,
+    this.stageLabel,
+    this.message,
+    this.nextLabel,
+    this.nextOn,
+  });
+
+  bool get owesAnything => owed > 0;
+  bool get isOverdue => (daysOverdue ?? -1) >= 0;
+  bool has(String step) => actions.contains(step);
+
+  /// Worth a banner on Home: anything from the warning step up, or a
+  /// reminder that the due date is close.
+  bool get showBanner => owesAnything && actions.isNotEmpty;
+
+  factory CommissionDues.fromJson(Map<String, dynamic> json) {
+    final next = json['next'] as Map<String, dynamic>?;
+    return CommissionDues(
+      owed: (json['owed'] as num?)?.toDouble() ?? 0,
+      dueDate: json['due_date']?.toString(),
+      daysOverdue: (json['days_overdue'] as num?)?.toInt(),
+      underReview: (json['under_review'] as num?)?.toInt() ?? 0,
+      actions: ((json['actions'] as List?) ?? const []).map((e) => e.toString()).toList(),
+      stage: json['stage']?.toString(),
+      stageLabel: json['stage_label']?.toString(),
+      message: json['message']?.toString(),
+      nextLabel: next?['label']?.toString(),
+      nextOn: next?['on']?.toString(),
+    );
+  }
+}
+
 class SalonAccess {
   final String salonName;
   final bool isLocked;
@@ -56,6 +108,13 @@ class SalonAccess {
   final Map<String, dynamic>? pendingRequest;
   final Map<String, dynamic>? latestRejectedRequest;
 
+  /// Commission Model salons only: unpaid dues and the steps in force.
+  final CommissionDues? dues;
+
+  /// Customers cannot book right now (unpaid commission), though the app
+  /// itself is open.
+  final bool bookingsPaused;
+
   SalonAccess({
     required this.salonName,
     required this.isLocked,
@@ -72,7 +131,12 @@ class SalonAccess {
     this.hasPendingRequest = false,
     this.pendingRequest,
     this.latestRejectedRequest,
+    this.dues,
+    this.bookingsPaused = false,
   });
+
+  /// Locked because the salon owes commission, not because a plan ran out.
+  bool get isCommissionLock => reason == 'commission_unsettled';
 
   /// A plan that ran out, as opposed to a salon that was never approved.
   bool get isSubscriptionProblem =>
@@ -115,6 +179,10 @@ class SalonAccess {
       pendingRequest: json['pending_request'] as Map<String, dynamic>?,
       latestRejectedRequest:
           json['latest_rejected_request'] as Map<String, dynamic>?,
+      dues: json['dues'] is Map<String, dynamic>
+          ? CommissionDues.fromJson(json['dues'] as Map<String, dynamic>)
+          : null,
+      bookingsPaused: json['bookings_paused'] == true,
     );
   }
 

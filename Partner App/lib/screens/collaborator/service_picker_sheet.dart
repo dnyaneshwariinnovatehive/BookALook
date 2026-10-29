@@ -4,11 +4,15 @@ import '../../models/onboarding_draft.dart';
 import '../../services/collaborator_api.dart';
 import '../../theme/app_theme.dart';
 
-/// Adding one line to the salon's menu.
+/// Adding lines to the salon's menu.
 ///
 /// Two ways in, and both end in a price. Most services are in the master
-/// catalog and only need a number typed against them; the rest are whatever
-/// this particular salon happens to do, and get described from scratch.
+/// catalog and only need a number typed against them — tapping one opens a
+/// price box right there in the list, and adding it saves it to the draft at
+/// once and marks it Added, so a whole menu goes in without leaving the sheet.
+/// Tapping an Added line opens the same box to change its price or remove it.
+/// The rest are whatever this particular salon happens to do, and get
+/// described from scratch.
 ///
 /// The catalog is fetched when the sheet opens, but it is not required — a
 /// collaborator with no signal can still add custom services, which is the
@@ -18,11 +22,25 @@ class ServicePickerSheet extends StatefulWidget {
   final Set<String> existingCustomIdentities;
   final List<dynamic>? initialCategories;
 
+  /// Saves one line to the draft: a new one, or a new price for a catalog
+  /// line already in it. Returns a message when it could not be saved. Null
+  /// keeps the old behaviour of handing a single service back on pop.
+  final Future<String?> Function(DraftService service)? onSave;
+
+  /// Takes a catalog line back out of the draft.
+  final Future<void> Function(String templateId)? onRemove;
+
+  /// The price already saved for an added catalog line, to edit from.
+  final double? Function(String templateId)? priceOf;
+
   const ServicePickerSheet({
     super.key,
     this.existingTemplateIds = const {},
     this.existingCustomIdentities = const {},
     this.initialCategories,
+    this.onSave,
+    this.onRemove,
+    this.priceOf,
   });
 
   static String normalizeCustomIdentity(String category, String name) {
@@ -46,6 +64,19 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   String? _selectedCategoryName;
 
   bool _custom = false;
+
+  /// What is in the draft, kept here so an Added tag appears the moment a
+  /// line is saved rather than the next time the sheet opens.
+  late final Set<String> _addedIds = {...widget.existingTemplateIds};
+  late final Set<String> _addedCustom = {...widget.existingCustomIdentities};
+
+  /// The catalog line whose price box is open, if any. One at a time.
+  String? _expandedId;
+  final _inlinePrice = TextEditingController();
+  bool _saving = false;
+
+  bool get _savesInPlace => widget.onSave != null;
+
   final _search = TextEditingController();
   final _price = TextEditingController();
   final _customName = TextEditingController();
@@ -82,6 +113,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   @override
   void dispose() {
     _search.dispose();
+    _inlinePrice.dispose();
     _price.dispose();
     _customName.dispose();
     _customCategory.dispose();
@@ -152,7 +184,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   }
 
 
-  void _submit() {
+  Future<void> _submit() async {
     final price = double.tryParse(_price.text.trim());
 
     if (price == null || price < 0) {
@@ -171,19 +203,30 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
           _customCategory.text.trim().isEmpty ? 'Other' : _customCategory.text.trim();
       final customIdentity = ServicePickerSheet.normalizeCustomIdentity(category, name);
 
-      if (widget.existingCustomIdentities.contains(customIdentity)) {
+      if (_addedCustom.contains(customIdentity)) {
         return _say('This custom service has already been added in "$category".');
       }
 
-      Navigator.pop(
-        context,
-        DraftService(
-          name: name,
-          categoryName: category,
-          durationMinutes: duration,
-          price: price,
-        ),
+      final service = DraftService(
+        name: name,
+        categoryName: category,
+        durationMinutes: duration,
+        price: price,
       );
+
+      if (!_savesInPlace) {
+        Navigator.pop(context, service);
+        return;
+      }
+
+      if (!await _save(service)) return;
+      _addedCustom.add(customIdentity);
+      _customName.clear();
+      _customCategory.clear();
+      _customDuration.text = '30';
+      _price.clear();
+      setState(() => _custom = false);
+      _say('"$name" added and saved.');
       return;
     }
 
@@ -201,7 +244,78 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
   }
 
   void _say(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(duration: const Duration(milliseconds: 2500), content: Text(message)));
+  }
+
+  Future<bool> _save(DraftService service) async {
+    setState(() => _saving = true);
+    String? problem;
+    try {
+      problem = await widget.onSave!(service);
+    } catch (e) {
+      problem = 'Could not save that service. Try again.';
+    }
+    if (!mounted) return false;
+    setState(() => _saving = false);
+    if (problem != null) _say(problem);
+    return problem == null;
+  }
+
+  // ------------------------------------------------------- inline price
+
+  void _toggle(Map<String, dynamic> template) {
+    final id = template['id']?.toString() ?? '';
+    setState(() {
+      if (_expandedId == id) {
+        _expandedId = null;
+        return;
+      }
+      _expandedId = id;
+      final saved = _addedIds.contains(id) ? widget.priceOf?.call(id) : null;
+      _inlinePrice.text = saved == null ? '' : saved.toStringAsFixed(saved % 1 == 0 ? 0 : 2);
+    });
+  }
+
+  Future<void> _saveInline(Map<String, dynamic> template, String categoryName) async {
+    final id = template['id'].toString();
+    final price = double.tryParse(_inlinePrice.text.trim());
+    if (price == null || price < 0) return _say('Enter a price.');
+
+    final wasAdded = _addedIds.contains(id);
+    final name = template['name'].toString();
+    final ok = await _save(DraftService(
+      templateId: id,
+      name: name,
+      categoryName: categoryName,
+      durationMinutes: (template['estimated_duration_minutes'] as num?)?.toInt() ?? 30,
+      price: price,
+    ));
+    if (!ok || !mounted) return;
+
+    setState(() {
+      _addedIds.add(id);
+      _expandedId = null;
+    });
+    FocusScope.of(context).unfocus();
+    _say(wasAdded ? 'Price for "$name" updated.' : '"$name" added and saved.');
+  }
+
+  Future<void> _removeInline(Map<String, dynamic> template) async {
+    final id = template['id'].toString();
+    setState(() => _saving = true);
+    try {
+      await widget.onRemove?.call(id);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (!mounted) return;
+    setState(() {
+      _addedIds.remove(id);
+      _expandedId = null;
+    });
+    _say('"${template['name']}" removed.');
   }
 
   @override
@@ -245,9 +359,19 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: Row(
               children: [
-                const Expanded(
-                  child: Text('Add a service',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_savesInPlace ? 'Add services' : 'Add a service',
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      if (_savesInPlace)
+                        Text(
+                          '${_addedIds.length + _addedCustom.length} on the menu · tap a service to price it',
+                          style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
+                        ),
+                    ],
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: () => setState(() => _custom = true),
@@ -255,6 +379,16 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
                   label: const Text('Custom', style: TextStyle(fontSize: 13)),
                   style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor),
                 ),
+                if (_savesInPlace)
+                  FilledButton(
+                    key: const ValueKey('service-picker-done'),
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.accentColor,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Done'),
+                  ),
               ],
             ),
           ),
@@ -430,7 +564,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
         // Count how many templates in this category have already been added to the draft
         final addedCount = templates.where((t) {
           final id = t['id']?.toString() ?? '';
-          return widget.existingTemplateIds.contains(id);
+          return _addedIds.contains(id);
         }).length;
 
         return Container(
@@ -511,28 +645,35 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
 
   Widget _buildTemplateItem(Map<String, dynamic> template, String categoryName, {bool isLast = false}) {
     final templateId = template['id']?.toString() ?? '';
-    final isAdded = widget.existingTemplateIds.contains(templateId);
+    final isAdded = _addedIds.contains(templateId);
+    final isOpen = _savesInPlace && _expandedId == templateId;
+    final savedPrice = isAdded ? widget.priceOf?.call(templateId) : null;
 
     return Material(
-      color: Colors.transparent,
+      color: isOpen ? AppTheme.lightAccentSoft.withValues(alpha: 0.45) : Colors.transparent,
       child: Column(
         children: [
           ListTile(
+            key: ValueKey('template-$templateId'),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
             title: Text(
               template['name'].toString(),
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
-                color: isAdded ? AppTheme.lightTextBody : AppTheme.lightTextHeading,
+                color: isAdded && !isOpen ? AppTheme.lightTextBody : AppTheme.lightTextHeading,
               ),
             ),
             subtitle: Text(
-              '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min',
+              '$categoryName · ${template['estimated_duration_minutes'] ?? 30} min'
+              '${savedPrice != null ? ' · ₹${savedPrice.toStringAsFixed(0)}' : ''}',
               style: const TextStyle(fontSize: 11.5, color: AppTheme.lightTextBody),
             ),
-            trailing: isAdded
-                ? Container(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isAdded)
+                  Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.lightAccentSoft,
@@ -546,16 +687,106 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
                         color: AppTheme.accentColor,
                       ),
                     ),
-                  )
-                : const Icon(Icons.chevron_right, color: AppTheme.lightTextLight, size: 20),
-            onTap: isAdded
-                ? () => _say('This service is already in the draft.')
-                : () => setState(() {
-                    _chosenTemplate = template;
-                    _chosenCategoryName = categoryName;
-                  }),
+                  ),
+                if (_savesInPlace || !isAdded)
+                  Icon(
+                    isOpen
+                        ? Icons.keyboard_arrow_up
+                        : (_savesInPlace ? Icons.keyboard_arrow_down : Icons.chevron_right),
+                    color: AppTheme.lightTextLight,
+                    size: 20,
+                  ),
+              ],
+            ),
+            onTap: _savesInPlace
+                ? () => _toggle(template)
+                : isAdded
+                    ? () => _say('This service is already in the draft.')
+                    : () => setState(() {
+                          _chosenTemplate = template;
+                          _chosenCategoryName = categoryName;
+                        }),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: isOpen ? _buildInlinePrice(template, categoryName, isAdded) : const SizedBox(width: double.infinity),
           ),
           if (!isLast) const Divider(height: 1, color: Color(0xFFF3F4F6)),
+        ],
+      ),
+    );
+  }
+
+  /// The price box that opens under a catalog line.
+  Widget _buildInlinePrice(Map<String, dynamic> template, String categoryName, bool isAdded) {
+    return Padding(
+      key: ValueKey('inline-price-${template['id']}'),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('inline-price-field'),
+                  controller: _inlinePrice,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _saving ? null : _saveInline(template, categoryName),
+                  decoration: InputDecoration(
+                    labelText: 'Price',
+                    prefixText: '₹ ',
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.lightBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.accentColor),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                key: const ValueKey('inline-price-save'),
+                onPressed: _saving ? null : () => _saveInline(template, categoryName),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text(isAdded ? 'Update' : 'Add'),
+              ),
+            ],
+          ),
+          if (isAdded && widget.onRemove != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _saving ? null : () => _removeInline(template),
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('Remove from menu', style: TextStyle(fontSize: 12.5)),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.lightTextBody),
+              ),
+            ),
         ],
       ),
     );
@@ -618,7 +849,7 @@ class _ServicePickerSheetState extends State<ServicePickerSheet> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _submit,
+            onPressed: _saving ? null : _submit,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 15),
               backgroundColor: AppTheme.accentColor,

@@ -463,3 +463,65 @@
   font-size: 0.9rem;
   line-height: 1.5;
 }
+
+/* Commission dues: one row per step, a switch and the day it starts. */
+.duesStep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-color);
+}
+
+.duesStepOff {
+  opacity: 0.6;
+}
+
+.duesToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  flex: 1 1 320px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.duesToggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.duesToggle b {
+  color: var(--text-heading);
+  font-size: 0.95rem;
+}
+
+.duesToggle small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.duesDays {
+  flex: 0 1 auto;
+}
+
+.duesDays .suffixRow {
+  flex-wrap: wrap;
+}
+
+.duesDays .input {
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+}
+
+.duesDays .input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

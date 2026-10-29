@@ -636,6 +636,10 @@ class SalonController extends Controller
                 'id' => $city->id,
                 'name' => $city->name,
                 'state' => $city->state,
+                // The app measures distance from the city centre when the
+                // customer is browsing a city they are not in.
+                'latitude' => $city->latitude,
+                'longitude' => $city->longitude,
             ] : null,
             'suggested_city' => $alternativeCity ? [
                 'id' => $alternativeCity->id,
@@ -822,8 +826,11 @@ class SalonController extends Controller
                 'cover_photo_url' => $salon->cover_photo_url,
                 'avg_rating' => (float) $salon->avg_rating,
                 'review_count' => (int) $salon->review_count,
-                'is_serviceable' => $status['is_active'],
-                'unavailable_reason' => $status['message'],
+                // Paused for unpaid commission counts as not bookable here,
+                // though the salon's own app keeps working.
+                'is_serviceable' => \App\Services\SalonAccessService::takesBookings($status),
+                'unavailable_reason' => $status['message']
+                    ?? (($status['bookings_paused'] ?? false) ? 'This salon is not taking online bookings right now.' : null),
                 // Null when the customer shared no position, or the salon has
                 // not been placed on the map yet.
                 'distance_km' => isset($salon->distance_km)
@@ -869,9 +876,11 @@ class SalonController extends Controller
             return ['is_bookable' => false, 'reason' => 'This salon is not accepting online bookings yet.'];
         }
 
-        $subscription = $salon->currentSubscription;
+        // The same answer the directory and the booking endpoint give: a
+        // lapsed plan, a commission lock, or bookings paused for unpaid dues.
+        $status = app(\App\Services\SalonAccessService::class)->status($salon);
 
-        if (! $subscription || Carbon::parse($subscription->end_date)->isPast()) {
+        if (! \App\Services\SalonAccessService::takesBookings($status)) {
             return [
                 'is_bookable' => false,
                 'reason' => 'This salon is temporarily unavailable for online booking.',

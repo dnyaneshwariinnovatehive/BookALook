@@ -90,6 +90,47 @@
         .terms { color: #6b655d; font-size: 12.5px; white-space: pre-line; }
         .note { margin-top: 14px; color: #6b655d; font-size: 13.5px; }
 
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        .name { overflow-wrap: anywhere; }
+
+        /* Phones. The desktop sheet spends 64px a side on margins, which on a
+           360px screen left the 300px totals table wider than the room it had
+           and pushed the whole invoice sideways. Here the sheet runs nearly
+           edge to edge, the header stacks, and every block fits the width. */
+        @media (max-width: 640px) {
+            body { padding: 10px; font-size: 14.5px; }
+            .sheet { padding: 20px 16px; border-radius: 12px; }
+            .bar { margin-bottom: 14px; }
+            .bar button { width: 100%; padding: 11px 16px; }
+            .head { flex-direction: column; gap: 14px; padding-bottom: 16px; }
+            .brand { gap: 10px; }
+            .brand img { max-height: 44px; max-width: 120px; }
+            .brand h1 { font-size: 19px; }
+            .meta { text-align: left; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+            .meta .doc { flex-basis: 100%; }
+            .meta .num { margin-top: 0; font-size: 16px; }
+            .meta .when { margin-top: 0; }
+            .grid { gap: 14px; padding: 16px 0; }
+            .col { flex-basis: 100%; }
+            thead th { padding: 8px 6px; }
+            tbody td { padding: 10px 6px; }
+            thead th:first-child, tbody td:first-child { padding-left: 0; }
+            thead th:last-child, tbody td:last-child { padding-right: 0; }
+            .totals { margin-top: 14px; }
+            .totals table { width: 100%; }
+            .totals td { padding: 7px 0; }
+            .foot { margin-top: 22px; }
+        }
+
+        /* The smallest phones (320–360px): a little tighter still. */
+        @media (max-width: 360px) {
+            body { padding: 6px; font-size: 14px; }
+            .sheet { padding: 16px 12px; }
+            .brand h1 { font-size: 17.5px; }
+            .totals tr:last-child td { font-size: 16px; }
+            .tag { margin-left: 0; margin-top: 3px; }
+        }
+
         /* Paper. The screen furniture is dropped and the sheet is allowed to
            use the whole page, because a browser printing this should produce
            something a salon would be happy to staple to a file. */

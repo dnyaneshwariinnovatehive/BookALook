@@ -100,4 +100,61 @@ class PlatformRevenueTest extends TestCase
             ->getJson('/api/superadmin/reports/platform-revenue')
             ->assertForbidden();
     }
+
+    public function test_monthly_ledger_splits_each_month_by_salon(): void
+    {
+        Carbon::setTestNow('2026-10-26 12:00:00');
+        $plan = SubscriptionPlan::create(['name' => 'Ledger ' . Str::random(4), 'price' => 999, 'validity_days' => 30, 'is_active' => true]);
+        $a = $this->salon('Ledger A');
+        $b = $this->salon('Ledger B');
+
+        $this->planPayment($a, $plan, 'approved', 999, 0, '2026-09-10 10:00:00');
+        $this->planPayment($a, $plan, 'approved', 899, 100, '2026-10-10 10:00:00');
+        $this->planPayment($b, $plan, 'approved', 999, 0, '2026-10-12 10:00:00');
+        $this->payout($b, 'distributed', 400, 0, '2026-10-02 10:00:00');
+        $this->payout($a, 'pending', 250, 50, null);
+
+        DB::table('salon_subscriptions')->insert([
+            'id' => (string) Str::uuid(), 'salon_id' => $b->id, 'plan_id' => $plan->id, 'billing_type' => 'subscription',
+            'plan_price_snapshot' => 999, 'start_date' => '2026-10-12', 'end_date' => '2026-11-10',
+            'status' => 'active', 'auto_renew' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $json = $this->actingAs($this->user('superadmin'), 'sanctum')
+            ->getJson('/api/superadmin/reports/platform-revenue/monthly?months=3')
+            ->assertOk()
+            ->json();
+
+        $months = collect($json['months'])->keyBy('key');
+        $this->assertSame(['2026-08', '2026-09', '2026-10'], array_column($json['months'], 'key'));
+        $this->assertTrue($months['2026-10']['is_current']);
+
+        // Other suites' rows may exist; check our salons' own share.
+        $salons = collect($json['salons'])->keyBy('name');
+        $this->assertEquals(999, $salons['Ledger A']['months']['2026-09']['total']);
+        $this->assertEquals(899, $salons['Ledger A']['months']['2026-10']['total']);
+        $this->assertEquals(100, $salons['Ledger A']['months']['2026-10']['coins']);
+        $this->assertSame(2, $salons['Ledger A']['active_months']);
+        $this->assertEquals(999, $salons['Ledger B']['months']['2026-10']['subscriptions']);
+        $this->assertEquals(400, $salons['Ledger B']['months']['2026-10']['commission']);
+        $this->assertCount(2, $salons['Ledger B']['months']['2026-10']['items']);
+        $this->assertSame($plan->name, $salons['Ledger B']['billing']);
+
+        $this->assertGreaterThanOrEqual(899 + 999 + 400, $months['2026-10']['total']);
+        $this->assertGreaterThanOrEqual(1, $months['2026-10']['new_paying_salons'], 'Ledger B first paid in October');
+
+        $pending = collect($json['pending_by_salon'])->keyBy('name');
+        $this->assertEquals(200, $pending['Ledger A']['amount']);
+
+        $renewals = collect($json['upcoming_renewals']['items'])->keyBy('name');
+        $this->assertEquals(999, $renewals['Ledger B']['price']);
+        $this->assertGreaterThanOrEqual(1, $json['insights']['repeat_salons'], 'Ledger A paid in two months');
+    }
+
+    public function test_only_superadmin_sees_the_monthly_ledger(): void
+    {
+        $this->actingAs($this->user('admin'), 'sanctum')
+            ->getJson('/api/superadmin/reports/platform-revenue/monthly')
+            ->assertForbidden();
+    }
 }

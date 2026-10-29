@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/salon_access_api.dart';
+import '../widgets/settlements_card.dart';
 import '../theme/app_theme.dart';
 import 'dashboard/more/upgrade_plan_screen.dart';
+import 'dashboard/more/salon_payouts_screen.dart';
 import 'phone_screen.dart';
 import '../services/push_notification_service.dart';
 import '../widgets/subscription/subscription_bill_summary_sheet.dart';
@@ -143,8 +145,10 @@ class SubscriptionLockedScreen extends StatelessWidget {
                   _buildPendingCard(context),
                 ],
 
+                // Coins go towards a plan; a commission lock is a bill instead.
                 if (access.canRenew &&
                     access.hasCoins &&
+                    !access.isCommissionLock &&
                     !access.isPendingApproval) ...[
                   const SizedBox(height: 20),
                   _buildCoinsCard(),
@@ -160,6 +164,14 @@ class SubscriptionLockedScreen extends StatelessWidget {
                   ..._ownerActions(context)
                 else
                   ..._staffActions(context),
+
+                // Owner only, on every lock state: money can still be owed
+                // either way while the salon is locked, and this is the one
+                // screen they can reach.
+                if (access.canRenew && _salonIdFrom(context).isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  SettlementsCard(salonId: _salonIdFrom(context)),
+                ],
 
                 if (onSwitchSalon != null) ...[
                   const SizedBox(height: 16),
@@ -204,6 +216,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
   }
 
   String get _title {
+    if (access.isCommissionLock) return 'Commission payment overdue';
     if (access.isPendingApproval) return 'Payment Received — Under Review';
     if (access.hasRejectedPayment) return 'Payment Not Accepted';
     if (!access.canRenew) return 'This salon is offline';
@@ -214,6 +227,7 @@ class SubscriptionLockedScreen extends StatelessWidget {
   String get _message => access.canRenew ? _ownerMessage() : _staffMessage();
 
   String _ownerMessage() {
+    if (access.isCommissionLock) return _commissionMessage(owner: true);
     if (access.isPendingApproval) {
       final planName =
           access.pendingRequest?['plan_name']?.toString() ?? 'your plan';
@@ -237,7 +251,25 @@ class SubscriptionLockedScreen extends StatelessWidget {
         'use the app again.';
   }
 
+  /// A Commission Model salon locked for unpaid commission: there is no plan
+  /// to renew, only a bill to pay.
+  String _commissionMessage({required bool owner}) {
+    final dues = access.dues;
+    final amount = dues != null && dues.owed > 0 ? '₹${dues.owed.toStringAsFixed(0)}' : 'Commission';
+    final due = DateTime.tryParse(dues?.dueDate ?? '');
+    final since = due == null ? '' : ' since ${DateFormat('d MMMM').format(due)}';
+
+    if (owner) {
+      return '$amount owed to BookALook has been overdue$since, so ${access.salonName} is locked. '
+          'Pay it and the salon reopens straight away.';
+    }
+    final who = access.adminName ?? 'the salon owner';
+    return '${access.salonName} owes BookALook commission, so the app is locked for everyone here. '
+        'Only $who can pay it.';
+  }
+
   String _staffMessage() {
+    if (access.isCommissionLock) return _commissionMessage(owner: false);
     if (access.isPendingApproval) {
       return 'A subscription payment for ${access.salonName} is currently under SuperAdmin review. The app will unlock as soon as the review is complete.';
     }
@@ -559,6 +591,45 @@ class SubscriptionLockedScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             child: const Text('Re-submit or Change Plan'),
+          ),
+        ),
+      ];
+    }
+
+    if (access.isCommissionLock) {
+      return [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            key: const ValueKey('locked_pay_commission'),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SalonPayoutsScreen(salonId: _salonIdFrom(context))),
+              );
+              await onRecheck();
+            },
+            icon: const Icon(Icons.payments_outlined),
+            label: Text(
+              access.dues != null && access.dues!.owed > 0
+                  ? 'Pay ₹${access.dues!.owed.toStringAsFixed(0)} now'
+                  : 'Pay what is owed',
+              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: onRecheck,
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+            child: const Text('I have paid — check again'),
           ),
         ),
       ];

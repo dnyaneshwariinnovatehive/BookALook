@@ -74,6 +74,27 @@ export default function SuperAdminLayout({
     return () => { cancelled = true; };
   }, [pathname]);
 
+  // Open salon requests badge, refreshed the same way.
+  const [openRequests, setOpenRequests] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      fetch('/api/proxy/superadmin/salon-requests?status=open&per_page=1')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (!cancelled && p?.counts) setOpenRequests(Number(p.counts.open) || 0);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    // The requests page announces replies and status changes.
+    window.addEventListener('salon-requests-changed', refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('salon-requests-changed', refresh);
+    };
+  }, [pathname]);
+
   const handleLogout = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
@@ -117,7 +138,11 @@ export default function SuperAdminLayout({
               <div className={styles.navGroupLabel}>{group.label}</div>
               {group.items.map((item) => {
                 const active = current?.item.path === item.path;
-                const badge = item.path === '/superadmin/salon-approval' && pendingCount > 0 ? pendingCount : 0;
+                const badge = item.path === '/superadmin/salon-approval'
+                  ? pendingCount
+                  : item.path === '/superadmin/salon-requests'
+                    ? openRequests
+                    : 0;
                 return (
                   <Link
                     key={item.path}
