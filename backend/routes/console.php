@@ -17,6 +17,10 @@ Schedule::command('app:check-subscriptions')->hourly();
 // the payment sheet has ten minutes, the next customer should not wait longer.
 Schedule::command('app:release-payment-holds')->everyMinute()->withoutOverlapping();
 
+// Expired login tokens (SANCTUM_EXPIRATION_MINUTES, SuperAdmin's 12 hours) no
+// longer work; this only clears the rows. Keeps a day for support questions.
+Schedule::command('sanctum:prune-expired --hours=24')->daily();
+
 // Reconcile and retry pending payment refunds that timed out or failed previously.
 Schedule::command('app:reconcile-pending-refunds')->everyTenMinutes()->withoutOverlapping();
 

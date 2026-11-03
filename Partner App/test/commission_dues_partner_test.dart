@@ -52,7 +52,7 @@ void main() {
     )));
 
     expect(find.text('Online bookings paused'), findsOneWidget);
-    expect(find.textContaining('Customers now pay the full amount online'), findsOneWidget);
+    expect(find.textContaining('Customers must now pay the full amount before their visit'), findsOneWidget);
     expect(find.textContaining('deducted from the money BookALook pays you'), findsOneWidget);
     expect(find.textContaining('From 26 Oct: full lock'), findsOneWidget);
 

@@ -76,7 +76,7 @@ class PayoutDuesTest extends TestCase
         ]);
         DB::table('payments')->insert([
             'id' => (string) Str::uuid(), 'appointment_id' => $a->id, 'amount' => 200, 'payment_type' => 'advance',
-            'payment_mode' => 'online', 'gateway' => 'razorpay', 'status' => 'success', 'created_at' => now(), 'updated_at' => now(),
+            'payment_mode' => 'online', 'gateway' => 'online_gateway', 'status' => 'success', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
         [$s, $e] = PayoutCycle::bounds(PayoutCycle::MONTHLY, Carbon::parse('2026-10-01'));

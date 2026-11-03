@@ -157,7 +157,7 @@ export const TERMS_OF_USE: LegalDocument = {
           text: 'Customers can book appointments with listed salons through the Platform by selecting a preferred service, date and time.',
         },
         {
-          text: 'Payments for confirmed bookings shall be processed through Razorpay, our authorised payment gateway.',
+          text: 'Payments for confirmed bookings, including any advance, are made directly to the salon and recorded on the Platform.',
         },
         {
           text: 'The Company is not responsible for payment disputes arising from user error or failed transactions.',
@@ -332,7 +332,7 @@ export const PRIVACY_POLICY: LegalDocument = {
         },
         { lead: 'C.3 Payment Information' },
         {
-          text: 'Payments are processed via our authorised payment gateway partner (Razorpay). We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping.',
+          text: 'Payments are made to the salon and recorded on the Platform. We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping.',
         },
       ],
     },
@@ -529,7 +529,7 @@ export const CANCELLATION_REFUND_POLICY: LegalDocument = {
           text: 'Refunds (where applicable) shall be initiated within 5-7 business days after cancellation confirmation.',
         },
         {
-          text: 'All refunds shall be credited to the original mode of payment used during the booking (e.g., Razorpay, credit/debit card, UPI, net banking).',
+          text: 'All refunds shall be credited to the original mode of payment used during the booking (e.g., cash, credit/debit card, UPI, net banking).',
         },
         {
           text: "The actual credit to the customer's account may take additional time depending on the payment gateway and the customer's bank policies.",
@@ -673,7 +673,7 @@ export const PARTNER_TERMS: LegalDocument = {
           text: 'Settlements will occur on a defined payment cycle as communicated by BookALook.in.',
         },
         {
-          text: 'BookALook.in shall not be liable for delays arising from banking networks, Razorpay, or other payment intermediaries.',
+          text: 'BookALook.in shall not be liable for delays arising from banking networks or other payment intermediaries.',
         },
       ],
     },

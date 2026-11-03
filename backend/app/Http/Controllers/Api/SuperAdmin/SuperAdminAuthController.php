@@ -36,9 +36,12 @@ class SuperAdminAuthController extends Controller
             ], 403);
         }
 
-        // Generate a Sanctum token
-        // Use plainTextToken for API consumption
-        $token = $user->createToken('superadmin-token')->plainTextToken;
+        // A SuperAdmin session lasts a working day; the website's cookie matches.
+        $token = $user->createToken(
+            'superadmin-token',
+            ['*'],
+            now()->addHours(12),
+        )->plainTextToken;
 
         return response()->json([
             'success' => true,

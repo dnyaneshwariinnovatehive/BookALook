@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Paying for an appointment: hold the slot, verify the payment, book.
+ * Paying for an appointment online: hold the slot, verify the payment, book.
  *
  * The point of these tests is that a booking cannot appear without a payment
  * the server itself verified, and that an unpaid hold always gives the slot
@@ -27,6 +27,17 @@ use Tests\TestCase;
 class BookingPaymentTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Support\PaysOnline;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The online payment path, kept for a future gateway. With no gateway
+        // (the default) bookings confirm straight away: see
+        // BookingWithoutGatewayTest.
+        $this->useFakePaymentGateway();
+    }
 
     public function test_booking_holds_the_slot_and_asks_for_payment(): void
     {
@@ -70,8 +81,7 @@ class BookingPaymentTest extends TestCase
         $appointmentId = $booked->json('appointment.id');
         $amount = (float) $booked->json('payment.amount');
 
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200)
             ->assertJsonPath('appointment.status', 'scheduled');
 
@@ -110,8 +120,8 @@ class BookingPaymentTest extends TestCase
 
         $this->actingAs($customer, 'sanctum')
             ->postJson("/api/customer/appointments/{$appointmentId}/payment/confirm", [
-                'razorpay_payment_id' => 'pay_forged_0001',
-                'razorpay_signature' => str_repeat('a', 64),
+                'payment_id' => 'pay_forged_0001',
+                'signature' => str_repeat('a', 64),
             ])
             ->assertStatus(422);
 
@@ -127,13 +137,11 @@ class BookingPaymentTest extends TestCase
             ->assertStatus(201)
             ->json('appointment.id');
 
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         // A retried callback — a flaky network is the normal case, not an edge one.
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $this->assertSame(1, DB::table('payments')->where('appointment_id', $appointmentId)->count());
@@ -229,7 +237,7 @@ class BookingPaymentTest extends TestCase
 
     public function test_subscription_payments_do_not_touch_the_gateway(): void
     {
-        // The rule this whole feature is scoped by: Razorpay is for appointment
+        // The rule this whole feature is scoped by: online payment is for appointment
         // advances. Subscriptions stay on screenshot verification, so no
         // subscription request may ever carry a gateway order.
         $requests = DB::table('subscription_payment_requests')->get();

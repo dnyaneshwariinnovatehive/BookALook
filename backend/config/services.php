@@ -162,12 +162,22 @@ return [
         'deeplink_base' => env('CUSTOMER_APP_DEEPLINK_BASE', 'bookalook://customer'),
     ],
 
-    'razorpay' => [
-        'driver' => env('PAYMENT_DRIVER', 'demo'), // fallback to demo if no keys
-        'key_id' => env('RAZORPAY_KEY_ID'),
-        'key_secret' => env('RAZORPAY_KEY_SECRET'),
-        'demo_secret' => env('DEMO_PAYMENT_SECRET', 'test-secret'),
+    // Online payments for appointments. `none` (the only driver today) means
+    // no gateway: bookings confirm straight away and the salon records what it
+    // is paid. A future provider adds its own driver name and keys here.
+    'payments' => [
+        'driver' => env('PAYMENT_DRIVER', 'none'),
         'display_name' => env('PAYMENT_DISPLAY_NAME', 'BookALook'),
+        // How long a slot stays held while a customer is paying online. Only
+        // used once a gateway is enabled.
+        'hold_minutes' => (int) env('BOOKING_PAYMENT_HOLD_MINUTES', 10),
+    ],
+
+    // Sign-in codes. The only fixed code is for the store-review numbers listed
+    // here (comma-separated); leave both empty in normal use.
+    'otp' => [
+        'review_phones' => array_values(array_filter(array_map('trim', explode(',', (string) env('OTP_REVIEW_PHONES', ''))))),
+        'review_code' => env('OTP_REVIEW_CODE', ''),
     ],
 
 ];

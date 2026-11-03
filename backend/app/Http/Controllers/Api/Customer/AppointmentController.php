@@ -127,7 +127,12 @@ class AppointmentController extends Controller
             'provider_id' => $request->provider_id,
             'total_duration_minutes' => $requirements['duration'],
             'total_amount' => $requirements['total'],
+            // What the booking policy asks the customer to pay before the
+            // visit. Online, it is paid at booking; with no gateway it is paid
+            // to the salon, which records it.
             'advance_amount' => $payableNow,
+            'online_payment' => $this->payments->onlinePaymentsEnabled(),
+            'pay_at_salon' => ! $this->payments->onlinePaymentsEnabled(),
             'full_upfront_required' => $requirement['full_upfront'],
             'same_day_changes_used' => $requirement['changes_used'],
             'same_day_change_threshold' => $requirement['threshold'],
@@ -281,12 +286,16 @@ class AppointmentController extends Controller
             if ($standing['restricted'] && $standing['action'] === \App\Services\CustomerStandingService::ACTION_FULL_PAYMENT) {
                 $requirement['full_upfront'] = true;
             }
-            // A Commission Model salon with overdue dues: BookALook takes the
-            // whole amount online, so what it owes can be recovered from it.
+            // A Commission Model salon with overdue dues: the whole amount is
+            // due before the visit.
             if ($this->salonNeedsFullPayment($salon_id)) {
                 $requirement['full_upfront'] = true;
             }
             $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
+
+            // With no online gateway nothing is paid at booking: the advance
+            // is recorded as due and the salon records it when it is paid.
+            $online = $this->payments->onlinePaymentsEnabled() && $payableNow > 0;
 
             $appointment = new Appointment([
                 'salon_id' => $salon_id,
@@ -297,13 +306,17 @@ class AppointmentController extends Controller
                 'start_time' => $request->time . ':00',
                 'end_time' => $endTime,
                 // Held, not booked. The slot is blocked but the customer owns
-                // nothing until the money is verified.
+                // nothing until the money is verified (online), or until the
+                // booking is confirmed just below (no gateway).
                 'status' => 'pending_payment',
-                'payment_hold_expires_at' => now()->addMinutes($this->payments->holdMinutes()),
+                'payment_hold_expires_at' => $online ? now()->addMinutes($this->payments->holdMinutes()) : null,
                 'payment_option' => $requirement['full_upfront'] ? 'full_upfront' : 'advance_only',
                 'total_amount' => $requirements['total'],
-                'advance_amount' => $payableNow,
-                'balance_amount' => $requirements['total'] - $payableNow,
+                // Received so far. Online, the advance is being paid now;
+                // otherwise nothing has been paid yet.
+                'advance_amount' => $online ? $payableNow : 0,
+                'advance_due' => $payableNow,
+                'balance_amount' => $requirements['total'] - ($online ? $payableNow : 0),
             ] + $this->recipient($request));
             $appointment->save();
 
@@ -471,17 +484,21 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Failed to book appointment.', 'error' => $e->getMessage()], 500);
         }
 
-        // Nothing to collect (an all-free basket, or a policy that asks for no
-        // advance) — there is no point sending the customer to a payment sheet.
-        if ($payableNow <= 0) {
+        // Nothing to collect online (an all-free basket, a policy that asks for
+        // no advance, or no online gateway at all): confirm the booking now.
+        if (! $online) {
             $this->settleBooking($appointment, $cart);
 
             return response()->json([
-                'message' => 'Appointment booked successfully.',
+                'message' => $payableNow > 0
+                    ? sprintf('Appointment booked. Please pay the ₹%s advance at the salon.', number_format($payableNow, 2))
+                    : 'Appointment booked successfully.',
                 'payment_required' => false,
                 'payment' => null,
+                'advance_due' => (float) $payableNow,
+                'pay_at_salon' => $payableNow > 0,
                 'appointment' => $appointment->load('services.service.template', 'appointedProvider.user'),
-            ]);
+            ], 201);
         }
 
         // The slot is held but the money has not moved. Saying so is the only
@@ -515,17 +532,18 @@ class AppointmentController extends Controller
     }
 
     /**
-     * Confirm a payment the gateway told the app succeeded.
+     * Confirm a payment an online gateway told the app succeeded.
      *
      * The signature is what makes this safe to expose: the app is telling us it
-     * paid, and only the provider (or, in demo, this server) can produce a
-     * signature that agrees.
+     * paid, and only the provider can produce a signature that agrees. With no
+     * gateway configured every signature fails, so this can never be used to
+     * confirm a booking without paying.
      */
     public function confirmPayment(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'razorpay_payment_id' => 'required|string|max:150',
-            'razorpay_signature' => 'required|string|max:500',
+            'payment_id' => 'required|string|max:150',
+            'signature' => 'required|string|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -537,35 +555,8 @@ class AppointmentController extends Controller
         return $this->settlePayment(
             $request,
             $appointment,
-            $request->razorpay_payment_id,
-            $request->razorpay_signature
-        );
-    }
-
-    /**
-     * Complete a payment on the demo gateway.
-     *
-     * Exists so the whole order → pay → verify → confirm path can be exercised
-     * without live keys. It refuses outright once a real gateway is configured,
-     * so it can never become a way to book without paying.
-     */
-    public function demoPay(Request $request, $id)
-    {
-        $appointment = Appointment::where('customer_id', $request->user()->id)->findOrFail($id);
-
-        $simulated = $this->payments->simulatePayment($appointment);
-
-        if (! $simulated) {
-            return response()->json([
-                'message' => 'Demo payments are not available.',
-            ], 400);
-        }
-
-        return $this->settlePayment(
-            $request,
-            $appointment,
-            $simulated['payment_id'],
-            $simulated['signature']
+            $request->payment_id,
+            $request->signature
         );
     }
 
@@ -1411,6 +1402,9 @@ class AppointmentController extends Controller
             'total_amount' => (float) $appointment->total_amount,
             'advance_paid' => (float) $appointment->advance_amount,
             'balance_amount' => (float) $appointment->balance_amount,
+            // Paid / partly paid / unpaid, and what is still due before the
+            // visit. Recorded by the salon when there is no online gateway.
+            'payment' => $this->payments->summary($appointment),
             'final_billed_amount' => $appointment->final_billed_amount !== null
                 ? (float) $appointment->final_billed_amount
                 : null,

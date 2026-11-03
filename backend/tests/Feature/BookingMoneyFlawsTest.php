@@ -359,7 +359,7 @@ class BookingMoneyFlawsTest extends TestCase
             'currency' => 'INR',
             'payment_type' => $type,
             'payment_mode' => 'online',
-            'gateway' => 'razorpay',
+            'gateway' => 'online_gateway',
             'status' => 'success',
             'paid_at' => now(),
             'idempotency_key' => 'advance:' . $appointment->id,

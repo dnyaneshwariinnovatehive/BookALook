@@ -183,11 +183,15 @@ class PayoutService
 
         foreach ($appointments as $appointment) {
             $held = $this->heldByPlatform($appointment);
-            $refunds = DB::table('payment_refunds')
-                ->where('appointment_id', $appointment->id)
-                ->where('status', '!=', 'failed')
-                ->whereNull('salon_payout_id')
-                ->get(['id', 'amount']);
+            // Only refunds of money BookALook held. Money the salon took in
+            // person, it gives back itself; it never passed through a payout.
+            $refunds = DB::table('payment_refunds as r')
+                ->join('payments as p', 'p.id', '=', 'r.payment_id')
+                ->where('r.appointment_id', $appointment->id)
+                ->where('r.status', '!=', 'failed')
+                ->whereNull('r.salon_payout_id')
+                ->whereNotNull('p.gateway')
+                ->get(['r.id', 'r.amount']);
             $refunded = round((float) $refunds->sum('amount'), 2);
 
             $isApp = $this->isAppBooking($appointment);
@@ -243,6 +247,11 @@ class PayoutService
     {
         $refunds = DB::table('payment_refunds as r')
             ->join('appointments as a', 'a.id', '=', 'r.appointment_id')
+            // Refunds of money BookALook held; a salon-held payment's refund
+            // never touches a payout.
+            ->join('payments as pay', function ($join) {
+                $join->on('pay.id', '=', 'r.payment_id')->whereNotNull('pay.gateway');
+            })
             ->join('salon_payout_items as spi', function ($join) {
                 $join->on('spi.appointment_id', '=', 'r.appointment_id')
                     ->where('spi.kind', '=', SalonPayoutItem::KIND_BOOKING);
@@ -342,7 +351,11 @@ class PayoutService
         // Bookings made before payments were recorded per booking carry only
         // their advance figure. A completed app booking was paid for, so that
         // figure stands; a cancelled one with no payment row was never paid.
-        return $appointment->status === 'completed' && $this->isAppBooking($appointment)
+        // Only for bookings made before `advance_due` existed: anything newer
+        // records every payment, and an advance it shows with no gateway
+        // payment was taken by the salon, not held by BookALook.
+        return $appointment->advance_due === null
+            && $appointment->status === 'completed' && $this->isAppBooking($appointment)
             ? (float) $appointment->advance_amount
             : 0.0;
     }

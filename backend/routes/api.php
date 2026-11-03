@@ -6,9 +6,9 @@ use App\Http\Controllers\Api\Customer\CustomerAuthController;
 use App\Http\Controllers\Api\SuperAdmin\SuperAdminAuthController;
 
 Route::prefix('customer')->group(function () {
-    Route::post('/auth/send-otp', [CustomerAuthController::class, 'sendOtp']);
-    Route::post('/auth/verify-otp', [CustomerAuthController::class, 'verifyOtp']);
-    Route::post('/auth/complete-profile', [CustomerAuthController::class, 'completeProfile']);
+    Route::post('/auth/send-otp', [CustomerAuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
+    Route::post('/auth/verify-otp', [CustomerAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
+    Route::post('/auth/complete-profile', [CustomerAuthController::class, 'completeProfile'])->middleware('throttle:otp-verify');
     
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);
@@ -72,10 +72,10 @@ Route::prefix('customer')->group(function () {
         Route::post('/appointments/{id}/reschedule', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{id}/generate-qr', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'generateQr']);
 
-        // Booking payment (Razorpay). Appointment advances only — salon
-        // subscriptions are paid by transfer and verified from a screenshot.
+        // Online booking payment, used only when a payment gateway is enabled
+        // (none is today: the salon records payments instead). Appointments
+        // only — salon subscriptions are paid by transfer and verified by SuperAdmin.
         Route::post('/appointments/{id}/payment/confirm', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'confirmPayment']);
-        Route::post('/appointments/{id}/payment/demo-pay', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'demoPay']);
         Route::post('/appointments/{id}/payment/abandon', [\App\Http\Controllers\Api\Customer\AppointmentController::class, 'abandonPayment']);
 
         // Rating a visit, and reporting one. The app asks for /reviews/pending
@@ -149,7 +149,7 @@ Route::get('/app-version/{app}', [\App\Http\Controllers\Api\AppVersionController
 Route::get('/public/subscription-plans', [\App\Http\Controllers\Api\Partner\PartnerSubscriptionController::class, 'getPlans']);
 
 Route::prefix('superadmin')->group(function () {
-    Route::post('/auth/login', [SuperAdminAuthController::class, 'login']);
+    Route::post('/auth/login', [SuperAdminAuthController::class, 'login'])->middleware('throttle:admin-login');
 
     // Everything below is SuperAdmin only. These were open to anyone while the
     // dashboard was being built; real salons, payouts and customer contact
@@ -311,6 +311,10 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/appointments', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'index']);
         Route::post('/appointments/verify-qr', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'verifyQrAndStartSession']);
         Route::post('/appointments/{id}/add-service', [\App\Http\Controllers\Api\SuperAdmin\SuperAdminAppointmentController::class, 'addServiceMidAppointment']);
+        // Money on a booking: what was paid, recording a payment, refunds.
+        Route::get('/appointments/{id}/payments', [\App\Http\Controllers\Api\SuperAdmin\AppointmentPaymentController::class, 'show']);
+        Route::post('/appointments/{id}/payments', [\App\Http\Controllers\Api\SuperAdmin\AppointmentPaymentController::class, 'store']);
+        Route::post('/appointments/{id}/refunds/{refundId}/returned', [\App\Http\Controllers\Api\SuperAdmin\AppointmentPaymentController::class, 'refundReturned']);
 
         // Customer intelligence. Read-only: the owner sees the whole base, its
         // value and its booking behaviour without touching the records.
@@ -352,12 +356,16 @@ Route::prefix('superadmin')->group(function () {
 });
 
 Route::prefix('partner')->group(function () {
-    Route::post('/auth/send-otp', [\App\Http\Controllers\Api\Partner\PartnerAuthController::class, 'sendOtp']);
-    Route::post('/auth/verify-otp', [\App\Http\Controllers\Api\Partner\PartnerAuthController::class, 'verifyOtp']);
+    Route::post('/auth/send-otp', [\App\Http\Controllers\Api\Partner\PartnerAuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
+    Route::post('/auth/verify-otp', [\App\Http\Controllers\Api\Partner\PartnerAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
     
     Route::post('/register', [\App\Http\Controllers\Api\Partner\SalonRegistrationController::class, 'register']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        // The app asks this at launch: a 401 means the login has expired and
+        // the partner is sent back to the phone screen.
+        Route::get('/auth/check', [\App\Http\Controllers\Api\Partner\PartnerAuthController::class, 'check']);
+
         // Change the signed-in owner's, staff member's or collaborator's own
         // phone number, verified with an OTP to the new number. Outside the
         // plan check: it is the person's login, not a salon feature.
@@ -545,6 +553,11 @@ Route::prefix('partner')->group(function () {
         Route::post('/salons/{salon_id}/appointments/{id}/start', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'start']);
         Route::get('/salons/{salon_id}/appointments/{id}/bill', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'bill']);
         Route::post('/salons/{salon_id}/appointments/{id}/collect-payment', [\App\Http\Controllers\Api\Partner\CheckInController::class, 'collectPayment']);
+        // Payments the customer made to the salon (advance, part payments),
+        // and refunds of money the salon took.
+        Route::get('/salons/{salon_id}/appointments/{id}/payments', [\App\Http\Controllers\Api\Partner\AppointmentPaymentController::class, 'show']);
+        Route::post('/salons/{salon_id}/appointments/{id}/payments', [\App\Http\Controllers\Api\Partner\AppointmentPaymentController::class, 'store'])->middleware('throttle:30,1');
+        Route::post('/salons/{salon_id}/appointments/{id}/refunds/{refundId}/returned', [\App\Http\Controllers\Api\Partner\AppointmentPaymentController::class, 'refundReturned']);
         Route::post('/appointments/{id}/no-show', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'markNoShow']);
         Route::post('/appointments/{id}/complete', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'complete']);
 

@@ -11,23 +11,45 @@ use Illuminate\Support\Str;
 /**
  * The money half of booking an appointment.
  *
- * A booking is created as `pending_payment` first, which holds the slot while
- * the customer is on the payment sheet — otherwise two people could pay for the
- * same time. The hold expires, so an abandoned checkout gives the slot back
- * instead of keeping it forever.
+ * Two ways money arrives, one set of records (payments, payment_refunds):
  *
- * Only the appointment advance comes through here. Salon subscriptions are paid
- * by bank transfer and verified from a screenshot.
+ *  - Recorded by hand. With no online gateway (the default) a booking is
+ *    confirmed straight away, the advance its policy asks for is kept as
+ *    `advance_due`, and the salon or SuperAdmin records what the customer
+ *    actually pays (recordPayment). `advance_amount` only ever counts money
+ *    received, so bills, refunds and payouts stay honest.
+ *  - Online, once a gateway is enabled: the booking is held as
+ *    `pending_payment` while the customer pays, an order is opened, the
+ *    provider's signature confirms it, and an abandoned checkout gives the
+ *    slot back when the hold expires.
+ *
+ * Salon subscriptions and commission dues are paid by bank transfer and
+ * verified by SuperAdmin; they do not come through here.
  */
 class BookingPaymentService
 {
+    /** Refund status for money that has to go back by hand. */
+    public const REFUND_AWAITING_MANUAL = 'awaiting_manual';
+
+    /** Ways a payment can be taken outside the app. */
+    public const MANUAL_MODES = ['cash', 'upi', 'card', 'bank_transfer', 'other'];
+
+    /** What a recorded payment is for. */
+    public const MANUAL_TYPES = ['advance', 'balance', 'full', 'other'];
+
     public function __construct(private PaymentGateway $gateway)
     {
     }
 
+    /** Whether customers pay online at booking. False: the salon collects. */
+    public function onlinePaymentsEnabled(): bool
+    {
+        return $this->gateway->isEnabled();
+    }
+
     public function holdMinutes(): int
     {
-        return (int) config('services.razorpay.hold_minutes', 10);
+        return (int) config('services.payments.hold_minutes', 10);
     }
 
     /**
@@ -61,7 +83,7 @@ class BookingPaymentService
 
         $order = $this->gateway->createOrder(
             $amount,
-            // Short enough for Razorpay's 40-character receipt limit.
+            // Kept short: providers cap receipt references (often at 40).
             'apt_' . substr(str_replace('-', '', $appointment->id), 0, 32),
             [
                 'appointment_id' => $appointment->id,
@@ -97,7 +119,6 @@ class BookingPaymentService
         return [
             'appointment_id' => $appointment->id,
             'gateway' => $order->gateway,
-            'is_demo' => $this->gateway->isDemo(),
             'key' => $this->gateway->publicKey(),
             'name' => $this->gateway->displayName(),
             'order_id' => $order->id,
@@ -453,42 +474,6 @@ class BookingPaymentService
     }
 
     /**
-     * Stand in for the provider's "payment succeeded" callback while running on
-     * the demo gateway.
-     *
-     * The signature is minted here rather than in the app because signing needs
-     * the secret, and a secret shipped to a phone is not a secret. This is the
-     * only reason the demo gateway exposes sign().
-     *
-     * @return array{payment_id: string, signature: string}|null
-     */
-    public function simulatePayment(Appointment $appointment): ?array
-    {
-        $gateway = $this->gateway;
-
-        if (! $gateway instanceof \App\Services\Payments\DemoPaymentGateway) {
-            return null;
-        }
-
-        $order = DB::table('payment_orders')
-            ->where('appointment_id', $appointment->id)
-            ->whereIn('status', ['created', 'paid', 'abandoned'])
-            ->orderByDesc('created_at')
-            ->first();
-
-        if (! $order) {
-            return null;
-        }
-
-        $paymentId = 'pay_demo_' . Str::lower(Str::random(14));
-
-        return [
-            'payment_id' => $paymentId,
-            'signature' => $gateway->sign($order->gateway_order_id, $paymentId),
-        ];
-    }
-
-    /**
      * Release a held slot the customer walked away from.
      */
     public function release(Appointment $appointment, string $reason): bool
@@ -593,6 +578,30 @@ class BookingPaymentService
                 'already_processed' => true,
                 'refund_id' => $refund->gateway_refund_id,
             ];
+        }
+
+        // Money no gateway can send back: taken by the salon in person, or
+        // paid online when no gateway is configured any more. It goes back by
+        // hand and is marked returned once it has (markRefundReturned).
+        $payment = DB::table('payments')->where('id', $refund->payment_id)->first();
+        $heldBySalon = $payment && $payment->gateway === null;
+
+        if ($heldBySalon || ! $this->gateway->isEnabled()) {
+            if ($refund->status !== self::REFUND_AWAITING_MANUAL) {
+                $meta = json_decode($refund->metadata ?? '{}', true) ?: [];
+                $meta['returned_by'] = $heldBySalon ? 'salon' : 'bookalook';
+
+                DB::table('payment_refunds')->where('id', $refundRecordId)->update([
+                    'status' => self::REFUND_AWAITING_MANUAL,
+                    'failure_reason' => $heldBySalon
+                        ? 'Paid to the salon; the salon returns it to the customer.'
+                        : 'No online gateway is configured; BookALook returns it by hand.',
+                    'metadata' => json_encode($meta),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return ['success' => false, 'manual' => true, 'returned_by' => $heldBySalon ? 'salon' : 'bookalook'];
         }
 
         // Atomic check-and-claim: only transition if still pending
@@ -727,6 +736,227 @@ class BookingPaymentService
     public function gateway(): PaymentGateway
     {
         return $this->gateway;
+    }
+
+    /**
+     * Record money a customer paid outside the app: the advance before the
+     * visit, part or all of the bill at the counter, or anything else.
+     *
+     * Writes an ordinary `payments` row (no gateway) and keeps the
+     * appointment's running figures in step: `advance_amount` is what has been
+     * paid towards the advance, `balance_amount` what is still owed.
+     */
+    public function recordPayment(
+        Appointment $appointment,
+        float $amount,
+        string $type,
+        string $mode,
+        string $actorId,
+        ?string $note = null,
+        ?string $reference = null,
+    ): string {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Enter an amount above zero.');
+        }
+        if (! in_array($type, self::MANUAL_TYPES, true)) {
+            throw new \InvalidArgumentException('Unknown payment type.');
+        }
+        if (! in_array($mode, self::MANUAL_MODES, true)) {
+            throw new \InvalidArgumentException('Unknown payment mode.');
+        }
+
+        return DB::transaction(function () use ($appointment, $amount, $type, $mode, $actorId, $note, $reference) {
+            $locked = Appointment::whereKey($appointment->id)->lockForUpdate()->firstOrFail();
+            $summary = $this->summary($locked);
+
+            if ($amount > $summary['outstanding'] + 0.009) {
+                throw new \InvalidArgumentException(sprintf(
+                    'That is more than is owed on this booking (₹%s).',
+                    number_format($summary['outstanding'], 2)
+                ));
+            }
+
+            $id = (string) Str::uuid();
+            DB::table('payments')->insert([
+                'id' => $id,
+                'appointment_id' => $locked->id,
+                'payment_order_id' => null,
+                'amount' => round($amount, 2),
+                'currency' => 'INR',
+                'payment_type' => $type,
+                'payment_mode' => $mode,
+                'gateway' => null,
+                'gateway_transaction_id' => $reference,
+                'status' => 'success',
+                'paid_at' => now(),
+                'idempotency_key' => 'manual:' . $id,
+                'metadata' => json_encode(array_filter([
+                    'recorded_by' => $actorId,
+                    'note' => $note,
+                    'source' => 'manual',
+                ])),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($type === 'advance') {
+                $locked->advance_amount = round((float) $locked->advance_amount + $amount, 2);
+            }
+            $locked->balance_amount = round(max(0, $summary['total'] - $summary['paid'] - $amount), 2);
+            $locked->save();
+
+            return $id;
+        });
+    }
+
+    /**
+     * Mark a refund that had to go back by hand as returned.
+     */
+    public function markRefundReturned(string $refundId, string $actorId, ?string $reference = null): void
+    {
+        $refund = DB::table('payment_refunds')->where('id', $refundId)->first();
+
+        if (! $refund) {
+            throw new \InvalidArgumentException('Refund not found.');
+        }
+        if ($refund->status === 'processed') {
+            return;
+        }
+
+        $meta = json_decode($refund->metadata ?? '{}', true) ?: [];
+        $meta['returned_by_user'] = $actorId;
+        $meta['manual_reference'] = $reference;
+
+        DB::table('payment_refunds')->where('id', $refundId)->update([
+            'status' => 'processed',
+            'processed_at' => now(),
+            'failure_reason' => null,
+            'metadata' => json_encode($meta),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * summary() for a whole list at once: two grouped queries instead of two
+     * per booking.
+     *
+     * @param  iterable<Appointment>  $appointments
+     * @return array<string, array>
+     */
+    public function summaries(iterable $appointments): array
+    {
+        $list = collect($appointments);
+        $ids = $list->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        $paid = DB::table('payments')->whereIn('appointment_id', $ids)->where('status', 'success')
+            ->groupBy('appointment_id')->selectRaw('appointment_id, sum(amount) as total')->pluck('total', 'appointment_id');
+        $refunded = DB::table('payment_refunds')->whereIn('appointment_id', $ids)->where('status', 'processed')
+            ->groupBy('appointment_id')->selectRaw('appointment_id, sum(amount) as total')->pluck('total', 'appointment_id');
+
+        return $list->mapWithKeys(fn (Appointment $a) => [
+            $a->id => $this->summarise($a, (float) ($paid[$a->id] ?? 0), (float) ($refunded[$a->id] ?? 0)),
+        ])->all();
+    }
+
+    /**
+     * Everything recorded against one booking: the summary, each payment and
+     * each refund, for the salon's and SuperAdmin's payment views.
+     */
+    public function ledger(Appointment $appointment): array
+    {
+        $payments = DB::table('payments')->where('appointment_id', $appointment->id)->orderBy('created_at')->get();
+        $refunds = DB::table('payment_refunds')->where('appointment_id', $appointment->id)->orderBy('created_at')->get();
+
+        return [
+            'summary' => $this->summary($appointment),
+            'online_payments' => $this->onlinePaymentsEnabled(),
+            'payments' => $payments->map(function ($p) {
+                $meta = json_decode($p->metadata ?? '{}', true) ?: [];
+
+                return [
+                    'id' => $p->id,
+                    'amount' => (float) $p->amount,
+                    'type' => $p->payment_type,
+                    'mode' => $p->payment_mode,
+                    'status' => $p->status,
+                    // Online (through a gateway) or recorded by hand.
+                    'source' => $p->gateway ? 'online' : 'recorded',
+                    'gateway' => $p->gateway,
+                    'reference' => $p->gateway_transaction_id,
+                    'note' => $meta['note'] ?? null,
+                    'paid_at' => $p->paid_at ?? $p->created_at,
+                ];
+            })->values()->all(),
+            'refunds' => $refunds->map(function ($r) {
+                $meta = json_decode($r->metadata ?? '{}', true) ?: [];
+
+                return [
+                    'id' => $r->id,
+                    'payment_id' => $r->payment_id,
+                    'amount' => (float) $r->amount,
+                    'reason' => $r->reason,
+                    'status' => $r->status,
+                    'returned_by' => $meta['returned_by'] ?? null,
+                    'note' => $r->failure_reason,
+                    'processed_at' => $r->processed_at,
+                    'created_at' => $r->created_at,
+                ];
+            })->values()->all(),
+            'modes' => self::MANUAL_MODES,
+            'types' => self::MANUAL_TYPES,
+        ];
+    }
+
+    /**
+     * Where a booking stands for money: what it costs, what the policy asks
+     * to be paid up front, what has been paid (less refunds returned) and the
+     * resulting status.
+     *
+     * @return array{total: float, advance_due: float, advance_paid: float, advance_outstanding: float, paid: float, refunded: float, outstanding: float, status: string}
+     */
+    public function summary(Appointment $appointment): array
+    {
+        $paid = (float) DB::table('payments')
+            ->where('appointment_id', $appointment->id)
+            ->where('status', 'success')
+            ->sum('amount');
+        $refunded = (float) DB::table('payment_refunds')
+            ->where('appointment_id', $appointment->id)
+            ->where('status', 'processed')
+            ->sum('amount');
+
+        return $this->summarise($appointment, $paid, $refunded);
+    }
+
+    private function summarise(Appointment $appointment, float $paid, float $refunded): array
+    {
+        $total = (float) ($appointment->final_billed_amount ?? $appointment->total_amount ?? 0);
+
+        $net = round(max(0, $paid - $refunded), 2);
+        $advancePaid = (float) $appointment->advance_amount;
+        // Bookings made before advance_due existed asked for what they paid.
+        $advanceDue = $appointment->advance_due !== null ? (float) $appointment->advance_due : $advancePaid;
+
+        $status = match (true) {
+            $total <= 0 => 'not_required',
+            $net >= $total - 0.009 => 'paid',
+            $net > 0 => 'partially_paid',
+            default => 'unpaid',
+        };
+
+        return [
+            'total' => round($total, 2),
+            'advance_due' => round($advanceDue, 2),
+            'advance_paid' => round($advancePaid, 2),
+            'advance_outstanding' => round(max(0, $advanceDue - $advancePaid), 2),
+            'paid' => $net,
+            'refunded' => round($refunded, 2),
+            'outstanding' => round(max(0, $total - $net), 2),
+            'status' => $status,
+        ];
     }
 
     private function paymentType(Appointment $appointment, float $amount): string

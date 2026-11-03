@@ -10,6 +10,7 @@ use App\Models\ServiceProvider;
 use App\Models\WhatsappAutomation;
 use App\Models\WhatsAppMessage;
 use App\Jobs\SendWhatsAppMessageJob;
+use App\Services\Auth\LoginOtp;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,14 @@ class PartnerAuthController extends Controller
         ]);
 
         $phone = $request->phone;
+        $otps = app(LoginOtp::class);
+
+        // A store-review number has a fixed code and is never sent one.
+        if ($otps->isReviewPhone($phone)) {
+            return response()->json(['status' => 'success', 'message' => 'OTP sent successfully.']);
+        }
+
+        $otps->resetAttempts('partner_otp_' . $phone);
         $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
 
         // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
@@ -55,6 +64,12 @@ class PartnerAuthController extends Controller
         ]);
     }
 
+    /** Reached only with a login that still works; an expired one gets a 401. */
+    public function check()
+    {
+        return response()->json(['success' => true]);
+    }
+
     public function verifyOtp(Request $request)
     {
         $request->validate([
@@ -62,9 +77,9 @@ class PartnerAuthController extends Controller
             'otp' => 'required|string',
         ]);
 
-        $cachedOtp = Cache::get('partner_otp_' . $request->phone);
-
-        if ($request->otp !== '123456' && $request->otp !== $cachedOtp) {
+        // Only the code sent to this phone (the demo code when WhatsApp OTP is
+        // off). Five wrong guesses discard it.
+        if (! app(LoginOtp::class)->check('partner_otp_' . $request->phone, $request->phone, $request->otp)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid OTP',

@@ -35,6 +35,15 @@ use Tests\TestCase;
 class InvoiceTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\Support\PaysOnline;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Invoices here follow an online payment, kept for a future gateway.
+        $this->useFakePaymentGateway();
+    }
 
     public function test_a_confirmed_booking_issues_an_invoice(): void
     {
@@ -89,15 +98,13 @@ class InvoiceTest extends TestCase
         $booked = $this->book($customer, $provider, $date, $time);
         $appointmentId = $booked->json('appointment.id');
 
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $first = Invoice::where('appointment_id', $appointmentId)->firstOrFail()->invoice_number;
 
         // The app retried a confirmation it had already got a 200 for.
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $this->assertSame(1, Invoice::where('appointment_id', $appointmentId)->count());
@@ -134,8 +141,7 @@ class InvoiceTest extends TestCase
         $booked = $this->book($customer, $provider, $date, $time);
         $appointmentId = $booked->json('appointment.id');
 
-        $url = $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $url = $this->payOnline($customer, $appointmentId)
             ->assertStatus(200)
             ->json('appointment.invoice.url');
 
@@ -150,8 +156,7 @@ class InvoiceTest extends TestCase
     {
         [$customer, $provider, $date, $time] = $this->readyToBook();
 
-        $url = $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$this->book($customer, $provider, $date, $time)->json('appointment.id')}/payment/demo-pay")
+        $url = $this->payOnline($customer, $this->book($customer, $provider, $date, $time)->json('appointment.id'))
             ->assertStatus(200)
             ->json('appointment.invoice.url');
 
@@ -266,8 +271,7 @@ class InvoiceTest extends TestCase
     {
         $appointmentId = $this->book($customer, $provider, $date, $time)->json('appointment.id');
 
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         return $appointmentId;

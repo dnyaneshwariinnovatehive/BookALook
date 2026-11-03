@@ -49,7 +49,7 @@ class CommissionDuesBanner extends StatelessWidget {
       if (paused) '${_inr(dues.owed)} has been overdue since ${_day(dues.dueDate)}. Customers cannot book until it is paid.',
       if (!paused && overdue) 'It was due on ${_day(dues.dueDate)}.',
       if (!overdue) 'Pay it before the due date to avoid restrictions.',
-      if (dues.has('force_advance')) 'Customers now pay the full amount online.',
+      if (dues.has('force_advance')) 'Customers must now pay the full amount before their visit.',
       if (dues.has('deduct')) 'It will be deducted from the money BookALook pays you.',
       if (dues.nextLabel != null && dues.nextOn != null) 'From ${_day(dues.nextOn)}: ${dues.nextLabel!.toLowerCase()}.',
       if (dues.underReview > 0) 'A payment you sent is being verified.',

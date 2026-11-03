@@ -166,7 +166,7 @@ The following table indexes all **75 tables** present in the BookALook database,
 | 37 | [`notifications`](#table-37-notifications) | User in-app notifications inbox capturing alerts, booking confirmations, payment reminders, and administrative updates. | `id` | appointments, salons, users | No | **Medium** |
 | 38 | [`password_reset_tokens`](#table-38-password-reset-tokens) | Security tokens for password recovery workflows, linking email addresses and expiration times. | `email` | None | No | **Low** |
 | 39 | [`payment_allocations`](#table-39-payment-allocations) | Breakdown of an incoming payment across booking components (advance deposit, balance, platform fee, taxes). | `id` | appointments, payments, users | No | **High** |
-| 40 | [`payment_orders`](#table-40-payment-orders) | Order initiation records created with payment gateways (e.g. Razorpay, Cashfree) prior to customer payment. | `id` | appointments | No | **Critical** |
+| 40 | [`payment_orders`](#table-40-payment-orders) | Order initiation records created with an online payment gateway prior to customer payment. Unused while no gateway is enabled (PAYMENT_DRIVER=none); kept for history and future gateways. | `id` | appointments | No | **Critical** |
 | 41 | [`payment_refunds`](#table-41-payment-refunds) | Financial ledger of processed refunds for cancelled appointments or overpayments with gateway refund IDs. | `id` | appointments, payments, users | No | **High** |
 | 42 | [`payments`](#table-42-payments) | Master payment transaction ledger capturing completed, pending, or failed customer transactions, gateway references, and fees. | `id` | appointments, payment_orders | No | **Critical** |
 | 43 | [`personal_access_tokens`](#table-43-personal-access-tokens) | Laravel Sanctum API authentication tokens for mobile apps and web administrative sessions. | `id` | None | No | **Low** |
@@ -1281,7 +1281,7 @@ This section provides the complete column-by-column schema definition for all 75
 <a id="table-40-payment-orders"></a>
 ### 40. `payment_orders`
 
-- **Purpose:** Order initiation records created with payment gateways (e.g. Razorpay, Cashfree) prior to customer payment.
+- **Purpose:** Order initiation records created with an online payment gateway prior to customer payment. Unused while no gateway is enabled (PAYMENT_DRIVER=none); kept for history and future gateways.
 - **Associated Eloquent Model:** No dedicated Eloquent model (system / pivot table)
 - **Soft Deletes:** No (hard deletes)
 - **Inbound Dependencies (Referenced By):** `payments`
@@ -2505,7 +2505,7 @@ BookALook enforces extensive relational integrity through **147 foreign key cons
 |---|---|---|---|
 | **Database-Enforced Foreign Keys** | `appointments.salon_id -> salons.id`, `appointment_services.appointment_id -> appointments.id` | Handled by PostgreSQL engine via `RESTRICT` or `CASCADE`. | Attempting to delete a parent row with child rows will throw a PostgreSQL constraint violation error unless children are cleared first. |
 | **Polymorphic / Dynamic Relationships** | `audit_log.auditable_id` + `auditable_type`, `notifications.notifiable_id` + `notifiable_type` | Enforced only in application PHP code; NO database foreign key exists. | Deleting a user or salon leaves orphan rows in `audit_log` and `notifications` because PostgreSQL cannot automatically cascade these deletions. |
-| **Payment Gateway Bindings** | `payments.gateway_payment_id`, `payment_orders.gateway_order_id`, `payment_refunds.gateway_refund_id` | Enforced through third-party APIs (Razorpay / Cashfree). | Deleting these rows destroys platform reconciliation with actual bank statements and payment processor dispute evidence. |
+| **Payment Gateway Bindings** | `payments.gateway_payment_id`, `payment_orders.gateway_order_id`, `payment_refunds.gateway_refund_id` | Enforced through a third-party payment gateway, when one is enabled. | Deleting these rows destroys platform reconciliation with actual bank statements and payment processor dispute evidence. |
 | **WhatsApp Vendor Bindings** | `whatsapp_messages.vendor_message_id`, `campaigns.aisensy_campaign_name` | Enforced through AiSensy / Meta Cloud API. | Deleting messages breaks message tracking and dispute audit records. |
 
 ---
@@ -2875,7 +2875,7 @@ Before executing any data cleanup script on the production PostgreSQL VPS, follo
 
 ### Phase 1: Identification & Quarantine
 - [ ] **Distinguish Real vs Dummy Salons:** Query salons created with test phone numbers (`0000000000`, `9999999999`, sequential numbers) or test emails (`test@`, `example.com`, `admin@salon.com`).
-- [ ] **Isolate Real Financial Records:** Flag any appointments with completed Razorpay/Cashfree payment orders where real currency changed hands. Never delete appointments tied to real payment IDs.
+- [ ] **Isolate Real Financial Records:** Flag any appointments with completed online payment orders where real currency changed hands. Never delete appointments tied to real payment IDs.
 - [ ] **Review Soft-Deleted Rows:** Inspect rows where `deleted_at IS NOT NULL` in `users`, `salons`, and `services`. Determine whether they represent legitimate closed businesses or test artifacts.
 - [ ] **Scan Polymorphic References:** Audit `audit_log` and `notifications` for target IDs before removing entities to avoid dead unreferenced metadata.
 
@@ -2905,7 +2905,7 @@ In accordance with the strict read-only audit directive, the following items are
 
 1. **Live Production VPS Data Volumes:** Actual row counts per table on the remote production VPS could not be queried directly from this local development environment, as production connection credentials must not be stored or executed locally.
 2. **PostgreSQL-Specific Extensions:** Extensions such as `pg_trgm`, `postgis`, or `uuid-ossp` if installed directly on the VPS PostgreSQL cluster were not introspected via `pg_extension`. Column types reflect Laravel standard `PostgresGrammar` conversions.
-3. **Third-Party External Ledgers:** Records in `payments` and `whatsapp_messages` carry vendor-assigned IDs (e.g., Razorpay `pay_*` or AiSensy message IDs). Verification against third-party provider dashboards is required before deleting rows.
+3. **Third-Party External Ledgers:** Records in `payments` and `whatsapp_messages` carry vendor-assigned IDs (e.g., payment gateway transaction IDs or AiSensy message IDs). Verification against third-party provider dashboards is required before deleting rows.
 4. **Custom DB Triggers / Stored Procedures:** Any custom PostgreSQL triggers added manually outside Laravel migrations on the VPS are not reflected in application code.
 
 ---

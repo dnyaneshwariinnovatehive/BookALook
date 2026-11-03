@@ -892,6 +892,8 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
     final total = _toDouble(booking['total_amount']);
     final advance = _toDouble(booking['advance_paid']);
     final balance = _toDouble(booking['balance_amount']);
+    final payment = booking['payment'] is Map ? booking['payment'] as Map : const {};
+    final advanceDue = _toDouble(payment['advance_outstanding']);
     final needsReschedule = booking['needs_reschedule'] == true;
     final isAlreadyRescheduled = booking['rescheduled_from_id'] != null;
     final canCancel = !isAlreadyRescheduled && booking['can_cancel'] == true;
@@ -1202,7 +1204,9 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       children: [
                         Flexible(
                           child: Text(
-                            'Advance Paid: ₹${advance.toStringAsFixed(0)}',
+                            advanceDue > 0
+                                ? 'Advance due: ₹${advanceDue.toStringAsFixed(0)}'
+                                : 'Advance Paid: ₹${advance.toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               color: context.colors.textSecondary,

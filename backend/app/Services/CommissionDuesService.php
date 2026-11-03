@@ -51,7 +51,7 @@ class CommissionDuesService
     public const LABELS = [
         self::STEP_REMINDER => 'Reminders',
         self::STEP_BANNER => 'Warning banner',
-        self::STEP_FORCE_ADVANCE => 'Full payment online',
+        self::STEP_FORCE_ADVANCE => 'Full payment up front',
         self::STEP_DEDUCT => 'Deduct from payouts',
         self::STEP_STOP_BOOKINGS => 'New online bookings stopped',
         self::STEP_FULL_LOCK => 'Full lock',
@@ -293,7 +293,7 @@ class CommissionDuesService
 
         return match ($step) {
             self::STEP_BANNER => "{$amount} in commission is now overdue. Please pay it to avoid restrictions.",
-            self::STEP_FORCE_ADVANCE => "{$amount} is overdue, so customers now pay the full amount online when they book.",
+            self::STEP_FORCE_ADVANCE => "{$amount} is overdue, so customers must now pay the full amount before their visit.",
             self::STEP_DEDUCT => "{$amount} is overdue, so it will be deducted from the money BookALook pays you.",
             self::STEP_STOP_BOOKINGS => "New online bookings are paused until the overdue {$amount} is paid. Existing bookings are not affected.",
             self::STEP_FULL_LOCK => "The salon is locked until the overdue {$amount} is paid.",

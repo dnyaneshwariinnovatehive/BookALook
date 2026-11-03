@@ -50,7 +50,10 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Every token stops working this many minutes after it was issued: 90 days
+    // for the Customer and Partner apps. SuperAdmin tokens are given a shorter
+    // expiry of their own when they are issued (SuperAdminAuthController).
+    'expiration' => (int) env('SANCTUM_EXPIRATION_MINUTES', 60 * 24 * 90) ?: null,
 
     /*
     |--------------------------------------------------------------------------

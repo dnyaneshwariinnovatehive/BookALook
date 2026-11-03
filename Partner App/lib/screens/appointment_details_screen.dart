@@ -7,6 +7,7 @@ import '../utils/booked_for.dart';
 import '../utils/feature_flags.dart';
 import 'check_in_confirm_sheet.dart';
 import 'collect_payment_sheet.dart';
+import '../widgets/booking_payments_card.dart';
 import 'add_extra_service_sheet.dart';
 import 'qr_scanner_screen.dart';
 
@@ -391,6 +392,19 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                 ],
               );
             }),
+
+            // What the customer has actually paid the salon, and recording
+            // more. There is no online payment, so the salon records it here.
+            BookingPaymentsCard(
+              key: ValueKey('payments_${appointment['id']}_${appointment['status']}'),
+              salonId: salonId,
+              appointmentId: appointment['id'].toString(),
+              canRecord: !const ['cancelled', 'no_show', 'rescheduled'].contains(appointment['status']),
+              onChanged: (ledger) => setState(() {
+                appointment['advance_amount'] = ledger.advancePaid;
+                appointment['balance_amount'] = ledger.outstanding;
+              }),
+            ),
           ],
         ),
       ),

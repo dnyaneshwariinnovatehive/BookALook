@@ -26,6 +26,8 @@ use Tests\TestCase;
 
 class SalonOfferManagementTest extends TestCase
 {
+    use \Tests\Support\PaysOnline;
+
     use DatabaseTransactions;
 
     private User $adminA;
@@ -272,6 +274,11 @@ class SalonOfferManagementTest extends TestCase
 
     public function test_4_first_time_eligibility_follows_configured_scope(): void
     {
+        // The first booking below must stay an unpaid hold, as it would with
+        // online payment; with no gateway it is confirmed and the customer is
+        // no longer new to the salon.
+        $this->useFakePaymentGateway();
+
         // Offer 1: new_to_platform owned by Salon A
         $platformScopeOffer = $this->createOffer([
             'salon_id' => $this->salonA->id,

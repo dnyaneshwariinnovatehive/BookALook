@@ -27,6 +27,8 @@ use Tests\TestCase;
 
 class FirstTimeOfferLifecycleTest extends TestCase
 {
+    use \Tests\Support\PaysOnline;
+
     use DatabaseTransactions;
     use \Tests\Feature\Concerns\ActivatesSalons;
 
@@ -55,6 +57,9 @@ class FirstTimeOfferLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // These tests cover the online payment path, kept for a future gateway.
+        $this->useFakePaymentGateway();
 
         $this->admin = $this->createUser('admin');
         $this->salonA = $this->createSalon($this->admin, 'Salon Alpha');
@@ -468,8 +473,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $this->assertSame(FirstTimeOfferRedemption::STATUS_RESERVED, $redemption->status);
 
         // Demo pay verifies and confirms
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $appointment = Appointment::find($appointmentId);
@@ -503,13 +507,11 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $appointmentId = $booked->json('appointment.id');
 
         // First payment confirmation
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         // Retried payment confirmation
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $this->assertSame(1, FirstTimeOfferRedemption::where('appointment_id', $appointmentId)->count());
@@ -538,8 +540,8 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $this->actingAs($customer, 'sanctum')->postJson(
             "/api/customer/appointments/{$appointmentId}/payment/confirm",
             [
-                'razorpay_payment_id' => 'pay_tampered_001',
-                'razorpay_signature' => str_repeat('0', 64),
+                'payment_id' => 'pay_tampered_001',
+                'signature' => str_repeat('0', 64),
             ]
         )->assertStatus(422);
 
@@ -592,8 +594,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $appointmentId = $booked->json('appointment.id');
 
         // Confirm payment
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         // Cancel the appointment
@@ -635,8 +636,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
 
         $appointmentId = $booked->json('appointment.id');
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $appointment = Appointment::find($appointmentId);
@@ -823,7 +823,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $paymentService = app(BookingPaymentService::class);
 
         // 1. Customer opened payment sheet and got payment credentials before expiration
-        $simulated = $paymentService->simulatePayment($appointment);
+        $simulated = $this->simulateOnlinePayment($appointment);
         $this->assertNotNull($simulated);
 
         // 2. Hold expires while customer was completing payment at the gateway
@@ -876,7 +876,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
 
         $app1 = Appointment::find($booked1->json('appointment.id'));
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         // Customer 1's hold expires and is released
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
@@ -897,8 +897,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
 
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')
-            ->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")
+        $this->payOnline($customer2, $app2->id)
             ->assertStatus(200);
 
         // Offer is now 100% full (1 of 1 redeemed)
@@ -958,8 +957,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         $appointment = Appointment::find($appointmentId);
 
         // Pay and confirm
-        $this->actingAs($customer, 'sanctum')
-            ->postJson("/api/customer/appointments/{$appointmentId}/payment/demo-pay")
+        $this->payOnline($customer, $appointmentId)
             ->assertStatus(200);
 
         $paymentService = app(BookingPaymentService::class);
@@ -1298,7 +1296,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
 
         $app1 = Appointment::find($booked1->json('appointment.id'));
         $paymentService = app(BookingPaymentService::class);
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         // Hold expires and is released
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
@@ -1315,10 +1313,11 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]
         )->assertStatus(201);
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer2, $app2->id)->assertStatus(200);
 
         // Spy / mock PaymentGateway: when refund() is called, assert database transaction was already committed!
         $mockGateway = \Mockery::mock(\App\Services\Payments\PaymentGateway::class);
+        $mockGateway->shouldReceive('isEnabled')->andReturn(true);
         $mockGateway->shouldReceive('verifySignature')->andReturn(true);
         $mockGateway->shouldReceive('refund')->once()->withArgs(function ($pid, $amount, $reason) use ($app1) {
             // Assert that during the gateway network request, DB state is already committed!
@@ -1373,7 +1372,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
 
         $app1 = Appointment::find($booked1->json('appointment.id'));
         $paymentService = app(BookingPaymentService::class);
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         // Hold expires and is released
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
@@ -1390,7 +1389,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]
         )->assertStatus(201);
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer2, $app2->id)->assertStatus(200);
 
         // First callback: processes payment and refunds successfully
         $result1 = $paymentService->confirm($app1, $simulated1['payment_id'], $simulated1['signature'], $customer1->id);
@@ -1400,6 +1399,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
 
         // Set up mock gateway to guarantee refund() is NEVER called on duplicate callback
         $mockGateway = \Mockery::mock(\App\Services\Payments\PaymentGateway::class);
+        $mockGateway->shouldReceive('isEnabled')->andReturn(true);
         $mockGateway->shouldReceive('verifySignature')->andReturn(true);
         $mockGateway->shouldReceive('refund')->never();
 
@@ -1443,7 +1443,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
 
         $app1 = Appointment::find($booked1->json('appointment.id'));
         $paymentService = app(BookingPaymentService::class);
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
         $paymentService->releaseExpiredHolds();
@@ -1459,10 +1459,11 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]
         )->assertStatus(201);
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer2, $app2->id)->assertStatus(200);
 
         // Gateway times out during refund
         $failingGateway = \Mockery::mock(\App\Services\Payments\PaymentGateway::class);
+        $failingGateway->shouldReceive('isEnabled')->andReturn(true);
         $failingGateway->shouldReceive('verifySignature')->andReturn(true);
         $failingGateway->shouldReceive('refund')->once()->andThrow(new \RuntimeException('Gateway connection timed out'));
 
@@ -1487,6 +1488,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
 
         // Now gateway recovers
         $recoveredGateway = \Mockery::mock(\App\Services\Payments\PaymentGateway::class);
+        $recoveredGateway->shouldReceive('isEnabled')->andReturn(true);
         $recoveredGateway->shouldReceive('refund')->once()->andReturn('rfnd_reconciled_999');
 
         $recoveredService = new BookingPaymentService($recoveredGateway);
@@ -1522,7 +1524,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
         $app1 = Appointment::find($booked1->json('appointment.id'));
         $paymentService = app(BookingPaymentService::class);
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
         $paymentService->releaseExpiredHolds();
@@ -1537,10 +1539,11 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]
         )->assertStatus(201);
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer2, $app2->id)->assertStatus(200);
 
         // Gateway returns null (e.g. 500 error)
         $failingGateway = \Mockery::mock(\App\Services\Payments\PaymentGateway::class);
+        $failingGateway->shouldReceive('isEnabled')->andReturn(true);
         $failingGateway->shouldReceive('verifySignature')->andReturn(true);
         $failingGateway->shouldReceive('refund')->andReturn(null);
 
@@ -1579,7 +1582,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
 
         $appId = $booked->json('appointment.id');
-        $this->actingAs($customer, 'sanctum')->postJson("/api/customer/appointments/{$appId}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer, $appId)->assertStatus(200);
 
         // Cancel the appointment
         $response = $this->actingAs($customer, 'sanctum')->postJson(
@@ -1614,7 +1617,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
         )->assertStatus(201);
         $app1 = Appointment::find($booked1->json('appointment.id'));
         $paymentService = app(BookingPaymentService::class);
-        $simulated1 = $paymentService->simulatePayment($app1);
+        $simulated1 = $this->simulateOnlinePayment($app1);
 
         $app1->update(['payment_hold_expires_at' => now()->subMinutes(5)]);
         $paymentService->releaseExpiredHolds();
@@ -1629,7 +1632,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]
         )->assertStatus(201);
         $app2 = Appointment::find($booked2->json('appointment.id'));
-        $this->actingAs($customer2, 'sanctum')->postJson("/api/customer/appointments/{$app2->id}/payment/demo-pay")->assertStatus(200);
+        $this->payOnline($customer2, $app2->id)->assertStatus(200);
 
         $this->assertSame(1, (int) $offer->fresh()->current_redemptions);
 

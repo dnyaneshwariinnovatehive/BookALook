@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_config.dart';
 import 'push_notification_service.dart';
 
 /// Persists a signed-in partner, moved out of the OTP screen so the screen only
@@ -38,5 +40,38 @@ class AuthSession {
     await prefs.setString(stateKey, jsonEncode(response));
 
     _registerPush().catchError((Object _) {});
+  }
+
+  /// Whether the saved login has expired (logins last 90 days).
+  ///
+  /// Only a 401 counts: offline, slow or any other answer keeps the partner
+  /// signed in, as before. An expired login is cleared the same way the
+  /// logout button clears it.
+  static Future<bool> clearIfExpired({
+    Duration timeout = const Duration(seconds: 4),
+    Future<int> Function()? probe,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(tokenKey);
+    if (token == null || token.isEmpty) return false;
+
+    int status;
+    try {
+      status = await (probe ?? _probe)().timeout(timeout);
+    } catch (_) {
+      return false;
+    }
+    if (status != 401) return false;
+
+    await prefs.clear();
+    return true;
+  }
+
+  static Future<int> _probe() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/partner/auth/check'),
+      headers: await ApiConfig.headers(),
+    );
+    return response.statusCode;
   }
 }

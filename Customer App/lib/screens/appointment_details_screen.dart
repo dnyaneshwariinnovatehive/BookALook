@@ -321,6 +321,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
     final total = _toDouble(_booking['total_amount']);
     final advance = _toDouble(_booking['advance_paid']);
     final balance = _toDouble(_booking['balance_amount']);
+    // What the salon has recorded: the advance still to pay before the visit,
+    // and whether the booking is paid in full.
+    final payment = _booking['payment'] is Map ? _booking['payment'] as Map : const {};
+    final advanceDue = _toDouble(payment['advance_outstanding']);
+    final paidInFull = payment['status'] == 'paid';
     
     final freeReschedule = _booking['free_reschedule'] == true;
     final needsReschedule = _booking['needs_reschedule'] == true;
@@ -643,9 +648,18 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen> {
                         ),
                       ],
 
-                      if (_booking['payment_option'] == 'full_upfront') ...[
+                      if (advanceDue > 0 && const ['scheduled', 'awaiting_reschedule'].contains(_booking['status'])) ...[
                         SizedBox(height: 12),
-                        Text('Paid in full upfront.', style: GoogleFonts.outfit(fontSize: 13, color: bodyColor)),
+                        Text(
+                          _booking['payment_option'] == 'full_upfront'
+                              ? 'Please pay the full ₹${advanceDue.toStringAsFixed(0)} at the salon before your visit.'
+                              : 'Please pay the ₹${advanceDue.toStringAsFixed(0)} advance at the salon before your visit.',
+                          key: const ValueKey('booking_advance_due'),
+                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: headingColor),
+                        ),
+                      ] else if (paidInFull) ...[
+                        SizedBox(height: 12),
+                        Text('Paid in full.', style: GoogleFonts.outfit(fontSize: 13, color: bodyColor)),
                       ],
                     ],
                   ),

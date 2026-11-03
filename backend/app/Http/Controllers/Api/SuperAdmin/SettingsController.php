@@ -130,7 +130,7 @@ class SettingsController extends Controller
             'commission_dues_reminder_before_days' => 'Days before the due date the first dues reminder goes out',
             'commission_dues_reminder_every_days' => 'Days between dues reminders after the first. 0 = only once',
             'commission_dues_banner_days' => 'Days after the due date the overdue banner appears in the Partner App',
-            'commission_dues_force_advance_days' => 'Days after the due date customers must pay the full amount online',
+            'commission_dues_force_advance_days' => 'Days after the due date customers must pay the full amount before their visit',
             'commission_dues_deduct_days' => 'Days after the due date dues are deducted from payouts to the salon',
             'commission_dues_stop_bookings_days' => 'Days after the due date new online bookings stop',
             'commission_dues_full_lock_days' => 'Days after the due date the salon is fully locked',
@@ -190,7 +190,7 @@ class SettingsController extends Controller
         $booleanSettings = [
             'commission_dues_reminder_enabled' => 'Send reminders about overdue commission',
             'commission_dues_banner_enabled' => 'Show an overdue banner in the Partner App',
-            'commission_dues_force_advance_enabled' => 'Make customers pay the full amount online while dues are overdue',
+            'commission_dues_force_advance_enabled' => 'Make customers pay the full amount before their visit while dues are overdue',
             'commission_dues_deduct_enabled' => 'Deduct overdue dues from payouts to the salon',
             'commission_dues_stop_bookings_enabled' => 'Stop new online bookings while dues are overdue',
             'commission_dues_full_lock_enabled' => 'Fully lock a salon whose dues stay overdue',

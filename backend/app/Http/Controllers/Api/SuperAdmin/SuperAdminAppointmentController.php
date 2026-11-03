@@ -122,7 +122,13 @@ class SuperAdminAppointmentController extends Controller
         // Stable tie-break so paging never repeats or skips across equal times.
         $query->orderBy('id', 'desc');
 
-        return response()->json($query->paginate((int) $request->get('per_page', 20)));
+        $page = $query->paginate((int) $request->get('per_page', 20));
+
+        // Paid / partly paid / unpaid and the advance still due on each row.
+        $summaries = app(\App\Services\BookingPaymentService::class)->summaries($page->getCollection());
+        $page->getCollection()->each(fn ($appointment) => $appointment->setAttribute('payment', $summaries[$appointment->id] ?? null));
+
+        return response()->json($page);
     }
 
     /**

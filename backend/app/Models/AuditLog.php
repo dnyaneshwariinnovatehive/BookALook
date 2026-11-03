@@ -79,6 +79,8 @@ class AuditLog extends Model
     public const PAYOUT_DISTRIBUTED = 'payout.distributed';
     public const COMMISSION_DUES_CHANGED = 'commission_dues.changed';
     public const COMMISSION_DUES_PAYMENT = 'commission_dues.payment_recorded';
+    public const BOOKING_PAYMENT_RECORDED = 'booking.payment_recorded';
+    public const BOOKING_REFUND_RETURNED = 'booking.refund_returned';
     public const SALON_BANK_DETAILS_UPDATED = 'salon.bank_details_updated';
     public const SALON_BANK_DETAILS_REVEALED = 'salon.bank_details_revealed';
 
@@ -125,6 +127,8 @@ class AuditLog extends Model
         // commission decides whether it can trade.
         self::COMMISSION_DUES_CHANGED => ['label' => "Changed a salon's overdue-commission steps", 'category' => 'Money', 'severity' => 'high'],
         self::COMMISSION_DUES_PAYMENT => ['label' => 'Recorded a commission payment', 'category' => 'Money', 'severity' => 'critical'],
+        self::BOOKING_PAYMENT_RECORDED => ['label' => 'Recorded a booking payment', 'category' => 'Money', 'severity' => 'high'],
+        self::BOOKING_REFUND_RETURNED => ['label' => 'Marked a booking refund returned', 'category' => 'Money', 'severity' => 'high'],
         // Where a salon's money is sent. Changing it is how a settlement goes
         // astray, so it stands out as much as moving the money itself.
         self::SALON_BANK_DETAILS_UPDATED => ['label' => "Changed a salon's bank details", 'category' => 'Money', 'severity' => 'critical'],

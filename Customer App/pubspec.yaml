@@ -41,7 +41,6 @@ dependencies:
   url_launcher: ^6.3.2
   intl: ^0.20.2
   qr_flutter: ^4.1.0
-  razorpay_flutter: ^1.4.6
   # Where the customer is, so the directory can show the nearest salons first.
   # The city itself is resolved server-side from this fix, which keeps the
   # mapping between coordinates and markets in one place.

@@ -43,7 +43,7 @@ class EnsureSalonSubscriptionActive
             'message' => match ($status['reason']) {
                 // Postpaid: nothing has been bought, so there is nothing to renew.
                 SalonAccessService::REASON_COMMISSION_UNSETTLED
-                    => 'This salon has an unsettled commission month. It will go back online once the payout is settled.',
+                    => 'This salon owes BookALook overdue commission. It will reopen once that is paid.',
                 SalonAccessService::REASON_SUBSCRIPTION_EXPIRED,
                 SalonAccessService::REASON_NO_SUBSCRIPTION
                     => 'This salon\'s subscription plan has lapsed. Renew the plan to use the app again.',

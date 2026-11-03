@@ -43,12 +43,18 @@ async function handleRequest(req: NextRequest, { params }: { params: Promise<{ p
     });
 
     const data = await backendRes.text();
-    return new NextResponse(data, {
+    const res = new NextResponse(data, {
       status: backendRes.status,
       headers: {
         'Content-Type': backendRes.headers.get('content-type') || 'application/json',
       }
     });
+    // The token has expired or been revoked: drop the cookie so the next page
+    // load goes to /login instead of a dashboard full of errors.
+    if (backendRes.status === 401 && token) {
+      res.cookies.delete('superadmin_token');
+    }
+    return res;
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

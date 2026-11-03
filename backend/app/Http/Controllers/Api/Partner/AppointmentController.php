@@ -75,6 +75,11 @@ class AppointmentController extends Controller
             $appointment->is_rescheduled = !is_null($appointment->rescheduled_from_id);
         });
 
+        // Paid / partly paid / unpaid and the advance still due, from the
+        // payments the salon has recorded.
+        $summaries = app(\App\Services\BookingPaymentService::class)->summaries($appointments);
+        $appointments->each(fn ($appointment) => $appointment->setAttribute('payment', $summaries[$appointment->id] ?? null));
+
         return response()->json(['appointments' => $appointments]);
     }
 

@@ -3,17 +3,32 @@
 namespace App\Services\Payments;
 
 /**
- * The seam a real payment provider plugs into.
+ * The seam an online payment provider plugs into.
  *
- * Scoped to customer appointment advances only. Salon subscriptions are paid
- * by bank transfer and verified from a screenshot by SuperAdmin — that flow
- * deliberately does not come through here.
+ * BookALook currently runs without one: the default binding is
+ * NoPaymentGateway, bookings are confirmed straight away and the salon records
+ * what it is paid (see BookingPaymentService::recordPayment). Everything that
+ * an online provider would need — orders, signature verification, refunds,
+ * the payment_orders / payments / payment_refunds tables — is kept, so a
+ * provider can be added later by implementing this interface and binding it
+ * in AppServiceProvider, without rebuilding the payment system.
+ *
+ * Scoped to customer appointment payments only. Salon subscriptions and
+ * commission dues are paid by bank transfer and verified by SuperAdmin.
  */
 interface PaymentGateway
 {
     /**
+     * Whether customers can pay online at all. False means bookings skip the
+     * payment step and the salon collects in person.
+     */
+    public function isEnabled(): bool;
+
+    /**
      * Open an order for [$amountInRupees]. The returned id is what the app
-     * hands to the checkout sheet.
+     * hands to the provider's checkout.
+     *
+     * @throws PaymentGatewayException when no order can be opened
      */
     public function createOrder(float $amountInRupees, string $receipt, array $notes = []): GatewayOrder;
 
@@ -37,11 +52,4 @@ interface PaymentGateway
 
     /** Name shown on the checkout sheet. */
     public function displayName(): string;
-
-    /**
-     * True when no real money moves. The app shows its own confirm sheet
-     * instead of the provider's, so the flow is exercised end to end without
-     * live keys.
-     */
-    public function isDemo(): bool;
 }

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\WhatsappAutomation;
 use App\Models\WhatsAppMessage;
 use App\Jobs\SendWhatsAppMessageJob;
+use App\Services\Auth\LoginOtp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -29,6 +30,14 @@ class CustomerAuthController extends Controller
         }
 
         $phone = $request->phone;
+        $otps = app(LoginOtp::class);
+
+        // A store-review number has a fixed code and is never sent one.
+        if ($otps->isReviewPhone($phone)) {
+            return response()->json(['message' => 'OTP sent successfully.', 'phone' => $phone]);
+        }
+
+        $otps->resetAttempts('otp_' . $phone);
         $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
 
         // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
@@ -77,10 +86,9 @@ class CustomerAuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $cachedOtp = \Illuminate\Support\Facades\Cache::get('otp_' . $request->phone);
-        
-        // Mock verification for testing without cache
-        if ($request->otp !== '123456' && $request->otp !== $cachedOtp) {
+        // Only the code sent to this phone (the demo code when WhatsApp OTP is
+        // off). Five wrong guesses discard it.
+        if (! app(LoginOtp::class)->check('otp_' . $request->phone, $request->phone, $request->otp)) {
             throw ValidationException::withMessages([
                 'otp' => ['The provided OTP is incorrect.'],
             ]);

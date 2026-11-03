@@ -13,9 +13,11 @@ use App\Services\Notifications\LogWhatsAppGateway;
 use App\Services\Notifications\MetaCloudWhatsAppGateway;
 use App\Services\Notifications\PushGateway;
 use App\Services\Notifications\WhatsAppGateway;
-use App\Services\Payments\DemoPaymentGateway;
+use App\Services\Payments\NoPaymentGateway;
 use App\Services\Payments\PaymentGateway;
-use App\Services\Payments\RazorpayGateway;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -76,22 +78,17 @@ class AppServiceProvider extends ServiceProvider
             return new FcmPushGateway($credentials, new FcmAccessTokenProvider($credentials));
         });
 
-        // Razorpay for appointment advances. Falls back to the demo gateway
-        // whenever keys are missing, so a half-configured environment cannot
-        // silently try to take real money through an unconfigured provider.
+        // Online payments for appointments. None is configured: bookings are
+        // confirmed without a payment step and the salon records what it is
+        // paid. A future provider implements PaymentGateway and is selected
+        // here by PAYMENT_DRIVER; anything unrecognised stays on `none`, so a
+        // half-configured environment can never try to take real money.
         $this->app->bind(PaymentGateway::class, function () {
-            $config = config('services.razorpay');
-            $hasKeys = ! empty($config['key_id']) && ! empty($config['key_secret']);
+            $config = config('services.payments');
 
-            if ($config['driver'] === 'razorpay' && $hasKeys) {
-                return new RazorpayGateway(
-                    $config['key_id'],
-                    $config['key_secret'],
-                    $config['display_name'],
-                );
-            }
-
-            return new DemoPaymentGateway($config['demo_secret'], $config['display_name']);
+            return match ($config['driver'] ?? 'none') {
+                default => new NoPaymentGateway($config['display_name'] ?? 'BookALook'),
+            };
         });
     }
 
@@ -101,6 +98,38 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->teachSqliteToMeasureDistance();
+        $this->limitSignIns();
+    }
+
+    /**
+     * Limits on the sign-in endpoints, counted per phone (or email) and per IP,
+     * so codes cannot be guessed or WhatsApp sends run up. Over the limit the
+     * API answers 429 with a message the apps show as is.
+     */
+    private function limitSignIns(): void
+    {
+        $phone = fn (Request $r) => preg_replace('/\D/', '', (string) $r->input('phone'));
+
+        RateLimiter::for('otp-send', fn (Request $r) => [
+            Limit::perMinute(3)->by('otp-send:phone:' . $phone($r))
+                ->response(fn () => response()->json(['message' => 'Please wait a minute before asking for another code.'], 429)),
+            Limit::perHour(10)->by('otp-send:phone-hour:' . $phone($r))
+                ->response(fn () => response()->json(['message' => 'Too many codes asked for this number. Try again in an hour.'], 429)),
+            Limit::perMinute(20)->by('otp-send:ip:' . $r->ip()),
+        ]);
+
+        RateLimiter::for('otp-verify', fn (Request $r) => [
+            Limit::perMinute(10)->by('otp-verify:phone:' . $phone($r))
+                ->response(fn () => response()->json(['message' => 'Too many tries. Please wait a minute.'], 429)),
+            Limit::perMinute(30)->by('otp-verify:ip:' . $r->ip()),
+        ]);
+
+        RateLimiter::for('admin-login', fn (Request $r) => [
+            Limit::perMinute(5)->by('admin-login:ip:' . $r->ip())
+                ->response(fn () => response()->json(['success' => false, 'message' => 'Too many sign-in attempts. Please wait a minute.'], 429)),
+            Limit::perHour(20)->by('admin-login:email:' . strtolower((string) $r->input('email')))
+                ->response(fn () => response()->json(['success' => false, 'message' => 'Too many sign-in attempts. Try again later.'], 429)),
+        ]);
     }
 
     /**

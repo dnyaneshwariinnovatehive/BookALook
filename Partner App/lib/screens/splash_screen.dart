@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:partner_app/theme/app_theme.dart';
 import '../services/api_config.dart' show mandatoryUpdateRouteName;
 import '../services/app_version_service.dart';
+import '../services/auth_session.dart';
 import 'mandatory_update_screen.dart';
 import 'phone_screen.dart';
 import 'dashboard/salon_switching.dart';
@@ -53,6 +54,10 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _preloadAuthAndVersion() async {
+    // A login past its 90 days is cleared here, so the partner lands on the
+    // phone screen instead of a dashboard that cannot load anything.
+    await AuthSession.clearIfExpired();
+
     final prefs = await SharedPreferences.getInstance();
     _cachedToken = prefs.getString('auth_token');
     _cachedAuthStateStr = prefs.getString('auth_state');

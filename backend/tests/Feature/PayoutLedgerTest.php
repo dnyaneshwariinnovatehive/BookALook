@@ -79,7 +79,7 @@ class PayoutLedgerTest extends TestCase
         if ($paidOnline > 0) {
             DB::table('payments')->insert([
                 'id' => (string) Str::uuid(), 'appointment_id' => $a->id, 'amount' => $paidOnline,
-                'payment_type' => 'advance', 'payment_mode' => 'online', 'gateway' => 'razorpay',
+                'payment_type' => 'advance', 'payment_mode' => 'online', 'gateway' => 'online_gateway',
                 'status' => 'success', 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

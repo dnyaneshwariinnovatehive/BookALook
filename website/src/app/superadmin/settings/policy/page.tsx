@@ -267,7 +267,7 @@ type DuesStepKey = 'Banner' | 'Advance' | 'Deduct' | 'Stop' | 'Lock';
 /** The steps after the due date, mildest first, as the Policy form shows them. */
 const DUES_STEPS: { key: DuesStepKey; title: string; hint: string }[] = [
   { key: 'Banner', title: 'Warning banner', hint: 'A red strip in the Partner App with the amount and a Pay now button. Blocks nothing.' },
-  { key: 'Advance', title: 'Customers pay the full amount online', hint: 'BookALook collects the whole price at booking, so what the salon owes can be recovered from it.' },
+  { key: 'Advance', title: 'Customers pay the full amount up front', hint: 'The whole price becomes due before the visit instead of just the advance. The salon collects and records it.' },
   { key: 'Deduct', title: 'Deduct from payouts', hint: 'Overdue dues are taken off the next money BookALook pays the salon.' },
   { key: 'Stop', title: 'Stop new online bookings', hint: 'Customers cannot book the salon. Existing bookings go ahead and the Partner App keeps working.' },
   { key: 'Lock', title: 'Full lock', hint: 'The Partner App locks for everyone and the salon is unavailable to customers.' },

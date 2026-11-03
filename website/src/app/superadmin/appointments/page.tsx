@@ -10,6 +10,7 @@ import {
   clickableRow, cx, downloadCSV, formatINR, localISODate, ui, useDebounced, type Tone,
 } from '@/components/admin/ui';
 import styles from './page.module.css';
+import PaymentPanel from './PaymentPanel';
 
 // The API is Laravel, so every relation arrives snake_cased.
 interface UserRef {
@@ -83,6 +84,13 @@ interface Appointment {
   advance_amount?: string;
   balance_amount?: string;
   final_billed_amount?: string | null;
+  /** Paid / partly paid / unpaid, from recorded payments. */
+  payment?: {
+    status: 'paid' | 'partially_paid' | 'unpaid' | 'not_required';
+    paid: number;
+    outstanding: number;
+    advance_outstanding: number;
+  } | null;
 
   walk_in_customer_name?: string | null;
   walk_in_customer_phone?: string | null;
@@ -645,7 +653,11 @@ export default function GlobalAppointmentsDashboard() {
                       <td><StatusBadge status={apt.status} /></td>
                       <td className={ui.alignRight}>
                         <div className={cx(ui.cellPrimary, ui.num)}>{money(apt.final_billed_amount ?? apt.total_amount)}</div>
-                        {Number(apt.advance_amount) > 0 && OPEN_STATUSES.has(apt.status) && (
+                        {OPEN_STATUSES.has(apt.status) && (apt.payment?.advance_outstanding ?? 0) > 0 ? (
+                          <div className={cx(ui.cellSub, ui.num)}>
+                            {money(apt.payment?.advance_outstanding)} advance due
+                          </div>
+                        ) : Number(apt.advance_amount) > 0 && OPEN_STATUSES.has(apt.status) && (
                           <div className={cx(ui.cellSub, ui.num)}>
                             {money(apt.advance_amount)} paid · {money(apt.balance_amount)} due
                           </div>
@@ -940,16 +952,7 @@ function AppointmentDetails({ apt, tab, onTab }: { apt: Appointment; tab: Detail
         )}
 
         {tab === 'payment' && (
-          <DescriptionList
-            variant="clean"
-            items={[
-              ['Option', apt.payment_option?.replace(/_/g, ' ') || '—'],
-              ['Total', money(apt.total_amount)],
-              ['Advance paid', money(apt.advance_amount)],
-              ['Balance due', money(apt.balance_amount)],
-              ['Final billed', money(apt.final_billed_amount)],
-            ]}
-          />
+          <PaymentPanel appointmentId={apt.id} status={apt.status} paymentOption={apt.payment_option} />
         )}
 
         {tab === 'timeline' && (

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../services/cart_service.dart';
@@ -63,8 +62,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int _totalDuration = 0;
 
   bool _isBooking = false;
-  String? _pendingPaymentAppointmentId;
-  late Razorpay _razorpay;
+
+  /// No online payment: the advance is paid to the salon, which records it.
+  /// The server says so with each quote; true until it does.
+  bool _payAtSalon = true;
 
   /// Who sits in the chair. The account holder always owns and pays for the
   /// booking; this only tells the salon who to expect.
@@ -80,10 +81,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     AudienceService.profileGender().then((gender) {
       if (mounted) setState(() => _viewerGender = gender);
     });
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadProviders();
     _loadCart();
     _appointmentService.fetchBookingStanding().then((standing) {
@@ -116,53 +113,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
-    _razorpay.clear();
     _scrollController.dispose();
     _recipientNameController.dispose();
     _recipientPhoneController.dispose();
     super.dispose();
-  }
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    if (_pendingPaymentAppointmentId == null) return;
-
-    setState(() => _isBooking = true);
-    try {
-      await _appointmentService.confirmPayment(
-        _pendingPaymentAppointmentId!,
-        response.paymentId ?? '',
-        response.signature ?? '',
-      );
-      _showSuccessDialog();
-    } catch (e) {
-      _setBookingError(
-        describeError(
-          e,
-          fallback:
-              'We could not confirm your booking yet. If the payment went through, '
-              'it will appear in My Bookings shortly.',
-        ),
-      );
-    } finally {
-      setState(() => _isBooking = false);
-    }
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    final reason = response.message?.trim() ?? '';
-    _setBookingError(
-      reason.isNotEmpty
-          ? reason
-          : 'Payment did not go through. Please try again.',
-    );
-    if (_pendingPaymentAppointmentId != null) {
-      _appointmentService.abandonPayment(_pendingPaymentAppointmentId!);
-      _pendingPaymentAppointmentId = null;
-    }
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    _toast('Continuing with ${response.walletName}.');
   }
 
   Future<void> _loadProviders({bool isDateChange = false}) async {
@@ -230,6 +184,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (returnedTotal > 0 || _totalAmount == 0) {
           _totalAmount = returnedTotal;
         }
+        _payAtSalon = data['pay_at_salon'] != false;
         final returnedAdvance = _toDouble(data['advance_amount']);
         if (returnedAdvance > 0 || _advanceAmount == 0) {
           _advanceAmount = returnedAdvance;
@@ -308,6 +263,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (returnedTotal > 0 || _totalAmount == 0) {
           _totalAmount = returnedTotal;
         }
+        _payAtSalon = data['pay_at_salon'] != false;
         final returnedAdvance = _toDouble(data['advance_amount']);
         if (returnedAdvance > 0 || _advanceAmount == 0) {
           _advanceAmount = returnedAdvance;
@@ -486,123 +442,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       setState(() => _isBooking = false);
 
-      final isPaymentRequired = response['payment_required'] == true;
+      // The slot just booked, start to finish — from the booking the server
+      // made, else worked out from the chosen start and duration.
+      final appointment = response['appointment'] is Map
+          ? Map<String, dynamic>.from(response['appointment'] as Map)
+          : const <String, dynamic>{};
 
-      if (!isPaymentRequired) {
-        _showSuccessDialog();
+      if (response['payment_required'] == true) {
+        // The server wants payment online, which this version of the app
+        // cannot take. Give the slot back rather than leave it held.
+        final id = appointment['id']?.toString() ??
+            (response['payment'] is Map ? response['payment']['appointment_id']?.toString() : null);
+        if (id != null) _appointmentService.abandonPayment(id);
+        _setBookingError('Online payment is not available in this version of the app. Please update the app and try again.');
         return;
       }
 
-      final payment = response['payment'];
-      final appointmentId = payment['appointment_id'];
-      _pendingPaymentAppointmentId = appointmentId;
-
-      if (payment['is_demo'] == true) {
-        if (!mounted) return;
-        // The slot being paid for, start to finish — from the booking the
-        // server made, else worked out from the chosen start and duration.
-        final appointment = response['appointment'] is Map
-            ? Map<String, dynamic>.from(response['appointment'] as Map)
-            : const <String, dynamic>{};
-        final start = appointment['start_time']?.toString() ?? _selectedTime;
-        final end = appointment['end_time']?.toString() ??
-            addMinutesToClock(_selectedTime, _totalDuration);
-        final window = formatTimeWindow(start, end);
-        final dayLabel = DateFormat('EEE, d MMM yyyy').format(_selectedDate);
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => AlertDialog(
-            title: Text('Demo Payment'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  key: const ValueKey('pay_dialog_time'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.schedule, size: 20, color: AppTheme.accentColor),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              dayLabel,
-                              style: GoogleFonts.outfit(fontSize: 12.5, color: context.colors.textSecondary),
-                            ),
-                            Text(
-                              window,
-                              style: GoogleFonts.outfit(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: context.colors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Simulate a successful payment for ₹${payment['amount']}?',
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  AppHaptics.lightImpact();
-                  Navigator.pop(dialogContext);
-                  _appointmentService.abandonPayment(appointmentId);
-                  _pendingPaymentAppointmentId = null;
-                },
-                child: Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  AppHaptics.lightImpact();
-                  Navigator.pop(dialogContext);
-                  setState(() => _isBooking = true);
-                  try {
-                    await _appointmentService.demoPay(appointmentId);
-                    _showSuccessDialog();
-                  } catch (e) {
-                    _setBookingError(
-                      describeError(
-                        e,
-                        fallback:
-                            'Payment did not go through. Please try again.',
-                      ),
-                    );
-                  } finally {
-                    setState(() => _isBooking = false);
-                  }
-                },
-                child: Text('Pay (Demo)'),
-              ),
-            ],
-          ),
-        );
-      } else {
-        var options = {
-          'key': payment['key'],
-          'amount': payment['amount_in_paise'],
-          'name': payment['name'],
-          'description': 'Appointment Booking',
-          'order_id': payment['order_id'],
-        };
-        _razorpay.open(options);
-      }
+      _showSuccessDialog(
+        start: appointment['start_time']?.toString() ?? _selectedTime,
+        end: appointment['end_time']?.toString() ?? addMinutesToClock(_selectedTime, _totalDuration),
+        advanceDue: _toDouble(response['advance_due']),
+      );
     } catch (e) {
       AppHaptics.error();
       setState(() => _isBooking = false);
@@ -618,9 +478,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog({String? start, String? end, double advanceDue = 0}) {
     if (!mounted) return;
     AppHaptics.success();
+    final window = start != null && end != null ? formatTimeWindow(start, end) : null;
+    final dayLabel = DateFormat('EEE, d MMM yyyy').format(_selectedDate);
 
     showDialog(
       context: context,
@@ -645,6 +507,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(color: context.colors.textSecondary),
             ),
+            if (window != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                key: const ValueKey('booking_confirmed_time'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.schedule, size: 20, color: AppTheme.accentColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(dayLabel,
+                              style: GoogleFonts.outfit(fontSize: 12.5, color: context.colors.textSecondary)),
+                          Text(window,
+                              style: GoogleFonts.outfit(
+                                  fontSize: 15, fontWeight: FontWeight.bold, color: context.colors.textPrimary)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (advanceDue > 0) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Please pay the ₹${advanceDue.toStringAsFixed(0)} advance at the salon.',
+                key: const ValueKey('booking_confirmed_advance_due'),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: context.colors.textPrimary),
+              ),
+            ],
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
@@ -678,12 +579,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!mounted) return;
     AppHaptics.error();
     setState(() => _bookingError = text);
-  }
-
-  /// Confirmations only: a message that may vanish without loss.
-  void _toast(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   Widget _hint(String? text, VoidCallback onDismiss) {
@@ -1828,7 +1723,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Advance payable now',
+                  _payAtSalon ? 'Advance to pay at the salon' : 'Advance payable now',
                   style: GoogleFonts.outfit(
                     fontSize: 14,
                     color: context.colors.textSecondary,
@@ -1869,7 +1764,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       )
                     : Text(
-                        'Confirm & Pay Advance',
+                        _payAtSalon ? 'Confirm Booking' : 'Confirm & Pay Advance',
                         style: GoogleFonts.outfit(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

@@ -126,7 +126,7 @@ const List<LegalDocument> kLegalDocuments = [
         heading: "G. Booking, Payment and Pricing",
         blocks: [
           LegalBlock(text: "Customers can book appointments with listed salons through the Platform by selecting a preferred service, date and time."),
-          LegalBlock(text: "Payments for confirmed bookings shall be processed through Razorpay, our authorised payment gateway."),
+          LegalBlock(text: "Payments for confirmed bookings, including any advance, are made directly to the salon and recorded on the Platform."),
           LegalBlock(text: "The Company is not responsible for payment disputes arising from user error or failed transactions."),
           LegalBlock(text: "Taxes (including GST) are applied as per applicable law and may vary by salon and location."),
           LegalBlock(text: "A valid booking confirmation shall be issued upon successful payment or as per Service Provider policy."),
@@ -246,7 +246,7 @@ const List<LegalDocument> kLegalDocuments = [
             "Device information (type, operating system, browser), IP address, date/time of visit, usage patterns, cookies and analytics data.",
           ]),
           LegalBlock(lead: "C.3 Payment Information"),
-          LegalBlock(text: "Payments are processed via our authorised payment gateway partner (Razorpay). We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping."),
+          LegalBlock(text: "Payments are made to the salon and recorded on the Platform. We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping."),
         ],
       ),
       LegalSection(
@@ -389,7 +389,7 @@ const List<LegalDocument> kLegalDocuments = [
         heading: "D. Refund Process",
         blocks: [
           LegalBlock(text: "Refunds (where applicable) shall be initiated within 5-7 business days after cancellation confirmation."),
-          LegalBlock(text: "All refunds shall be credited to the original mode of payment used during the booking (e.g., Razorpay, credit/debit card, UPI, net banking)."),
+          LegalBlock(text: "All refunds shall be credited to the original mode of payment used during the booking (e.g., cash, credit/debit card, UPI, net banking)."),
           LegalBlock(text: "The actual credit to the customer's account may take additional time depending on the payment gateway and the customer's bank policies."),
           LegalBlock(text: "The Company is not responsible for any delay caused by third-party payment processors."),
         ],
@@ -485,7 +485,7 @@ const List<LegalDocument> kLegalDocuments = [
         blocks: [
           LegalBlock(text: "Payments to Partners will be made after deducting platform commissions, taxes, and other applicable charges."),
           LegalBlock(text: "Settlements will occur on a defined payment cycle as communicated by BookALook.in."),
-          LegalBlock(text: "BookALook.in shall not be liable for delays arising from banking networks, Razorpay, or other payment intermediaries."),
+          LegalBlock(text: "BookALook.in shall not be liable for delays arising from banking networks or other payment intermediaries."),
         ],
       ),
       LegalSection(

@@ -22,7 +22,7 @@ To successfully host this, the VPS needs the following installed:
 - **Node.js:** Node.js v20+ and `npm`.
 - **Process Manager:** PM2 (to keep Next.js running).
 - **Database:** MySQL Server / MariaDB Server.
-- **SSL Certificates:** Certbot (Let's Encrypt) is mandatory for HTTPS (required by Flutter apps and Razorpay).
+- **SSL Certificates:** Certbot (Let's Encrypt) is mandatory for HTTPS (required by the Flutter apps).
 
 ---
 
@@ -34,7 +34,7 @@ To successfully host this, the VPS needs the following installed:
 The backend relies on the following key services:
 - **Database:** Needs `DB_CONNECTION`, `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` configured for MySQL.
 - **Cloudinary:** `CLOUDINARY_URL` (for image uploads).
-- **Razorpay:** `RAZORPAY_DRIVER`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`.
+- **Booking payments:** `PAYMENT_DRIVER=none` (no online gateway; salons record payments). Remove any old `RAZORPAY_*` keys from the server `.env`.
 - **WhatsApp Business:** `WHATSAPP_DRIVER`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`.
 - **App URL:** `APP_URL` must point to the production API domain (e.g., `https://api.bookalook.com`).
 
