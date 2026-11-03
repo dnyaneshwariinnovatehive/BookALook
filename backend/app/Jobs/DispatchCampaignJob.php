@@ -6,6 +6,7 @@ use App\Models\Campaign;
 use App\Models\CampaignRecipient;
 use App\Services\Marketing\CampaignService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -23,14 +24,33 @@ use Illuminate\Support\Facades\Log;
  * Takes the id rather than the model so a campaign edited between queueing and
  * running is read fresh — the serialised copy would otherwise send the old one.
  */
-class DispatchCampaignJob implements ShouldQueue
+/**
+ * Unique per campaign: a second copy (double click, the recovery sweep) is
+ * dropped while the first is queued or running. Recipients are also claimed
+ * one by one in SendCampaignMessageJob, so even two runs never message anyone
+ * twice.
+ */
+class DispatchCampaignJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
 
+    public int $backoff = 60;
+
+    /** Writing the recipient rows and queueing one job each, in chunks. */
+    public int $timeout = 120;
+
+    public int $uniqueFor = 3600;
+
     public function __construct(public string $campaignId)
     {
+        $this->onQueue('marketing');
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->campaignId;
     }
 
     public function handle(CampaignService $campaigns): void
@@ -56,7 +76,18 @@ class DispatchCampaignJob implements ShouldQueue
             return;
         }
 
-        $campaign->update(['status' => Campaign::STATUS_SENDING, 'started_at' => now()]);
+        // Start it exactly once. Two copies of this job (a delayed one left in
+        // the old queue, one re-queued by the recovery sweep) both get here;
+        // only the one whose update changes the row fans out, the other stops
+        // instead of writing the recipients a second time.
+        $started = Campaign::whereKey($campaign->id)
+            ->whereIn('status', [Campaign::STATUS_SENDING, Campaign::STATUS_SCHEDULED])
+            ->whereNull('started_at')
+            ->update(['status' => Campaign::STATUS_SENDING, 'started_at' => now()]);
+        if ($started !== 1) {
+            return;
+        }
+        $campaign->refresh();
 
         try {
             $sendable = $campaigns->materialiseRecipients($campaign);

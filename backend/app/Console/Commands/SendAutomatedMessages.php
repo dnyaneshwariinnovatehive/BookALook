@@ -100,7 +100,7 @@ class SendAutomatedMessages extends Command
                 'category' => 'marketing',
             ]);
             
-            SendWhatsAppMessageJob::dispatch($message->id);
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
             $sentCount++;
         }
         
@@ -171,7 +171,7 @@ class SendAutomatedMessages extends Command
                 'category' => 'marketing',
             ]);
             
-            SendWhatsAppMessageJob::dispatch($message->id);
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
             $sentCount++;
         }
         

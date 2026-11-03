@@ -166,6 +166,15 @@ class FcmPushGateway implements PushGateway
             $message['android']['notification']['image'] = $payload->imageUrl;
         }
 
+        // FCM has no idempotency key, so a push re-sent after a worker died
+        // mid-send (the provider took it, the result was never recorded) can
+        // arrive twice. Tagging it with the notification id makes the phone
+        // replace the first with the second instead of showing both.
+        if (filled($payload->notificationId ?? null)) {
+            $message['android']['notification']['tag'] = (string) $payload->notificationId;
+            $message['apns'] = ['headers' => ['apns-collapse-id' => substr((string) $payload->notificationId, 0, 64)]];
+        }
+
         return $message;
     }
 

@@ -63,12 +63,23 @@ return [
             'after_commit' => false,
         ],
 
+        // On the state instance (6380: never evicts, AOF + RDB), never on the
+        // cache instance. Jobs carry ids only; the rows they act on are in
+        // PostgreSQL, and app:recover-queued-work re-queues anything lost.
+        //
+        // Queues, in worker priority order: critical (login codes),
+        // notifications (booking WhatsApp, push, salon sync), marketing
+        // (campaigns), default (anything not yet assigned).
+        //
+        // retry_after (180 s) must stay above the longest job timeout (120 s,
+        // DispatchCampaignJob) so a slow job is never handed to a second
+        // worker while the first is still running it.
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'state'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 180),
+            'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),
             'after_commit' => false,
         ],
 

@@ -53,7 +53,7 @@ class CustomerAuthController extends Controller
                 'category' => 'authentication',
             ]);
 
-            SendWhatsAppMessageJob::dispatch($message->id);
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
 
             return response()->json([
                 'message' => 'OTP sent successfully to your WhatsApp number.',

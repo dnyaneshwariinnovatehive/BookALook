@@ -42,6 +42,13 @@ class WhatsAppMessage extends Model
      * Business account gets restricted.
      */
     public const CATEGORY_UTILITY = 'utility';
+
+    /**
+     * The `error` of a message whose send was started but whose result was
+     * never recorded (worker killed mid-send). It may or may not have arrived;
+     * it is never re-sent automatically. Search for it to find them.
+     */
+    public const OUTCOME_UNKNOWN = 'Outcome unknown: a send was started but its result was never recorded, so it was not sent again automatically.';
     public const CATEGORY_MARKETING = 'marketing';
 
     public function user()

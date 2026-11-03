@@ -113,11 +113,15 @@ class CampaignService
 
         $campaign->save();
 
-        $job = DispatchCampaignJob::dispatch($campaign->id);
+        // The campaign row (scheduled / sending) is the durable record; if the
+        // queue cannot take this, app:recover-queued-work starts it later.
+        $job = new DispatchCampaignJob($campaign->id);
 
         if ($campaign->status === Campaign::STATUS_SCHEDULED) {
             $job->delay($campaign->scheduled_for);
         }
+
+        \App\Support\SafeDispatch::afterCommit($job, ['campaign_id' => $campaign->id]);
 
         return $campaign->fresh();
     }

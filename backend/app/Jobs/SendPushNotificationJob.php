@@ -45,12 +45,14 @@ class SendPushNotificationJob implements ShouldQueue
     public int $tries = 3;
 
     /**
-     * Comfortably inside the production worker's --timeout=90, so a slow
-     * gateway loses its worker slot to a timeout rather than to a kill.
+     * FCM is called once per device (20 s timeout each). Below the queue's
+     * retry_after (180 s), so a slow gateway loses its worker slot to a
+     * timeout and is retried, never run twice at the same time.
      */
-    public int $timeout = 60;
+    public int $timeout = 90;
 
-    public int $backoff = 10;
+    /** A gateway-wide failure (FCM down, token endpoint) is retried. */
+    public array $backoff = [10, 60];
 
     public function __construct(public readonly string $notificationId)
     {
@@ -67,11 +69,18 @@ class SendPushNotificationJob implements ShouldQueue
         // treats a redeclaration with a different initial value as an
         // incompatible trait composition — a fatal, not a warning.
         $this->afterCommit = true;
+        $this->onQueue('notifications');
     }
 
     public function handle(PushGateway $gateway): void
     {
         $notification = Notification::find($this->notificationId);
+
+        // Already finished by an earlier copy of this job (re-queued by the
+        // recovery sweep, or dispatched twice): nothing to send again.
+        if ($notification?->push_done_at) {
+            return;
+        }
 
         if (! $notification) {
             Log::warning('Push job found no notification to send; nothing to do', [
@@ -92,6 +101,7 @@ class SendPushNotificationJob implements ShouldQueue
                 'user_id' => $notification->user_id,
                 'type' => $notification->type,
             ]);
+            $this->markDone();
 
             return;
         }
@@ -103,6 +113,7 @@ class SendPushNotificationJob implements ShouldQueue
                 'notification_id' => $notification->id,
                 'user_id' => $notification->user_id,
             ]);
+            $this->markDone();
 
             return;
         }
@@ -126,6 +137,20 @@ class SendPushNotificationJob implements ShouldQueue
                 RetryPendingPushDeliveryJob::dispatch($delivery->id);
             }
         }
+
+        $this->markDone();
+    }
+
+    /**
+     * Tell the recovery sweep this push needs nothing more from this job.
+     * Pending deliveries carry on through RetryPendingPushDeliveryJob and have
+     * their own recovery.
+     */
+    private function markDone(): void
+    {
+        Notification::whereKey($this->notificationId)
+            ->whereNull('push_done_at')
+            ->update(['push_done_at' => now()]);
     }
 
     /**
@@ -161,6 +186,8 @@ class SendPushNotificationJob implements ShouldQueue
         if (! $notification) {
             return;
         }
+
+        $this->markDone();
 
         $reason = $exception?->getMessage() ?: 'The push job failed without a message.';
 

@@ -1,0 +1,40 @@
+# BookALook Redis queue workers (Phase 4). One unit per worker process:
+#
+#   bookalook-worker@critical-1        login codes only, always free for them
+#   bookalook-worker@notifications-1   critical first, then notifications
+#   bookalook-worker@notifications-2   (same, second process)
+#   bookalook-worker@marketing-1       campaigns only, can never starve the rest
+#
+# The queue list for each comes from /etc/bookalook-workers/<instance>.env
+# (QUEUES=...). Install: see deploy/queue/PHASE4-CUTOVER.md.
+[Unit]
+Description=BookALook queue worker (%i)
+After=network-online.target bookalook-redis@state.service postgresql.service
+Wants=bookalook-redis@state.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/bookalook/backend
+EnvironmentFile=/etc/bookalook-workers/%i.env
+# --timeout is the fallback for a job without its own; every BookALook job
+# sets one (max 120 s), all below the queue's retry_after (180 s).
+# --max-time / --max-jobs / --memory: the worker exits cleanly now and then
+# and systemd starts a fresh one, so a slow leak can never build up.
+ExecStart=/usr/bin/php artisan queue:work redis --queue=${QUEUES} --sleep=3 --timeout=120 --tries=3 --max-time=3600 --max-jobs=1000 --memory=256
+Restart=always
+RestartSec=5
+# SIGTERM lets the worker finish the job in hand before exiting (graceful);
+# it gets up to 150 s (> the longest job timeout) before being killed.
+KillSignal=SIGTERM
+TimeoutStopSec=150
+# Hard ceiling well above --memory, only reached by a runaway.
+MemoryMax=512M
+StandardOutput=append:/var/log/bookalook-workers/%i.log
+StandardError=append:/var/log/bookalook-workers/%i.log
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

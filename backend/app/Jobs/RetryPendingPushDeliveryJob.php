@@ -50,6 +50,7 @@ class RetryPendingPushDeliveryJob implements ShouldQueue
         public readonly int $attempt = 1,
     ) {
         $this->afterCommit = true;
+        $this->onQueue('notifications');
     }
 
     public function handle(PushGateway $gateway): void

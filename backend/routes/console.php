@@ -59,6 +59,11 @@ Schedule::command('app:send-appointment-reminders')->everyFifteenMinutes()->with
 // decide to send the same message.
 Schedule::command('app:drain-whatsapp-outbox')->everyMinute()->withoutOverlapping();
 
+// The queue is only the transport; PostgreSQL holds what is owed. This finds
+// pushes, push retries and campaign sends whose job was lost (queue outage,
+// killed worker, Redis restart) and queues them again, claiming each row first.
+Schedule::command('app:recover-queued-work')->everyMinute()->withoutOverlapping();
+
 // Sends the 25-day reminders and birthday messages. Whether each runs is
 // decided only by its switch in SuperAdmin's WhatsApp automations; salons have no say.
 Schedule::command('app:send-automated-messages')->dailyAt('09:00')->withoutOverlapping();

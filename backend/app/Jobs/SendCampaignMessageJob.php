@@ -28,8 +28,13 @@ class SendCampaignMessageJob implements ShouldQueue
 
     public int $tries = 2;
 
+    public int $backoff = 30;
+
+    public int $timeout = 60;
+
     public function __construct(public string $recipientId)
     {
+        $this->onQueue('marketing');
     }
 
     public function handle(WhatsAppGateway $gateway): void
@@ -60,6 +65,16 @@ class SendCampaignMessageJob implements ShouldQueue
 
             $campaign->increment('skipped_count');
 
+            return;
+        }
+
+        // Claim this recipient atomically before anything is sent: of two
+        // copies of this job, only the one whose update changes the row goes
+        // on. The other sees 0 rows and stops.
+        $claimed = CampaignRecipient::whereKey($recipient->id)
+            ->where('status', CampaignRecipient::STATUS_PENDING)
+            ->update(['status' => CampaignRecipient::STATUS_QUEUED]);
+        if ($claimed !== 1) {
             return;
         }
 

@@ -36,28 +36,35 @@ class SendWhatsAppMessageJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Two attempts, spaced out.
-     *
-     * One is not enough because the failure that actually happens is a network
-     * blip against the provider, and that clears on its own. More than two is
-     * wasted: the gateway already records a rejected message as `failed` rather
-     * than throwing, so a second attempt is only ever for the case where the
-     * worker itself died mid-request, not for a message the provider disliked.
+     * Retrying is safe: the gateway counts the attempt (`attempts`) before it
+     * calls the provider and never throws after that, so a retry only ever
+     * follows a failure that happened before anything was sent (the invoice
+     * PDF, typically). Provider rejections are recorded on the row, not
+     * thrown, so bad credentials or a bad payload never loop.
      */
-    public int $tries = 2;
+    public int $tries = 3;
 
-    /**
-     * Wait between attempts. Long enough for a dropped connection to come back,
-     * short enough that a retry does not turn a same-day reminder into a
-     * next-day one.
-     */
+    /** Invoice PDF + Cloudinary upload + one provider call (20 s timeout). */
+    public int $timeout = 90;
+
     public function backoff(): array
     {
-        return [30];
+        return [30, 120];
     }
 
-    public function __construct(public string $messageId)
+    /**
+     * Login codes go on `critical`, marketing on `marketing`, everything else
+     * (booking confirmations, reminders, cancellations) on `notifications`.
+     */
+    public function __construct(public string $messageId, ?string $category = null)
     {
+        $category ??= WhatsAppMessage::whereKey($messageId)->value('category');
+
+        $this->onQueue(match ($category) {
+            'authentication' => 'critical',
+            WhatsAppMessage::CATEGORY_MARKETING => 'marketing',
+            default => 'notifications',
+        });
     }
 
     public function handle(WhatsAppGateway $gateway, InvoicePdfService $pdfs): void
@@ -67,6 +74,21 @@ class SendWhatsAppMessageJob implements ShouldQueue
         // Sent or failed already, or gone. Either way this job has nothing left
         // to do — the row is the record of what happened, not the queue's.
         if (! $message || $message->status !== WhatsAppMessage::STATUS_QUEUED) {
+            return;
+        }
+
+        // Attempted before but never recorded a result: the worker died
+        // between calling the provider and saving the answer. The provider may
+        // well have sent it, and there is no idempotency key to ask, so it is
+        // NOT sent again. It is failed visibly instead; SuperAdmin can resend
+        // it with app:resend-whatsapp if it really did not arrive.
+        if ($message->attempts > 0) {
+            $message->forceFill([
+                'status' => WhatsAppMessage::STATUS_FAILED,
+                'failed_at' => now(),
+                'error' => WhatsAppMessage::OUTCOME_UNKNOWN,
+            ])->save();
+
             return;
         }
 

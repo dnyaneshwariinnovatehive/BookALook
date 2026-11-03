@@ -133,7 +133,7 @@ class DrainWhatsAppOutbox extends Command
                     return false;
                 }
 
-                SendWhatsAppMessageJob::dispatch($row->id);
+                \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($row->id), ['whatsapp_message_id' => $row->id]);
 
                 return true;
             });

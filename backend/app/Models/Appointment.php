@@ -58,9 +58,12 @@ class Appointment extends Model
             \Illuminate\Support\Facades\Log::warning('app_cache.debounce_failed', ['salon_id' => $this->salon_id]);
         }
 
-        \App\Jobs\SendSalonSyncJob::dispatch($this->salon_id, $this->id)
-            ->delay(now()->addSeconds(2))
-            ->afterCommit();
+        // After the booking commits, and never able to fail it: a queue outage
+        // only costs this live-refresh nudge.
+        \App\Support\SafeDispatch::afterCommit(
+            (new \App\Jobs\SendSalonSyncJob($this->salon_id, $this->id))->delay(now()->addSeconds(2)),
+            ['salon_id' => $this->salon_id],
+        );
     }
 
     public function firstTimeOffer()

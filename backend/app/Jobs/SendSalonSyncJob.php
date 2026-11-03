@@ -29,12 +29,16 @@ class SendSalonSyncJob implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
 
+    /** A live-refresh nudge: losing one is harmless, the next change sends another. */
     public int $tries = 1;
+
+    public int $timeout = 60;
 
     public function __construct(
         public string $salonId,
         public ?string $appointmentId = null,
     ) {
+        $this->onQueue('notifications');
     }
 
     public function handle(PushGateway $gateway): void

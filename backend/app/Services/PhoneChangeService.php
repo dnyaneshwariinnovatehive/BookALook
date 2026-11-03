@@ -70,7 +70,7 @@ class PhoneChangeService
             'status' => WhatsAppMessage::STATUS_QUEUED,
             'category' => 'authentication',
         ]);
-        SendWhatsAppMessageJob::dispatch($message->id);
+        \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
 
         return 'OTP sent to the new number on WhatsApp.';
     }

@@ -983,7 +983,10 @@ class NotificationService
     private function mirrorToPush(Notification $notification): void
     {
         try {
-            SendPushNotificationJob::dispatch($notification->id)->afterCommit();
+            // Recorded first, so a push that never reaches a worker is still
+            // owed in PostgreSQL and app:recover-queued-work queues it again.
+            Notification::whereKey($notification->id)->update(['push_queued_at' => now()]);
+            \App\Support\SafeDispatch::afterCommit(new SendPushNotificationJob($notification->id), ['notification_id' => $notification->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not queue push notification', [
                 'notification_id' => $notification->id,
@@ -1054,7 +1057,8 @@ class NotificationService
                 'status' => WhatsAppMessage::STATUS_QUEUED,
             ]);
 
-            SendWhatsAppMessageJob::dispatch($message->id)->afterCommit();
+            // The row is the outbox; app:drain-whatsapp-outbox re-queues it if this does not land.
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not queue salonDeactivated WhatsApp notification', [
                 'salon_id' => $salon->id,
@@ -1105,7 +1109,8 @@ class NotificationService
                 'status' => WhatsAppMessage::STATUS_QUEUED,
             ]);
 
-            SendWhatsAppMessageJob::dispatch($message->id)->afterCommit();
+            // The row is the outbox; app:drain-whatsapp-outbox re-queues it if this does not land.
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
         } catch (\Throwable $e) {
             Log::warning('Could not queue WhatsApp notification', [
                 'appointment_id' => $appointment->id,

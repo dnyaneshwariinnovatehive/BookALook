@@ -46,7 +46,7 @@ class PartnerAuthController extends Controller
                 'category' => 'authentication',
             ]);
 
-            SendWhatsAppMessageJob::dispatch($message->id);
+            \App\Support\SafeDispatch::afterCommit(new SendWhatsAppMessageJob($message->id), ['whatsapp_message_id' => $message->id]);
 
             return response()->json([
                 'status' => 'success',
