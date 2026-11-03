@@ -34,7 +34,7 @@ class IntegrityReport extends Command
 
         $this->line('== Environment');
         $this->line('  PostgreSQL: ' . DB::selectOne('select version() as v')->v);
-        $ext = DB::selectOne("select (select installed_version from pg_extension e where e.extname = 'btree_gist') as installed, (select default_version from pg_available_extensions where name = 'btree_gist') as available");
+        $ext = DB::selectOne("select (select extversion from pg_extension e where e.extname = 'btree_gist') as installed, (select default_version from pg_available_extensions where name = 'btree_gist') as available");
         $this->line('  btree_gist available: ' . ($ext->available ?? 'NO') . ', installed: ' . ($ext->installed ?? 'no'));
         $role = DB::selectOne("select current_user as u, rolsuper as su, (select datdba = r.oid from pg_database where datname = current_database()) as owns_db from pg_roles r where rolname = current_user");
         $this->line("  app role: {$role->u}, superuser: " . ($role->su ? 'yes' : 'no') . ', owns database: ' . ($role->owns_db ? 'yes' : 'no'));
