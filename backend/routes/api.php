@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\SuperAdmin\SuperAdminAuthController;
 Route::prefix('customer')->group(function () {
     Route::post('/auth/send-otp', [CustomerAuthController::class, 'sendOtp'])->middleware('throttle:otp-send');
     Route::post('/auth/verify-otp', [CustomerAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
-    Route::post('/auth/complete-profile', [CustomerAuthController::class, 'completeProfile'])->middleware('throttle:otp-verify');
+    Route::post('/auth/complete-profile', [CustomerAuthController::class, 'completeProfile'])->middleware('throttle:otp-signup');
     
     // Public routes
     Route::get('/banners', [\App\Http\Controllers\Api\Customer\BannerController::class, 'index']);

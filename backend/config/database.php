@@ -152,27 +152,52 @@ return [
 
         'client' => env('REDIS_CLIENT', 'phpredis'),
 
+        // Every key starts "bookalook:{environment}:", so a staging app could
+        // never read or clear production keys even on a shared instance.
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'prefix' => env('REDIS_PREFIX', 'bookalook:'.env('APP_ENV', 'production').':'),
         ],
 
+        // Two separate Redis (Valkey) instances on the VPS — see deploy/redis.
+        //
+        // cache (6379): disposable. allkeys-lru, no persistence. Anything here
+        //   may vanish at any time; PostgreSQL is always the source.
+        // state (6380): must not be lost or evicted. noeviction, AOF + RDB.
+        //   OTP codes, rate-limit counters, locks; later (Phase 4) queues.
+        //
+        // `default` is the state instance: Laravel's locks and the Redis rate
+        // limiter use it unless told otherwise.
+
         'default' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_DB', '0'),
+            'host' => env('REDIS_STATE_HOST', '127.0.0.1'),
+            'username' => env('REDIS_STATE_USERNAME'),
+            'password' => env('REDIS_STATE_PASSWORD'),
+            'port' => env('REDIS_STATE_PORT', '6380'),
+            'database' => env('REDIS_STATE_DB', '0'),
+            'timeout' => (float) env('REDIS_TIMEOUT', 1.0),
+            'read_timeout' => (float) env('REDIS_READ_TIMEOUT', 2.0),
+        ],
+
+        'state' => [
+            'host' => env('REDIS_STATE_HOST', '127.0.0.1'),
+            'username' => env('REDIS_STATE_USERNAME'),
+            'password' => env('REDIS_STATE_PASSWORD'),
+            'port' => env('REDIS_STATE_PORT', '6380'),
+            'database' => env('REDIS_STATE_DB', '0'),
+            'timeout' => (float) env('REDIS_TIMEOUT', 1.0),
+            'read_timeout' => (float) env('REDIS_READ_TIMEOUT', 2.0),
         ],
 
         'cache' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_CACHE_DB', '1'),
+            'host' => env('REDIS_CACHE_HOST', '127.0.0.1'),
+            'username' => env('REDIS_CACHE_USERNAME'),
+            'password' => env('REDIS_CACHE_PASSWORD'),
+            'port' => env('REDIS_CACHE_PORT', '6379'),
+            'database' => env('REDIS_CACHE_DB', '0'),
+            // Short: a slow or missing cache must never hold up a request.
+            'timeout' => (float) env('REDIS_CACHE_TIMEOUT', 0.5),
+            'read_timeout' => (float) env('REDIS_CACHE_READ_TIMEOUT', 1.0),
         ],
 
     ],

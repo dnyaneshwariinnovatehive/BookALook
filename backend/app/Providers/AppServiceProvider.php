@@ -15,6 +15,7 @@ use App\Services\Notifications\PushGateway;
 use App\Services\Notifications\WhatsAppGateway;
 use App\Services\Payments\NoPaymentGateway;
 use App\Services\Payments\PaymentGateway;
+use App\Services\Auth\LoginOtp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -99,36 +100,70 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->teachSqliteToMeasureDistance();
         $this->limitSignIns();
+        $this->countLimitsAtomicallyOnRedis();
+        \App\Support\AppCacheInvalidation::register();
     }
 
     /**
-     * Limits on the sign-in endpoints, counted per phone (or email) and per IP,
-     * so codes cannot be guessed or WhatsApp sends run up. Over the limit the
-     * API answers 429 with a message the apps show as is.
+     * When rate-limit counters live in Redis, every `throttle` route counts
+     * with one atomic Lua script per limit on the state instance, shared by
+     * all PHP-FPM workers. With a non-Redis limiter store (tests, rollback to
+     * database) Laravel's own throttle middleware stays in place.
+     */
+    private function countLimitsAtomicallyOnRedis(): void
+    {
+        $store = config('cache.limiter');
+        if (config("cache.stores.{$store}.driver") === 'redis') {
+            $this->app['router']->aliasMiddleware('throttle', \App\Http\Middleware\ThrottleRequestsWithStateRedis::class);
+        }
+    }
+
+    /**
+     * Limits on the sign-in endpoints, so codes cannot be guessed and WhatsApp
+     * sends cannot be run up.
+     *
+     * Phone limits use the normalised number (+91 98…, 98… and 98-… are one
+     * key), so reformatting the number does not reset them. IP limits use
+     * $request->ip(): no proxy is trusted (TrustProxies has no list), so it is
+     * the address that connected to Nginx and X-Forwarded-For is ignored.
+     * Over a limit the API answers 429 with a message, `retry_after` seconds
+     * and the standard Retry-After header.
      */
     private function limitSignIns(): void
     {
-        $phone = fn (Request $r) => preg_replace('/\D/', '', (string) $r->input('phone'));
+        $phone = fn (Request $r) => LoginOtp::normalise((string) $r->input('phone'));
+        $tooMany = fn (string $message, array $extra = []) => fn (Request $r, array $headers) => response()->json(
+            $extra + ['message' => $message, 'retry_after' => (int) ($headers['Retry-After'] ?? 60)],
+            429,
+            $headers,
+        );
+        $limit = fn (string $name) => (int) config("services.otp.limits.{$name}");
 
         RateLimiter::for('otp-send', fn (Request $r) => [
-            Limit::perMinute(3)->by('otp-send:phone:' . $phone($r))
-                ->response(fn () => response()->json(['message' => 'Please wait a minute before asking for another code.'], 429)),
-            Limit::perHour(10)->by('otp-send:phone-hour:' . $phone($r))
-                ->response(fn () => response()->json(['message' => 'Too many codes asked for this number. Try again in an hour.'], 429)),
-            Limit::perMinute(20)->by('otp-send:ip:' . $r->ip()),
+            Limit::perMinutes(10, $limit('send_per_phone_10min'))->by('phone:' . $phone($r))
+                ->response($tooMany('Too many codes asked for this number. Please wait before trying again.')),
+            Limit::perHour($limit('send_per_ip_hour'))->by('ip:' . $r->ip())
+                ->response($tooMany('Too many codes asked from this network. Please try again later.')),
         ]);
 
         RateLimiter::for('otp-verify', fn (Request $r) => [
-            Limit::perMinute(10)->by('otp-verify:phone:' . $phone($r))
-                ->response(fn () => response()->json(['message' => 'Too many tries. Please wait a minute.'], 429)),
-            Limit::perMinute(30)->by('otp-verify:ip:' . $r->ip()),
+            Limit::perMinutes(10, $limit('verify_per_phone_10min'))->by('phone:' . $phone($r))
+                ->response($tooMany('Too many tries for this number. Please wait before trying again.')),
+            Limit::perHour($limit('verify_per_ip_hour'))->by('ip:' . $r->ip())
+                ->response($tooMany('Too many tries from this network. Please try again later.')),
+        ]);
+
+        // Finishing sign-up after a verified code: per phone only.
+        RateLimiter::for('otp-signup', fn (Request $r) => [
+            Limit::perMinutes(10, 10)->by('phone:' . $phone($r))
+                ->response($tooMany('Too many tries for this number. Please wait before trying again.')),
         ]);
 
         RateLimiter::for('admin-login', fn (Request $r) => [
-            Limit::perMinute(5)->by('admin-login:ip:' . $r->ip())
-                ->response(fn () => response()->json(['success' => false, 'message' => 'Too many sign-in attempts. Please wait a minute.'], 429)),
-            Limit::perHour(20)->by('admin-login:email:' . strtolower((string) $r->input('email')))
-                ->response(fn () => response()->json(['success' => false, 'message' => 'Too many sign-in attempts. Try again later.'], 429)),
+            Limit::perMinute(5)->by('email-ip:' . strtolower(trim((string) $r->input('email'))) . '|' . $r->ip())
+                ->response($tooMany('Too many sign-in attempts. Please wait a minute.', ['success' => false])),
+            Limit::perHour(20)->by('ip:' . $r->ip())
+                ->response($tooMany('Too many sign-in attempts. Please try again later.', ['success' => false])),
         ]);
     }
 

@@ -113,8 +113,10 @@ class PartnerSubscriptionController extends Controller
 
     public function getPlans(Request $request)
     {
-        $plans = SubscriptionPlan::purchasable()->orderBy('price')->get();
-        $commissionPlan = $this->commission->plan();
+        [$plans, $commissionPlan] = \App\Support\AppCache::remember(\App\Support\CacheKeys::plans(), \App\Support\CacheKeys::TTL_PLANS, fn () => [
+            SubscriptionPlan::purchasable()->orderBy('price')->get(),
+            $this->commission->plan(),
+        ]);
 
         return response()->json([
             'success' => true,

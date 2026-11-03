@@ -30,13 +30,12 @@ class PartnerAuthController extends Controller
             return response()->json(['status' => 'success', 'message' => 'OTP sent successfully.']);
         }
 
-        $otps->resetAttempts('partner_otp_' . $phone);
         $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
 
         // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
         if ($automation && $automation->is_enabled && !empty($automation->aisensy_campaign_name)) {
             $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            Cache::put('partner_otp_' . $phone, $otp, now()->addMinutes(10));
+            $otps->issue(LoginOtp::PARTNER, $phone, $otp);
 
             $message = WhatsAppMessage::create([
                 'to_phone' => $phone,
@@ -55,12 +54,19 @@ class PartnerAuthController extends Controller
             ]);
         }
 
-        // When disabled (default during development): Use demo OTP
-        Cache::put('partner_otp_' . $phone, '123456', now()->addMinutes(10));
+        // WhatsApp OTP off: the demo code, outside production only.
+        $demo = $otps->demoCode();
+        if ($demo === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Login codes cannot be sent right now. Please try again later.',
+            ], 503);
+        }
+        $otps->issue(LoginOtp::PARTNER, $phone, $demo);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'OTP sent successfully (Use 123456 for testing)',
+            'message' => "OTP sent successfully (Use {$demo} for testing)",
         ]);
     }
 
@@ -79,14 +85,13 @@ class PartnerAuthController extends Controller
 
         // Only the code sent to this phone (the demo code when WhatsApp OTP is
         // off). Five wrong guesses discard it.
-        if (! app(LoginOtp::class)->check('partner_otp_' . $request->phone, $request->phone, $request->otp)) {
+        if (! app(LoginOtp::class)->check(LoginOtp::PARTNER, $request->phone, $request->otp)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid OTP',
             ], 400);
         }
 
-        Cache::forget('partner_otp_' . $request->phone);
 
         $user = User::where('phone', $request->phone)
             ->whereIn('role', ['admin', 'service_provider', 'collaborator'])

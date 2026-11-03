@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import 'main_screen.dart';
 import 'profile_screen.dart';
 import '../utils/app_haptics.dart';
+import '../utils/auth_errors.dart';
 import '../utils/auth_motion.dart';
 import '../widgets/auth/otp_boxes.dart';
 import '../theme/app_colors.dart';
@@ -174,7 +175,8 @@ class _OtpScreenState extends State<OtpScreen> with WidgetsBindingObserver {
       _otpController.clear();
       _startResendCountdown(30);
     } else {
-      _fail('Could not resend right now. Please try again.');
+      // Never the raw result: it can carry a status code and a response body.
+      _fail(friendlyAuthError(result));
     }
   }
 
@@ -234,6 +236,8 @@ class _OtpScreenState extends State<OtpScreen> with WidgetsBindingObserver {
         _fail('That code is not right. Check the digits and try again.');
         _otpController.clear();
       }
+    } on OtpRefusedException catch (e) {
+      _fail(e.message);
     } catch (e) {
       _fail('Something went wrong. Please try again.');
     } finally {

@@ -1,0 +1,2 @@
+# Shell scripts and server configs must stay LF to run on the VPS.
+deploy/** text eol=lf

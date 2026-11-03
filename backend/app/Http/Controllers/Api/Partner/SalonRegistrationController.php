@@ -227,6 +227,7 @@ class SalonRegistrationController extends Controller
             if (!empty($uploadedPhotos)) {
                 // If replacing photos on revision, clean up old records
                 SalonMedia::where('salon_id', $salon->id)->delete();
+                \App\Support\CacheKeys::forgetSalonProfile($salon->id); // bulk delete: no model events
 
                 $coverUrl = null;
                 foreach (array_values($uploadedPhotos) as $index => $photo) {

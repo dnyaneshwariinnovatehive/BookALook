@@ -7,6 +7,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'push_notification_service.dart';
 import 'http_client.dart' as http;
 
+/// The server refused to check a code for now (too many tries, HTTP 429).
+/// [message] is written for people and says how long to wait.
+class OtpRefusedException implements Exception {
+  OtpRefusedException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class AuthService {
   static String get baseUrl => '${dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api'}/customer/auth';
 
@@ -83,6 +93,13 @@ class AuthService {
         } else if (data['requires_registration'] == true) {
           return 'requires_registration';
         }
+      }
+      if (response.statusCode == 429) {
+        String? message;
+        try {
+          message = (jsonDecode(response.body) as Map)['message'] as String?;
+        } catch (_) {}
+        throw OtpRefusedException(message ?? 'Too many tries. Please wait a few minutes and try again.');
       }
       debugPrint('Verify OTP failed: ${response.body}');
       return false;

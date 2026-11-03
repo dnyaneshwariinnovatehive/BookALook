@@ -71,11 +71,38 @@ return [
             ],
         ],
 
+        // Disposable application cache on the cache instance (6379). Its locks
+        // (scheduler withoutOverlapping, Cache::lock) live on the state
+        // instance, which never evicts, so a full cache cannot drop a lock.
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
-            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'state'),
+            // No extra prefix: keys read bookalook:{env}:{module}:{resource}:{id}.
+            'prefix' => '',
         ],
+
+        // Security state on the state instance (6380): OTP codes, attempt
+        // counters, verified-phone markers. Never falls back to anything: if
+        // it is unreachable, sign-in fails instead of skipping a check.
+        // STATE_STORE_DRIVER: redis (normal), database (rollback: back on
+        // PostgreSQL, same behaviour), array (tests, no Redis).
+        'state' => match (env('STATE_STORE_DRIVER', 'redis')) {
+            'array' => ['driver' => 'array', 'serialize' => true],
+            'database' => [
+                'driver' => 'database',
+                'connection' => env('DB_CACHE_CONNECTION'),
+                'table' => env('DB_CACHE_TABLE', 'cache'),
+                'lock_connection' => env('DB_CACHE_LOCK_CONNECTION'),
+                'lock_table' => env('DB_CACHE_LOCK_TABLE'),
+            ],
+            default => [
+                'driver' => 'redis',
+                'connection' => 'state',
+                'lock_connection' => 'state',
+                'prefix' => 'state:',
+            ],
+        },
 
         'dynamodb' => [
             'driver' => 'dynamodb',
@@ -104,5 +131,12 @@ return [
     */
 
     'prefix' => env('CACHE_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_cache_'),
+
+    /*
+    | Rate-limit counters. `state` keeps them on the state instance, shared by
+    | every PHP-FPM worker; when that store is Redis the throttle middleware
+    | counts with one atomic Lua script per limit (see AppServiceProvider).
+    */
+    'limiter' => env('CACHE_LIMITER_STORE', 'state'),
 
 ];

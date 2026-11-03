@@ -148,7 +148,7 @@ class AppVersionManagementController extends Controller
             ]
         );
 
-        Cache::forget("app_version_policy_{$release->app}");
+        \App\Support\CacheKeys::forgetAppVersion($release->app);
 
         return response()->json([
             'success' => true,
@@ -244,7 +244,7 @@ class AppVersionManagementController extends Controller
             );
         }
 
-        Cache::forget("app_version_policy_{$release->app}");
+        \App\Support\CacheKeys::forgetAppVersion($release->app);
 
         return response()->json([
             'success' => true,
@@ -357,7 +357,7 @@ class AppVersionManagementController extends Controller
             );
         }
 
-        Cache::forget("app_version_policy_{$app}");
+        \App\Support\CacheKeys::forgetAppVersion($app);
 
         // Check for store URL warnings
         $warnings = [];

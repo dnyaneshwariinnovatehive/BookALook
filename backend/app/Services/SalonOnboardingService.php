@@ -536,6 +536,7 @@ class SalonOnboardingService
         // A resubmission sends the full set again; keeping the old rows would
         // leave the gallery holding photos the collaborator deleted.
         SalonMedia::where('salon_id', $salon->id)->delete();
+        \App\Support\CacheKeys::forgetSalonProfile($salon->id); // bulk delete: no model events
 
         $coverUrl = null;
 

@@ -11,13 +11,13 @@ class CategoryController extends Controller
     public function index()
     {
         // Only fetch active, non-custom categories (master catalog)
-        $categories = ServiceCategory::where('is_active', true)
+        $categories = \App\Support\AppCache::remember(\App\Support\CacheKeys::categories(), \App\Support\CacheKeys::TTL_CATEGORIES, fn () => ServiceCategory::where('is_active', true)
             ->where('is_custom', false)
             // display_order is what SuperAdmin arranges them by; name is only
             // the tie-breaker. Ordering by name alone ignored that entirely.
             ->orderBy('display_order')
             ->orderBy('name')
-            ->get();
+            ->get());
 
         return response()->json([
             'categories' => $categories->map(fn (ServiceCategory $category) => [

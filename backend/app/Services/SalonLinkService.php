@@ -111,7 +111,7 @@ class SalonLinkService
 
     private function trimmed(string $key): ?string
     {
-        $value = trim((string) PlatformPolicySetting::value($key, ''));
+        $value = trim((string) PlatformPolicySetting::cachedValue($key, ''));
 
         return $value === '' ? null : $value;
     }

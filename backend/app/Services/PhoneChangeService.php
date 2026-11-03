@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Jobs\SendWhatsAppMessageJob;
+use App\Services\Auth\LoginOtp;
+use App\Services\Auth\OtpStore;
 use App\Models\User;
 use App\Models\WhatsappAutomation;
 use App\Models\WhatsAppMessage;
@@ -43,16 +45,21 @@ class PhoneChangeService
         $live = $automation && $automation->is_enabled && ! empty($automation->aisensy_campaign_name);
 
         // Same behaviour as sign-in: a real code over WhatsApp when the
-        // automation is set up, the demo code otherwise.
+        // automation is set up, the demo code otherwise — never in production.
         $code = $live
             ? str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT)
-            : '123456';
+            : app(LoginOtp::class)->demoCode();
 
-        Cache::put($this->codeKey($user, $phone), $code, now()->addMinutes(self::CODE_MINUTES));
-        Cache::forget($this->attemptsKey($user, $phone));
+        if ($code === null) {
+            throw ValidationException::withMessages([
+                'phone' => 'Codes cannot be sent right now. Please try again later.',
+            ]);
+        }
+
+        app(OtpStore::class)->issue($this->codeKey($user, $phone), $code, self::CODE_MINUTES);
 
         if (! $live) {
-            return 'OTP sent. For testing, use 123456.';
+            return "OTP sent. For testing, use {$code}.";
         }
 
         $message = WhatsAppMessage::create([
@@ -74,29 +81,22 @@ class PhoneChangeService
     public function confirm(User $user, string $phone, string $code): User
     {
         $phone = $this->normalise($phone);
-        $codeKey = $this->codeKey($user, $phone);
-        $attemptsKey = $this->attemptsKey($user, $phone);
-        $expected = Cache::get($codeKey);
+        // Checked and used up atomically (OtpStore): two requests with the
+        // same code cannot both move the account.
+        $result = app(OtpStore::class)->consume(
+            $this->codeKey($user, $phone), $code, self::MAX_ATTEMPTS, self::CODE_MINUTES
+        );
 
-        if ($expected === null) {
-            throw ValidationException::withMessages([
+        match ($result) {
+            OtpStore::OK => null,
+            OtpStore::EXPIRED => throw ValidationException::withMessages([
                 'otp' => 'That code has expired. Ask for a new one.',
-            ]);
-        }
-
-        if (! hash_equals((string) $expected, trim($code))) {
-            $attempts = (int) Cache::get($attemptsKey, 0) + 1;
-            Cache::put($attemptsKey, $attempts, now()->addMinutes(self::CODE_MINUTES));
-
-            if ($attempts >= self::MAX_ATTEMPTS) {
-                Cache::forget($codeKey);
-                throw ValidationException::withMessages([
-                    'otp' => 'Too many wrong codes. Ask for a new one.',
-                ]);
-            }
-
-            throw ValidationException::withMessages(['otp' => 'That code is not right.']);
-        }
+            ]),
+            OtpStore::BURNED => throw ValidationException::withMessages([
+                'otp' => 'Too many wrong codes. Ask for a new one.',
+            ]),
+            default => throw ValidationException::withMessages(['otp' => 'That code is not right.']),
+        };
 
         // Checked again here: the number may have been taken since the code
         // was sent. The unique index is the final word if two race.
@@ -112,9 +112,6 @@ class PhoneChangeService
                 'phone' => 'This number is already used by another account.',
             ]);
         }
-
-        Cache::forget($codeKey);
-        Cache::forget($attemptsKey);
 
         return $user->fresh();
     }
@@ -138,13 +135,9 @@ class PhoneChangeService
         return $phone;
     }
 
+    /** One code per account and new number: it cannot move anyone else. */
     private function codeKey(User $user, string $phone): string
     {
-        return "phone_change_otp:{$user->id}:{$phone}";
-    }
-
-    private function attemptsKey(User $user, string $phone): string
-    {
-        return "phone_change_attempts:{$user->id}:{$phone}";
+        return "otp:phone-change:{$user->id}:{$phone}";
     }
 }

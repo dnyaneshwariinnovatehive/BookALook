@@ -36,19 +36,10 @@ class FcmAccessTokenProvider
 
     public function token(): string
     {
-        $cached = Cache::get(self::CACHE_KEY);
-
-        if (is_string($cached) && $cached !== '') {
-            return $cached;
-        }
-
-        $accessToken = $this->requestToken();
-
         // Google's own access tokens last an hour. Caching for 50 minutes keeps
         // the safety margin without a second request on every single push.
-        Cache::put(self::CACHE_KEY, $accessToken, now()->addMinutes(50));
-
-        return $accessToken;
+        // If the cache is down, a fresh token is requested instead.
+        return \App\Support\AppCache::remember(\App\Support\CacheKeys::fcmToken(), \App\Support\CacheKeys::TTL_FCM_TOKEN, fn () => $this->requestToken());
     }
 
     /**
@@ -58,7 +49,7 @@ class FcmAccessTokenProvider
      */
     public function forget(): void
     {
-        Cache::forget(self::CACHE_KEY);
+        \App\Support\AppCache::forget(\App\Support\CacheKeys::fcmToken());
     }
 
     private function requestToken(): string

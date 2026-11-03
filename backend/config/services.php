@@ -173,11 +173,22 @@ return [
         'hold_minutes' => (int) env('BOOKING_PAYMENT_HOLD_MINUTES', 10),
     ],
 
-    // Sign-in codes. The only fixed code is for the store-review numbers listed
-    // here (comma-separated); leave both empty in normal use.
+    // Sign-in codes.
     'otp' => [
+        // Used when WhatsApp OTP is switched off. Never accepted in production:
+        // there, sign-in needs WhatsApp OTP switched on.
+        'demo_code' => env('OTP_DEMO_CODE', '123456'),
+        // Store-review numbers (comma-separated) and their fixed code. Empty in
+        // normal use; works in production only while both are set.
         'review_phones' => array_values(array_filter(array_map('trim', explode(',', (string) env('OTP_REVIEW_PHONES', ''))))),
         'review_code' => env('OTP_REVIEW_CODE', ''),
+        'limits' => [
+            'send_per_phone_10min' => (int) env('OTP_SEND_PER_PHONE_10MIN', 3),
+            'send_per_ip_hour' => (int) env('OTP_SEND_PER_IP_HOUR', 20),
+            'verify_per_phone_10min' => (int) env('OTP_VERIFY_PER_PHONE_10MIN', 5),
+            // Generous: many phones share one IP on Indian mobile networks.
+            'verify_per_ip_hour' => (int) env('OTP_VERIFY_PER_IP_HOUR', 60),
+        ],
     ],
 
 ];

@@ -47,8 +47,15 @@ class Appointment extends Model
             return;
         }
 
-        if (! \Illuminate\Support\Facades\Cache::add('salon_sync:' . $this->salon_id, true, 3)) {
-            return;
+        // A 3-second debounce so a burst of changes sends one sync. It runs
+        // inside the booking transaction, so a cache outage must not throw:
+        // without the cache the sync is simply sent every time.
+        try {
+            if (! \Illuminate\Support\Facades\Cache::add('appointments:salon-sync:' . $this->salon_id, true, 3)) {
+                return;
+            }
+        } catch (\RedisException $e) {
+            \Illuminate\Support\Facades\Log::warning('app_cache.debounce_failed', ['salon_id' => $this->salon_id]);
         }
 
         \App\Jobs\SendSalonSyncJob::dispatch($this->salon_id, $this->id)

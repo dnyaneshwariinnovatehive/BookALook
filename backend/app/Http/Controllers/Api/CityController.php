@@ -22,6 +22,22 @@ class CityController extends Controller
      */
     public function index(Request $request)
     {
+        // The two plain lists are shared by everyone; a search is not cached.
+        if (! $request->filled('search')) {
+            $serviceable = $request->boolean('serviceable');
+
+            return response()->json(\App\Support\AppCache::remember(
+                \App\Support\CacheKeys::cities($serviceable),
+                \App\Support\CacheKeys::TTL_LOCATIONS,
+                fn () => $this->cityList($request),
+            ));
+        }
+
+        return response()->json($this->cityList($request));
+    }
+
+    private function cityList(Request $request)
+    {
         $query = City::where('is_active', true);
 
         if ($request->boolean('serviceable')) {
@@ -41,7 +57,7 @@ class CityController extends Controller
             ->orderBy('name')
             ->get();
 
-        return response()->json($cities);
+        return $cities;
     }
 
     /**
@@ -80,7 +96,11 @@ class CityController extends Controller
         return response()->json([
             'success' => true,
             'city' => ['id' => $city->id, 'name' => $city->name, 'state' => $city->state],
-            'sub_areas' => $query->get(['id', 'name']),
+            'sub_areas' => \App\Support\AppCache::remember(
+                \App\Support\CacheKeys::subAreas($city->id, $request->boolean('serviceable')),
+                \App\Support\CacheKeys::TTL_LOCATIONS,
+                fn () => $query->get(['id', 'name']),
+            ),
         ]);
     }
 

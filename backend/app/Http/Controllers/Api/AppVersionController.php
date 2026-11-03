@@ -27,8 +27,7 @@ class AppVersionController extends Controller
 
         $platform = strtolower((string) $request->query('platform', ''));
 
-        $cacheKey = "app_version_policy_{$app}";
-        $data = Cache::remember($cacheKey, 300, function () use ($app) {
+        $data = \App\Support\AppCache::remember(\App\Support\CacheKeys::appVersion($app, 'public'), \App\Support\CacheKeys::TTL_APP_VERSION, function () use ($app) {
             $policy = AppUpdatePolicy::with(['latestRelease', 'minimumRelease'])
                 ->where('app', $app)
                 ->first();

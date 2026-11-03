@@ -1082,7 +1082,7 @@ class NotificationService
                 $campaign = $automation->aisensy_campaign_name;
             }
         } else {
-            if (! \App\Models\PlatformPolicySetting::value("whatsapp_{$event}_enabled", true)) {
+            if (! \App\Models\PlatformPolicySetting::cachedValue("whatsapp_{$event}_enabled", true)) {
                 return;
             }
         }

@@ -154,11 +154,55 @@ class PlatformPolicySetting extends Model
             return $default ?? (self::DEFAULTS[$key] ?? null);
         }
 
-        return match ($setting->data_type) {
-            'integer' => (int) $setting->setting_value,
-            'decimal' => (float) $setting->setting_value,
-            'boolean' => filter_var($setting->setting_value, FILTER_VALIDATE_BOOLEAN),
-            default => $setting->setting_value,
+        return self::cast($setting->data_type, $setting->setting_value);
+    }
+
+    /**
+     * Settings that are safe to read from the cache: links and notification
+     * switches. Nothing that prices, pays, refunds, settles, decides who may
+     * book or when — those are only ever read with value(), from PostgreSQL.
+     */
+    public const CACHEABLE_KEYS = [
+        'public_web_url',
+        'android_app_url',
+        'ios_app_url',
+        'android_apk_url',
+        'whatsapp_booking_confirmed_enabled',
+        'whatsapp_appointment_reminder_enabled',
+        'whatsapp_appointment_cancelled_enabled',
+        'whatsapp_salon_closure_enabled',
+        'whatsapp_salon_deactivated_enabled',
+    ];
+
+    /**
+     * value() for a CACHEABLE_KEYS setting, from one cached map (5 minutes,
+     * dropped whenever any setting is saved). Any other key is refused, so a
+     * money setting can never be read through the cache by mistake.
+     */
+    public static function cachedValue(string $key, mixed $default = null): mixed
+    {
+        if (! in_array($key, self::CACHEABLE_KEYS, true)) {
+            throw new \LogicException("Setting '{$key}' is not cacheable; use PlatformPolicySetting::value().");
+        }
+
+        $map = \App\Support\AppCache::remember(
+            \App\Support\CacheKeys::settings(),
+            \App\Support\CacheKeys::TTL_SETTINGS,
+            fn () => static::whereIn('setting_key', self::CACHEABLE_KEYS)->get()
+                ->mapWithKeys(fn (self $s) => [$s->setting_key => self::cast($s->data_type, $s->setting_value)])
+                ->all(),
+        );
+
+        return array_key_exists($key, $map) ? $map[$key] : ($default ?? (self::DEFAULTS[$key] ?? null));
+    }
+
+    private static function cast(?string $type, mixed $value): mixed
+    {
+        return match ($type) {
+            'integer' => (int) $value,
+            'decimal' => (float) $value,
+            'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            default => $value,
         };
     }
 }

@@ -1,0 +1,44 @@
+# BookALook Redis instances: bookalook-redis@cache (6379), bookalook-redis@state (6380).
+# Installed to /etc/systemd/system/ by 10-install.sh, which fills in @SERVER_BIN@
+# (redis-server or valkey-server).
+[Unit]
+Description=BookALook Redis (%i)
+Documentation=file:///etc/bookalook-redis/%i/redis.conf
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=bookalook-redis
+Group=bookalook-redis
+ExecStart=@SERVER_BIN@ /etc/bookalook-redis/%i/redis.conf
+TimeoutStartSec=60
+# SIGTERM (the default) is a clean shutdown: state writes AOF/RDB first.
+TimeoutStopSec=60
+Restart=always
+RestartSec=2
+# Each instance has its own runtime dir, so stopping one never affects the other.
+RuntimeDirectory=bookalook-redis-%i
+RuntimeDirectoryMode=0750
+UMask=0077
+LimitNOFILE=65535
+
+# Hardening: may only write its own data and log directories.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bookalook-redis/%i /var/log/bookalook-redis
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

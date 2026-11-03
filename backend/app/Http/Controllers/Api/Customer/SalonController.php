@@ -94,9 +94,12 @@ class SalonController extends Controller
                 'gender_focus' => $salon->gender_focus,
 
                 'cover_photo_url' => $salon->cover_photo_url,
-                'gallery' => $this->gallery($salon),
+                // Shared by every customer, so cached. Everything personal or
+                // live below (services, prices, offers, favourites, hours,
+                // bookability) is read fresh on every request.
+                'gallery' => \App\Support\AppCache::remember(\App\Support\CacheKeys::salonGallery($salon->id), \App\Support\CacheKeys::TTL_SALON_PROFILE, fn () => $this->gallery($salon)),
 
-                'rating' => $this->ratings($salon),
+                'rating' => \App\Support\AppCache::remember(\App\Support\CacheKeys::salonRatings($salon->id), \App\Support\CacheKeys::TTL_SALON_PROFILE, fn () => $this->ratings($salon)),
 
                 'advance_required' => (bool) $salon->advance_required,
                 'advance_refundable' => (bool) $salon->advance_refundable,

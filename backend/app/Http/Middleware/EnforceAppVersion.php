@@ -137,7 +137,7 @@ class EnforceAppVersion
      */
     protected function getPolicyData(string $app): ?array
     {
-        return Cache::remember("app_version_policy_{$app}", 300, function () use ($app) {
+        return \App\Support\AppCache::remember(\App\Support\CacheKeys::appVersion($app, 'enforcement'), \App\Support\CacheKeys::TTL_APP_VERSION, function () use ($app) {
             $policy = AppUpdatePolicy::with(['latestRelease', 'minimumRelease'])
                 ->where('app', $app)
                 ->first();

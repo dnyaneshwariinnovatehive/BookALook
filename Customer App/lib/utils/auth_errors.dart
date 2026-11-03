@@ -20,8 +20,13 @@ String friendlyAuthError(String? raw) {
   if (match == null) return generic;
 
   final status = int.parse(match.group(1)!);
+  // Too many tries, or codes cannot be sent: the server says how long to wait
+  // or what is wrong, in words written for people.
   if (status == 429) {
-    return 'Too many attempts. Please wait a minute and try again.';
+    return _messageFrom(match.group(2)) ?? 'Too many attempts. Please wait a few minutes and try again.';
+  }
+  if (status == 503) {
+    return _messageFrom(match.group(2)) ?? 'Login codes cannot be sent right now. Please try again later.';
   }
   if (status >= 500) {
     return 'Something went wrong on our side. Please try again in a moment.';

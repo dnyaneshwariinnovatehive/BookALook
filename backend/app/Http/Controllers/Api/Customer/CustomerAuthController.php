@@ -37,13 +37,12 @@ class CustomerAuthController extends Controller
             return response()->json(['message' => 'OTP sent successfully.', 'phone' => $phone]);
         }
 
-        $otps->resetAttempts('otp_' . $phone);
         $automation = WhatsappAutomation::where('key', 'whatsapp_otp')->first();
 
         // If WhatsApp OTP is enabled and has a configured campaign, send real OTP via WhatsApp
         if ($automation && $automation->is_enabled && !empty($automation->aisensy_campaign_name)) {
             $otp = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            Cache::put('otp_' . $phone, $otp, now()->addMinutes(10));
+            $otps->issue(LoginOtp::CUSTOMER, $phone, $otp);
 
             $message = WhatsAppMessage::create([
                 'to_phone' => $phone,
@@ -62,12 +61,17 @@ class CustomerAuthController extends Controller
             ]);
         }
 
-        // When disabled (default during development): Use demo OTP
-        $mockedOtp = '123456';
-        Cache::put('otp_' . $phone, $mockedOtp, now()->addMinutes(10));
+        // WhatsApp OTP off: the demo code, outside production only.
+        $demo = $otps->demoCode();
+        if ($demo === null) {
+            return response()->json([
+                'message' => 'Login codes cannot be sent right now. Please try again later.',
+            ], 503);
+        }
+        $otps->issue(LoginOtp::CUSTOMER, $phone, $demo);
 
         return response()->json([
-            'message' => 'OTP sent successfully. For testing, use 123456.',
+            'message' => "OTP sent successfully. For testing, use {$demo}.",
             'phone' => $phone
         ]);
     }
@@ -88,14 +92,15 @@ class CustomerAuthController extends Controller
 
         // Only the code sent to this phone (the demo code when WhatsApp OTP is
         // off). Five wrong guesses discard it.
-        if (! app(LoginOtp::class)->check('otp_' . $request->phone, $request->phone, $request->otp)) {
+        $otps = app(LoginOtp::class);
+        if (! $otps->check(LoginOtp::CUSTOMER, $request->phone, $request->otp)) {
             throw ValidationException::withMessages([
                 'otp' => ['The provided OTP is incorrect.'],
             ]);
         }
 
-        \Illuminate\Support\Facades\Cache::forget('otp_' . $request->phone);
-        \Illuminate\Support\Facades\Cache::put('verified_phone_' . $request->phone, true, now()->addMinutes(15));
+        // The code was used up by check(); a new customer may now finish sign-up.
+        $otps->markVerified($request->phone);
 
         $user = User::where('phone', $request->phone)->first();
 
@@ -157,7 +162,8 @@ class CustomerAuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if (!\Illuminate\Support\Facades\Cache::get('verified_phone_' . $request->phone)) {
+        $otps = app(LoginOtp::class);
+        if (! $otps->isVerified($request->phone)) {
             return response()->json(['message' => 'Phone number not verified or verification expired.'], 403);
         }
 
@@ -181,7 +187,7 @@ class CustomerAuthController extends Controller
             'last_login_at' => now(),
         ]);
 
-        \Illuminate\Support\Facades\Cache::forget('verified_phone_' . $request->phone);
+        $otps->forgetVerified($request->phone);
 
         $token = $user->createToken('customer_app')->plainTextToken;
 

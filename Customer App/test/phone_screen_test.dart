@@ -211,6 +211,16 @@ void main() {
       expect(friendlyAuthError('HTTP Error 429: {}'), contains('wait'));
     });
 
+    test('rate limiting shows how long the server says to wait', () {
+      expect(friendlyAuthError('HTTP Error 429: {"message":"Too many codes asked for this number. Please wait before trying again.","retry_after":540}'),
+          'Too many codes asked for this number. Please wait before trying again.');
+    });
+
+    test('codes switched off says so', () {
+      expect(friendlyAuthError('HTTP Error 503: {"message":"Login codes cannot be sent right now. Please try again later."}'),
+          'Login codes cannot be sent right now. Please try again later.');
+    });
+
     test('anything unrecognised falls back to a generic sentence', () {
       expect(friendlyAuthError('HTTP Error 404: not json'),
           'We could not send a code right now. Please try again.');

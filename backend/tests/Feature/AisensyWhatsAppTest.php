@@ -201,6 +201,41 @@ class AisensyWhatsAppTest extends TestCase
         Http::assertSent(fn ($request) => $request->data()['campaignName'] === 'BAL_APPOINTMENT_REMINDER');
     }
 
+    public function test_a_login_code_also_fills_the_copy_code_button(): void
+    {
+        Http::fake(['backend.aisensy.com/*' => Http::response([], 200)]);
+
+        $message = WhatsAppMessage::create([
+            'to_phone' => '9876543210',
+            'template' => 'whatsapp_otp',
+            'campaign' => 'BAL_whatsapp_otp',
+            'payload' => ['parameters' => ['482913']],
+            'status' => WhatsAppMessage::STATUS_QUEUED,
+            'category' => 'authentication',
+        ]);
+
+        $this->gateway()->send($message);
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return $body['templateParams'] === ['482913']
+                && $body['buttons'] === [[
+                    'type' => 'button', 'sub_type' => 'url', 'index' => 0,
+                    'parameters' => [['type' => 'text', 'text' => '482913']],
+                ]];
+        });
+    }
+
+    public function test_other_messages_carry_no_buttons(): void
+    {
+        Http::fake(['backend.aisensy.com/*' => Http::response([], 200)]);
+
+        $this->gateway()->send($this->queuedMessage(['parameters' => ['Glow Studio']]));
+
+        Http::assertSent(fn ($request) => ! array_key_exists('buttons', $request->data()));
+    }
+
     // ------------------------------------------------------------- fixtures
 
     private function gateway(): AisensyWhatsAppGateway

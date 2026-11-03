@@ -148,6 +148,18 @@ class AisensyWhatsAppGateway implements WhatsAppGateway
             );
         }
 
+        // A WhatsApp authentication template has a "Copy code" button, and the
+        // button carries the code as its own parameter. Without it AISensy
+        // rejects the send with "Required parameter is missing".
+        if ($message->category === 'authentication' && ($body['templateParams'] ?? []) !== []) {
+            $body['buttons'] = [[
+                'type' => 'button',
+                'sub_type' => 'url',
+                'index' => 0,
+                'parameters' => [['type' => 'text', 'text' => $body['templateParams'][0]]],
+            ]];
+        }
+
         // Only sent when present. An empty media object is not the same as no
         // media, and a text template would be rejected for having one.
         $media = $message->payload['media'] ?? null;

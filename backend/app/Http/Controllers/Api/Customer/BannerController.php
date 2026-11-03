@@ -124,9 +124,7 @@ class BannerController extends Controller
      */
     private function resolveDynamicBanner(Banner $banner): bool
     {
-        $cacheKey = "banner_resolution_{$banner->id}";
-
-        return Cache::remember($cacheKey, 60 * 15, function () use ($banner) {
+        return \App\Support\AppCache::remember(\App\Support\CacheKeys::bannerResolution($banner->id), \App\Support\CacheKeys::TTL_BANNER_RESOLUTION, function () use ($banner) {
             $config = $banner->config ?? [];
             $scope = $banner->target_scope;
             $cityId = $banner->target_city_id;
