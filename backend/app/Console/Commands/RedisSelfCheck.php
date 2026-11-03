@@ -133,7 +133,8 @@ class RedisSelfCheck extends Command
 
         $this->line('== Outages (simulated in this process only, by pointing at a closed port)');
         $this->check('cache down: AppCache returns the database value', function () use ($run) {
-            return $this->withConnectionDown('cache', 'redis', fn () => AppCache::remember("{$run}:down", 60, fn () => 'from-postgres') === 'from-postgres');
+            return $this->withConnectionDown('cache', 'redis', fn () => $this->throws(fn () => Cache::store('redis')->get('x'))
+                && AppCache::remember("{$run}:down", 60, fn () => 'from-postgres') === 'from-postgres');
         });
         $this->check('state down: OTP check fails closed (throws)', function () {
             return $this->withConnectionDown('state', 'state', fn () => $this->throws(
@@ -210,17 +211,34 @@ class RedisSelfCheck extends Command
         return $out;
     }
 
+    /**
+     * Run $test with $connection pointing at a closed port. Laravel's Redis
+     * manager copies its config when built, so a fresh manager is swapped in
+     * (changing config() alone would not break anything). Fails the check if
+     * the outage did not take effect.
+     */
     private function withConnectionDown(string $connection, string $store, \Closure $test): bool
     {
-        $port = config("database.redis.{$connection}.port");
-        config(["database.redis.{$connection}.port" => 1]);
-        Redis::purge($connection);
+        $original = app('redis');
+        $config = config('database.redis');
+        $config[$connection]['port'] = 1;
+
+        app()->instance('redis', new \Illuminate\Redis\RedisManager(app(), $config['client'] ?? 'phpredis', $config));
+        Redis::clearResolvedInstance('redis');
         Cache::forgetDriver($store);
+        $default = Cache::getDefaultDriver();
+        Cache::setDefaultDriver($store);
+
         try {
+            if (! $this->throws(fn () => Redis::connection($connection)->ping())) {
+                throw new \RuntimeException("could not simulate an outage of {$connection}");
+            }
+
             return (bool) $test();
         } finally {
-            config(["database.redis.{$connection}.port" => $port]);
-            Redis::purge($connection);
+            Cache::setDefaultDriver($default);
+            app()->instance('redis', $original);
+            Redis::clearResolvedInstance('redis');
             Cache::forgetDriver($store);
         }
     }
