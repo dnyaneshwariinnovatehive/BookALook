@@ -42,8 +42,10 @@ class SalonAccessService
      */
     public function status(Salon $salon): array
     {
-        $this->expireStale($salon->id);
-
+        // Read-only. A plan past its end date is treated as lapsed right here,
+        // in memory; marking the row `expired` is the hourly
+        // app:check-subscriptions job's work. (This used to run an UPDATE on
+        // every call — once per salon in every customer's salon list.)
         $model = $salon->billingModel();
 
         if ($salon->status === 'suspended') {
@@ -54,11 +56,27 @@ class SalonAccessService
             return $this->blocked(self::REASON_NOT_APPROVED, 'This salon is not accepting online bookings yet.', model: $model);
         }
 
-        $subscription = SalonSubscription::with('plan')
-            ->where('salon_id', $salon->id)
-            ->where('status', 'active')
-            ->latest('start_date')
-            ->first();
+        // Already loaded with the salon (the salon list eager-loads
+        // currentSubscription.plan) — reuse it instead of one query per salon.
+        $subscription = $salon->relationLoaded('currentSubscription')
+            ? $salon->currentSubscription
+            : SalonSubscription::with('plan')
+                ->where('salon_id', $salon->id)
+                ->where('status', 'active')
+                ->latest('start_date')
+                ->first();
+
+        if ($subscription && ! $subscription->relationLoaded('plan')) {
+            $subscription->load('plan');
+        }
+
+        // Still marked active but past its end date: lapsed, exactly as if the
+        // hourly job had already caught it. No end date (commission model) is
+        // open-ended, as before.
+        if ($subscription && $subscription->end_date
+            && Carbon::parse($subscription->end_date)->lt(Carbon::today())) {
+            $subscription = null;
+        }
 
         if (! $subscription) {
             // Either never signed up, or the arrangement lapsed.

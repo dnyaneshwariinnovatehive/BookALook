@@ -98,6 +98,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Saves last_used_at at most every 10 minutes per token instead of on
+        // every signed-in request.
+        \Laravel\Sanctum\Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
+
         $this->teachSqliteToMeasureDistance();
         $this->limitSignIns();
         $this->countLimitsAtomicallyOnRedis();

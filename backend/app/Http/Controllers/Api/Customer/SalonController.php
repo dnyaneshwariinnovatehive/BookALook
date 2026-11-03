@@ -33,7 +33,7 @@ class SalonController extends Controller
 
     public function show(Request $request, $id)
     {
-        $salon = Salon::with(['city:id,name,state', 'currentSubscription'])->find($id);
+        $salon = Salon::with(['city:id,name,state', 'currentSubscription.plan'])->find($id);
 
         if (! $salon || $salon->status === 'rejected') {
             return response()->json(['message' => 'Salon not found.'], 404);
@@ -494,12 +494,14 @@ class SalonController extends Controller
     {
         $access = app(\App\Services\SalonAccessService::class);
 
-        // One sweep, rather than once per salon.
-        $access->expireStale();
-
+        // No sweep here: browsing never writes. SalonAccessService treats a
+        // plan past its end date as lapsed in memory, and the hourly
+        // app:check-subscriptions job marks it expired.
         $city = $this->resolveCity($request);
 
-        $query = Salon::with(['currentSubscription'])
+        // The plan comes with each salon, so the per-salon access check below
+        // costs no query (it used to cost three per salon).
+        $query = Salon::with(['currentSubscription.plan'])
             ->where('status', 'active');
 
         if ($request->filled('search')) {
@@ -594,7 +596,7 @@ class SalonController extends Controller
             && ! $request->filled('service_id') && ! $request->filled('combo')) {
             if ($request->filled('search')) {
                 $suggestedRows = $this->present(
-                    Salon::with(['currentSubscription'])
+                    Salon::with(['currentSubscription.plan'])
                         ->where('status', 'active')
                         ->when($city, fn ($q) => $q->where('city_id', $city->id))
                         ->orderByDesc('avg_rating')
