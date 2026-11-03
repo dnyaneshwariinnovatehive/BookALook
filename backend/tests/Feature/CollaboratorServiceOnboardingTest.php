@@ -369,7 +369,7 @@ class CollaboratorServiceOnboardingTest extends TestCase
         $otherOwner = User::create([
             'name' => 'Other Owner',
             'phone' => '9' . rand(100000000, 999999999),
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'password_hash' => 'x',
             'is_active' => true,
         ]);
@@ -553,7 +553,7 @@ class CollaboratorServiceOnboardingTest extends TestCase
         $otherOwner = User::create([
             'name' => 'Other Owner',
             'phone' => '9' . rand(100000000, 999999999),
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'password_hash' => 'x',
             'is_active' => true,
         ]);

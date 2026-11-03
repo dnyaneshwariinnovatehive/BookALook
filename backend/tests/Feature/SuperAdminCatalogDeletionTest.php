@@ -179,7 +179,7 @@ class SuperAdminCatalogDeletionTest extends TestCase
         $service = $this->createService($this->salon, $template, 2500.00);
 
         $staffUser = User::create([
-            'role' => 'staff',
+            'role' => 'service_provider',
             'phone' => '9000000004',
             'name' => 'Stylist Staff',
             'password_hash' => bcrypt('password'),
@@ -489,7 +489,7 @@ class SuperAdminCatalogDeletionTest extends TestCase
 
         // 4. Customer attempts to book with stale cart
         $staffUser = User::create([
-            'role' => 'staff',
+            'role' => 'service_provider',
             'phone' => '9000000005',
             'name' => 'Provider 5',
             'password_hash' => bcrypt('password'),
@@ -529,7 +529,7 @@ class SuperAdminCatalogDeletionTest extends TestCase
         $service = $this->createService($this->salon, $template, 5000.00);
 
         $staffUser = User::create([
-            'role' => 'staff',
+            'role' => 'service_provider',
             'phone' => '9000000006',
             'name' => 'Artist Staff',
             'password_hash' => bcrypt('password'),

@@ -481,7 +481,16 @@ class AppointmentController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to book appointment.', 'error' => $e->getMessage()], 500);
+            if (self::isSlotClash($e)) {
+                return response()->json([
+                    'message' => 'That slot is no longer available. Please pick another time.',
+                    'slot_unavailable' => true,
+                ], 409);
+            }
+            // Logged in full; the customer never sees a raw database error.
+            report($e);
+
+            return response()->json(['message' => 'Failed to book appointment.'], 500);
         }
 
         // Nothing to collect online (an all-free basket, a policy that asks for
@@ -717,6 +726,18 @@ class AppointmentController extends Controller
      *
      * @param  string[]  $providerIds
      */
+    /**
+     * The database refused an overlapping online booking for the same staff
+     * member (exclusion constraint appointments_no_online_overlap, SQLSTATE
+     * 23P01). The provider locks and the in-transaction re-check normally
+     * stop this first; this is the last line, for anything that slips past.
+     */
+    private static function isSlotClash(\Throwable $e): bool
+    {
+        return $e instanceof \Illuminate\Database\QueryException
+            && ($e->getCode() === '23P01' || str_contains($e->getMessage(), 'appointments_no_online_overlap'));
+    }
+
     private function lockProviders(array $providerIds): void
     {
         \App\Models\ServiceProvider::whereIn('id', $providerIds)
@@ -1143,6 +1164,15 @@ class AppointmentController extends Controller
                 ->addMinutes($requirements['duration'])
                 ->format('H:i:s');
 
+            // Give the old slot back before taking the new one. Availability
+            // already ignores this booking, so a move to an overlapping time
+            // on the same staff member is allowed — and the database's
+            // no-overlap rule (appointments_no_online_overlap) would refuse
+            // the new row while the old one still held the chair. Both happen
+            // in this transaction, so a failure below undoes both.
+            $appointment->status = 'rescheduled';
+            $appointment->save();
+
             $replacement = Appointment::create([
                 'salon_id' => $appointment->salon_id,
                 'customer_id' => $appointment->customer_id,
@@ -1184,7 +1214,6 @@ class AppointmentController extends Controller
             // Carry any money already paid forward instead of refunding it.
             $this->carryPaymentsForward($appointment, $replacement, $request->user()->id);
 
-            $appointment->status = 'rescheduled';
             $appointment->reschedule_reason = $replacement->reschedule_reason;
             $appointment->save();
 
@@ -1193,7 +1222,15 @@ class AppointmentController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to reschedule appointment.', 'error' => $e->getMessage()], 500);
+            if (self::isSlotClash($e)) {
+                return response()->json([
+                    'message' => 'That slot is no longer available. Please pick another time.',
+                    'slot_unavailable' => true,
+                ], 409);
+            }
+            report($e);
+
+            return response()->json(['message' => 'Failed to reschedule appointment.'], 500);
         }
 
         // The provider notice went out inside the transaction above (the job's

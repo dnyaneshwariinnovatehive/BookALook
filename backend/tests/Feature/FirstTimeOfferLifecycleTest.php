@@ -123,7 +123,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
             ]);
         }
 
-        $providerUser = $this->createUser('provider');
+        $providerUser = $this->createUser('service_provider');
         $this->providerA = ServiceProvider::create([
             'id' => (string) Str::uuid(),
             'user_id' => $providerUser->id,
@@ -151,7 +151,7 @@ class FirstTimeOfferLifecycleTest extends TestCase
             'advance_percentage' => 20.0,
             'is_active' => true,
         ]);
-        $providerUserB = $this->createUser('provider');
+        $providerUserB = $this->createUser('service_provider');
         $this->providerB = ServiceProvider::create([
             'id' => (string) Str::uuid(),
             'user_id' => $providerUserB->id,

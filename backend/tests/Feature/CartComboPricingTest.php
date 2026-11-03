@@ -256,13 +256,13 @@ class CartComboPricingTest extends TestCase
         [$salon, $customer, $services] = $this->fixture();
 
         // Two completed appointments where A was booked with C.
-        foreach ([1, 2] as $ignored) {
+        foreach ([5, 6] as $daysAgo) {
             $appointment = Appointment::create([
                 'salon_id' => $salon->id,
                 'customer_id' => $customer->id,
                 'appointed_provider_id' => $this->anyProviderId($salon),
                 'booking_source' => 'online',
-                'appointment_date' => Carbon::today()->subDays(5)->toDateString(),
+                'appointment_date' => Carbon::today()->subDays($daysAgo)->toDateString(),
                 'start_time' => '10:00:00',
                 'end_time' => '11:00:00',
                 'status' => 'completed',
@@ -421,7 +421,7 @@ class CartComboPricingTest extends TestCase
                 'name' => 'Provider Test',
                 'phone' => '98' . rand(10000000, 99999999),
                 'password_hash' => bcrypt('password'),
-                'role' => 'provider',
+                'role' => 'service_provider',
                 'is_active' => true,
             ]);
             $provider = \App\Models\ServiceProvider::create([

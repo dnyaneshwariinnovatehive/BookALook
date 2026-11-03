@@ -326,7 +326,7 @@ class BookingPaymentTest extends TestCase
                 'name' => 'Payment Staff',
                 'phone' => '98' . rand(10000000, 99999999),
                 'password_hash' => bcrypt('password'),
-                'role' => 'provider',
+                'role' => 'service_provider',
                 'is_active' => true,
             ]);
             $provider = ServiceProvider::create([

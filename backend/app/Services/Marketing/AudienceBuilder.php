@@ -130,7 +130,10 @@ class AudienceBuilder
             ->select([
                 DB::raw('COALESCE(u.phone, a.walk_in_customer_phone) as phone'),
                 DB::raw('MAX(COALESCE(u.name, a.walk_in_customer_name)) as name'),
-                DB::raw('MAX(a.customer_id) as user_id'),
+                // PostgreSQL has no MAX() for uuid (SQLite does not care), so
+                // every campaign failed to fan out in production. As text it
+                // is the same id, on both.
+                DB::raw('MAX(CAST(a.customer_id AS TEXT)) as user_id'),
                 DB::raw('COUNT(*) as visits'),
                 DB::raw('COALESCE(SUM(COALESCE(a.final_billed_amount, a.total_amount)), 0) as spend'),
                 DB::raw('MAX(a.appointment_date) as last_visit'),

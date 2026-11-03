@@ -111,7 +111,11 @@ class Notification extends Model
         }
 
         try {
-            return static::create($attributes);
+            // In its own (nested) transaction, i.e. a SAVEPOINT when the caller
+            // already has one open. On PostgreSQL a failed INSERT aborts the
+            // whole surrounding transaction; rolling back to the savepoint
+            // undoes only this insert, so the caller's work carries on.
+            return \Illuminate\Support\Facades\DB::transaction(fn () => static::create($attributes));
         } catch (UniqueConstraintViolationException $e) {
             if ($dedupeKey === null) {
                 throw $e;

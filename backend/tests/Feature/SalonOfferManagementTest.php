@@ -113,7 +113,7 @@ class SalonOfferManagementTest extends TestCase
             ]);
         }
 
-        $providerUserA = $this->createUser('provider');
+        $providerUserA = $this->createUser('service_provider');
         $this->providerA = ServiceProvider::create([
             'id' => (string) Str::uuid(),
             'user_id' => $providerUserA->id,

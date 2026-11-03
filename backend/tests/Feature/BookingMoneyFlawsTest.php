@@ -104,8 +104,8 @@ class BookingMoneyFlawsTest extends TestCase
     {
         [$salon, $admin, $customer, $provider] = $this->fixture();
 
-        foreach (['scheduled', 'cancelled', 'no_show', 'pending_payment'] as $status) {
-            $appointment = $this->booking($salon, $customer, $provider, total: 1000, advance: 300);
+        foreach (['scheduled', 'cancelled', 'no_show', 'pending_payment'] as $i => $status) {
+            $appointment = $this->booking($salon, $customer, $provider, total: 1000, advance: 300, start: sprintf('%02d:00:00', 9 + $i));
             $appointment->forceFill(['status' => $status])->save();
 
             $this->actingAs($admin, 'sanctum')
@@ -152,8 +152,8 @@ class BookingMoneyFlawsTest extends TestCase
     {
         [$salon, $admin, $customer, $provider] = $this->fixture();
 
-        foreach (['completed', 'cancelled', 'in_progress'] as $status) {
-            $appointment = $this->booking($salon, $customer, $provider, total: 1000, advance: 300);
+        foreach (['completed', 'cancelled', 'in_progress'] as $i => $status) {
+            $appointment = $this->booking($salon, $customer, $provider, total: 1000, advance: 300, start: sprintf('%02d:00:00', 9 + $i));
             $appointment->forceFill(['status' => $status])->save();
 
             $this->actingAs($admin, 'sanctum')

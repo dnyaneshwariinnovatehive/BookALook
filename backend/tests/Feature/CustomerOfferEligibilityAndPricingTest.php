@@ -107,7 +107,7 @@ class CustomerOfferEligibilityAndPricingTest extends TestCase
 
         $this->providerA = ServiceProvider::create([
             'id' => (string) Str::uuid(),
-            'user_id' => $this->createUser('provider')->id,
+            'user_id' => $this->createUser('service_provider')->id,
             'salon_id' => $this->salonA->id,
             'is_active' => true,
         ]);

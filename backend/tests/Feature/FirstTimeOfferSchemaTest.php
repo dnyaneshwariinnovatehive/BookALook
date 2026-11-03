@@ -405,7 +405,7 @@ class FirstTimeOfferSchemaTest extends TestCase
 
     private function createTestProvider(Salon $salon): ServiceProvider
     {
-        $user = $this->createTestUser('partner');
+        $user = $this->createTestUser('service_provider');
         return ServiceProvider::create([
             'id' => (string) Str::uuid(),
             'user_id' => $user->id,

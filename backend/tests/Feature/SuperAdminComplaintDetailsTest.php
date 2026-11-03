@@ -80,7 +80,7 @@ class SuperAdminComplaintDetailsTest extends TestCase
         $staffUser = User::create([
             'name' => 'Rohan Staff',
             'phone' => '9111111111',
-            'role' => 'staff',
+            'role' => 'service_provider',
             'password_hash' => bcrypt('password'),
         ]);
         $provider = ServiceProvider::create([

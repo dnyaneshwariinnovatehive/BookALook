@@ -33,7 +33,7 @@ class FirstTimeOfferManagementTest extends TestCase
 
         $this->superadmin = $this->createUser('superadmin');
         $this->customer = $this->createUser('customer');
-        $this->partner = $this->createUser('partner');
+        $this->partner = $this->createUser('admin');
 
         $this->category = ServiceCategory::firstOrCreate(
             ['name' => 'Hair & Styling'],

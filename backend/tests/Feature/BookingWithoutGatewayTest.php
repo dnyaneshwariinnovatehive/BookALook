@@ -64,7 +64,7 @@ class BookingWithoutGatewayTest extends TestCase
         ]);
 
         $this->provider = ServiceProvider::create([
-            'id' => (string) Str::uuid(), 'user_id' => $this->user('provider')->id,
+            'id' => (string) Str::uuid(), 'user_id' => $this->user('service_provider')->id,
             'salon_id' => $this->salon->id, 'is_active' => true,
         ]);
         $this->provider->services()->attach([$this->service->id]);

@@ -138,7 +138,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'phone' => '96666' . rand(10000, 99999),
             'email' => 'vikram' . uniqid() . '@example.com',
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
         $collaborator = User::create([
@@ -209,7 +209,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'name' => 'Owner ' . uniqid(),
             'phone' => '94444' . rand(10000, 99999),
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
 
@@ -241,7 +241,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'name' => 'Owner ' . uniqid(),
             'phone' => '93333' . rand(10000, 99999),
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
 
@@ -299,7 +299,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'name' => 'Correction Owner',
             'phone' => '92222' . rand(10000, 99999),
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
 
@@ -336,7 +336,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'phone' => '91111' . rand(10000, 99999),
             'email' => 'resubmit' . uniqid() . '@example.com',
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
 
@@ -395,7 +395,7 @@ class SalonRegistrationAndReviewTest extends TestCase
             'name' => 'Sub Separation Owner',
             'phone' => '90000' . rand(10000, 99999),
             'password_hash' => 'x',
-            'role' => 'salon_owner',
+            'role' => 'admin',
             'is_active' => true,
         ]);
         $plan = SubscriptionPlan::first() ?? SubscriptionPlan::create([

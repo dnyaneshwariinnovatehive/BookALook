@@ -31,3 +31,6 @@ storage/dev/database.backup.sqlite
 # an old raw-SQL migration in this repository's history is MySQL/Postgres only.
 # Tests run inside transactions and roll back, so the copy is never modified.
 /testing
+
+# Local PostgreSQL test database credentials (Phase 5 tests)
+.env.pgtest

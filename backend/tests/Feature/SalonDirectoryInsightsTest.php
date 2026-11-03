@@ -20,6 +20,9 @@ use Tests\TestCase;
  */
 class SalonDirectoryInsightsTest extends TestCase
 {
+    /** Each booking gets its own hour: one staff member cannot hold two online bookings at once. */
+    private int $slot = 0;
+
     use DatabaseTransactions;
 
     private string $tag;
@@ -60,7 +63,7 @@ class SalonDirectoryInsightsTest extends TestCase
             'appointed_provider_id' => $provider->id,
             'salon_id' => $salon->id, 'customer_id' => $this->user('customer')->id,
             'booking_source' => 'online', 'appointment_date' => Carbon::today()->toDateString(),
-            'start_time' => '10:00:00', 'end_time' => '10:30:00', 'status' => $status,
+            'start_time' => sprintf('%02d:00:00', 8 + ($this->slot % 12)), 'end_time' => sprintf('%02d:30:00', 8 + ($this->slot++ % 12)), 'status' => $status,
             'payment_option' => 'advance_only', 'total_amount' => $total,
             'advance_amount' => 0, 'balance_amount' => $total,
         ]);

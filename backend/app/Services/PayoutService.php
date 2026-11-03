@@ -58,6 +58,19 @@ class PayoutService
      */
     public function calculate(string $salonId, Carbon $start, Carbon $end, ?string $cycleType = null): SalonPayout
     {
+        try {
+            return $this->calculateOnce($salonId, $start, $end, $cycleType);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Two runs created this cycle's payout at the same moment (the
+            // 04:00 schedule and SuperAdmin's button, say). The database kept
+            // one (salon_payouts_one_per_cycle); this run now recalculates
+            // that row instead of leaving a second.
+            return $this->calculateOnce($salonId, $start, $end, $cycleType);
+        }
+    }
+
+    private function calculateOnce(string $salonId, Carbon $start, Carbon $end, ?string $cycleType): SalonPayout
+    {
         $salon = Salon::find($salonId);
         $billingModel = $salon?->billingModel() ?? BillingModel::SUBSCRIPTION;
         $cycleType ??= PayoutCycle::forBillingModel($billingModel);
@@ -76,6 +89,17 @@ class PayoutService
         }
 
         return DB::transaction(function () use ($salon, $salonId, $start, $end, $cycleType, $billingModel, $existing) {
+            // Re-read under a row lock: a second recalculation of the same
+            // payout waits here instead of interleaving its delete-and-rewrite
+            // of the items with this one (which could double them). And the
+            // freeze is checked again, in case it was approved meanwhile.
+            if ($existing) {
+                $existing = SalonPayout::whereKey($existing->id)->lockForUpdate()->first();
+                if ($existing && (in_array($existing->status, [self::STATUS_APPROVED, self::STATUS_DISTRIBUTED], true) || $existing->locked_at)) {
+                    return $existing;
+                }
+            }
+
             $payout = $existing ?? new SalonPayout([
                 'salon_id' => $salonId,
                 'cycle_type' => $cycleType,
