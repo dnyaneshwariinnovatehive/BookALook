@@ -644,3 +644,214 @@ div.cellSub { margin-top: 2px; }
   .summaryGrid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .summaryValue { font-size: 18px; }
 }
+
+/* ---- Payout desk: tabs, overview, inbox, drawers, bank details ---------- */
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.lastCalc {
+  font-size: 12px;
+  color: var(--text-muted, var(--text-body));
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.viewTabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 16px;
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.viewTab:hover { color: var(--text-heading); }
+
+.viewTabActive {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.countPill {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lateText {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.salonLink,
+.linkBtn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.salonLink {
+  font-weight: 650;
+  color: var(--text-heading);
+}
+
+.salonLink:hover,
+.linkBtn:hover { text-decoration: underline; }
+
+.linkBtn {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.drawerH {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-body));
+}
+
+.drawerAmount {
+  margin-bottom: 8px;
+  font-size: 26px;
+  font-weight: 750;
+  color: var(--text-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.miniTable th,
+.miniTable td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.miniTable th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-body));
+}
+
+.miniTable .num { text-align: right; }
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.timeline li {
+  padding-left: 12px;
+  border-left: 2px solid var(--border-strong, var(--border-color));
+}
+
+.bankBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.copyRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyRow code {
+  font-size: 13px;
+  color: var(--text-heading);
+}
+
+.copyBtn {
+  padding: 2px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--surface-color);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copyBtn:hover:not(:disabled) { background: var(--surface-2); }
+
+.fineprint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted, var(--text-body));
+}
+
+.modalBank {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--surface-subtle, var(--surface-2));
+}
+
+.modalBankTitle {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, var(--text-body));
+}

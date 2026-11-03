@@ -45,7 +45,7 @@ class PayoutController extends Controller
      */
     public function index(Request $request)
     {
-        $request->validate([
+        $request->validate(self::FILTER_RULES + [
             'per_page' => 'nullable|integer|min:5|max:100',
             'column' => 'nullable|in:' . implode(',', self::SORTABLE),
             'direction' => 'nullable|in:asc,desc',
@@ -54,22 +54,9 @@ class PayoutController extends Controller
         $cycleType = $this->cycleType($request);
         [$start, $end] = PayoutCycle::bounds($cycleType, $this->anchor($request));
 
-        // Filters shared by the totals roll-up and the page of rows, so the
-        // sign-off figures always describe the same set the table is showing.
-        $applyFilters = function ($query) use ($request, $start) {
-            $query->where('cycle_type', $this->cycleType($request))
-                ->whereDate('cycle_start_date', $start->toDateString());
-
-            if ($request->filled('status')) {
-                $query->where('status', $request->status);
-            }
-
-            if ($request->filled('billing_type')) {
-                $query->where('billing_type', BillingModel::normalise($request->billing_type));
-            }
-
-            return $query;
-        };
+        // Filters shared by the totals roll-up, the page of rows and the CSV
+        // export, so they always describe the same set.
+        $applyFilters = fn ($query) => $this->filtered($query, $request, $cycleType, $start);
 
         $column = $request->input('column');
         $direction = $request->input('direction') === 'asc' ? 'asc' : 'desc';
@@ -112,6 +99,14 @@ class PayoutController extends Controller
             'cycle_end' => $end->toDateString(),
             // Still running: figures are a preview and cannot be approved yet.
             'cycle_in_progress' => $end->copy()->startOfDay()->gte(Carbon::today()),
+            // The cycle is rebuilt by app:generate-payouts every day at 04:00
+            // and by the Recalculate button; this is when that last happened.
+            'last_calculated_at' => optional(
+                SalonPayout::where('cycle_type', $cycleType)
+                    ->whereDate('cycle_start_date', $start->toDateString())
+                    ->max('updated_at'),
+                fn ($t) => Carbon::parse($t)->toIso8601String()
+            ),
             'totals' => [
                 'salons' => (int) $totals->salons,
                 'appointment_revenue' => round((float) $totals->appointment_revenue, 2),
@@ -186,12 +181,240 @@ class PayoutController extends Controller
 
     public function show($id)
     {
-        $payout = SalonPayout::with(['salon:id,name,address,phone_num', 'settlementInvoice'])->findOrFail($id);
+        $payout = SalonPayout::with(['salon', 'settlementInvoice', 'paymentSubmissions'])->findOrFail($id);
+
+        // Every line this payout settles: the bookings (with who and when) and
+        // any late refunds, so SuperAdmin can answer "why this amount?".
+        $items = DB::table('salon_payout_items as i')
+            ->leftJoin('appointments as a', 'a.id', '=', 'i.appointment_id')
+            ->leftJoin('users as u', 'u.id', '=', 'a.customer_id')
+            ->where('i.salon_payout_id', $payout->id)
+            ->orderBy('a.appointment_date')
+            ->orderBy('a.start_time')
+            ->get([
+                'i.id', 'i.kind', 'i.appointment_id', 'i.appointment_status', 'i.gross_amount',
+                'i.commission_base', 'i.commission_rate', 'i.commission_amount', 'i.refund_amount', 'i.net_amount',
+                'a.appointment_date', 'a.start_time', 'a.booking_source',
+                DB::raw('COALESCE(u.name, a.walk_in_customer_name) as customer_name'),
+            ])
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'kind' => $r->kind ?? 'booking',
+                'appointment_id' => $r->appointment_id,
+                'date' => $r->appointment_date ? Carbon::parse($r->appointment_date)->toDateString() : null,
+                'time' => $r->start_time ? substr((string) $r->start_time, 0, 5) : null,
+                'customer_name' => $r->customer_name,
+                'source' => $r->booking_source,
+                'appointment_status' => $r->appointment_status,
+                'advance_held' => round((float) $r->gross_amount, 2),
+                'commission_base' => round((float) $r->commission_base, 2),
+                'commission_rate' => round((float) $r->commission_rate, 2),
+                'commission' => round((float) $r->commission_amount, 2),
+                'refund' => round((float) $r->refund_amount, 2),
+                'net' => round((float) $r->net_amount, 2),
+            ])->values();
+
+        // Who approved, paid or collected it, and when — from the audit log.
+        $history = AuditLog::with('actor:id,name')
+            ->where('entity_type', 'SalonPayout')
+            ->where('entity_id', $payout->id)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (AuditLog $log) => [
+                'action' => $log->action,
+                'label' => AuditLog::CATALOGUE[$log->action]['label'] ?? $log->action,
+                'by' => $log->actor?->name,
+                'at' => $log->created_at?->toIso8601String(),
+                'reference' => $log->metadata['distribution_reference'] ?? null,
+                'note' => $log->metadata['reason'] ?? null,
+            ])->values();
 
         return response()->json([
             'success' => true,
             'payout' => $this->payouts->present($payout),
+            'items' => $items,
+            // Masked: the full account number is only shown through the
+            // salon bank-details endpoint, which logs the reveal.
+            'bank_details' => $payout->salon ? app(\App\Services\BankDetailsService::class)->present($payout->salon) : null,
+            'payment_submissions' => $payout->paymentSubmissions->sortByDesc('created_at')->map->present()->values(),
+            'history' => $history,
         ]);
+    }
+
+    /**
+     * Everything waiting on SuperAdmin, across every cycle, oldest first:
+     * payouts to approve, approved payouts to pay, salon payments to verify,
+     * and money salons owe that has not come in.
+     */
+    public function inbox()
+    {
+        $today = Carbon::today();
+        $open = fn () => SalonPayout::with(['salon:id,name', 'settlementInvoice', 'paymentSubmissions'])
+            ->where('status', '!=', PayoutService::STATUS_DISTRIBUTED);
+        $row = function (SalonPayout $p, ?string $since) use ($today) {
+            return $this->payouts->present($p) + [
+                'waiting_since' => $since,
+                'waiting_days' => $since ? (int) Carbon::parse($since)->startOfDay()->diffInDays($today) : null,
+            ];
+        };
+
+        $toApprove = $open()->where('status', PayoutService::STATUS_PENDING)
+            ->whereDate('cycle_end_date', '<', $today)
+            ->orderBy('cycle_end_date')->limit(200)->get()
+            ->map(fn ($p) => $row($p, Carbon::parse($p->cycle_end_date)->addDay()->toDateString()));
+
+        $toPay = $open()->where('status', PayoutService::STATUS_APPROVED)
+            ->where('net_amount', '>=', 0)
+            ->orderBy('approved_at')->limit(200)->get()
+            ->map(fn ($p) => $row($p, $p->approved_at ? Carbon::parse($p->approved_at)->toDateString() : null));
+
+        $toVerify = $open()->whereHas('paymentSubmissions', fn ($q) => $q->where('status', 'pending'))
+            ->limit(200)->get()
+            ->map(function ($p) use ($row) {
+                $sub = $p->paymentSubmissions->where('status', 'pending')->sortBy('created_at')->first();
+
+                return $row($p, $sub?->created_at?->toDateString());
+            })
+            ->sortByDesc('waiting_days')->values();
+
+        $owed = $open()->where('net_amount', '<', 0)
+            ->whereDate('cycle_end_date', '<', $today)
+            ->whereDoesntHave('paymentSubmissions', fn ($q) => $q->where('status', 'pending'))
+            ->orderBy('cycle_end_date')->limit(200)->get()
+            ->map(fn ($p) => $row($p, Carbon::parse($p->cycle_end_date)->addDay()->toDateString()));
+
+        return response()->json([
+            'success' => true,
+            'counts' => [
+                'to_approve' => $toApprove->count(),
+                'to_pay' => $toPay->count(),
+                'to_verify' => $toVerify->count(),
+                'salons_owe' => $owed->count(),
+            ],
+            'to_approve' => $toApprove->values(),
+            'to_pay' => $toPay->values(),
+            'to_verify' => $toVerify,
+            'salons_owe' => $owed->values(),
+        ]);
+    }
+
+    /** Both settlement rhythms at a glance: what is owed each way, and this month. */
+    public function overview()
+    {
+        $today = Carbon::today();
+        $monthStart = $today->copy()->startOfMonth();
+        $monthEnd = $today->copy()->endOfMonth();
+        $openEnded = fn () => SalonPayout::where('status', '!=', PayoutService::STATUS_DISTRIBUTED)
+            ->whereDate('cycle_end_date', '<', $today);
+        $paidThisMonth = fn () => SalonPayout::where('status', PayoutService::STATUS_DISTRIBUTED)
+            ->whereBetween('distributed_at', [$monthStart, $monthEnd->copy()->endOfDay()]);
+
+        return response()->json([
+            'success' => true,
+            'month_label' => $today->format('F Y'),
+            'to_pay_salons' => round((float) $openEnded()->where('net_amount', '>', 0)->sum('net_amount'), 2),
+            'to_pay_count' => $openEnded()->where('net_amount', '>', 0)->count(),
+            'salons_owe' => round(abs((float) $openEnded()->where('net_amount', '<', 0)->sum('net_amount')), 2),
+            'salons_owe_count' => $openEnded()->where('net_amount', '<', 0)->count(),
+            'paid_this_month' => round((float) $paidThisMonth()->where('net_amount', '>', 0)->sum('net_amount'), 2),
+            'collected_this_month' => round(abs((float) $paidThisMonth()->where('net_amount', '<', 0)->sum('net_amount')), 2),
+            // Commission on cycles that started this month, both rhythms.
+            'commission_this_month' => round((float) SalonPayout::whereBetween('cycle_start_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+                ->sum('commission_deducted'), 2),
+        ]);
+    }
+
+    /** The selected cycle (with the page's filters) as a CSV, for the accountant. */
+    public function export(Request $request)
+    {
+        $request->validate(self::FILTER_RULES);
+
+        $cycleType = $this->cycleType($request);
+        [$start, $end] = PayoutCycle::bounds($cycleType, $this->anchor($request));
+
+        $rows = $this->filtered(SalonPayout::with(['salon:id,name', 'settlementInvoice']), $request, $cycleType, $start)
+            ->orderBy(DB::table('salons')->select('name')->whereColumn('salons.id', 'salon_payouts.salon_id')->limit(1))
+            ->get();
+
+        $filename = sprintf('bookalook-payouts-%s-%s.csv', $cycleType, $start->toDateString());
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel shows ₹ and names correctly
+            fputcsv($out, [
+                'Salon', 'Billing', 'Cycle', 'Cycle start', 'Cycle end', 'Appointments', 'Billed (app bookings)',
+                'Advances held', 'Commission %', 'Commission', 'Refunds deducted', 'Coins added', 'Dues adjustment',
+                'Net', 'Direction', 'Status', 'Approved at', 'Paid / collected at', 'Reference', 'Statement no.',
+            ]);
+            foreach ($rows as $p) {
+                $d = $this->payouts->present($p);
+                fputcsv($out, [
+                    self::csvSafe($d['salon_name']), $d['billing_label'], $d['cycle_label'], $d['cycle_start_date'], $d['cycle_end_date'],
+                    $d['appointments_count'], $d['appointment_revenue'], $d['gross_amount'], $d['commission_percentage'],
+                    $d['commission_deducted'], $d['refund_adjustment'], $d['wallet_redeemed_amount'], $d['dues_adjustment'],
+                    $d['net_amount'], $d['direction'] === 'salon_owes' ? 'Salon owes' : 'Pay salon', ucfirst($d['status']),
+                    $d['approved_at'] ? Carbon::parse($d['approved_at'])->toDateTimeString() : '',
+                    $d['distributed_at'] ? Carbon::parse($d['distributed_at'])->toDateTimeString() : '',
+                    self::csvSafe($d['distribution_reference']), $d['settlement_invoice']['number'] ?? '',
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** Filters the list, totals and export share. */
+    private const FILTER_RULES = [
+        'search' => 'nullable|string|max:100',
+        'flow' => 'nullable|in:pay_salon,salon_owes',
+        'has_refunds' => 'nullable|boolean',
+        'payment' => 'nullable|in:pending,rejected',
+        'status' => 'nullable|in:pending,approved,distributed',
+    ];
+
+    private function filtered($query, Request $request, string $cycleType, Carbon $start)
+    {
+        $query->where('cycle_type', $cycleType)
+            ->whereDate('cycle_start_date', $start->toDateString());
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('billing_type')) {
+            $query->where('billing_type', BillingModel::normalise($request->billing_type));
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . mb_strtolower(trim((string) $request->search)) . '%';
+            $query->whereHas('salon', fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', [$term]));
+        }
+
+        match ($request->input('flow')) {
+            'salon_owes' => $query->where('net_amount', '<', 0),
+            'pay_salon' => $query->where('net_amount', '>=', 0),
+            default => null,
+        };
+
+        if ($request->boolean('has_refunds')) {
+            $query->where('refund_adjustment', '>', 0);
+        }
+
+        if ($request->input('payment') === 'pending') {
+            $query->whereHas('paymentSubmissions', fn ($q) => $q->where('status', 'pending'));
+        } elseif ($request->input('payment') === 'rejected') {
+            $query->whereHas('paymentSubmissions', fn ($q) => $q->where('status', 'rejected'))
+                ->whereDoesntHave('paymentSubmissions', fn ($q) => $q->whereIn('status', ['pending', 'approved']));
+        }
+
+        return $query;
+    }
+
+    /** A cell starting with = + - @ would run as a formula in Excel. */
+    private static function csvSafe(?string $value): string
+    {
+        $value = (string) $value;
+
+        return $value !== '' && in_array($value[0], ['=', '+', '-', '@'], true) ? "'" . $value : $value;
     }
 
     public function approve(Request $request, $id)
@@ -257,6 +480,8 @@ class PayoutController extends Controller
         }
 
         $isCommission = BillingModel::isCommission($payout->billing_type);
+
+        $this->tellSalonSettled($payout, $request->input('distribution_reference'));
 
         // Money actually leaving the platform. Nothing else in the system is
         // less reversible.
@@ -394,6 +619,40 @@ class PayoutController extends Controller
     }
 
     // ------------------------------------------------------------- internals
+
+    /**
+     * Tell the salon owner the money moved (push + in-app), so they are not
+     * left asking "did you pay us?". The settlement stands whether or not the
+     * notice goes out.
+     */
+    private function tellSalonSettled(SalonPayout $payout, ?string $reference): void
+    {
+        try {
+            $payout->loadMissing('salon');
+            $label = PayoutCycle::label(
+                $payout->cycle_type ?? PayoutCycle::WEEKLY,
+                Carbon::parse($payout->cycle_start_date),
+                Carbon::parse($payout->cycle_end_date)
+            );
+            $amount = '₹' . number_format(abs((float) $payout->net_amount), 2);
+            $ref = $reference ? " Ref {$reference}." : '';
+            $owes = (float) $payout->net_amount < 0;
+
+            app(\App\Services\Notifications\NotificationService::class)->send(
+                $payout->salon?->admin_id,
+                \App\Support\Notifications\NotificationType::GENERAL,
+                $owes ? 'Payment received' : 'Payout sent',
+                $owes
+                    ? "We have received your payment of {$amount} for {$label}.{$ref} Thank you!"
+                    : "{$amount} for {$label} has been sent to your account.{$ref} Your statement is in Payouts.",
+                ['payout_id' => $payout->id, 'action' => 'open_payouts'],
+                salon: $payout->salon,
+                dedupeKey: 'payout.settled.' . $payout->id,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
 
     private function cycleType(Request $request): string
     {

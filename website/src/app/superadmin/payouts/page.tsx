@@ -1,8 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pagination, SortHeader, useConfirm } from '@/components/admin/ui';
+import { Pagination, SearchInput, SortHeader, useConfirm, useDebounced } from '@/components/admin/ui';
 import styles from './page.module.css';
+import {
+  BankBlock, NeedsActionInbox, PayoutDetailDrawer, PayoutsOverview, SalonHistoryDrawer, useRefreshKey,
+  type DeskPayout,
+} from './PayoutDesk';
 
 type CycleType = 'weekly' | 'monthly';
 
@@ -155,6 +159,19 @@ export default function PayoutsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [confirm, confirmDialog] = useConfirm();
 
+  // The desk: inbox vs one cycle, search and filters, drawers, refresh.
+  const [view, setView] = useState<'inbox' | 'cycle'>('inbox');
+  const [needsCount, setNeedsCount] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search, 350);
+  const [flow, setFlow] = useState<'' | 'pay_salon' | 'salon_owes'>('');
+  const [extra, setExtra] = useState<'' | 'has_refunds' | 'payment_pending' | 'payment_rejected'>('');
+  const [lastCalculated, setLastCalculated] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [historySalon, setHistorySalon] = useState<{ id: string; name: string | null } | null>(null);
+  const [refreshKey, bumpRefresh] = useRefreshKey();
+  const [exporting, setExporting] = useState(false);
+
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
@@ -181,6 +198,11 @@ export default function PayoutsPage() {
         per_page: String(perPage),
       });
       if (statusFilter) query.append('status', statusFilter);
+      if (debouncedSearch.trim()) query.append('search', debouncedSearch.trim());
+      if (flow) query.append('flow', flow);
+      if (extra === 'has_refunds') query.append('has_refunds', '1');
+      if (extra === 'payment_pending') query.append('payment', 'pending');
+      if (extra === 'payment_rejected') query.append('payment', 'rejected');
       if (sort) {
         query.append('column', sort.key);
         query.append('direction', sort.dir);
@@ -197,6 +219,7 @@ export default function PayoutsPage() {
       setCycleEnd(data.cycle_end);
       setCycleLabel(data.cycle_label);
       setInProgress(Boolean(data.cycle_in_progress));
+      setLastCalculated(data.last_calculated_at ?? null);
       if (data.meta) setMeta(data.meta);
     } catch (e: unknown) {
       if (seq !== listSeq.current) return;
@@ -204,7 +227,34 @@ export default function PayoutsPage() {
     } finally {
       if (seq === listSeq.current) setIsLoading(false);
     }
-  }, [cycleType, cycleStart, statusFilter, page, perPage, sort]);
+  }, [cycleType, cycleStart, statusFilter, page, perPage, sort, debouncedSearch, flow, extra]);
+
+  /** The selected cycle with the same filters, as a CSV for the accountant. */
+  const exportCsv = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const query = new URLSearchParams({ cycle_type: cycleType, cycle_start: cycleStart });
+      if (statusFilter) query.append('status', statusFilter);
+      if (debouncedSearch.trim()) query.append('search', debouncedSearch.trim());
+      if (flow) query.append('flow', flow);
+      if (extra === 'has_refunds') query.append('has_refunds', '1');
+      if (extra === 'payment_pending') query.append('payment', 'pending');
+      if (extra === 'payment_rejected') query.append('payment', 'rejected');
+      const res = await fetch(`/api/proxy/superadmin/payouts/export?${query}`);
+      if (!res.ok) throw new Error('Could not export this cycle.');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bookalook-payouts-${cycleType}-${cycleStart}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not export this cycle.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(fetchPayouts, 0);
@@ -235,6 +285,7 @@ export default function PayoutsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Could not calculate the cycle.');
       setNotice(data.message || 'Cycle calculated.');
+      bumpRefresh();
       // The new cycle can be shorter than the page we were on.
       if (page === 1) await fetchPayouts();
       else setPage(1);
@@ -299,6 +350,7 @@ export default function PayoutsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'That did not work.');
       await fetchPayouts();
+      bumpRefresh();
       if (action === 'distribute') {
         setDistributeTarget(null);
       }
@@ -332,6 +384,7 @@ export default function PayoutsPage() {
       setReviewTarget(null);
       setRejectReason('');
       await fetchPayouts();
+      bumpRefresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'That did not work.');
     } finally {
@@ -393,15 +446,57 @@ export default function PayoutsPage() {
         <div>
           <h1 className={styles.title}>Payouts &amp; distribution</h1>
           <p className={styles.subtitle}>
-            {cycleType === 'monthly'
-              ? 'Commission Model salons, settled on the 1st for the month just finished. Settling extends the salon’s access into the next month.'
-              : 'Subscription Plan salons, settled weekly. They have already paid for access, so this hands back the advances BookALook collected for them.'}
+            {view === 'inbox'
+              ? 'Everything waiting on you across all cycles, oldest first: payments to verify, payouts to pay and approve, and money salons owe.'
+              : cycleType === 'monthly'
+                ? 'Commission Model salons, settled on the 1st for the month just finished. Settling extends the salon’s access into the next month.'
+                : 'Subscription Plan salons, settled weekly. They have already paid for access, so this hands back the advances BookALook collected for them.'}
           </p>
         </div>
-        <button className={styles.primaryAction} onClick={confirmGenerate} disabled={busyId === 'generate'}>
-          {busyId === 'generate' ? 'Calculating…' : cycleType === 'monthly' ? 'Calculate selected month' : 'Calculate selected week'}
-        </button>
+        {view === 'cycle' && (
+          <div className={styles.headerActions}>
+            <span className={styles.lastCalc}>
+              {lastCalculated
+                ? `Last calculated ${new Date(lastCalculated).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })} · updates daily at 04:00`
+                : 'Calculated automatically every day at 04:00'}
+            </span>
+            <button className={styles.btnGhost} onClick={exportCsv} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button className={styles.primaryAction} onClick={confirmGenerate} disabled={busyId === 'generate'}>
+              {busyId === 'generate' ? 'Recalculating…' : 'Recalculate now'}
+            </button>
+          </div>
+        )}
       </header>
+
+      <PayoutsOverview refreshKey={refreshKey} />
+
+      <div className={styles.viewTabs} role="tablist" aria-label="Payout view">
+        <button role="tab" aria-selected={view === 'inbox'} className={`${styles.viewTab} ${view === 'inbox' ? styles.viewTabActive : ''}`} onClick={() => setView('inbox')}>
+          Needs action{needsCount !== null && needsCount > 0 && <span className={styles.countPill}>{needsCount}</span>}
+        </button>
+        <button role="tab" aria-selected={view === 'cycle'} className={`${styles.viewTab} ${view === 'cycle' ? styles.viewTabActive : ''}`} onClick={() => setView('cycle')}>
+          By cycle
+        </button>
+      </div>
+
+      {view === 'inbox' && (
+        <>
+          {error && <div className={styles.errorBanner} role="alert">{error}</div>}
+          <NeedsActionInbox
+            refreshKey={refreshKey}
+            onCount={setNeedsCount}
+            onApprove={(p) => confirmApprove(p as Payout)}
+            onPay={(p) => confirmDistribute(p as Payout)}
+            onReview={(p) => { setReviewTarget(p as Payout); setRejectReason(''); }}
+            onDetails={setDetailId}
+            onSalon={(p: DeskPayout) => setHistorySalon({ id: p.salon_id, name: p.salon_name })}
+          />
+        </>
+      )}
+
+      {view === 'cycle' && (<>
 
       <div className={styles.filterBar}>
         <div className={styles.segmented} role="tablist" aria-label="Settlement run">
@@ -452,6 +547,26 @@ export default function PayoutsPage() {
         )}
       </div>
 
+      <div className={styles.filterBar}>
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search salon…" ariaLabel="Search salon" />
+        <div className={styles.chips} role="group" aria-label="Money direction and flags">
+          {([
+            ['', 'Everything'],
+            ['pay_salon', 'We pay'],
+            ['salon_owes', 'Salon owes'],
+          ] as const).map(([v, l]) => (
+            <button key={v || 'all-flow'} className={`${styles.chip} ${flow === v ? styles.chipActive : ''}`} aria-pressed={flow === v} onClick={() => { setFlow(v); setPage(1); }}>{l}</button>
+          ))}
+          {([
+            ['has_refunds', 'Has refunds'],
+            ['payment_pending', 'Payment to verify'],
+            ['payment_rejected', 'Payment declined'],
+          ] as const).map(([v, l]) => (
+            <button key={v} className={`${styles.chip} ${extra === v ? styles.chipActive : ''}`} aria-pressed={extra === v} onClick={() => { setExtra(extra === v ? '' : v); setPage(1); }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
       {error && <div className={styles.errorBanner} role="alert">{error}</div>}
       {notice && !error && <div className={styles.noticeBanner} role="status">{notice}</div>}
       {inProgress && (
@@ -489,8 +604,9 @@ export default function PayoutsPage() {
           <div className={styles.empty}>
             <div className={styles.emptyTitle}>No payouts for this cycle yet</div>
             <p>
-              {cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts appear here once the cycle has
-              bookings. Press “{cycleType === 'monthly' ? 'Calculate selected month' : 'Calculate selected week'}” to build them.
+              {debouncedSearch || flow || extra
+                ? 'Nothing matches these filters in this cycle.'
+                : `${cycleType === 'monthly' ? 'Commission Model' : 'Subscription Plan'} payouts are built automatically every day at 04:00 once the cycle has bookings. Use “Recalculate now” if you need fresher figures.`}
             </p>
           </div>
         ) : (
@@ -519,7 +635,9 @@ export default function PayoutsPage() {
                   return (
                     <tr key={p.id} className={paymentPending ? styles.rowAttention : undefined}>
                       <td>
-                        <div className={styles.salonName}>{p.salon_name ?? '—'}</div>
+                        <button type="button" className={styles.salonLink} onClick={() => setHistorySalon({ id: p.salon_id, name: p.salon_name })} title="Payout history for this salon">
+                          {p.salon_name ?? '—'}
+                        </button>
                         <div className={styles.salonMeta}>
                           <span className={`${styles.pill} ${p.billing_type === 'commission' ? styles.pillCommission : styles.pillSubscription}`}>
                             {p.billing_label}
@@ -570,6 +688,7 @@ export default function PayoutsPage() {
                       </td>
                       <td className={styles.actionsCol}>
                         <div className={styles.rowActions}>
+                          <button className={styles.btnGhost} onClick={() => setDetailId(p.id)}>Details</button>
                           {p.status === 'pending' && (
                             <button
                               className={styles.btnGhost}
@@ -633,6 +752,7 @@ export default function PayoutsPage() {
           </div>
         )}
       </section>
+      </>)}
 
       {distributeTarget && (
         <div className={styles.modalOverlay} onClick={() => setDistributeTarget(null)}>
@@ -654,6 +774,12 @@ export default function PayoutsPage() {
                 : `${money(distributeTarget.commission_deducted)} commission is earned in this cycle.`}
               {distributeTarget.cycle_type === 'monthly' ? ' Settling also extends their access into the next month.' : ''}
             </p>
+            {distributeTarget.direction !== 'salon_owes' && (
+              <div className={styles.modalBank}>
+                <div className={styles.modalBankTitle}>Send it to</div>
+                <BankBlock salonId={distributeTarget.salon_id} />
+              </div>
+            )}
             <p className={styles.modalWarn}>This cannot be undone.</p>
             <div className={styles.formGroup}>
               <label htmlFor="ref">
@@ -729,6 +855,13 @@ export default function PayoutsPage() {
           </div>
         </div>
       )}
+
+      <PayoutDetailDrawer payoutId={detailId} onClose={() => setDetailId(null)} />
+      <SalonHistoryDrawer
+        salon={historySalon}
+        onClose={() => setHistorySalon(null)}
+        onOpenPayout={(id) => { setHistorySalon(null); setDetailId(id); }}
+      />
 
       {confirmDialog}
     </div>

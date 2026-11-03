@@ -260,6 +260,9 @@ Route::prefix('superadmin')->group(function () {
         Route::post('/salon-requests/{id}/status', [\App\Http\Controllers\Api\SuperAdmin\SalonRequestController::class, 'updateStatus']);
 
         Route::get('/payouts', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'index']);
+        Route::get('/payouts/inbox', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'inbox']);
+        Route::get('/payouts/overview', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'overview']);
+        Route::get('/payouts/export', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'export']);
         Route::post('/payouts/generate', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'generate']);
         Route::get('/payouts/{id}', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'show']);
         Route::post('/payouts/{id}/approve', [\App\Http\Controllers\Api\SuperAdmin\PayoutController::class, 'approve']);

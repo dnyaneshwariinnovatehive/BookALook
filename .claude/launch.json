@@ -31,6 +31,17 @@
         "NEXT_PUBLIC_BACKEND_URL": "http://127.0.0.1:8010"
       },
       "port": 3001
+    },
+    {
+      "name": "backend-local",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "backend/artisan",
+        "serve",
+        "--host=127.0.0.1",
+        "--port=8010"
+      ],
+      "port": 8010
     }
   ]
 }
