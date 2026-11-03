@@ -80,7 +80,7 @@ class CityScopedDirectoryTest extends TestCase
         $this->assertNotContains($savedSalon->id, collect($listed['salons'])->pluck('id'));
     }
 
-    public function test_an_empty_city_offers_somewhere_that_is_not_empty(): void
+    public function test_an_empty_city_names_another_city_but_never_lists_its_salons(): void
     {
         $this->givenSalonInItsOwnCity();
 
@@ -95,10 +95,12 @@ class CityScopedDirectoryTest extends TestCase
             ->json();
 
         $this->assertEmpty($listed['salons']);
-        // An empty list on its own is a dead end.
+        // An empty list on its own is a dead end, so another city is named
+        // for the app to offer a switch to...
         $this->assertNotNull($listed['suggested_city']);
-        $this->assertNotEmpty($listed['suggested_salons']);
         $this->assertNotSame($barren->id, $listed['suggested_city']['id']);
+        // ...but the chosen city's list never fills up with another city's salons.
+        $this->assertEmpty($listed['suggested_salons']);
     }
 
     public function test_the_city_list_only_offers_cities_with_salons_in_them(): void

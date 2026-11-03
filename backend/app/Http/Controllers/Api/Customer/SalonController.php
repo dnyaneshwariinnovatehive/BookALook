@@ -604,8 +604,10 @@ class SalonController extends Controller
                 );
             }
 
-            // Still nothing — this city has no salons worth showing. Point at
-            // the busiest one that does, so the screen has somewhere to go.
+            // Still nothing — this city has no salons worth showing. Name the
+            // busiest city that does, so the app can offer to switch, but never
+            // list its salons: a customer who chose a city (or whose phone
+            // placed them in one) sees only that city's salons.
             if ($suggestedRows->isEmpty()) {
                 $alternativeCity = City::where('is_active', true)
                     ->when($city, fn ($q) => $q->where('id', '!=', $city->id))
@@ -613,18 +615,6 @@ class SalonController extends Controller
                     ->withOpenSalonCount()
                     ->orderByDesc('salon_count')
                     ->first();
-
-                if ($alternativeCity) {
-                    $suggestedRows = $this->present(
-                        Salon::with(['currentSubscription'])
-                            ->where('status', 'active')
-                            ->where('city_id', $alternativeCity->id)
-                            ->orderByDesc('avg_rating')
-                            ->limit(5)
-                            ->get(),
-                        $access
-                    );
-                }
             }
         }
 

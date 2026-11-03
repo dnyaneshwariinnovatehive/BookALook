@@ -187,10 +187,10 @@ class _HomeTabState extends State<HomeTab> {
         gender: AudienceService.apiParam(_selectedGender),
       );
       if (!mounted) return;
-      final rawSalons = (response['salons'] as List?) ?? [];
-      final suggested = (response['suggested_salons'] as List?) ?? [];
-
-      final allSalons = rawSalons.isNotEmpty ? rawSalons : suggested;
+      // Only the chosen city's salons. The server's suggestions are never
+      // swapped in: when the city has none, the section stays empty rather
+      // than quietly showing salons from somewhere else.
+      final allSalons = (response['salons'] as List?) ?? [];
 
       // Deduplicate by salon ID
       final Map<String, dynamic> uniqueSalons = {};
@@ -596,45 +596,55 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
           const SizedBox(width: 10),
-          // Greeting + Location
+          // Location, the way delivery apps show it: the area in bold with a
+          // chevron, the city under it. Tapping opens the location sheet.
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.isGuest ? 'Hi Guest 👋' : 'Welcome back 👋',
-                  style: TextStyle(
-                    color: bodyColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                InkWell(
-                  onTap: _pickCity,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 168),
-                        child: Text(
-                          LocationService.instance.label,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: headingColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
+            child: InkWell(
+              key: const ValueKey('home_location_header'),
+              onTap: _pickCity,
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on_rounded, size: 22, color: AppTheme.accentColor),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                LocationService.instance.headline,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: headingColor,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.keyboard_arrow_down_rounded,
+                                size: 18, color: AppTheme.accentColor),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.keyboard_arrow_down,
-                          size: 14, color: AppTheme.accentColor),
-                    ],
+                        if (LocationService.instance.subline != null)
+                          Text(
+                            LocationService.instance.subline!,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: bodyColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           // Notification bell

@@ -87,6 +87,15 @@ class ExploreTabState extends State<ExploreTab> {
 
   Future<void> _pickCity() async => showCityPicker(context);
 
+  /// Move to the city the server named because this one has no salons. The
+  /// city listener reloads the list.
+  Future<void> _switchToSuggestedCity() async {
+    final suggested = _suggestedCity;
+    if (suggested == null) return;
+    AppHaptics.lightImpact();
+    await LocationService.instance.setCity(ServiceCity.fromJson({'salon_count': 0, ...suggested}));
+  }
+
   /// Narrow the directory to one category and reload.
   ///
   /// Called by the shell when a category is picked elsewhere in the app. The
@@ -1597,6 +1606,18 @@ class ExploreTabState extends State<ExploreTab> {
                 }
               : _pickCity,
         ),
+
+        // The nearest city that has salons, offered as a switch — never listed
+        // here, because this screen only ever shows the chosen city's salons.
+        if (!isFiltered && suggestedName != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const ValueKey('switch_to_suggested_city'),
+            onPressed: _switchToSuggestedCity,
+            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            label: Text('See salons in $suggestedName'),
+          ),
+        ],
 
         if (_suggested.isNotEmpty) ...[
           const SizedBox(height: 40),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:customer_app/services/http_client.dart' as http;
@@ -52,6 +53,35 @@ class ServiceCity {
       };
 }
 
+/// A locality inside a city (Kothrud in Pune), as the server lists them.
+class ServiceArea {
+  final String id;
+  final String name;
+
+  const ServiceArea({required this.id, required this.name});
+
+  factory ServiceArea.fromJson(Map<String, dynamic> json) =>
+      ServiceArea(id: json['id'].toString(), name: (json['name'] ?? '').toString());
+}
+
+/// A place the customer used before, offered again at the top of the picker.
+class RecentPlace {
+  final ServiceCity city;
+  final String? area;
+
+  const RecentPlace({required this.city, this.area});
+
+  String get title => area ?? city.name;
+  String get subtitle => area == null ? city.state : city.label;
+
+  Map<String, dynamic> toJson() => {'city': city.toJson(), if (area != null) 'area': area};
+
+  factory RecentPlace.fromJson(Map<String, dynamic> json) => RecentPlace(
+        city: ServiceCity.fromJson(Map<String, dynamic>.from(json['city'] as Map)),
+        area: json['area'] as String?,
+      );
+}
+
 /// Which city the customer is shopping in.
 ///
 /// One place owns this, because four screens read it and any of them showing a
@@ -68,6 +98,14 @@ class LocationService extends ChangeNotifier {
   static final LocationService instance = LocationService._();
 
   static const _cityKey = 'selected_city';
+  static const _areaKey = 'selected_area';
+  static const _recentKey = 'recent_places';
+  static const maxRecent = 4;
+
+  /// Turns a fix into a locality name using the phone's own geocoder (free,
+  /// no key). Replaceable in tests.
+  @visibleForTesting
+  static Future<String?> Function(double lat, double lng) areaResolver = _deviceAreaFor;
 
   static String get _baseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'http://127.0.0.1:8000/api';
@@ -88,6 +126,10 @@ class LocationService extends ChangeNotifier {
   static const double nearCityKm = 60;
 
   ServiceCity? _city;
+
+  /// The locality shown above the city in the header ("Kothrud"). Only for
+  /// display: salons are always filtered by the city.
+  String? _area;
 
   /// True while [_city] is only the server's guess (its busiest market), not
   /// something the customer chose or their position decided.
@@ -140,8 +182,22 @@ class LocationService extends ChangeNotifier {
     return 2 * r * math.asin(math.min(1, math.sqrt(a)));
   }
 
-  /// What the header shows before anything is chosen.
-  String get label => _city?.name ?? 'Select location';
+  String? get area => _area;
+
+  /// The header, the way delivery apps show it: the area in bold, the city
+  /// under it. Without an area the city is the headline.
+  String get headline => _area ?? _city?.name ?? 'Select location';
+
+  /// The grey line under [headline]; null before a city is chosen.
+  String? get subline {
+    final city = _city;
+    if (city == null) return null;
+    if (_area != null) return city.label;
+    return city.state.isEmpty ? null : city.state;
+  }
+
+  /// One line, for places with room for only one ("Kothrud, Pune").
+  String get label => _area != null && _city != null ? '$_area, ${_city!.name}' : (_city?.name ?? 'Select location');
 
   /// Read the stored choice. Safe to call repeatedly; only the first does work.
   Future<void> restore() async {
@@ -154,6 +210,7 @@ class LocationService extends ChangeNotifier {
 
       if (raw != null) {
         _city = ServiceCity.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        _area = prefs.getString(_areaKey);
       }
 
       // Kept so a returning customer gets distance ordering on the first
@@ -174,21 +231,99 @@ class LocationService extends ChangeNotifier {
   /// The local copy is written first and is what the app reads: a customer
   /// switching city should not wait on the network, and a failed sync must not
   /// leave the screen showing a city they did not pick.
-  Future<void> setCity(ServiceCity city) async {
+  Future<void> setCity(ServiceCity city, {String? area}) async {
     // The city's centre is read from the city itself when it is needed; the
     // device's own fix is left alone.
+    final cityChanged = _city?.id != city.id;
     _city = city;
+    _area = (area == null || area.trim().isEmpty) ? null : area.trim();
     _cityIsGuess = false;
     notifyListeners();
 
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cityKey, jsonEncode(city.toJson()));
+      if (_area == null) {
+        await prefs.remove(_areaKey);
+      } else {
+        await prefs.setString(_areaKey, _area!);
+      }
     } catch (e) {
       debugPrint('Could not save the city locally: $e');
     }
 
-    await _syncToProfile(city);
+    await _remember(RecentPlace(city: city, area: _area));
+    if (cityChanged) await _syncToProfile(city);
+  }
+
+  // ------------------------------------------------------------ recent places
+
+  Future<List<RecentPlace>> recentPlaces() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_recentKey);
+      if (raw == null) return [];
+      return (jsonDecode(raw) as List)
+          .map((e) => RecentPlace.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Newest first, no duplicates (same city and area), at most [maxRecent].
+  Future<void> _remember(RecentPlace place) async {
+    try {
+      final list = (await recentPlaces())
+          .where((p) => !(p.city.id == place.city.id && p.area == place.area))
+          .toList()
+        ..insert(0, place);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          _recentKey, jsonEncode(list.take(maxRecent).map((p) => p.toJson()).toList()));
+    } catch (e) {
+      debugPrint('Could not save recent places: $e');
+    }
+  }
+
+  // ------------------------------------------------------------ areas
+
+  /// The localities of one city that have salons, for the picker.
+  Future<List<ServiceArea>> fetchAreas(String cityId) async {
+    final uri = Uri.parse('$_baseUrl/cities/$cityId/sub-areas')
+        .replace(queryParameters: {'serviceable': '1'});
+    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    if (response.statusCode != 200) throw Exception('Could not load areas');
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return ((body['sub_areas'] as List?) ?? [])
+        .map((e) => ServiceArea.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// The phone's own reverse geocoder: the neighbourhood if it knows one,
+  /// else the locality. Null when it cannot say (offline, no result).
+  static Future<String?> _deviceAreaFor(double lat, double lng) async {
+    try {
+      final marks = await geo.Geocoding()
+          .placemarkFromCoordinates(lat, lng)
+          .timeout(const Duration(seconds: 4));
+      for (final m in marks) {
+        for (final name in <String?>[m.subLocality, m.locality, m.subAdministrativeArea]) {
+          if (name != null && name.trim().isNotEmpty) return name.trim();
+        }
+      }
+    } catch (e) {
+      debugPrint('Could not name this place: $e');
+    }
+    return null;
+  }
+
+  /// Name the area for a fix, but only one that adds something: a "locality"
+  /// that is just the city's own name is left out of the header.
+  Future<String?> _areaForFix(double lat, double lng, ServiceCity city) async {
+    final name = await areaResolver(lat, lng);
+    if (name == null) return null;
+    return name.toLowerCase() == city.name.toLowerCase() ? null : name;
   }
 
   /// Push the choice to the account so it follows them to a new device.
@@ -267,6 +402,17 @@ class LocationService extends ChangeNotifier {
     // one it picked the customer's own. Only the first is worth revisiting.
     _cityIsGuess = !hasPosition;
     notifyListeners();
+
+    // Placed by their own position: name the area too, like the header of a
+    // delivery app. Quietly, after the list has already loaded.
+    if (_deviceLat != null && _deviceLng != null && usingDevicePosition) {
+      final city = _city!;
+      _areaForFix(_deviceLat!, _deviceLng!, city).then((area) {
+        if (area != null && _city?.id == city.id && _area == null) {
+          setCity(city, area: area);
+        }
+      });
+    }
   }
 
   // ------------------------------------------------------------- where they are
@@ -383,8 +529,9 @@ class LocationService extends ChangeNotifier {
   bool _refreshing = false;
 
   @visibleForTesting
-  void debugSet({ServiceCity? city, double? deviceLat, double? deviceLng, bool cityIsGuess = false}) {
+  void debugSet({ServiceCity? city, String? area, double? deviceLat, double? deviceLng, bool cityIsGuess = false}) {
     _city = city;
+    _area = area;
     _cityIsGuess = cityIsGuess;
     _deviceLat = deviceLat;
     _deviceLng = deviceLng;
@@ -420,7 +567,12 @@ class LocationService extends ChangeNotifier {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final city = ServiceCity.fromJson(body['city'] as Map<String, dynamic>);
 
-      await setCity(city);
+      // The area is only named when the fix is really in this city; a
+      // customer 200 km away is shown the city, not their own village.
+      final inCity = body['in_range'] == true;
+      final area = inCity ? await _areaForFix(position.latitude, position.longitude, city) : null;
+
+      await setCity(city, area: area);
 
       // Honest about the edge case rather than pretending the nearest market
       // is local: it may be hundreds of kilometres away.
