@@ -14,6 +14,15 @@ abstract class TestCase extends BaseTestCase
         $this->refuseUnfakedCloudinary();
     }
 
+    /** Set one of SuperAdmin's payment switches (see App\Support\PaymentOptions). */
+    protected function setPaymentOption(string $key, bool $on): void
+    {
+        \App\Models\PlatformPolicySetting::updateOrCreate(
+            ['setting_key' => $key],
+            ['setting_value' => $on ? '1' : '0', 'data_type' => 'boolean']
+        );
+    }
+
     /**
      * Stand a refusing Cloudinary client in front of every test.
      *

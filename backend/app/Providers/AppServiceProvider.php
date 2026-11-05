@@ -15,6 +15,7 @@ use App\Services\Notifications\PushGateway;
 use App\Services\Notifications\WhatsAppGateway;
 use App\Services\Payments\NoPaymentGateway;
 use App\Services\Payments\PaymentGateway;
+use App\Services\Payments\RazorpayGateway;
 use App\Services\Auth\LoginOtp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -79,15 +80,20 @@ class AppServiceProvider extends ServiceProvider
             return new FcmPushGateway($credentials, new FcmAccessTokenProvider($credentials));
         });
 
-        // Online payments for appointments. None is configured: bookings are
-        // confirmed without a payment step and the salon records what it is
-        // paid. A future provider implements PaymentGateway and is selected
-        // here by PAYMENT_DRIVER; anything unrecognised stays on `none`, so a
-        // half-configured environment can never try to take real money.
+        // Online payments for customer appointments, chosen by PAYMENT_DRIVER.
+        // Anything unrecognised stays on `none`, and `razorpay` without both
+        // keys reports itself disabled, so a half-configured environment can
+        // never try to take real money.
         $this->app->bind(PaymentGateway::class, function () {
             $config = config('services.payments');
 
             return match ($config['driver'] ?? 'none') {
+                'razorpay' => new RazorpayGateway(
+                    (string) ($config['razorpay']['key_id'] ?? ''),
+                    (string) ($config['razorpay']['key_secret'] ?? ''),
+                    $config['display_name'] ?? 'BookALook',
+                    (string) ($config['razorpay']['webhook_secret'] ?? ''),
+                ),
                 default => new NoPaymentGateway($config['display_name'] ?? 'BookALook'),
             };
         });

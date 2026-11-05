@@ -121,6 +121,7 @@ class AppointmentController extends Controller
             $requirement['full_upfront'] = true;
         }
         $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
+        $online = $this->payments->onlinePaymentsEnabled();
 
         return response()->json([
             'date' => $request->date,
@@ -131,8 +132,14 @@ class AppointmentController extends Controller
             // visit. Online, it is paid at booking; with no gateway it is paid
             // to the salon, which records it.
             'advance_amount' => $payableNow,
-            'online_payment' => $this->payments->onlinePaymentsEnabled(),
-            'pay_at_salon' => ! $this->payments->onlinePaymentsEnabled(),
+            // What the services ask for at least, before any penalty.
+            'minimum_advance' => $requirements['advance'],
+            'partial_advance_enabled' => \App\Support\PaymentOptions::partialAdvanceEnabled(),
+            // Show the optional "Pay full amount" button. Booking with
+            // pay_full=true then charges total_amount instead.
+            'full_payment_available' => $this->fullPaymentOffered($online, $requirement['full_upfront'], $requirements),
+            'online_payment' => $online,
+            'pay_at_salon' => ! $online,
             'full_upfront_required' => $requirement['full_upfront'],
             'same_day_changes_used' => $requirement['changes_used'],
             'same_day_change_threshold' => $requirement['threshold'],
@@ -167,6 +174,9 @@ class AppointmentController extends Controller
             'recipient_name' => 'required_if:booked_for,other|nullable|string|max:150',
             'recipient_gender' => 'nullable|in:male,female,other',
             'recipient_phone' => ['nullable', 'string', 'max:15', 'regex:/^\+?[0-9 ]{7,15}$/'],
+            // The customer chose "Pay full amount". Only honoured while
+            // SuperAdmin offers full payment and a gateway can take it.
+            'pay_full' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -291,7 +301,17 @@ class AppointmentController extends Controller
             if ($this->salonNeedsFullPayment($salon_id)) {
                 $requirement['full_upfront'] = true;
             }
-            $payableNow = $requirement['full_upfront'] ? $requirements['total'] : $requirements['advance'];
+            $payFull = $request->boolean('pay_full') && $this->fullPaymentOffered(
+                $this->payments->onlinePaymentsEnabled(),
+                $requirement['full_upfront'],
+                $requirements,
+            );
+            $payableNow = ($requirement['full_upfront'] || $payFull) ? $requirements['total'] : $requirements['advance'];
+            $paymentOption = match (true) {
+                $requirement['full_upfront'] => 'full_upfront',
+                $payFull => 'full_optional',
+                default => 'advance_only',
+            };
 
             // With no online gateway nothing is paid at booking: the advance
             // is recorded as due and the salon records it when it is paid.
@@ -310,12 +330,15 @@ class AppointmentController extends Controller
                 // booking is confirmed just below (no gateway).
                 'status' => 'pending_payment',
                 'payment_hold_expires_at' => $online ? now()->addMinutes($this->payments->holdMinutes()) : null,
-                'payment_option' => $requirement['full_upfront'] ? 'full_upfront' : 'advance_only',
+                'payment_option' => $paymentOption,
                 'total_amount' => $requirements['total'],
                 // Received so far. Online, the advance is being paid now;
                 // otherwise nothing has been paid yet.
                 'advance_amount' => $online ? $payableNow : 0,
                 'advance_due' => $payableNow,
+                // Kept apart so a full payment by choice refunds everything
+                // above it on cancellation (BookingPolicyService::refundBreakdown).
+                'minimum_advance' => $requirements['advance'],
                 'balance_amount' => $requirements['total'] - ($online ? $payableNow : 0),
             ] + $this->recipient($request));
             $appointment->save();
@@ -538,6 +561,20 @@ class AppointmentController extends Controller
             'payment' => $this->payments->checkoutPayload($appointment, $order, (float) $payableNow),
             'appointment' => $appointment->load('services.service.template', 'appointedProvider.user'),
         ], 201);
+    }
+
+    /**
+     * Whether the customer may choose to pay the whole bill now: SuperAdmin
+     * offers it, a gateway can take it, and it would actually be more than
+     * the booking already asks for.
+     */
+    private function fullPaymentOffered(bool $online, bool $fullUpfront, array $requirements): bool
+    {
+        return $online
+            && ! $fullUpfront
+            && (float) $requirements['total'] > 0
+            && (float) $requirements['total'] > (float) $requirements['advance'] + 0.009
+            && \App\Support\PaymentOptions::fullPaymentEnabled();
     }
 
     /**
@@ -1185,6 +1222,8 @@ class AppointmentController extends Controller
                 'payment_option' => $appointment->payment_option,
                 'total_amount' => $appointment->total_amount,
                 'advance_amount' => $appointment->advance_amount,
+                'advance_due' => $appointment->advance_due,
+                'minimum_advance' => $appointment->minimum_advance,
                 'balance_amount' => $appointment->balance_amount,
                 'rescheduled_from_id' => $appointment->id,
                 // Who sits in the chair and the first-time offer belong to the

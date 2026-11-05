@@ -27,6 +27,15 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
   SalonInsights? _insights;
   bool _isLoadingExtra = true;
 
+  // Minimum advance. Shown and sent only while SuperAdmin has partial
+  // advance on; off, whatever is saved is left exactly as it is.
+  bool _partialAdvance = false;
+  final _advanceController = TextEditingController();
+  bool _refundAdvance = false;
+  bool _advanceTouched = false;
+
+  double get _advancePct => double.tryParse(_advanceController.text.trim()) ?? 0;
+
   @override
   void initState() {
     super.initState();
@@ -36,11 +45,26 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
     _loadExtraData();
   }
 
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _advanceController.dispose();
+    super.dispose();
+  }
+
   bool _linksTouched = false;
 
   Future<void> _loadExtraData() async {
     try {
-      final groupedServices = await ServiceManagementApi.getSalonServices(widget.salonId);
+      final detailed = await ServiceManagementApi.getSalonServicesDetailed(widget.salonId);
+      final groupedServices = detailed.groupedServices;
+      Map<String, dynamic>? savedRaw;
+      for (var group in groupedServices) {
+        for (var s in (group['services'] as List? ?? const [])) {
+          if (s is Map && s['id'] == widget.service.id) savedRaw = Map<String, dynamic>.from(s);
+        }
+      }
       final List<SalonService> flatServices = [];
       for (var group in groupedServices) {
         if (group['services'] != null) {
@@ -59,6 +83,13 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
           _allServices = flatServices;
           _insights = insights;
           _isLoadingExtra = false;
+          _partialAdvance = detailed.partialAdvanceEnabled;
+          if (savedRaw != null && !_advanceTouched) {
+            final pct = double.tryParse('${savedRaw['advance_percentage'] ?? ''}');
+            _advanceController.text = pct == null ? '0' : pct.toStringAsFixed(pct % 1 == 0 ? 0 : 2);
+            final refund = savedRaw['will_refund_advance_if_cancelled'];
+            _refundAdvance = refund == true || refund == 1;
+          }
           // What is saved right now, unless the owner already started editing.
           final saved = flatServices.where((s) => s.id == widget.service.id).firstOrNull;
           if (saved != null && !_linksTouched) {
@@ -83,6 +114,8 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
         description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
         // Always the full list, so removing the last add-on clears it.
         linkedServiceIds: _linkedServiceIds,
+        advancePercentage: _partialAdvance ? _advancePct : null,
+        willRefundAdvanceIfCancelled: _partialAdvance ? (_advancePct > 0 && _refundAdvance) : null,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -150,6 +183,38 @@ class _EditServiceSheetState extends State<EditServiceSheet> {
               decoration: InputDecoration(labelText: 'Description (Optional)', border: OutlineInputBorder()),
               maxLines: 3,
             ),
+            if (_partialAdvance) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _advanceController,
+                decoration: const InputDecoration(
+                  labelText: 'Minimum advance (%)',
+                  helperText: 'Paid online by the customer when booking. 0 = no advance.',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {
+                  _advanceTouched = true;
+                  if (_advancePct <= 0) _refundAdvance = false;
+                }),
+                validator: (v) {
+                  final pct = double.tryParse((v ?? '').trim());
+                  if (pct == null || pct < 0 || pct > 100) return 'Enter 0 to 100';
+                  return null;
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Refund advance if customer cancels'),
+                value: _advancePct > 0 && _refundAdvance,
+                onChanged: _advancePct > 0
+                    ? (v) => setState(() {
+                          _advanceTouched = true;
+                          _refundAdvance = v;
+                        })
+                    : null,
+              ),
+            ],
             const SizedBox(height: 24),
             if (_isLoadingExtra)
               const Center(child: CircularProgressIndicator())

@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partner_app/models/service_models.dart';
 import 'package:partner_app/screens/dashboard/services/add_service_flow.dart';
+import 'package:partner_app/services/service_management_api.dart';
 import 'package:partner_app/theme/app_theme.dart';
 
 void main() {
+  // Most tests here run with BookALook's partial advance switched on, so the
+  // minimum advance field is on the form.
+  setUp(() => ServiceManagementApi.lastPartialAdvanceEnabled = true);
+  tearDown(() => ServiceManagementApi.lastPartialAdvanceEnabled = null);
+
   final sampleCategoryHair = ServiceCategory(
     id: 'cat-hair-1',
     name: 'Hair Care',
@@ -121,6 +127,24 @@ void main() {
     });
   });
 
+  group('AddServiceFlow - Partial advance switched off', () {
+    testWidgets('hides the minimum advance and its refund option', (tester) async {
+      ServiceManagementApi.lastPartialAdvanceEnabled = false;
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(createWidget(categories: [sampleCategoryHair], existingServices: []));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Min Advance %'), findsNothing);
+      expect(find.text('Refund advance if cancelled'), findsNothing);
+    });
+  });
+
   group('AddServiceFlow - Refund Advance Checkbox Logic', () {
     testWidgets('checkbox is enabled when advance percentage > 0% and disabled when 0%', (tester) async {
       tester.view.physicalSize = const Size(800, 1600);
@@ -136,11 +160,20 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Default advance is 20%
-      expect(find.text('20'), findsOneWidget);
+      // No advance unless the owner sets one.
+      expect(find.text('0'), findsOneWidget);
+      var checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+      expect(checkbox.onChanged, isNull);
+
+      final numericFields = find.byWidgetPredicate(
+        (w) => w is TextField && w.keyboardType == TextInputType.number,
+      );
+      final advanceField = numericFields.last;
+      await tester.enterText(advanceField, '20');
+      await tester.pumpAndSettle();
 
       // Checkbox should be enabled (onChanged is not null)
-      var checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+      checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
       expect(checkbox.onChanged, isNotNull);
       expect(checkbox.value, isFalse);
 
@@ -152,10 +185,6 @@ void main() {
       expect(checkbox.value, isTrue);
 
       // Now change advance percentage to 0
-      final numericFields = find.byWidgetPredicate(
-        (w) => w is TextField && w.keyboardType == TextInputType.number,
-      );
-      final advanceField = numericFields.last;
       await tester.enterText(advanceField, '0');
       await tester.pumpAndSettle();
 

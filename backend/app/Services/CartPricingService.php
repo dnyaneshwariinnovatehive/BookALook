@@ -23,8 +23,11 @@ use Illuminate\Support\Facades\DB;
  */
 class CartPricingService
 {
-    /** Fallback advance % when neither service nor combo defines one. */
-    public const DEFAULT_ADVANCE_PERCENTAGE = AvailabilityService::DEFAULT_ADVANCE_PERCENTAGE;
+    /**
+     * SuperAdmin's partial-advance switch, read once per price() so a long
+     * basket costs one settings query, not one per line.
+     */
+    private ?bool $partialAdvance = null;
 
     public function __construct(
         private ?CustomerOfferEligibilityService $eligibility = null
@@ -45,6 +48,7 @@ class CartPricingService
     public function price(Cart $cart): array
     {
         $cart->loadMissing(['items.service.template', 'items.combo.services.template']);
+        $this->partialAdvance = \App\Support\PaymentOptions::partialAdvanceEnabled();
 
         // Quantities of each loose service — what combos are matched against.
         $loose = [];
@@ -607,8 +611,9 @@ class CartPricingService
         return (int) ($service->template->estimated_duration_minutes ?? AvailabilityService::SLOT_MINUTES);
     }
 
+    /** The advance % a line asks for: its own, 0% when unset or switched off. */
     private function advancePercentage($value): float
     {
-        return $value === null ? self::DEFAULT_ADVANCE_PERCENTAGE : (float) $value;
+        return \App\Support\PaymentOptions::advancePercentage($value, $this->partialAdvance);
     }
 }

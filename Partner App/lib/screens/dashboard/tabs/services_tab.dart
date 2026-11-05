@@ -331,8 +331,10 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
                       const SizedBox(width: 12),
                       if (savings > 0)
                         Text('Save \u20B9${savings.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: (Theme.of(context).brightness == Brightness.dark ? AppTheme.darkSuccess : AppTheme.lightSuccess))),
-                      const SizedBox(width: 12),
-                      Text('Adv: ${combo['advance_percentage'] ?? 0}%', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                      if (ServiceManagementApi.lastPartialAdvanceEnabled == true) ...[
+                        const SizedBox(width: 12),
+                        Text('Adv: ${combo['advance_percentage'] ?? 0}%', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                      ],
                     ],
                   ),
                 ],
@@ -506,8 +508,6 @@ class ServicesTabState extends State<ServicesTab> with SingleTickerProviderState
                 Text('\u20B9${service.price.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
                 const SizedBox(width: 12),
                 Text('${service.template?.estimatedDurationMinutes ?? 0} min', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
-                const SizedBox(width: 12),
-                Text('Adv: 20%', style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
               ],
             ),
             const SizedBox(height: 12),

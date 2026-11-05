@@ -162,12 +162,18 @@ return [
         'deeplink_base' => env('CUSTOMER_APP_DEEPLINK_BASE', 'bookalook://customer'),
     ],
 
-    // Online payments for appointments. `none` (the only driver today) means
-    // no gateway: bookings confirm straight away and the salon records what it
-    // is paid. A future provider adds its own driver name and keys here.
+    // Online payments for customer appointments. `none` means no gateway:
+    // bookings confirm straight away and the salon records what it is paid.
+    // `razorpay` takes the advance / full payment in the Customer App. Salon
+    // subscriptions and dues never come through here.
     'payments' => [
         'driver' => env('PAYMENT_DRIVER', 'none'),
         'display_name' => env('PAYMENT_DISPLAY_NAME', 'BookALook'),
+        'razorpay' => [
+            'key_id' => env('RAZORPAY_KEY_ID', ''),
+            'key_secret' => env('RAZORPAY_KEY_SECRET', ''),
+            'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET', ''),
+        ],
         // How long a slot stays held while a customer is paying online. Only
         // used once a gateway is enabled.
         'hold_minutes' => (int) env('BOOKING_PAYMENT_HOLD_MINUTES', 10),

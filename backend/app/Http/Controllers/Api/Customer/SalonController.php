@@ -164,7 +164,11 @@ class SalonController extends Controller
             ? app(\App\Services\CustomerOfferEligibilityService::class)
             : null;
 
-        $services = $rows->map(function (Service $service) use ($rows, $providerCounts, $bookingStats, $salonId, $user, $eligibilityService, $salonFocus) {
+        // What each service asks for now: 0% while SuperAdmin has partial
+        // advance off, whatever the salon saved.
+        $partialAdvance = \App\Support\PaymentOptions::partialAdvanceEnabled();
+
+        $services = $rows->map(function (Service $service) use ($rows, $providerCounts, $bookingStats, $salonId, $user, $eligibilityService, $salonFocus, $partialAdvance) {
             $discountInfo = null;
             $discountedPrice = (float) $service->price;
 
@@ -206,9 +210,7 @@ class SalonController extends Controller
                 // Unisex service at a Women Only salon is for women. The app
                 // sorts the customer's own services first by this.
                 'audience' => GenderFocus::effective($service->gender_focus, $salonFocus),
-                'advance_percentage' => $service->advance_percentage !== null
-                    ? (float) $service->advance_percentage
-                    : null,
+                'advance_percentage' => \App\Support\PaymentOptions::advancePercentage($service->advance_percentage, $partialAdvance),
                 'refundable_advance' => (bool) $service->will_refund_advance_if_cancelled,
                 // Zero means nobody at this salon is trained for it — the app greys
                 // it out rather than letting the customer hit a dead end at checkout.
@@ -287,11 +289,13 @@ class SalonController extends Controller
      */
     private function combos(string $salonId): array
     {
+        $partialAdvance = \App\Support\PaymentOptions::partialAdvanceEnabled();
+
         return Combo::with('services.template:id,name,estimated_duration_minutes')
             ->where('salon_id', $salonId)
             ->where('is_active', true)
             ->get()
-            ->map(function (Combo $combo) {
+            ->map(function (Combo $combo) use ($partialAdvance) {
                 $price = 0.0;
                 $originalPrice = 0.0;
                 $duration = 0;
@@ -318,7 +322,7 @@ class SalonController extends Controller
                     'original_price' => round($originalPrice, 2),
                     'savings' => round(max($originalPrice - $price, 0), 2),
                     'duration_minutes' => $duration,
-                    'advance_percentage' => (float) $combo->advance_percentage,
+                    'advance_percentage' => \App\Support\PaymentOptions::advancePercentage($combo->advance_percentage, $partialAdvance),
                     'refundable_advance' => (bool) $combo->will_refund_advance_if_cancelled,
                     'services' => $lines,
                 ];

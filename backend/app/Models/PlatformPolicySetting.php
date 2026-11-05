@@ -132,6 +132,14 @@ class PlatformPolicySetting extends Model
         'first_time_discount_max_flat_amount' => 1000.0,
         'first_time_discount_default_flat_cap' => 1000.0,
         'first_time_discount_platform_max_cap' => 5000.0,
+
+        // Online payments in the Customer App (Razorpay). See PaymentOptions.
+        // Partial advance off: nothing is taken at booking and every service's
+        // minimum advance % is kept, untouched, for when it is turned back on.
+        'partial_advance_enabled' => false,
+        // Full payment on: the customer may choose to pay the whole bill when
+        // booking. Always optional.
+        'full_payment_enabled' => false,
     ];
 
     /** Settings that hold a URL rather than a number. */

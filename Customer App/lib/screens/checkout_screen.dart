@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../theme/app_theme.dart';
 import '../services/appointment_service.dart';
 import '../services/cart_service.dart';
@@ -67,6 +68,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// The server says so with each quote; true until it does.
   bool _payAtSalon = true;
 
+  /// BookALook offers an optional "Pay full amount" button (SuperAdmin's
+  /// full payment switch, a gateway, and more to pay than the advance).
+  bool _fullPaymentAvailable = false;
+
+  /// A slot quote has arrived; its advance replaces the cart's estimate.
+  bool _hasQuote = false;
+
+  /// Razorpay's checkout, and the held booking it is paying for.
+  late final Razorpay _razorpay;
+  String? _pendingPaymentAppointmentId;
+  String? _pendingStart;
+  String? _pendingEnd;
+
   /// Who sits in the chair. The account holder always owns and pays for the
   /// booking; this only tells the salon who to expect.
   String _bookedFor = 'self';
@@ -81,6 +95,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     AudienceService.profileGender().then((gender) {
       if (mounted) setState(() => _viewerGender = gender);
     });
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadProviders();
     _loadCart();
     _appointmentService.fetchBookingStanding().then((standing) {
@@ -113,10 +131,85 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _razorpay.clear();
     _scrollController.dispose();
     _recipientNameController.dispose();
     _recipientPhoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final id = _pendingPaymentAppointmentId;
+    if (id == null) return;
+
+    setState(() => _isBooking = true);
+    try {
+      await _appointmentService.confirmPayment(id, response.paymentId ?? '', response.signature ?? '');
+      _pendingPaymentAppointmentId = null;
+      if (!mounted) return;
+      setState(() => _isBooking = false);
+      _showSuccessDialog(start: _pendingStart, end: _pendingEnd);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isBooking = false);
+      _setBookingError(
+        describeError(
+          e,
+          fallback: 'We could not confirm your booking yet. If the payment went through, '
+              'it will appear in My Bookings shortly.',
+        ),
+      );
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    final id = _pendingPaymentAppointmentId;
+    _pendingPaymentAppointmentId = null;
+    // Give the slot straight back rather than hold it until the hold lapses.
+    if (id != null) {
+      _appointmentService.abandonPayment(id).catchError((_) => <String, dynamic>{});
+    }
+    if (!mounted) return;
+    setState(() => _isBooking = false);
+    final cancelled = response.code == Razorpay.PAYMENT_CANCELLED;
+    final reason = response.message?.trim() ?? '';
+    _setBookingError(
+      cancelled
+          ? 'Payment cancelled. Your slot was not booked.'
+          : (reason.isNotEmpty && !reason.startsWith('{')
+              ? reason
+              : 'Payment did not go through. Please try again.'),
+    );
+    _fetchSlots();
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Continuing with ${response.walletName}.')),
+    );
+  }
+
+  /// Open Razorpay for a held booking.
+  void _openCheckout(Map<String, dynamic> payment, String appointmentId) {
+    _pendingPaymentAppointmentId = appointmentId;
+    try {
+      _razorpay.open({
+        'key': payment['key'],
+        'amount': payment['amount_in_paise'],
+        'currency': payment['currency'] ?? 'INR',
+        'name': payment['name'] ?? 'BookALook',
+        'description': 'Appointment booking',
+        'order_id': payment['order_id'],
+        // Matches the server's hold, so the sheet closes before the slot goes.
+        if (payment['hold_minutes'] is int) 'timeout': (payment['hold_minutes'] as int) * 60,
+        'retry': {'enabled': true, 'max_count': 2},
+      });
+    } catch (_) {
+      _handlePaymentError(
+        PaymentFailureResponse(Razorpay.UNKNOWN_ERROR, 'Could not open the payment screen.', null),
+      );
+    }
   }
 
   Future<void> _loadProviders({bool isDateChange = false}) async {
@@ -185,9 +278,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _totalAmount = returnedTotal;
         }
         _payAtSalon = data['pay_at_salon'] != false;
-        final returnedAdvance = _toDouble(data['advance_amount']);
-        if (returnedAdvance > 0 || _advanceAmount == 0) {
-          _advanceAmount = returnedAdvance;
+        _fullPaymentAvailable = data['full_payment_available'] == true;
+        // The quote is the authority: 0 is a real answer (no advance asked).
+        if (data.containsKey('advance_amount')) {
+          _advanceAmount = _toDouble(data['advance_amount']);
+          _hasQuote = true;
         }
         final duration = (data['total_duration_minutes'] ?? 0) as int;
         if (duration > 0 || _totalDuration == 0) {
@@ -264,9 +359,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _totalAmount = returnedTotal;
         }
         _payAtSalon = data['pay_at_salon'] != false;
-        final returnedAdvance = _toDouble(data['advance_amount']);
-        if (returnedAdvance > 0 || _advanceAmount == 0) {
-          _advanceAmount = returnedAdvance;
+        _fullPaymentAvailable = data['full_payment_available'] == true;
+        // The quote is the authority: 0 is a real answer (no advance asked).
+        if (data.containsKey('advance_amount')) {
+          _advanceAmount = _toDouble(data['advance_amount']);
+          _hasQuote = true;
         }
         final duration = data['total_duration_minutes'];
         if (duration is int && duration > 0) {
@@ -406,7 +503,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return proceed == true;
   }
 
-  Future<void> _bookAppointment() async {
+  Future<void> _bookAppointment({bool payFull = false}) async {
     if (_selectedTime == null || _selectedProviderKey == null) return;
 
     if (_bookedFor == 'other' && _recipientNameController.text.trim().isEmpty) {
@@ -438,9 +535,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         recipientPhone: forOther && _recipientPhoneController.text.trim().isNotEmpty
             ? _recipientPhoneController.text.trim()
             : null,
+        payFull: payFull,
       );
 
-      setState(() => _isBooking = false);
+      if (!mounted) return;
 
       // The slot just booked, start to finish — from the booking the server
       // made, else worked out from the chosen start and duration.
@@ -448,19 +546,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ? Map<String, dynamic>.from(response['appointment'] as Map)
           : const <String, dynamic>{};
 
-      if (response['payment_required'] == true) {
-        // The server wants payment online, which this version of the app
-        // cannot take. Give the slot back rather than leave it held.
-        final id = appointment['id']?.toString() ??
-            (response['payment'] is Map ? response['payment']['appointment_id']?.toString() : null);
-        if (id != null) _appointmentService.abandonPayment(id);
-        _setBookingError('Online payment is not available in this version of the app. Please update the app and try again.');
+      final start = appointment['start_time']?.toString() ?? _selectedTime;
+      final end = appointment['end_time']?.toString() ?? addMinutesToClock(_selectedTime, _totalDuration);
+
+      if (response['payment_required'] == true && response['payment'] is Map) {
+        // The slot is held while the customer pays; it is booked once the
+        // server verifies Razorpay's signature.
+        final payment = Map<String, dynamic>.from(response['payment'] as Map);
+        final id = payment['appointment_id']?.toString() ?? appointment['id']?.toString();
+        if (id == null) {
+          setState(() => _isBooking = false);
+          _setBookingError('We could not start the payment. Please try again.');
+          return;
+        }
+        _pendingStart = start;
+        _pendingEnd = end;
+        _openCheckout(payment, id);
         return;
       }
 
+      setState(() => _isBooking = false);
       _showSuccessDialog(
-        start: appointment['start_time']?.toString() ?? _selectedTime,
-        end: appointment['end_time']?.toString() ?? addMinutesToClock(_selectedTime, _totalDuration),
+        start: start,
+        end: end,
         advanceDue: _toDouble(response['advance_due']),
       );
     } catch (e) {
@@ -1642,8 +1750,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ? _toDouble(cartSummary['advance_amount'])
         : 0.0;
     final displayTotal = _totalAmount > 0 ? _totalAmount : fallbackTotal;
-    final displayAdvance =
-        _advanceAmount > 0 ? _advanceAmount : fallbackAdvance;
+    // The quote, once there is one; the cart's figure until then.
+    final displayAdvance = _hasQuote ? _advanceAmount : fallbackAdvance;
+    final payOnlineNow = !_payAtSalon && displayAdvance > 0;
 
     final ftd = cartSummary?['first_time_discount'] is Map<String, dynamic>
         ? cartSummary!['first_time_discount'] as Map<String, dynamic>
@@ -1718,6 +1827,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ],
             ),
+            if (displayAdvance > 0) ...[
             SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1739,6 +1849,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ],
             ),
+            ],
             SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -1764,7 +1875,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       )
                     : Text(
-                        _payAtSalon ? 'Confirm Booking' : 'Confirm & Pay Advance',
+                        payOnlineNow
+                            ? 'Confirm & Pay ₹${displayAdvance.toStringAsFixed(0)} Advance'
+                            : 'Confirm Booking',
+                        key: const ValueKey('checkout_primary_button'),
                         style: GoogleFonts.outfit(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1772,6 +1886,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
               ),
             ),
+            if (_fullPaymentAvailable && displayTotal > 0) ...[
+              SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  key: const ValueKey('checkout_pay_full_button'),
+                  onPressed: canBook
+                      ? () {
+                          AppHaptics.lightImpact();
+                          _bookAppointment(payFull: true);
+                        }
+                      : null,
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: AppTheme.accentColor),
+                    foregroundColor: AppTheme.accentColor,
+                  ),
+                  child: Text(
+                    'Pay full amount ₹${displayTotal.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                displayAdvance > 0
+                    ? 'Optional. If you cancel, everything above the advance is refunded.'
+                    : 'Optional. If you cancel, the full amount is refunded.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(fontSize: 12, color: context.colors.textSecondary),
+              ),
+            ],
           ],
         ),
       ),

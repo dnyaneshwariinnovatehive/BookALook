@@ -46,6 +46,9 @@ class BookingWithoutGatewayTest extends TestCase
     {
         parent::setUp();
 
+        // These bookings ask for each service's minimum advance.
+        $this->setPaymentOption('partial_advance_enabled', true);
+
         $this->owner = $this->user('admin');
         $this->customer = $this->user('customer');
         $this->salon = $this->activateSalon(Salon::create([

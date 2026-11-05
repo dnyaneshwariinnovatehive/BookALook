@@ -8,14 +8,36 @@ class SalonServicesResult {
   final List<Map<String, dynamic>> groupedServices;
   final List<UnassignedServiceItem> unassignedServices;
 
+  /// Whether SuperAdmin has partial advance on. Off: the minimum advance
+  /// fields are hidden and whatever was saved stays untouched.
+  final bool partialAdvanceEnabled;
+
   SalonServicesResult({
     required this.groupedServices,
     required this.unassignedServices,
+    this.partialAdvanceEnabled = false,
   });
 }
 
 class ServiceManagementApi {
   static String get baseUrl => '${ApiConfig.baseUrl}/partner';
+
+  /// Last partial-advance switch the server reported, refreshed by every
+  /// services or combos fetch.
+  static bool? lastPartialAdvanceEnabled;
+
+  /// Whether to show the minimum advance fields. Uses the last answer when
+  /// there is one, otherwise asks (via the light combos list).
+  static Future<bool> partialAdvanceEnabled(String salonId) async {
+    final known = lastPartialAdvanceEnabled;
+    if (known != null) return known;
+    try {
+      await getCombos(salonId);
+    } catch (_) {
+      return false;
+    }
+    return lastPartialAdvanceEnabled ?? false;
+  }
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -70,9 +92,12 @@ class ServiceManagementApi {
       final unassigned = (jsonResponse['unassigned_services'] as List? ?? [])
           .map((item) => UnassignedServiceItem.fromJson(item))
           .toList();
+      final partialAdvance = jsonResponse['partial_advance_enabled'] == true;
+      lastPartialAdvanceEnabled = partialAdvance;
       return SalonServicesResult(
         groupedServices: grouped,
         unassignedServices: unassigned,
+        partialAdvanceEnabled: partialAdvance,
       );
     } else {
       throw Exception('Failed to fetch salon services: ${response.body}');
@@ -145,11 +170,16 @@ class ServiceManagementApi {
     double? price,
     String? description,
     List<String>? linkedServiceIds,
+    double? advancePercentage,
+    bool? willRefundAdvanceIfCancelled,
   }) async {
     final body = <String, dynamic>{};
     if (price != null) body['price'] = price;
     if (description != null) body['description'] = description;
     if (linkedServiceIds != null) body['linked_service_ids'] = linkedServiceIds;
+    // Only sent while partial advance is on; the server ignores it otherwise.
+    if (advancePercentage != null) body['advance_percentage'] = advancePercentage;
+    if (willRefundAdvanceIfCancelled != null) body['will_refund_advance_if_cancelled'] = willRefundAdvanceIfCancelled;
 
     final response = await http.put(
       Uri.parse('$baseUrl/salons/$salonId/services/$serviceId'),
@@ -181,6 +211,7 @@ class ServiceManagementApi {
     final response = await http.get(Uri.parse('$baseUrl/salons/$salonId/combos'), headers: await _getHeaders());
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
+      lastPartialAdvanceEnabled = jsonResponse['partial_advance_enabled'] == true;
       return jsonResponse['combos'] as List<dynamic>;
     } else {
       throw Exception('Failed to fetch combos: ${response.body}');

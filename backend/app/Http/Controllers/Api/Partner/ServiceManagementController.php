@@ -103,6 +103,8 @@ class ServiceManagementController extends Controller
         return response()->json([
             'grouped_services' => array_values($grouped),
             'unassigned_services' => Service::formatUnassigned($unassigned),
+            // Show the minimum advance field only while SuperAdmin has it on.
+            'partial_advance_enabled' => \App\Support\PaymentOptions::partialAdvanceEnabled(),
         ]);
     }
 
@@ -426,10 +428,35 @@ class ServiceManagementController extends Controller
             'gender_focus' => 'sometimes|string|'.GenderFocus::rule(),
             'linked_service_ids' => 'sometimes|nullable|array|max:'.self::MAX_UPSELLS,
             'linked_service_ids.*' => 'string',
+            'advance_percentage' => 'sometimes|nullable|numeric|min:0|max:100',
+            'will_refund_advance_if_cancelled' => 'sometimes|nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Minimum advance is only editable while SuperAdmin has partial advance
+        // on. Off, whatever the salon saved is kept untouched for when it is
+        // turned back on.
+        if (\App\Support\PaymentOptions::partialAdvanceEnabled()
+            && ($request->has('advance_percentage') || $request->has('will_refund_advance_if_cancelled'))) {
+            $pct = $request->has('advance_percentage')
+                ? ($request->advance_percentage === null ? null : (float) $request->advance_percentage)
+                : ($service->advance_percentage === null ? null : (float) $service->advance_percentage);
+            $refund = $request->has('will_refund_advance_if_cancelled')
+                ? $request->boolean('will_refund_advance_if_cancelled')
+                : (bool) $service->will_refund_advance_if_cancelled;
+
+            if (($pct === null || $pct <= 0) && $refund && $request->boolean('will_refund_advance_if_cancelled')) {
+                return response()->json([
+                    'message' => 'Refund advance cannot be enabled when minimum advance is 0%.',
+                    'errors' => ['will_refund_advance_if_cancelled' => ['Refund advance cannot be enabled when minimum advance is 0%.']],
+                ], 422);
+            }
+
+            $service->advance_percentage = $pct;
+            $service->will_refund_advance_if_cancelled = ($pct !== null && $pct > 0) ? $refund : false;
         }
 
         if ($request->has('gender_focus')) {
@@ -492,7 +519,10 @@ class ServiceManagementController extends Controller
             ->where('is_active', true)
             ->get();
 
-        return response()->json(['combos' => $combos]);
+        return response()->json([
+            'combos' => $combos,
+            'partial_advance_enabled' => \App\Support\PaymentOptions::partialAdvanceEnabled(),
+        ]);
     }
 
     public function createCombo($salon_id, Request $request)
@@ -527,7 +557,7 @@ class ServiceManagementController extends Controller
         $combo = \App\Models\Combo::create([
             'salon_id' => $salon_id,
             'name' => $request->name,
-            'advance_percentage' => $request->advance_percentage ?? 25.00,
+            'advance_percentage' => $request->advance_percentage ?? 0,
             'will_refund_advance_if_cancelled' => $request->will_refund_advance_if_cancelled ?? false,
         ]);
 
@@ -570,10 +600,13 @@ class ServiceManagementController extends Controller
         if ($request->has('name')) {
             $combo->name = $request->name;
         }
-        if ($request->has('advance_percentage')) {
-            $combo->advance_percentage = $request->advance_percentage;
+        // As for services: only editable while partial advance is on, so
+        // switching it off never wipes what the salon saved.
+        $partialAdvance = \App\Support\PaymentOptions::partialAdvanceEnabled();
+        if ($partialAdvance && $request->has('advance_percentage')) {
+            $combo->advance_percentage = $request->advance_percentage ?? 0;
         }
-        if ($request->has('will_refund_advance_if_cancelled')) {
+        if ($partialAdvance && $request->has('will_refund_advance_if_cancelled')) {
             $combo->will_refund_advance_if_cancelled = $request->will_refund_advance_if_cancelled;
         }
         

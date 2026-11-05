@@ -55,7 +55,10 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
   final _priceController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController(); // For custom
-  final _advanceController = TextEditingController(text: '20'); // Added advance controller
+  // Minimum advance %, 0 unless the owner sets one. Shown only while
+  // SuperAdmin has partial advance on.
+  final _advanceController = TextEditingController(text: '0');
+  bool _partialAdvance = false;
 
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
@@ -165,6 +168,12 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
     super.initState();
     _advanceController.addListener(_onAdvanceChanged);
     _fetchMasterCatalog();
+    _loadPartialAdvance();
+  }
+
+  Future<void> _loadPartialAdvance() async {
+    final on = await ServiceManagementApi.partialAdvanceEnabled(widget.salonId);
+    if (mounted) setState(() => _partialAdvance = on);
   }
 
   @override
@@ -285,8 +294,9 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
       }
     }
 
-    final advancePercentage = _currentAdvancePercentage;
-    final willRefund = advancePercentage > 0 ? _refundAdvance : false;
+    // Off: nothing is sent and the service asks for no advance.
+    final double? advancePercentage = _partialAdvance ? _currentAdvancePercentage : null;
+    final willRefund = (advancePercentage ?? 0) > 0 ? _refundAdvance : false;
 
     setState(() { _isSaving = true; });
 
@@ -507,6 +517,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           ),
           const SizedBox(height: 16),
           
+          if (_partialAdvance) ...[
           _buildLabel('Min Advance %'),
           _buildTextField(
             _advanceController,
@@ -520,6 +531,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
             },
           ),
           const SizedBox(height: 16),
+          ],
           
           // Category dropdown was moved up
           
@@ -573,6 +585,7 @@ class _AddServiceFlowState extends State<AddServiceFlow> {
           ),
           const SizedBox(height: 16),
           
+          if (_partialAdvance)
           Builder(
             builder: (context) {
               final canRefund = _canRefundAdvance;

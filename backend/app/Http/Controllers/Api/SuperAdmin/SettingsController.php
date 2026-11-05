@@ -94,6 +94,8 @@ class SettingsController extends Controller
             'whatsapp_appointment_cancelled_enabled' => 'sometimes|boolean',
             'whatsapp_salon_closure_enabled' => 'sometimes|boolean',
             'whatsapp_salon_deactivated_enabled' => 'sometimes|boolean',
+            'partial_advance_enabled' => 'sometimes|boolean',
+            'full_payment_enabled' => 'sometimes|boolean',
             'combos_limit_per_salon' => 'sometimes|integer|min:0|max:100',
             // Customer booking limits. One rule for every customer.
             'customer_cancellation_limit' => 'sometimes|integer|min:0|max:50',
@@ -199,6 +201,8 @@ class SettingsController extends Controller
             'whatsapp_appointment_cancelled_enabled' => 'Enable WhatsApp messages for cancelled appointments',
             'whatsapp_salon_closure_enabled' => 'Enable WhatsApp messages when a salon closes for a day',
             'whatsapp_salon_deactivated_enabled' => 'Enable WhatsApp messages when a salon is deactivated',
+            'partial_advance_enabled' => 'Customers pay each service minimum advance online when booking',
+            'full_payment_enabled' => 'Customers may choose to pay the full amount online when booking',
         ];
 
         foreach ($booleanSettings as $key => $description) {

@@ -23,9 +23,6 @@ class AvailabilityService
     /** Booking grid granularity, in minutes. */
     public const SLOT_MINUTES = 30;
 
-    /** Advance % used when neither the service nor the combo defines one. */
-    public const DEFAULT_ADVANCE_PERCENTAGE = 25.0;
-
     /**
      * Flatten a cart into what the availability engine needs:
      * the distinct services that must be performed, the total duration and money.
@@ -489,11 +486,6 @@ class AvailabilityService
     private function serviceDuration($service): int
     {
         return (int) ($service->template->estimated_duration_minutes ?? self::SLOT_MINUTES);
-    }
-
-    private function advancePercentage($value): float
-    {
-        return $value === null ? self::DEFAULT_ADVANCE_PERCENTAGE : (float) $value;
     }
 
     /**

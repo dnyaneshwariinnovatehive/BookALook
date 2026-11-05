@@ -137,6 +137,11 @@ Route::get('/settlement-invoices/{invoice}', [\App\Http\Controllers\SettlementIn
 Route::get('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'verify']);
 Route::post('/whatsapp/webhook', [\App\Http\Controllers\Api\WhatsAppWebhookController::class, 'handle']);
 
+// Razorpay calls this when a customer's payment is captured. Unauthenticated by
+// necessity; X-Razorpay-Signature proves every payload.
+Route::post('/payments/razorpay/webhook', [\App\Http\Controllers\Api\RazorpayWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1');
+
 // What a scanned salon QR code resolves to. Open to anyone: the person holding
 // the phone has no account yet, which is the whole point of the poster.
 Route::get('/public/salons/{slug}', [\App\Http\Controllers\Api\PublicSalonController::class, 'show']);

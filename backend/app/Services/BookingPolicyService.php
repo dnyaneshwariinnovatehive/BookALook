@@ -237,6 +237,10 @@ class BookingPolicyService
      * How much of the paid advance comes back, following each service's own
      * will_refund_advance_if_cancelled flag (combo lines follow the combo's).
      *
+     * A customer who chose to pay the full amount (payment_option
+     * `full_optional`) gets everything above the services' minimum advance
+     * back; only that minimum follows the per-service rule.
+     *
      * @return array{refundable: float, forfeited: float, refundable_service_names: string[]}
      */
     public function refundBreakdown(Appointment $appointment): array
@@ -261,6 +265,16 @@ class BookingPolicyService
                     ->unique()->values()->all(),
             ];
         }
+
+        // Paid in full by choice: the part above the minimum advance was
+        // never at risk and always comes back.
+        $aboveMinimum = 0.0;
+        if ($appointment->payment_option === 'full_optional') {
+            $minimum = min($advancePaid, max(0.0, (float) ($appointment->minimum_advance ?? 0)));
+            $aboveMinimum = $advancePaid - $minimum;
+            $advancePaid = $minimum;
+        }
+        $refundable = $aboveMinimum;
 
         foreach ($lines as $line) {
             // Split the advance across lines in proportion to their price, so a

@@ -192,6 +192,7 @@ const TAB_LABELS: Record<PolicyTab, string> = {
 const TAB_FIELDS: Record<PolicyTab, (keyof FormState)[]> = {
   catalog: ['combosLimit'],
   bookings: [
+    'partialAdvance', 'fullPayment',
     'cancelCutoff', 'rescheduleCutoff', 'startEarly',
     'cancelLimit', 'cancelMode', 'noShowLimit', 'noShowMode', 'limitAction', 'limitWindow', 'limitRelease',
   ],
@@ -236,6 +237,9 @@ interface FormState {
   waAppointmentCancelled: boolean;
   waSalonClosure: boolean;
   waSalonDeactivated: boolean;
+  // Customer App online payments (Razorpay).
+  partialAdvance: boolean;
+  fullPayment: boolean;
   combosLimit: string;
   // Customer booking limits — one rule for every customer.
   cancelLimit: string;
@@ -334,6 +338,8 @@ const EMPTY: FormState = {
   waAppointmentCancelled: true,
   waSalonClosure: true,
   waSalonDeactivated: true,
+  partialAdvance: false,
+  fullPayment: false,
   combosLimit: '10',
   cancelLimit: '0',
   cancelMode: 'total',
@@ -456,6 +462,8 @@ export default function PlatformPolicyPage() {
         waAppointmentCancelled: s.whatsapp_appointment_cancelled_enabled ?? true,
         waSalonClosure: s.whatsapp_salon_closure_enabled ?? true,
         waSalonDeactivated: s.whatsapp_salon_deactivated_enabled ?? true,
+        partialAdvance: s.partial_advance_enabled ?? false,
+        fullPayment: s.full_payment_enabled ?? false,
         combosLimit: String(s.combos_limit_per_salon ?? 10),
         cancelLimit: String(s.customer_cancellation_limit ?? 0),
         cancelMode: String(s.customer_cancellation_count_mode ?? 'total'),
@@ -577,6 +585,8 @@ export default function PlatformPolicyPage() {
       whatsapp_appointment_cancelled_enabled: state.waAppointmentCancelled,
       whatsapp_salon_closure_enabled: state.waSalonClosure,
       whatsapp_salon_deactivated_enabled: state.waSalonDeactivated,
+      partial_advance_enabled: state.partialAdvance,
+      full_payment_enabled: state.fullPayment,
       combos_limit_per_salon: Number(state.combosLimit),
       customer_cancellation_limit: Number(state.cancelLimit),
       customer_cancellation_count_mode: state.cancelMode,
@@ -736,6 +746,54 @@ export default function PlatformPolicyPage() {
               <span className={styles.suffix}>combos</span>
             </div>
           </Field>
+        </section>
+        )}
+
+        {tab === 'bookings' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Customer payments</h2>
+          <p className={styles.sectionHint}>
+            What customers pay online in the Customer App when they book. Salons
+            keep paying BookALook by uploading a payment photo; nothing here
+            changes that. Money paid online is held by BookALook and paid out to
+            the salon, less commission. The payment gateway&apos;s fee is
+            BookALook&apos;s.
+          </p>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.partialAdvance}
+              onChange={(e) => set('partialAdvance', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Partial advance</span>
+              <span className={styles.checkboxHint}>
+                On: each salon sets a minimum advance (a % of the price) for every
+                service, 0% unless they set one, and customers pay it when booking.
+                Off: no advance is taken. The percentages salons saved are kept and
+                come back as they were when you turn this on again.
+              </span>
+            </div>
+          </label>
+
+          <label className={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={form.fullPayment}
+              onChange={(e) => set('fullPayment', e.target.checked)}
+            />
+            <div className={styles.checkboxText}>
+              <span className={styles.checkboxTitle}>Full payment</span>
+              <span className={styles.checkboxHint}>
+                Shows an optional &ldquo;Pay full amount&rdquo; button at checkout. If the
+                customer cancels, everything above the minimum advance is refunded;
+                the advance part follows each service&apos;s refund setting.
+              </span>
+            </div>
+          </label>
         </section>
         )}
 

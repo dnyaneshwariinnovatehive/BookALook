@@ -75,6 +75,7 @@ class AppointmentService {
     String? recipientName,
     String? recipientGender,
     String? recipientPhone,
+    bool payFull = false,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -94,6 +95,9 @@ class AppointmentService {
         if (recipientName != null) 'recipient_name': recipientName,
         if (recipientGender != null) 'recipient_gender': recipientGender,
         if (recipientPhone != null) 'recipient_phone': recipientPhone,
+        // The customer chose "Pay full amount" (only offered when the quote
+        // says full_payment_available).
+        if (payFull) 'pay_full': true,
       }),
     );
 
@@ -265,6 +269,29 @@ class AppointmentService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Tell the server Razorpay's checkout succeeded. The signature is what the
+  /// server verifies; nothing is booked on the app's word alone.
+  Future<Map<String, dynamic>> confirmPayment(String id, String paymentId, String signature) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/customer/appointments/$id/payment/confirm'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'payment_id': paymentId, 'signature': signature}),
+    );
+
+    final body = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(body as Map);
+    }
+    throw Exception((body is Map ? body['message'] : null) ?? 'Failed to confirm payment');
   }
 
   Future<Map<String, dynamic>> abandonPayment(String id) async {

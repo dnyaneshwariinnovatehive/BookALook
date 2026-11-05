@@ -28,7 +28,10 @@ class AddComboScreen extends StatefulWidget {
 class _AddComboScreenState extends State<AddComboScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _advanceController = TextEditingController(text: '25'); // Default matching backend
+  // Minimum advance %, 0 unless set. Shown only while SuperAdmin has
+  // partial advance on.
+  final _advanceController = TextEditingController(text: '0');
+  bool _partialAdvance = false;
   bool _refundAdvance = false;
   
   bool _isLoading = true;
@@ -43,9 +46,12 @@ class _AddComboScreenState extends State<AddComboScreen> {
   @override
   void initState() {
     super.initState();
+    ServiceManagementApi.partialAdvanceEnabled(widget.salonId).then((on) {
+      if (mounted) setState(() => _partialAdvance = on);
+    });
     if (widget.existingCombo != null) {
       _nameController.text = widget.existingCombo!['name'] ?? '';
-      _advanceController.text = (widget.existingCombo!['advance_percentage'] ?? 25).toString();
+      _advanceController.text = (widget.existingCombo!['advance_percentage'] ?? 0).toString();
       final refundVal = widget.existingCombo!['will_refund_advance_if_cancelled'];
       _refundAdvance = refundVal == 1 || refundVal == true;
 
@@ -175,16 +181,17 @@ class _AddComboScreenState extends State<AddComboScreen> {
           comboId: widget.existingCombo!['id'],
           name: _nameController.text,
           services: validServices,
-          advancePercentage: double.tryParse(_advanceController.text),
-          willRefundAdvanceIfCancelled: _refundAdvance,
+          // Off: not sent, so the saved advance stays as it is.
+          advancePercentage: _partialAdvance ? double.tryParse(_advanceController.text) : null,
+          willRefundAdvanceIfCancelled: _partialAdvance ? _refundAdvance : null,
         );
       } else {
         await ServiceManagementApi.createCombo(
           salonId: widget.salonId,
           name: _nameController.text,
           services: validServices,
-          advancePercentage: double.tryParse(_advanceController.text),
-          willRefundAdvanceIfCancelled: _refundAdvance,
+          advancePercentage: _partialAdvance ? double.tryParse(_advanceController.text) : null,
+          willRefundAdvanceIfCancelled: _partialAdvance ? _refundAdvance : null,
         );
       }
       if (mounted) {
@@ -267,11 +274,16 @@ class _AddComboScreenState extends State<AddComboScreen> {
           ),
           const SizedBox(height: 16),
           
+          if (_partialAdvance) ...[
           TextFormField(
             controller: _advanceController,
             decoration: InputDecoration(labelText: 'Min Advance %', border: OutlineInputBorder()),
             keyboardType: TextInputType.number,
-            validator: (v) => v!.isEmpty ? 'Required' : null,
+            validator: (v) {
+              final n = double.tryParse((v ?? '').trim());
+              if (n == null || n < 0 || n > 100) return 'Enter 0 to 100';
+              return null;
+            },
           ),
           const SizedBox(height: 16),
           
@@ -291,6 +303,7 @@ class _AddComboScreenState extends State<AddComboScreen> {
             ],
           ),
           const SizedBox(height: 24),
+          ],
           
           Text('Services Included:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),

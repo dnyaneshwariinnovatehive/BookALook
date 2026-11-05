@@ -209,44 +209,8 @@ class _EditSalonProfileScreenState extends State<EditSalonProfileScreen> {
             const DeactivateSalonButton(),
             const SizedBox(height: 30),
             
-            // Advance Booking Settings
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.dividerColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Booking Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Require Advance Payment', style: TextStyle(fontSize: 14)),
-                      Switch(
-                        value: _advanceRequired,
-                        activeColor: AppTheme.accentColor,
-                        onChanged: (val) {
-                          setState(() => _advanceRequired = val);
-                        },
-                      ),
-                    ],
-                  ),
-                  if (_advanceRequired) ...[
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      'Default Advance %', 
-                      _advancePercentageController, 
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true)
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            
+            // Advance is set per service (Services tab), and only while
+            // BookALook has partial advance switched on.
             const SizedBox(height: 40),
 
             // Save Button

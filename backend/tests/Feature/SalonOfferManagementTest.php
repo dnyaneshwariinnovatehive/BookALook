@@ -47,6 +47,9 @@ class SalonOfferManagementTest extends TestCase
     {
         parent::setUp();
 
+        // These bookings ask for each service's minimum advance.
+        $this->setPaymentOption('partial_advance_enabled', true);
+
         $this->adminA = $this->createUser('admin');
         $this->adminB = $this->createUser('admin');
         $this->superadmin = $this->createUser('superadmin');

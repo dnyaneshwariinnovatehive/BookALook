@@ -58,6 +58,9 @@ class FirstTimeOfferLifecycleTest extends TestCase
     {
         parent::setUp();
 
+        // These bookings ask for each service's minimum advance.
+        $this->setPaymentOption('partial_advance_enabled', true);
+
         // These tests cover the online payment path, kept for a future gateway.
         $this->useFakePaymentGateway();
 
