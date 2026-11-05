@@ -32,3 +32,22 @@ String? addMinutesToClock(String? start, int minutes) {
   final total = (h * 60 + m + minutes) % (24 * 60);
   return '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
 }
+
+/// A length of time as people say it: "45 minutes", "1 hour",
+/// "1 hour 30 minutes", "3 hours", "1 day 2 hours". Used for policy windows
+/// such as how close to an appointment it can still be cancelled.
+String formatMinutes(int minutes) {
+  if (minutes <= 0) return '0 minutes';
+  String unit(int n, String word) => '$n $word${n == 1 ? '' : 's'}';
+
+  final days = minutes ~/ 1440;
+  final hours = (minutes % 1440) ~/ 60;
+  final mins = minutes % 60;
+
+  final parts = <String>[
+    if (days > 0) unit(days, 'day'),
+    if (hours > 0) unit(hours, 'hour'),
+    if (mins > 0) unit(mins, 'minute'),
+  ];
+  return parts.join(' ');
+}

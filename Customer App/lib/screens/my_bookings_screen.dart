@@ -726,7 +726,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Bookings can be cancelled up to $_cancelCutoffMinutes minutes or rescheduled up to $_rescheduleCutoffMinutes minutes before the start time.',
+              'Bookings can be cancelled up to ${formatMinutes(_cancelCutoffMinutes)} or rescheduled up to ${formatMinutes(_rescheduleCutoffMinutes)} before the start time.',
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 color: isDark ? context.colors.textSecondary : const Color(0xFF6A5E82),

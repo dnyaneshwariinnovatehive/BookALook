@@ -1,0 +1,106 @@
+/* Money in pocket: the stat card and its breakdown drawer. */
+
+.card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.card:disabled { cursor: default; }
+.card:disabled:hover { transform: none; box-shadow: none; }
+
+.tone { background: var(--color-success-bg); color: var(--color-success); }
+
+.how {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+  transition: color 0.2s ease;
+}
+
+.card:hover .how { color: var(--accent-text); }
+
+.negative { color: var(--color-danger); }
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.group { display: flex; flex-direction: column; gap: 6px; }
+
+.groupTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.lines li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-color);
+}
+
+.lines li + li { border-top: 1px solid var(--border-color); }
+
+.lineText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lineLabel { font-size: 14px; font-weight: 600; color: var(--text-heading); }
+.lineHint { font-size: 12px; color: var(--text-muted); }
+
+.lineAmount {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-heading);
+}
+
+.muted .lines li { background: var(--surface-2); }
+.muted .lineLabel, .muted .lineAmount { color: var(--text-body); font-weight: 500; }
+
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.subtotal b { font-variant-numeric: tabular-nums; font-size: 16px; }
+
+.total {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.total b { font-size: 20px; }
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}

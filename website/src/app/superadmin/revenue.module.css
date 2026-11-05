@@ -302,3 +302,12 @@
 .tabActive:hover {
   color: #fff;
 }
+
+/* Revenue tab: money in pocket joins the four revenue cards. */
+@media (min-width: 1280px) {
+  .kpiGrid5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+@media (min-width: 721px) and (max-width: 1279px) {
+  .kpiGrid5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

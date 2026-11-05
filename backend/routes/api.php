@@ -360,6 +360,11 @@ Route::prefix('superadmin')->group(function () {
         Route::get('/reports/sub-areas', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'subAreas']);
         Route::get('/reports/services', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'services']);
         Route::get('/reports/crowd-analysis', [\App\Http\Controllers\Api\SuperAdmin\PlatformReportController::class, 'crowdAnalysis']);
+        // What BookALook holds right now and how much of it is its own.
+        Route::get('/reports/cash-position', [\App\Http\Controllers\Api\SuperAdmin\PlatformRevenueController::class, 'cashPosition']);
+        // The analytics dashboard, one section per call so each tab loads alone.
+        Route::get('/reports/analytics/{section}', [\App\Http\Controllers\Api\SuperAdmin\PlatformAnalyticsController::class, 'show'])
+            ->whereIn('section', \App\Http\Controllers\Api\SuperAdmin\PlatformAnalyticsController::SECTIONS);
     });
 });
 

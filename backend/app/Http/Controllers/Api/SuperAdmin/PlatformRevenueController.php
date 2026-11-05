@@ -25,6 +25,12 @@ class PlatformRevenueController extends Controller
 {
     private const GRANULARITIES = ['daily', 'weekly', 'monthly'];
 
+    /** Money in pocket: cash BookALook holds, less what it still owes out. */
+    public function cashPosition(\App\Services\PlatformCashPosition $position)
+    {
+        return response()->json(['success' => true] + $position->snapshot());
+    }
+
     public function show(Request $request)
     {
         $request->validate([

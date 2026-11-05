@@ -1,695 +1,282 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { PageHeader } from '@/components/admin/ui';
-import styles from './page.module.css';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { useMemo, useState } from 'react';
+import Icon, { type IconName } from '@/components/admin/Icon';
+import { localISODate } from '@/components/admin/ui';
+import styles from './reports.module.css';
+import { ErrorBox, exportSectionCSV, fmtDate, useSection, type Scope } from './parts';
+import OverviewTab from './OverviewTab';
+import MoneyTab from './MoneyTab';
+import BookingsTab from './BookingsTab';
+import PlacesTab from './PlacesTab';
+import SalonsTab from './SalonsTab';
+import CatalogTab from './CatalogTab';
+import CustomersTab from './CustomersTab';
+import EngagementTab from './EngagementTab';
 
 /**
- * Platform Reporting — the owner's single view across the whole network.
+ * Platform Reporting — the owner's analytics across the whole marketplace.
  *
- * Pulls read-only aggregates from /api/proxy/superadmin/reports/* and lays
- * them out as KPI cards plus per-salon, per-area and per-service tables. Every
- * table can be exported to CSV, which opens straight into Excel. Nothing on
- * this screen writes back to the platform — it is a reporting surface only.
+ * One scope (date range, city, area) drives every tab, and every figure is
+ * compared with the same length of time just before it. Each tab loads its own
+ * section from /superadmin/reports/analytics/{section}; every table and the
+ * whole tab can be downloaded as CSV. Read-only: nothing here writes back.
  */
 
-const money = (v: any) => {
-  const n = Number(v || 0);
-  return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const TABS: { key: string; label: string; icon: IconName }[] = [
+  { key: 'overview', label: 'Overview', icon: 'dashboard' },
+  { key: 'money', label: 'Money', icon: 'rupee' },
+  { key: 'bookings', label: 'Bookings', icon: 'calendar' },
+  { key: 'places', label: 'Cities & areas', icon: 'pin' },
+  { key: 'salons', label: 'Salons & teams', icon: 'store' },
+  { key: 'catalog', label: 'Services', icon: 'catalog' },
+  { key: 'customers', label: 'Customers', icon: 'users' },
+  { key: 'engagement', label: 'Engagement', icon: 'star' },
+];
+
+const PRESETS = [
+  { key: '7d', label: '7D' },
+  { key: '30d', label: '30D' },
+  { key: '90d', label: '90D' },
+  { key: 'mtd', label: 'This month' },
+  { key: 'last', label: 'Last month' },
+  { key: 'ytd', label: 'This year' },
+  { key: '12m', label: '12M' },
+] as const;
+
+const addDays = (iso: string, days: number) => {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return localISODate(d);
 };
 
-const int = (v: any) => Number(v || 0).toLocaleString('en-IN');
+const presetRange = (key: string): [string, string] => {
+  const now = new Date();
+  const today = localISODate(now);
+  switch (key) {
+    case '7d': return [addDays(today, -6), today];
+    case '90d': return [addDays(today, -89), today];
+    case 'mtd': return [localISODate(new Date(now.getFullYear(), now.getMonth(), 1)), today];
+    case 'last': return [
+      localISODate(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      localISODate(new Date(now.getFullYear(), now.getMonth(), 0)),
+    ];
+    case 'ytd': return [localISODate(new Date(now.getFullYear(), 0, 1)), today];
+    case '12m': return [addDays(today, -364), today];
+    default: return [addDays(today, -29), today];
+  }
+};
 
-const pct = (v: any) => (v == null ? '—' : `${Number(v)}%`);
+const autoGranularity = (from: string, to: string): Scope['granularity'] => {
+  const days = Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000) + 1;
+  return days <= 31 ? 'daily' : days <= 120 ? 'weekly' : 'monthly';
+};
 
-/** Trigger a CSV download that opens cleanly in Excel. */
-function downloadCSV(filename: string, headers: string[], rows: any[][]) {
-  const escape = (v: any) => {
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lines = [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))];
-  const csv = '\uFEFF' + lines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+interface Options {
+  cities: { id: string; name: string; salons: number; areas: { id: string; name: string }[] }[];
 }
+
+const OPTIONS_SCOPE: Scope = { from: '', to: '', granularity: 'daily', cityId: '', subAreaId: '' };
 
 export default function ReportsPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [tab, setTab] = useState('overview');
+  const [preset, setPreset] = useState<string>('30d');
+  const [range, setRange] = useState<[string, string]>(() => presetRange('30d'));
+  const [granularity, setGranularity] = useState<Scope['granularity']>('daily');
+  const [cityId, setCityId] = useState('');
+  const [subAreaId, setSubAreaId] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const [overview, setOverview] = useState<any>(null);
-  const [salons, setSalons] = useState<any[]>([]);
-  const [salonTotals, setSalonTotals] = useState<any>(null);
-  const [cities, setCities] = useState<any[]>([]);
-  const [subAreas, setSubAreas] = useState<any[]>([]);
-  const [services, setServices] = useState<any[]>([]);
-  const [reviewsData, setReviewsData] = useState<any>(null);
+  const scope = useMemo<Scope>(
+    () => ({ from: range[0], to: range[1], granularity, cityId, subAreaId }),
+    [range, granularity, cityId, subAreaId],
+  );
 
-  const authHeaders = (): Record<string, string> => {
-    return {
-      'Content-Type': 'application/json',
-    };
+  const options = useSection<Options>('options', OPTIONS_SCOPE, 0);
+  const section = useSection<Record<string, unknown>>(tab, scope, refreshKey);
+  const cities = options.data?.cities ?? [];
+  const city = cities.find((c) => c.id === cityId);
+  const area = city?.areas.find((a) => a.id === subAreaId);
+
+  const applyPreset = (key: string) => {
+    const r = presetRange(key);
+    setPreset(key);
+    setRange(r);
+    setGranularity(autoGranularity(r[0], r[1]));
   };
 
-  const handleUnauthorized = (res: Response) => {
-    if (res.status === 401) {
-      window.location.href = '/login';
-      return true;
-    }
-    return false;
+  const setFrom = (v: string) => {
+    if (!v) return;
+    setPreset('custom');
+    const next: [string, string] = [v, v > range[1] ? v : range[1]];
+    setRange(next);
+    setGranularity(autoGranularity(next[0], next[1]));
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const q = new URLSearchParams();
-      if (from) q.append('from', from);
-      if (to) q.append('to', to);
-      const suffix = q.toString() ? `?${q}` : '';
+  const setTo = (v: string) => {
+    if (!v) return;
+    setPreset('custom');
+    const next: [string, string] = [v < range[0] ? v : range[0], v];
+    setRange(next);
+    setGranularity(autoGranularity(next[0], next[1]));
+  };
 
-      const [ovRes, salRes, cityRes, subRes, svcRes, revRes] = await Promise.all([
-        fetch('/api/proxy/superadmin/reports/overview', { headers: authHeaders() }),
-        fetch(`/api/proxy/superadmin/reports/salons${suffix}`, { headers: authHeaders() }),
-        fetch(`/api/proxy/superadmin/reports/cities${suffix}`, { headers: authHeaders() }),
-        fetch(`/api/proxy/superadmin/reports/sub-areas${suffix}`, { headers: authHeaders() }),
-        fetch(`/api/proxy/superadmin/reports/services${suffix}`, { headers: authHeaders() }),
-        fetch('/api/proxy/superadmin/reviews', { headers: authHeaders() }),
-      ]);
+  const meta = section.data?.range as { previous_from: string; previous_to: string } | undefined;
+  const active = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const props = { data: section.data, loading: section.loading, scope };
 
-      for (const r of [ovRes, salRes, cityRes, subRes, svcRes, revRes]) {
-        if (handleUnauthorized(r)) return;
-        if (!r.ok) throw new Error('Could not load reports.');
-      }
+  return (
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div>
+          <p className={styles.eyebrow}>Platform reporting</p>
+          <h1 className={styles.title}>Analytics</h1>
+          <p className={styles.subtitle}>
+            Every number across the marketplace for the range you pick, compared with the period just before it.
+            Narrow it to a city or an area, and download any table as CSV.
+          </p>
+        </div>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={() => setRefreshKey((n) => n + 1)}
+            disabled={section.loading}
+          >
+            <Icon name="refresh" size={15} className={section.loading ? styles.spin : undefined} />
+            {section.loading ? 'Loading' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={() => exportSectionCSV(active.label, section.data)}
+            disabled={!section.data || section.loading}
+            title={`Download everything on the ${active.label} tab as one CSV`}
+          >
+            <Icon name="download" size={15} />
+            Export tab
+          </button>
+        </div>
+      </header>
 
-      const ov = await ovRes.json();
-      const sal = await salRes.json();
-      const city = await cityRes.json();
-      const sub = await subRes.json();
-      const svc = await svcRes.json();
-      const rev = await revRes.json();
+      <nav className={styles.tabs} role="tablist" aria-label="Report">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`${styles.tab} ${tab === t.key ? styles.tabActive : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            <Icon name={t.icon} size={15} />
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
-      setOverview(ov);
-      setSalons(sal.salons ?? []);
-      setSalonTotals(sal.totals ?? null);
-      setCities(city.cities ?? []);
-      setSubAreas(sub.sub_areas ?? []);
-      setServices(svc.services ?? []);
-      setReviewsData(rev);
-    } catch (e: any) {
-      setError(e.message || 'Could not load reports.');
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const exportSalons = () =>
-    downloadCSV(
-      'salon-report.csv',
-      ['Salon', 'City', 'Status', 'Bookings', 'Completed', 'Cancelled', 'No-Show', 'Cancellation %', 'No-Show %', 'Revenue', 'Avg Rating'],
-      salons.map((s) => [
-        s.name, s.city, s.status, s.bookings, s.completed, s.cancelled,
-        s.no_show, pct(s.cancellation_rate), pct(s.no_show_rate), money(s.revenue), s.avg_rating,
-      ])
-    );
-
-  const exportCities = () =>
-    downloadCSV(
-      'area-report.csv',
-      ['City', 'Salons', 'Bookings', 'Completed', 'Revenue'],
-      cities.map((c) => [c.city, c.salons, c.bookings, c.completed, money(c.revenue)])
-    );
-
-  const exportSubAreas = () =>
-    downloadCSV(
-      'subarea-report.csv',
-      ['Sub Area', 'City', 'Salons', 'Bookings', 'Completed', 'Revenue'],
-      subAreas.map((c) => [c.sub_area, c.city, c.salons, c.bookings, c.completed, money(c.revenue)])
-    );
-
-  const exportServices = () =>
-    downloadCSV(
-      'service-report.csv',
-      ['Service', 'Category', 'Bookings', 'Revenue'],
-      services.map((s) => [s.service, s.category, s.bookings, money(s.revenue)])
-    );
-
-  const exportTopSalons = () =>
-    downloadCSV(
-      'top-salons.csv',
-      ['Salon', 'City', 'Bookings', 'Revenue'],
-      (overview?.top_salons ?? []).map((s: any) => [s.name, s.city, s.bookings, money(s.revenue)])
-    );
-
-  /* -------- skeleton loading state -------- */
-  if (loading && !overview) {
-    return (
-      <div className={styles.container}>
-        {/* Same header as the loaded state, so switching between loading,
-            error and data doesn't shift the page or change its look. */}
-        <PageHeader
-          eyebrow="Platform"
-          title="Reporting"
-          subtitle="Gathering analytics from across the network…"
-          actions={
-            <span className={styles.badge}>
-              <span className={styles.badgeDot} />
-              Loading
-            </span>
-          }
-        />
-        <div className={styles.content}>
-          <div className={`${styles.skeletonHeader} ${styles.skeleton}`} />
-          <div className={styles.skeletonGrid}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className={`${styles.skeletonKpi} ${styles.skeleton}`} />
+      <div className={styles.filterBar}>
+        <div className={styles.filterGroup}>
+          <div className={styles.segmented} role="group" aria-label="Date range">
+            {PRESETS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className={`${styles.segBtn} ${preset === p.key ? styles.segBtnActive : ''}`}
+                aria-pressed={preset === p.key}
+                onClick={() => applyPreset(p.key)}
+              >
+                {p.label}
+              </button>
             ))}
           </div>
-          <div className={`${styles.skeletonCard} ${styles.skeleton}`} />
-          <div className={`${styles.skeletonCard} ${styles.skeleton}`} />
-          <div className={`${styles.skeletonCard} ${styles.skeleton}`} />
-          <p className={styles.loadingLabel}>Fetching data…</p>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>From</span>
+            <input type="date" value={range[0]} max={range[1]} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>To</span>
+            <input type="date" value={range[1]} min={range[0]} onChange={(e) => setTo(e.target.value)} />
+          </label>
+        </div>
+        <div className={styles.filterGroup}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>City</span>
+            <select
+              value={cityId}
+              onChange={(e) => {
+                setCityId(e.target.value);
+                setSubAreaId('');
+              }}
+              aria-label="City"
+            >
+              <option value="">All cities</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.salons})</option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Area</span>
+            <select
+              value={subAreaId}
+              onChange={(e) => setSubAreaId(e.target.value)}
+              disabled={!city || city.areas.length === 0}
+              aria-label="Area"
+            >
+              <option value="">{city ? (city.areas.length ? 'All areas' : 'No areas yet') : 'Pick a city'}</option>
+              {city?.areas.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </label>
+          <div className={styles.segmented} role="group" aria-label="Chart grouping">
+            {(['daily', 'weekly', 'monthly'] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                className={`${styles.segBtn} ${granularity === g ? styles.segBtnActive : ''}`}
+                aria-pressed={granularity === g}
+                onClick={() => setGranularity(g)}
+              >
+                {g === 'daily' ? 'Day' : g === 'weekly' ? 'Week' : 'Month'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    );
-  }
 
-  /* -------- error state -------- */
-  if (error) {
-    return (
-      <div className={styles.container}>
-        <PageHeader
-          eyebrow="Platform"
-          title="Reporting"
-          subtitle="A complete view of every salon, area and service on the platform."
-        />
-        <div className={styles.content}>
-          <div className={styles.errorCard}>
-            <p className={styles.errorTitle}>Unable to load reports</p>
-            <p className={styles.errorMessage}>{error}</p>
-            <button className={styles.retryButton} onClick={load}>Try again</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const b = overview?.bookings ?? {};
-  const sa = overview?.salons ?? {};
-  const r = overview?.rating ?? {};
-  const rev = overview?.revenue ?? {};
-  const topSalons = overview?.top_salons ?? [];
-  const topCities = overview?.cities ?? [];
-  const topSubAreas = overview?.sub_areas ?? [];
-
-  const hasBookings = (b.total ?? 0) > 0;
-
-  return (
-    <div className={styles.container}>
-      {/* The shared header, as every other admin page uses. This page had its
-          own full-bleed purple banner instead, which cost a large slice of a
-          phone screen before any data appeared and made the page read as a
-          different product from the rest of the dashboard. The "read-only" note
-          and the generation timestamp are preserved as header content. */}
-      <PageHeader
-        eyebrow="Platform"
-        title="Reporting"
-        subtitle="A complete view of every salon, area and service on the platform."
-        actions={
-          <div className={styles.headerMeta}>
-            <span className={styles.badge}>
-              <span className={styles.badgeDot} />
-              Read-only
-            </span>
-            {overview?.generated_at && (
-              <span className={styles.generatedAt}>
-                Generated{' '}
-                {new Date(overview.generated_at).toLocaleString('en-IN', {
-                  day: 'numeric', month: 'short', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              </span>
-            )}
-          </div>
-        }
-      />
-
-      <div className={styles.content}>
-        {/* ---- filter bar ---- */}
-        <div className={styles.rangeBar}>
-          <div className={styles.field}>
-            <label htmlFor="rep-from">From</label>
-            <input id="rep-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="rep-to">To</label>
-            <input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-          <button className={styles.button} onClick={load}>Apply</button>
-          <span className={styles.rangeHint}>
-            Filters the Salon / Area / Service tables below. KPI cards always show today, this week and this month.
+      <div className={styles.filterGroup}>
+        <span className={styles.compare}>
+          <Icon name="history" size={14} />
+          {fmtDate(range[0])} – {fmtDate(range[1])}
+          {meta && <> · compared with <b>{fmtDate(meta.previous_from)} – {fmtDate(meta.previous_to)}</b></>}
+        </span>
+        {city && (
+          <span className={styles.scopeChip}>
+            <Icon name="pin" size={12} />
+            {city.name}{area ? ` · ${area.name}` : ''}
+            <button type="button" aria-label="Clear city filter" onClick={() => { setCityId(''); setSubAreaId(''); }}>
+              <Icon name="close" size={12} />
+            </button>
           </span>
-        </div>
-
-        {/* ---- KPI cards ---- */}
-        <div className={styles.kpiGrid}>
-          <KPI label="Active salons" value={int(sa.active)} sub={`${int(sa.total)} total · ${int(sa.pending)} pending`} dotColor="#22c55e" />
-          <KPI label="Total bookings" value={int(b.total)} sub={`${int(b.today)} today · ${int(b.week)} this week · ${int(b.month)} this month`} dotColor="#6366f1" />
-          <KPI label="Completed" value={int(b.completed)} sub={`${int(b.online)} online · ${int(b.walk_in)} walk-in`} dotColor="#14b8a6" />
-          <KPI label="Average rating" value={r.average ? r.average.toFixed(2) : '—'} sub={`${int(r.review_count)} reviews`} accent dotColor="#f59e0b" />
-          <KPI label="Billed by salons" value={money(rev.billed_by_salons)} sub="from completed appointments" dotColor="#ec4899" />
-          <KPI label="Commission earned" value={money(rev.commission_earned)} sub={`${money(rev.net_to_salons)} net to salons`} accent dotColor="#7c3aed" />
-        </div>
-
-        {/* ---- booking health ---- */}
-        <Section title="Booking health" desc="Platform-wide cancellation and no-show performance." accent>
-          <div className={styles.healthRow}>
-            <HealthStat label="Cancellation rate" value={pct(b.cancellation_rate)} tone="warn" hint="Target: below 15%" />
-            <HealthStat label="No-show rate" value={pct(b.no_show_rate)} tone="bad" hint="Target: below 10%" />
-            <HealthStat label="Review coverage" value={`${int(r.review_count)}`} tone="ok" hint="Total reviews collected" />
-          </div>
-          {!hasBookings && (
-            <p className={styles.muted}>No bookings worth calculating rates from yet.</p>
-          )}
-        </Section>
-
-        {/* ---- top performing salons ---- */}
-        <Section title="Top performing salons" desc="Highest revenue-generating salons across the platform." accent action={
-          <button className={styles.smallButton} onClick={exportTopSalons}>↓ CSV</button>
-        }>
-          {topSalons.length === 0 ? (
-            <p className={styles.muted}>No completed appointments yet.</p>
-          ) : (
-            <div className={styles.tableScroll}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 50 }}>#</th>
-                    <th>Salon</th><th>City</th><th>Bookings</th><th style={{ textAlign: 'right' }}>Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topSalons.map((s2: any, idx: number) => (
-                    <tr key={s2.id}>
-                      <td>
-                        <span className={`${styles.rankBadge} ${idx === 0 ? styles.rank1 : idx === 1 ? styles.rank2 : idx === 2 ? styles.rank3 : styles.rankN}`}>
-                          {idx + 1}
-                        </span>
-                      </td>
-                      <td><strong>{s2.name}</strong></td>
-                      <td>{s2.city ?? '—'}</td>
-                      <td>{int(s2.bookings)}</td>
-                      <td className={styles.textRightBold}>{money(s2.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Section>
-
-        {/* ---- per-salon report ---- */}
-        <Section title="Salons — cancellation & no-show" desc="Per-salon booking health, revenue and ratings." accent action={
-          <button className={styles.smallButton} onClick={exportSalons}>↓ CSV</button>
-        }>
-          {salons.length === 0 ? (
-            <p className={styles.muted}>No salons with bookings in this range.</p>
-          ) : (
-            <>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Salon</th><th>City</th><th>Status</th><th>Bookings</th>
-                      <th>Completed</th><th>Cancelled</th><th>No-show</th>
-                      <th>Cancellation %</th><th>No-show %</th>
-                      <th style={{ textAlign: 'right' }}>Revenue</th><th>Rating</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {salons.map((s2) => (
-                      <tr key={s2.id}>
-                        <td><strong>{s2.name}</strong></td>
-                        <td>{s2.city ?? '—'}</td>
-                        <td><StatusPill status={s2.status} /></td>
-                        <td>{int(s2.bookings)}</td>
-                        <td>{int(s2.completed)}</td>
-                        <td>{int(s2.cancelled)}</td>
-                        <td>{int(s2.no_show)}</td>
-                        <td className={s2.cancellation_rate > 15 ? styles.warnText : styles.okText}>{pct(s2.cancellation_rate)}</td>
-                        <td className={s2.no_show_rate > 15 ? styles.warnText : styles.okText}>{pct(s2.no_show_rate)}</td>
-                        <td className={styles.textRightBold}>{money(s2.revenue)}</td>
-                        <td>{s2.avg_rating ? s2.avg_rating.toFixed(1) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {salonTotals && (
-                <div className={styles.totalsRow}>
-                  <span className={styles.totalsLabel}>Totals</span>
-                  <span>·</span>
-                  <span>{int(salonTotals.bookings)} bookings</span>
-                  <span>·</span>
-                  <span>{int(salonTotals.completed)} completed</span>
-                  <span>·</span>
-                  <span>{pct(salonTotals.cancellation_rate)} cancelled</span>
-                  <span>·</span>
-                  <span>{pct(salonTotals.no_show_rate)} no-show</span>
-                  <span>·</span>
-                  <span>{money(salonTotals.revenue)} revenue</span>
-                </div>
-              )}
-            </>
-          )}
-        </Section>
-
-        {/* ---- areas / cities ---- */}
-        <Section title="Areas & cities" desc="Breakdown of salon and booking activity by city." accent action={
-          <button className={styles.smallButton} onClick={exportCities}>↓ CSV</button>
-        }>
-          {cities.length === 0 ? (
-            <p className={styles.muted}>No cities with booking activity in this range.</p>
-          ) : (
-            <>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>City</th><th>Salons</th><th>Bookings</th><th>Completed</th><th style={{ textAlign: 'right' }}>Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cities.map((c, i) => (
-                      <tr key={i}>
-                        <td><strong>{c.city}</strong></td>
-                        <td>{int(c.salons)}</td>
-                        <td>{int(c.bookings)}</td>
-                        <td>{int(c.completed)}</td>
-                        <td className={styles.textRightBold}>{money(c.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {topCities.length > 0 && (
-                <div className={styles.totalsRow}>
-                  <span className={styles.totalsLabel}>Leading areas</span>
-                  {topCities.map((c: any) => (
-                    <span key={c.city}>{c.city} ({money(c.revenue)})</span>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </Section>
-
-        {/* ---- sub areas ---- */}
-        <Section title="Sub Areas" desc="Breakdown of salon and booking activity by sub area." accent action={
-          <button className={styles.smallButton} onClick={exportSubAreas}>↓ CSV</button>
-        }>
-          {subAreas.length === 0 ? (
-            <p className={styles.muted}>No sub areas with booking activity in this range.</p>
-          ) : (
-            <>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Sub Area</th><th>City</th><th>Salons</th><th>Bookings</th><th>Completed</th><th style={{ textAlign: 'right' }}>Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {subAreas.map((c, i) => (
-                      <tr key={i}>
-                        <td><strong>{c.sub_area}</strong></td>
-                        <td>{c.city}</td>
-                        <td>{int(c.salons)}</td>
-                        <td>{int(c.bookings)}</td>
-                        <td>{int(c.completed)}</td>
-                        <td className={styles.textRightBold}>{money(c.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {topSubAreas.length > 0 && (
-                <div className={styles.totalsRow}>
-                  <span className={styles.totalsLabel}>Leading sub areas</span>
-                  {topSubAreas.map((c: any) => (
-                    <span key={`${c.city}-${c.sub_area}`}>{c.sub_area} ({money(c.revenue)})</span>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </Section>
-
-        {/* ---- services & categories ---- */}
-        <Section title="Services & categories" desc="Most booked services and their revenue contribution." accent action={
-          <button className={styles.smallButton} onClick={exportServices}>↓ CSV</button>
-        }>
-          {services.length === 0 ? (
-            <p className={styles.muted}>No service bookings in this range.</p>
-          ) : (
-            <div className={styles.tableScroll}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Service</th><th>Category</th><th style={{ textAlign: 'right' }}>Bookings</th><th style={{ textAlign: 'right' }}>Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((sv, i) => (
-                    <tr key={i}>
-                      <td><strong>{sv.service}</strong></td>
-                      <td>{sv.category}</td>
-                      <td className={styles.textRight}>{int(sv.bookings)}</td>
-                      <td className={styles.textRightBold}>{money(sv.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Section>
-
-        {/* ---- customer reviews ---- */}
-        <Section title="Customer reviews" desc="Lowest rated salons that require attention." accent>
-          {!reviewsData || !reviewsData.data || reviewsData.data.length === 0 ? (
-            <p className={styles.muted}>No salon reviews yet.</p>
-          ) : (
-            <>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Salon</th>
-                      <th>Status</th>
-                      <th>Reviews</th>
-                      <th>Average Rating</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reviewsData.data.map((salon: any) => (
-                      <tr key={salon.id}>
-                        <td><strong>{salon.name}</strong>{!salon.is_credible && <span style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '6px'}}>(Low volume)</span>}</td>
-                        <td><StatusPill status={salon.status} /></td>
-                        <td>{int(salon.review_count)}</td>
-                        <td className={salon.average < 3.5 ? styles.warnText : styles.okText}>{salon.average.toFixed(1)} / 5</td>
-                        <td><a href={`/superadmin/salons/${salon.id}`} style={{color: 'var(--accent-color)', fontSize: '0.85rem', fontWeight: 500}}>View Profile</a></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className={styles.totalsRow} style={{ marginTop: '12px' }}>
-                <span className={styles.totalsLabel}>Platform Summary</span>
-                <span>·</span>
-                <span>{int(reviewsData.platform?.total_reviews)} total reviews</span>
-                <span>·</span>
-                <span>{reviewsData.platform?.average} avg platform rating</span>
-                <span>·</span>
-                <span className={reviewsData.platform?.salons_below_three > 0 ? styles.warnText : ''}>{reviewsData.platform?.salons_below_three} salons below 3.0</span>
-              </div>
-            </>
-          )}
-        </Section>
-        
-        <CrowdAnalysisSection from={from} to={to} salonsReport={salons} />
-      </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------- helpers */
-
-function CrowdAnalysisSection({ from, to, salonsReport }: { from: string; to: string; salonsReport: any[] }) {
-  const [cities, setCities] = useState<any[]>([]);
-  const [cityId, setCityId] = useState('');
-  const [subAreas, setSubAreas] = useState<any[]>([]);
-  const [subAreaId, setSubAreaId] = useState('');
-  const [salonId, setSalonId] = useState('');
-
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/cities').then(r => r.json()).then(setCities).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (cityId) {
-      fetch(`/api/cities/${cityId}/sub-areas`).then(r => r.json()).then(data => setSubAreas(data.sub_areas || [])).catch(() => {});
-    } else {
-      setSubAreas([]);
-      setSubAreaId('');
-    }
-  }, [cityId]);
-
-  useEffect(() => {
-    if (!cityId) {
-      setChartData([]);
-      return;
-    }
-    setLoading(true);
-    const q = new URLSearchParams({ city_id: cityId });
-    if (subAreaId) q.append('sub_area_id', subAreaId);
-    if (salonId) q.append('salon_id', salonId);
-    if (from) q.append('from', from);
-    if (to) q.append('to', to);
-    
-    fetch(`/api/proxy/superadmin/reports/crowd-analysis?${q.toString()}`)
-      .then(r => r.json())
-      .then(data => {
-        setChartData(data.data || []);
-      })
-      .finally(() => setLoading(false));
-  }, [cityId, subAreaId, salonId, from, to]);
-
-  const selectedCityName = cities.find(c => String(c.id) === String(cityId))?.name;
-  const filteredSalons = salonsReport.filter(s => s.city === selectedCityName);
-
-  return (
-    <Section title="Crowd Analysis" desc="Visualise average crowd by timeslots." accent>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
-          <select value={cityId} onChange={e => { setCityId(e.target.value); setSubAreaId(''); setSalonId(''); }}>
-            <option value="">Select City (Required)</option>
-            {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        
-        {cityId && (
-          <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
-            <select value={subAreaId} onChange={e => { setSubAreaId(e.target.value); setSalonId(''); }}>
-              <option value="">All Sub Areas</option>
-              {subAreas.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-        )}
-        
-        {cityId && (
-          <div className={styles.field} style={{ margin: 0, minWidth: '200px' }}>
-            <select value={salonId} onChange={e => setSalonId(e.target.value)}>
-              <option value="">All Salons in City</option>
-              {filteredSalons.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
         )}
       </div>
-      
-      {cityId ? (
-        <div style={{ height: '350px', width: '100%', marginTop: '24px' }}>
-          {loading ? (
-            <p className={styles.muted}>Loading data...</p>
-          ) : chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="time" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} tickMargin={10} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} tickMargin={10} />
-                <Tooltip cursor={{ fill: 'var(--surface-sunken)' }} contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                <Bar dataKey="count" name="Appointments" fill="var(--accent-color)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className={styles.muted}>No appointments found for these filters.</p>
-          )}
-        </div>
+
+      {section.error && !section.data ? (
+        <ErrorBox message={section.error} onRetry={() => setRefreshKey((n) => n + 1)} />
       ) : (
-        <p className={styles.muted}>Please select a city to view the analysis.</p>
-      )}
-    </Section>
-  );
-}
-
-function KPI({ label, value, sub, accent, dotColor }: { label: string; value: string; sub: string; accent?: boolean; dotColor?: string }) {
-  return (
-    <div className={`${styles.kpi} ${accent ? styles.kpiAccent : ''}`}>
-      <div className={styles.kpiLabel}>
-        <span className={styles.kpiDot} style={{ background: dotColor ?? '#6b7280' }} />
-        {label}
-      </div>
-      <div className={styles.kpiValue}>{value}</div>
-      <div className={styles.kpiSub}>{sub}</div>
-    </div>
-  );
-}
-
-function Section({ title, desc, children, accent, action }: { title: string; desc?: string; children?: React.ReactNode; accent?: boolean; action?: React.ReactNode }) {
-  return (
-    <div className={`${styles.card} ${accent ? styles.cardAccent : ''}`}>
-      <div className={styles.cardHeader}>
-        <div>
-          <h2 className={styles.cardTitle}>{title}</h2>
-          {desc && <p className={styles.cardDesc}>{desc}</p>}
+        <div className={`${styles.body} ${section.loading && section.data ? styles.bodyLoading : ''}`} aria-busy={section.loading}>
+          {tab === 'overview' && <OverviewTab {...props} />}
+          {tab === 'money' && <MoneyTab {...props} />}
+          {tab === 'bookings' && <BookingsTab {...props} />}
+          {tab === 'places' && <PlacesTab {...props} onPickCity={(id) => { setCityId(id); setSubAreaId(''); }} />}
+          {tab === 'salons' && <SalonsTab {...props} />}
+          {tab === 'catalog' && <CatalogTab {...props} />}
+          {tab === 'customers' && <CustomersTab {...props} />}
+          {tab === 'engagement' && <EngagementTab {...props} />}
         </div>
-        {action && <div>{action}</div>}
-      </div>
-      {children}
+      )}
     </div>
-  );
-}
-
-function HealthStat({ label, value, tone, hint }: { label: string; value: string; tone: 'ok' | 'warn' | 'bad'; hint?: string }) {
-  return (
-    <div className={styles.healthStat}>
-      <div className={`${styles.healthDot} ${styles['healthDot_' + tone]}`} />
-      <div className={`${styles.healthValue} ${styles['tone_' + tone]}`}>{value}</div>
-      <div className={styles.healthLabel}>{label}</div>
-      {hint && <div className={styles.healthHint}>{hint}</div>}
-    </div>
-  );
-}
-
-const statusTone: Record<string, string> = {
-  active: styles.sActive,
-  pending_approval: styles.sPending,
-  suspended: styles.sSuspended,
-};
-
-function StatusPill({ status }: { status: string }) {
-  return (
-    <span className={`${styles.statusPill} ${statusTone[status] ?? ''}`}>
-      {(status ?? 'unknown').replace(/_/g, ' ')}
-    </span>
   );
 }

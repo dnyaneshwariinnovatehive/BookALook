@@ -12,6 +12,7 @@ import styles from './dashboard.module.css';
 import rev from './revenue.module.css';
 import { EmptyState, KpiCard } from './DashboardParts';
 import MonthlyLedger from './MonthlyLedger';
+import { PocketCard } from './PocketCard';
 
 interface Totals {
   total: number;
@@ -134,7 +135,8 @@ export default function RevenueTab({ from, to, granularity, rangeLabel, refreshK
 
   return (
     <>
-      <div className={styles.kpiGrid}>
+      <div className={`${styles.kpiGrid} ${rev.kpiGrid5}`}>
+        <PocketCard refreshKey={refreshKey} />
         <KpiCard
           label="BookALook revenue"
           icon="rupee"

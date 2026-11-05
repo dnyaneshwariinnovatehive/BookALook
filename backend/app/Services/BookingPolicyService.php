@@ -168,6 +168,29 @@ class BookingPolicyService
             ->exists();
     }
 
+    /**
+     * A length of time as people say it: "45 minutes", "1 hour",
+     * "1 hour 30 minutes", "1 day 2 hours". Mirrors formatMinutes() in the
+     * Customer App so the server's reasons read the same as the app's own text.
+     */
+    public static function describeMinutes(int $minutes): string
+    {
+        if ($minutes <= 0) {
+            return '0 minutes';
+        }
+
+        $unit = fn (int $n, string $word) => $n . ' ' . $word . ($n === 1 ? '' : 's');
+        $days = intdiv($minutes, 1440);
+        $hours = intdiv($minutes % 1440, 60);
+        $mins = $minutes % 60;
+
+        return implode(' ', array_filter([
+            $days > 0 ? $unit($days, 'day') : null,
+            $hours > 0 ? $unit($hours, 'hour') : null,
+            $mins > 0 ? $unit($mins, 'minute') : null,
+        ]));
+    }
+
     private function baseWindow(Appointment $appointment, int $cutoff): array
     {
         // The link to the closure is the durable entitlement: an admin deleting
@@ -198,7 +221,7 @@ class BookingPolicyService
         if (now()->addMinutes($cutoff)->greaterThan($this->startsAt($appointment))) {
             return $base + [
                 'allowed' => false,
-                'reason' => "Changes are not allowed within {$cutoff} minutes of the appointment.",
+                'reason' => 'Changes are not allowed within ' . self::describeMinutes($cutoff) . ' of the appointment.',
             ];
         }
 

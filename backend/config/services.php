@@ -173,6 +173,9 @@ return [
             'key_id' => env('RAZORPAY_KEY_ID', ''),
             'key_secret' => env('RAZORPAY_KEY_SECRET', ''),
             'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET', ''),
+            // Razorpay does not report its fee per payment to us, so reports
+            // estimate it: 2% standard rate plus 18% GST on that fee.
+            'fee_percent' => (float) env('RAZORPAY_FEE_PERCENT', 2.36),
         ],
         // How long a slot stays held while a customer is paying online. Only
         // used once a gateway is enabled.
