@@ -72,7 +72,7 @@ export default function CustomersTab({ data: raw }: TabProps) {
         <Metric label="Customers served" icon="users" value={num(c.customers)} delta={deltaOf(c.customers, p.customers)} hint="With a completed visit" />
         <Metric label="New customers" icon="userPlus" tone="teal" value={num(c.new)} delta={deltaOf(c.new, p.new)} hint="First visit ever, in this scope" />
         <Metric label="Returning customers" icon="repeat" tone="blue" value={num(c.returning)} delta={deltaOf(c.returning, p.returning)} hint="Had visited before" />
-        <Metric label="Came back in range" icon="history" tone="amber" value={pct(c.repeat_rate)} delta={pointsOf(c.repeat_rate, p.repeat_rate)} points hint={`${num(c.repeaters)} with 2+ visits`} />
+        <Metric label="Came back in range" icon="history" tone="amber" value={pct(c.repeat_rate)} delta={pointsOf(c.repeat_rate, p.repeat_rate, p.customers > 0)} points hint={`${num(c.repeaters)} with 2+ visits`} />
         <Metric label="Spend per customer" icon="rupee" value={inr(c.spend_per_customer)} delta={deltaOf(c.spend_per_customer, p.spend_per_customer)} hint={`${c.visits_per_customer} visits each`} />
         <Metric label="App sign-ups" icon="smartphone" tone="teal" value={num(data.signups.total)} hint={`${pct(data.signups.conversion)} have booked`} />
         <Metric label="Visits by app customers" icon="calendar" tone="blue" value={num(c.visits)} delta={deltaOf(c.visits, p.visits)} />

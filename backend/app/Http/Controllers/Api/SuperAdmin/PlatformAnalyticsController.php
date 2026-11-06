@@ -55,8 +55,8 @@ class PlatformAnalyticsController extends Controller
             'from' => 'nullable|date',
             'to' => 'nullable|date',
             'granularity' => 'nullable|in:daily,weekly,monthly',
-            'city_id' => 'nullable|string|max:64',
-            'sub_area_id' => 'nullable|string|max:64',
+            'city_id' => 'nullable|uuid',
+            'sub_area_id' => 'nullable|uuid',
         ]);
 
         $this->scope($data);

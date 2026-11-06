@@ -53,7 +53,8 @@ export const deltaOf = (curr: number, prev: number): Delta => {
 };
 
 /** For rates: the change in percentage points. */
-export const pointsOf = (curr: number, prev: number): Delta => {
+export const pointsOf = (curr: number, prev: number, hasPrevious = true): Delta => {
+  if (!hasPrevious) return null;
   const d = Math.round((curr - prev) * 10) / 10;
   return { pct: Math.abs(d), dir: d > 0 ? 'up' : d < 0 ? 'down' : 'flat' };
 };

@@ -44,9 +44,9 @@ export default function BookingsTab({ data: raw }: TabProps) {
     <>
       <MetricGrid cols={6}>
         <Metric label="Bookings" icon="calendar" value={num(k.bookings)} delta={deltaOf(k.bookings, p.bookings)} hint={`${num(data.other.avg_per_day)} a day`} />
-        <Metric label="Completion rate" icon="checkCircle" tone="teal" value={pct(k.completion_rate)} delta={pointsOf(k.completion_rate, p.completion_rate)} points hint="Of bookings already due" />
-        <Metric label="Cancellation rate" icon="close" tone="amber" value={pct(k.cancellation_rate)} delta={pointsOf(k.cancellation_rate, p.cancellation_rate)} invert points hint={`${num(k.cancelled)} cancelled`} />
-        <Metric label="No-show rate" icon="userX" tone="rose" value={pct(k.no_show_rate)} delta={pointsOf(k.no_show_rate, p.no_show_rate)} invert points hint={`${num(k.no_show)} no-shows`} />
+        <Metric label="Completion rate" icon="checkCircle" tone="teal" value={pct(k.completion_rate)} delta={pointsOf(k.completion_rate, p.completion_rate, p.bookings > 0)} points hint="Of bookings already due" />
+        <Metric label="Cancellation rate" icon="close" tone="amber" value={pct(k.cancellation_rate)} delta={pointsOf(k.cancellation_rate, p.cancellation_rate, p.bookings > 0)} invert points hint={`${num(k.cancelled)} cancelled`} />
+        <Metric label="No-show rate" icon="userX" tone="rose" value={pct(k.no_show_rate)} delta={pointsOf(k.no_show_rate, p.no_show_rate, p.bookings > 0)} invert points hint={`${num(k.no_show)} no-shows`} />
         <Metric label="Checkouts abandoned" icon="alert" tone="amber" value={num(k.abandoned_checkouts)} delta={deltaOf(k.abandoned_checkouts, p.abandoned_checkouts)} invert hint="Payment hold ran out" />
         <Metric label="Walk-ins" icon="walkIn" tone="blue" value={num(k.walk_in)} delta={deltaOf(k.walk_in, p.walk_in)} hint={k.bookings ? `${pct((k.walk_in / k.bookings) * 100)} of bookings` : undefined} />
       </MetricGrid>

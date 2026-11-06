@@ -81,8 +81,8 @@ export default function OverviewTab({ data: raw }: TabProps) {
         <Metric label="BookALook earnings" icon="crown" value={inr(c.earnings)} delta={deltaOf(c.earnings, p.earnings)} hint={`Take rate ${pct(c.take_rate)} of GMV`} title="Commission on visits in range plus plan payments approved in range" />
         <Metric label="Paid out to salons" icon="wallet" tone="blue" value={inr(c.paid_to_salons)} delta={deltaOf(c.paid_to_salons, p.paid_to_salons)} hint="Payouts distributed" />
         <Metric label="Refunds" icon="repeat" tone="rose" value={inr(c.refunds)} delta={deltaOf(c.refunds, p.refunds)} invert hint="Of online payments" />
-        <Metric label="Cancellation rate" icon="close" tone="amber" value={pct(c.cancellation_rate)} delta={pointsOf(c.cancellation_rate, p.cancellation_rate)} invert points hint={`${num(c.cancelled)} cancelled`} />
-        <Metric label="No-show rate" icon="userX" tone="rose" value={pct(c.no_show_rate)} delta={pointsOf(c.no_show_rate, p.no_show_rate)} invert points hint={`${num(c.no_show)} no-shows`} />
+        <Metric label="Cancellation rate" icon="close" tone="amber" value={pct(c.cancellation_rate)} delta={pointsOf(c.cancellation_rate, p.cancellation_rate, p.bookings > 0)} invert points hint={`${num(c.cancelled)} cancelled`} />
+        <Metric label="No-show rate" icon="userX" tone="rose" value={pct(c.no_show_rate)} delta={pointsOf(c.no_show_rate, p.no_show_rate, p.bookings > 0)} invert points hint={`${num(c.no_show)} no-shows`} />
       </MetricGrid>
 
       <Grid cols={3}>
