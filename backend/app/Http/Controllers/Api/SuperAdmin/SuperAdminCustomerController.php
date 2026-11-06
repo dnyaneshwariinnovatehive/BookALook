@@ -201,9 +201,9 @@ class SuperAdminCustomerController extends Controller
         $query = clone $base;
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('u.name', 'like', "%$search%")
-                  ->orWhere('u.phone', 'like', "%$search%")
-                  ->orWhere('u.email', 'like', "%$search%");
+                $q->whereLike('u.name', "%$search%")
+                  ->orWhereLike('u.phone', "%$search%")
+                  ->orWhereLike('u.email', "%$search%");
             });
         }
 

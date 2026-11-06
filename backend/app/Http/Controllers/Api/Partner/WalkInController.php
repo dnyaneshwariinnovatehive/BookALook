@@ -289,8 +289,8 @@ class WalkInController extends Controller
         if ($request->filled('search')) {
             $term = trim($request->search);
             $query->where(function ($q) use ($term) {
-                $q->where('walk_in_customer_name', 'like', "%{$term}%")
-                  ->orWhere('walk_in_customer_phone', 'like', "%{$term}%");
+                $q->whereLike('walk_in_customer_name', "%{$term}%")
+                  ->orWhereLike('walk_in_customer_phone', "%{$term}%");
             });
         }
 

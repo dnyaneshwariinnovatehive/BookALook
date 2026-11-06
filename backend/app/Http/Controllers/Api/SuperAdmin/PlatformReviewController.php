@@ -53,7 +53,7 @@ class PlatformReviewController extends Controller
         $salons = Salon::query()
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
-            ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
+            ->when($request->filled('search'), fn ($q) => $q->whereLike('name', "%{$request->search}%"))
             ->has('reviews')
             ->get()
             ->map(fn (Salon $salon) => [

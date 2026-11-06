@@ -36,12 +36,12 @@ class SuperAdminEnquiryController extends Controller
         ]);
 
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = trim((string) $request->input('search'));
             $query->where(function ($q) use ($search) {
-                $q->where('salon_name', 'like', "%{$search}%")
-                  ->orWhere('owner_name', 'like', "%{$search}%")
-                  ->orWhere('city', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                $q->whereLike('salon_name', "%{$search}%")
+                  ->orWhereLike('owner_name', "%{$search}%")
+                  ->orWhereLike('city', "%{$search}%")
+                  ->orWhereLike('phone', "%{$search}%");
             });
         }
 

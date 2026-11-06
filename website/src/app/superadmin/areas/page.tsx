@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './page.module.css';
-import { useConfirm } from '@/components/admin/ui';
+import { matchesSearch, useConfirm } from '@/components/admin/ui';
 import { readSpreadsheet, templateCsv } from './spreadsheet';
 
 interface SubArea {
@@ -205,20 +205,13 @@ export default function SubAreasPage() {
   }, [cityId]);
 
   const visibleCities = useMemo(() => {
-    const q = cityQuery.trim().toLowerCase();
     const list = currentState?.cities ?? [];
-    return q ? list.filter((c) => c.name.toLowerCase().includes(q)) : list;
+    return list.filter((c) => matchesSearch(cityQuery, c.name));
   }, [currentState, cityQuery]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return areas.filter(
-      (a) =>
-        a.name.toLowerCase().includes(q) ||
-        a.city_name.toLowerCase().includes(q) ||
-        (a.state ?? '').toLowerCase().includes(q)
-    );
+    if (!query.trim()) return [];
+    return areas.filter((a) => matchesSearch(query, a.name, a.city_name, a.state));
   }, [areas, query]);
 
   const stats = useMemo(

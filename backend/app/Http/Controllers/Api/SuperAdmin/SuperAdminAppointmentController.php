@@ -71,15 +71,15 @@ class SuperAdminAppointmentController extends Controller
 
         // Filter by Search (Customer Name, Phone, Email, or Appointment ID)
         if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
+            $search = trim((string) $request->search);
             $query->where(function ($q) use ($search) {
                 $q->whereHas('customer', function ($cq) use ($search) {
-                    $cq->where('name', 'like', "%{$search}%")
-                       ->orWhere('phone', 'like', "%{$search}%")
-                       ->orWhere('email', 'like', "%{$search}%");
-                })->orWhere('id', 'like', "%{$search}%")
-                  ->orWhere('walk_in_customer_name', 'like', "%{$search}%")
-                  ->orWhere('walk_in_customer_phone', 'like', "%{$search}%");
+                    $cq->whereLike('name', "%{$search}%")
+                       ->orWhereLike('phone', "%{$search}%")
+                       ->orWhereLike('email', "%{$search}%");
+                })->orWhereRaw('LOWER(CAST(appointments.id AS TEXT)) LIKE ?', ['%' . mb_strtolower($search) . '%'])
+                  ->orWhereLike('walk_in_customer_name', "%{$search}%")
+                  ->orWhereLike('walk_in_customer_phone', "%{$search}%");
             });
         }
 

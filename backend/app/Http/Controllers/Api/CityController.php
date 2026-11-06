@@ -45,9 +45,9 @@ class CityController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")
-                ->orWhere('state', 'like', "%{$search}%"));
+            $search = trim((string) $request->input('search'));
+            $query->where(fn ($q) => $q->whereLike('name', "%{$search}%")
+                ->orWhereLike('state', "%{$search}%"));
         }
 
         $cities = $query->withOpenSalonCount()

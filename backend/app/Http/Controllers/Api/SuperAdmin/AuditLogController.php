@@ -78,11 +78,12 @@ class AuditLogController extends Controller
         // Searches the name of the thing acted on and the reason typed at the
         // time — both live in metadata, which is where the words are.
         if ($request->filled('search')) {
-            $term = '%' . $request->search . '%';
+            $term = '%' . trim((string) $request->search) . '%';
             $query->where(function ($q) use ($term) {
-                $q->where('metadata', 'like', $term)
-                    ->orWhere('action', 'like', $term)
-                    ->orWhereHas('actor', fn ($a) => $a->where('name', 'like', $term));
+                // jsonb and uuid columns are cast to text so PostgreSQL can match them.
+                $q->whereRaw('LOWER(CAST(metadata AS TEXT)) LIKE ?', [mb_strtolower($term)])
+                    ->orWhereLike('action', $term)
+                    ->orWhereHas('actor', fn ($a) => $a->whereLike('name', $term));
             });
         }
 

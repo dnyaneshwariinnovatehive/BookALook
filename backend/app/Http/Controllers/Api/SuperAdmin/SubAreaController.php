@@ -48,8 +48,8 @@ class SubAreaController extends Controller
 
         if ($request->filled('search')) {
             $term = "%{$request->search}%";
-            $query->where(fn ($q) => $q->where('name', 'like', $term)
-                ->orWhereHas('city', fn ($c) => $c->where('name', 'like', $term)));
+            $query->where(fn ($q) => $q->whereLike('name', $term)
+                ->orWhereHas('city', fn ($c) => $c->whereLike('name', $term)));
         }
 
         $areas = $query->get()->sortBy([

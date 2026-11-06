@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useConfirm } from '@/components/admin/ui';
+import { matchesSearch, useConfirm } from '@/components/admin/ui';
 import styles from './notifications.module.css';
 
 interface NotificationTemplate {
@@ -95,14 +95,7 @@ export default function NotificationsPage() {
     return templates.filter(t => {
       if (audienceFilter !== 'all' && t.audience.key !== audienceFilter) return false;
       if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
-      if (search) {
-        const query = search.toLowerCase();
-        return (
-          (t.name || '').toLowerCase().includes(query) ||
-          t.key.toLowerCase().includes(query) ||
-          (t.title || t.default_title).toLowerCase().includes(query)
-        );
-      }
+      if (search) return matchesSearch(search, t.name, t.key, t.title || t.default_title);
       return true;
     });
   }, [templates, search, audienceFilter, categoryFilter]);

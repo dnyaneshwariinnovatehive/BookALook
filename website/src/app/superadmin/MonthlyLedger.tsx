@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Icon from '@/components/admin/Icon';
+import { matchesSearch } from '@/components/admin/ui';
 import { useChartPalette } from '@/lib/theme';
 import styles from './dashboard.module.css';
 import lg from './ledger.module.css';
@@ -146,8 +147,7 @@ export default function MonthlyLedger({ refreshKey }: { refreshKey: number }) {
   const maxMonth = Math.max(1, ...(data?.months ?? []).map((m) => m.total));
 
   const salons = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = (data?.salons ?? []).filter((s) => !q || s.name.toLowerCase().includes(q) || s.city.toLowerCase().includes(q));
+    const rows = (data?.salons ?? []).filter((s) => matchesSearch(query, s.name, s.city));
     return [...rows].sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : b[sort] - a[sort]));
   }, [data, query, sort]);
   const maxCell = Math.max(1, ...(data?.salons ?? []).flatMap((s) => Object.values(s.months).map((m) => m.total)));

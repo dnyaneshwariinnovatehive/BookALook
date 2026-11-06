@@ -509,9 +509,9 @@ class SalonController extends Controller
             ->where('status', 'active');
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")
-                ->orWhere('address', 'like', "%{$search}%"));
+            $search = trim((string) $request->search);
+            $query->where(fn ($q) => $q->whereLike('name', "%{$search}%")
+                ->orWhereLike('address', "%{$search}%"));
         }
 
         if ($city) {

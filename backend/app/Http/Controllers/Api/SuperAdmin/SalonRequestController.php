@@ -29,8 +29,8 @@ class SalonRequestController extends Controller
             ->when($request->filled('topic'), fn ($q) => $q->where('topic', $request->topic))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = '%' . trim($request->search) . '%';
-                $q->where(fn ($w) => $w->where('message', 'like', $term)
-                    ->orWhereHas('salon', fn ($s) => $s->where('name', 'like', $term)));
+                $q->where(fn ($w) => $w->whereLike('message', $term)
+                    ->orWhereHas('salon', fn ($s) => $s->whereLike('name', $term)));
             })
             ->latest();
 

@@ -68,13 +68,13 @@ class SalonController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = trim((string) $request->input('search'));
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%")
-                  ->orWhereHas('city', fn ($qc) => $qc->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('subArea', fn ($qa) => $qa->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('admin', fn ($qa) => $qa->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"));
+                $q->whereLike('name', "%{$search}%")
+                  ->orWhereLike('address', "%{$search}%")
+                  ->orWhereHas('city', fn ($qc) => $qc->whereLike('name', "%{$search}%"))
+                  ->orWhereHas('subArea', fn ($qa) => $qa->whereLike('name', "%{$search}%"))
+                  ->orWhereHas('admin', fn ($qa) => $qa->whereLike('name', "%{$search}%")->orWhereLike('phone', "%{$search}%"));
             });
         }
 

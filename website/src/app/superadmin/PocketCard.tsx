@@ -80,6 +80,7 @@ export function PocketCard({ refreshKey = 0 }: { refreshKey?: number }) {
         disabled={!data}
         title={data ? `${summary}. Click for the full breakdown.` : undefined}
         aria-haspopup="dialog"
+        data-section="Money in pocket"
       >
         <div className={styles.kpiHeader}>
           <span className={`${styles.kpiIcon} ${pocket.tone}`}><Icon name="wallet" size={20} /></span>

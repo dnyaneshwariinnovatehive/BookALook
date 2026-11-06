@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert, Badge, Button, DataTable, DescriptionList, IconButton, Modal, PageHeader,
-  SearchInput, Skeleton, StatCard, useConfirm, type DataColumn, type Tone,
+  SearchInput, Skeleton, matchesSearch, StatCard, useConfirm, type DataColumn, type Tone,
 } from '@/components/admin/ui';
 import styles from './offers.module.css';
 
@@ -120,11 +120,7 @@ export default function FirstTimeOffersPage() {
   }, [offers, salonOptions]);
 
   const filtered = useMemo(() => offers.filter((o) => {
-    if (search) {
-      const q = search.toLowerCase();
-      const hay = `${o.name} ${o.description ?? ''} ${o.created_by_salon?.name ?? ''}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+    if (!matchesSearch(search, o.name, o.description, o.created_by_salon?.name)) return false;
     if (salonFilter === 'platform' && !o.is_retired_platform_offer) return false;
     if (salonFilter && salonFilter !== 'platform' && o.created_by_salon?.id !== salonFilter) return false;
     if (scopeFilter && o.scope !== scopeFilter) return false;

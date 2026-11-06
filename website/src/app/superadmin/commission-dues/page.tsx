@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Alert, Badge, Button, DataTable, DescriptionList, Drawer, PageHeader, SearchInput, Segmented, StatCard,
+  Alert, Badge, Button, DataTable, DescriptionList, Drawer, PageHeader, SearchInput, Segmented, matchesSearch, StatCard,
   cx, formatINR, useConfirm, type DataColumn, type Tone,
 } from '@/components/admin/ui';
 import styles from './dues.module.css';
@@ -154,9 +154,8 @@ export default function CommissionDuesPage() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      if (q && !`${r.salon.name} ${r.salon.city ?? ''} ${r.salon.owner?.name ?? ''}`.toLowerCase().includes(q)) return false;
+      if (!matchesSearch(search, r.salon.name, r.salon.city, r.salon.owner?.name)) return false;
       if (filter === 'overdue') return (r.state.days_overdue ?? -1) >= 0;
       if (filter === 'restricted') return r.state.actions.some((a) => a === 'stop_bookings' || a === 'full_lock');
       if (filter === 'controlled') return r.state.paused || !!r.state.override || !!r.state.extended_until;

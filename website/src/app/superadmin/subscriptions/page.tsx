@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Icon from '@/components/admin/Icon';
 import {
   Alert, Badge, Button, Card, DescriptionList, EmptyState, Field, IconButton, Modal, PageHeader,
-  Person, SearchInput, Segmented, Skeleton, StatCard, Tabs, cx, formatINR, localISODate, ui, useConfirm,
+  Person, SearchInput, Segmented, matchesSearch, Skeleton, StatCard, Tabs, cx, formatINR, localISODate, ui, useConfirm,
 } from '@/components/admin/ui';
 import styles from './page.module.css';
 
@@ -690,10 +690,7 @@ export default function SubscriptionsPage() {
     } else if (salonFilterModel && (s.billing_model === COMMISSION ? COMMISSION : SUBSCRIPTION) !== salonFilterModel) {
       return false;
     }
-    if (salonSearch) {
-      const q = salonSearch.toLowerCase();
-      return [s.name, s.owner, s.owner_phone, s.city].some((v) => String(v ?? '').toLowerCase().includes(q));
-    }
+    if (salonSearch) return matchesSearch(salonSearch, s.name, s.owner, s.owner_phone, s.city);
     return true;
   }).sort((a, b) => {
     if (salonSort === 'name_asc') return (a.name || '').localeCompare(b.name || '');
@@ -715,15 +712,13 @@ export default function SubscriptionsPage() {
      because the reference is how a bank transfer is traced back to the row that
      authorised it, and searching only by salon would not find it. */
   const decidedRequests = useMemo(() => {
-    const q = requestSearch.trim().toLowerCase();
+    const q = requestSearch;
 
     return allRequests
       .filter((r) => r.status !== 'pending')
       .filter((r) => (requestStatus === 'all' ? true : r.status === requestStatus))
       .filter((r) => {
-        if (!q) return true;
-        return [r.salon?.name, r.plan?.name, r.billing_label, r.transaction_id, r.note]
-          .some((v) => String(v ?? '').toLowerCase().includes(q));
+        return matchesSearch(q, r.salon?.name, r.plan?.name, r.billing_label, r.transaction_id, r.note);
       });
   }, [allRequests, requestStatus, requestSearch]);
 

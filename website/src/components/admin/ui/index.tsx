@@ -232,6 +232,27 @@ export function Field({ label, hint, children, className }: {
   );
 }
 
+/** Lower-case, accent-free, single-spaced — so "Café  Glow" and "cafe glow" compare equal. */
+export const normalizeSearch = (v: unknown) =>
+  String(v ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Case-insensitive match for client-side filters: every word of the query must
+ * appear somewhere in the fields, in any order ("glow pune" finds Glow Studio
+ * in Pune). An empty query matches everything.
+ */
+export function matchesSearch(query: string, ...fields: unknown[]) {
+  const words = normalizeSearch(query).split(' ').filter(Boolean);
+  if (!words.length) return true;
+  const hay = normalizeSearch(fields.join(' '));
+  return words.every((w) => hay.includes(w));
+}
+
 export function SearchInput({ value, onChange, placeholder = 'Search…', className, ariaLabel }: {
   value: string;
   onChange: (v: string) => void;
@@ -239,18 +260,42 @@ export function SearchInput({ value, onChange, placeholder = 'Search…', classN
   className?: string;
   ariaLabel?: string;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className={cx(s.searchWrap, className)}>
       <Icon name="search" size={16} className={s.searchIcon} />
       <input
+        ref={inputRef}
         type="search"
         className={s.control}
         value={value}
         placeholder={placeholder}
         aria-label={ariaLabel ?? placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        enterKeyHint="search"
+        maxLength={100}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Escape clears the box first; a second Escape is left to the page.
+          if (e.key === 'Escape' && value) {
+            e.preventDefault();
+            e.stopPropagation();
+            onChange('');
+          }
+        }}
       />
-      {value && <IconButton icon="close" label="Clear search" className={s.searchClear} onClick={() => onChange('')} />}
+      {value && (
+        <IconButton
+          icon="close"
+          label="Clear search"
+          className={s.searchClear}
+          onClick={() => {
+            onChange('');
+            inputRef.current?.focus();
+          }}
+        />
+      )}
     </div>
   );
 }

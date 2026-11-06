@@ -409,6 +409,14 @@ textarea.control {
   padding-right: 32px;
 }
 
+/* The box has its own clear button; hide the browser's built-in one. */
+.searchWrap .control::-webkit-search-cancel-button,
+.searchWrap .control::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .searchClear {
   position: absolute;
   right: 5px;
