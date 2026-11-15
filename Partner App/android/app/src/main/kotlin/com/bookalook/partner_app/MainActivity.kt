@@ -1,4 +1,4 @@
-package com.example.partner_app
+package com.bookalook.partner_app
 
 import io.flutter.embedding.android.FlutterActivity
 

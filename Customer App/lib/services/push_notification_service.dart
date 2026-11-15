@@ -13,6 +13,16 @@ import 'deep_link_service.dart';
 import '../screens/salon_detail_screen.dart';
 import 'package:path_provider/path_provider.dart';
 
+/// Android notification channel every push uses. Must match the backend's
+/// FCM_CHANNEL_ID (default `bookalook_notifications`): FCM names it on each
+/// message, and Android only shows a notification on a channel that exists.
+const AndroidNotificationChannel _pushChannel = AndroidNotificationChannel(
+  'bookalook_notifications',
+  'Bookings and updates',
+  description: 'Booking confirmations, reminders, changes and offers.',
+  importance: Importance.high,
+);
+
 // Top-level function for background message handling
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -52,6 +62,12 @@ class PushNotificationService {
         settings: initializationSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
+
+      // Created before any message can arrive, so pushes received while the
+      // app is in the background or closed have a channel to land on.
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_pushChannel);
 
       // Request permission
       NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
@@ -139,8 +155,9 @@ class PushNotificationService {
       }
 
       AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'bookalook_customer_channel', // id
-        'Customer Notifications', // title
+        _pushChannel.id,
+        _pushChannel.name,
+        channelDescription: _pushChannel.description,
         importance: Importance.max,
         priority: Priority.high,
         styleInformation: styleInformation,

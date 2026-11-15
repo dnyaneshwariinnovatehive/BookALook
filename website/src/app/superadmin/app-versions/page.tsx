@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -12,12 +12,17 @@ import {
   PageHeader,
   Segmented,
   Skeleton,
+  StatCard,
+  cx,
   useConfirm,
 } from '@/components/admin/ui';
-import Icon from '@/components/admin/Icon';
+import Icon, { type IconName } from '@/components/admin/Icon';
 import styles from './page.module.css';
 
+/* ------------------------------------------------------------------ types */
+
 type AppId = 'customer' | 'partner';
+type ReleaseStatus = 'draft' | 'published' | 'retired';
 
 interface Release {
   id: string;
@@ -28,15 +33,11 @@ interface Release {
   release_notes: string | null;
   android_store_url: string | null;
   ios_store_url: string | null;
-  status: 'draft' | 'published' | 'retired';
-  created_by?: { id: string; name: string } | null;
-  updater?: { id: string; name: string } | null;
+  status: ReleaseStatus;
   created_at: string;
 }
 
 interface Policy {
-  id?: string;
-  app: AppId;
   latest_release_id: string | null;
   minimum_release_id: string | null;
   update_mode: 'optional' | 'mandatory';
@@ -46,395 +47,420 @@ interface Policy {
   android_store_url: string | null;
   ios_store_url: string | null;
   resolved_android_url?: string | null;
-  resolved_ios_url?: string | null;
   is_active?: boolean;
-  latest_release?: Release | null;
-  minimum_release?: Release | null;
   updated_by?: string | null;
   updated_at?: string | null;
 }
 
 interface AuditItem {
   id: string;
-  action: string;
   actor: string;
   label: string;
-  before: any;
-  after: any;
-  metadata?: any;
   created_at: string;
 }
 
+/**
+ * The one decision the policy really encodes. The backend stores it as three
+ * fields (is_enforced, update_mode, minimum_release_id); the apps and the API
+ * middleware read them like this:
+ *
+ *  remind   — is_enforced off: anyone older than Latest gets a dismissible
+ *             popup. Minimum and mode are ignored.
+ *  minimum  — is_enforced on, optional: older than Minimum is blocked in the
+ *             app and refused by the API; between Minimum and Latest gets
+ *             the popup.
+ *  everyone — is_enforced on, mandatory, Minimum = Latest: anyone not on
+ *             Latest is blocked in the app and by the API.
+ */
+type Rule = 'remind' | 'minimum' | 'everyone';
+
+const APP_LABEL: Record<AppId, string> = {
+  customer: 'Customer App',
+  partner: 'Partner App',
+};
+
+/** Android applicationId of each app; the Play listing URL is derived from it. */
+const PLAY_PACKAGE: Record<AppId, string> = {
+  customer: 'com.bookalook.customer_app',
+  partner: 'com.bookalook.partner_app',
+};
+const playUrl = (app: AppId) => `https://play.google.com/store/apps/details?id=${PLAY_PACKAGE[app]}`;
+
+const STATUS_META: Record<ReleaseStatus, { label: string; tone: 'success' | 'neutral' | 'danger'; hint: string }> = {
+  published: {
+    label: 'Live',
+    tone: 'success',
+    hint: 'Available to everyone on the store. Can be chosen as Latest.',
+  },
+  draft: {
+    label: 'Testing',
+    tone: 'neutral',
+    hint: 'Only on internal testing. Not offered to users yet.',
+  },
+  retired: {
+    label: 'Retired',
+    tone: 'danger',
+    hint: 'Pulled or replaced. Kept here for history.',
+  },
+};
+
+/* ---------------------------------------------------------------- helpers */
+
 function parseSemVer(v: string): [number, number, number] {
-  const clean = v.replace(/^v/i, '').trim();
-  const core = clean.split(/[+-]/)[0] || '';
-  const parts = core.split('.').map((p) => parseInt(p, 10) || 0);
-  return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  const core = v.replace(/^v/i, '').trim().split(/[+-]/)[0] || '';
+  const p = core.split('.').map((x) => parseInt(x, 10) || 0);
+  return [p[0] || 0, p[1] || 0, p[2] || 0];
 }
 
-function compareReleases(v1: string, b1: number, v2: string, b2: number): number {
-  const [maj1, min1, pat1] = parseSemVer(v1);
-  const [maj2, min2, pat2] = parseSemVer(v2);
-
-  if (maj1 !== maj2) return maj1 - maj2;
-  if (min1 !== min2) return min1 - min2;
-  if (pat1 !== pat2) return pat1 - pat2;
-  return (b1 || 0) - (b2 || 0);
+function compareReleases(a: Pick<Release, 'version' | 'build_number'>, b: Pick<Release, 'version' | 'build_number'>) {
+  const [a1, a2, a3] = parseSemVer(a.version);
+  const [b1, b2, b3] = parseSemVer(b.version);
+  return a1 - b1 || a2 - b2 || a3 - b3 || (a.build_number || 0) - (b.build_number || 0);
 }
+
+const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
+function bumpPatch(v: string) {
+  const [a, b, c] = parseSemVer(v);
+  return `${a}.${b}.${c + 1}`;
+}
+
+const fmtDate = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : '—';
+
+const fmtDateTime = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : '—';
+
+function timeAgo(iso: string) {
+  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hr ago`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `${d} day${d === 1 ? '' : 's'} ago`;
+  return fmtDate(iso);
+}
+
+/** ISO → value for <input type="datetime-local"> in the admin's own timezone. */
+function toLocalInput(iso: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+function cleanUrl(url: string) {
+  const t = url.trim();
+  if (!t) return null;
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`;
+}
+
+const isValidUrl = (url: string) => {
+  try {
+    new URL(cleanUrl(url) || '');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+function ruleOf(p: Policy | null): Rule {
+  if (!p || !p.is_enforced) return 'remind';
+  return p.update_mode === 'mandatory' ? 'everyone' : 'minimum';
+}
+
+const v = (r: Pick<Release, 'version'> | null | undefined) => (r ? `v${r.version}` : '—');
+
+/* ------------------------------------------------------------- the page */
 
 export default function AppVersionsPage() {
-  const [currentApp, setCurrentApp] = useState<AppId>('customer');
+  const [app, setApp] = useState<AppId>('customer');
   const [loading, setLoading] = useState(true);
-  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [releases, setReleases] = useState<Release[]>([]);
   const [policies, setPolicies] = useState<Record<AppId, Policy | null>>({
     customer: null,
     partner: null,
   });
-  const [auditHistory, setAuditHistory] = useState<AuditItem[]>([]);
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error' | 'warning'; message: string } | null>(null);
+  const [audit, setAudit] = useState<AuditItem[]>([]);
+  const [showAllAudit, setShowAllAudit] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Form state for current app's policy
-  const [formLatestId, setFormLatestId] = useState<string>('');
-  const [formMinimumId, setFormMinimumId] = useState<string>('');
-  const [formUpdateMode, setFormUpdateMode] = useState<'optional' | 'mandatory'>('optional');
-  const [formIsEnforced, setFormIsEnforced] = useState<boolean>(false);
-  const [formEnforceAt, setFormEnforceAt] = useState<string>('');
-  const [formUpdateMessage, setFormUpdateMessage] = useState<string>('');
-  const [formAndroidUrl, setFormAndroidUrl] = useState<string>('');
-  const [formIosUrl, setFormIosUrl] = useState<string>('');
+  // Rule form
+  const [latestId, setLatestId] = useState('');
+  const [minimumId, setMinimumId] = useState('');
+  const [rule, setRule] = useState<Rule>('remind');
+  const [startLater, setStartLater] = useState(false);
+  const [startAt, setStartAt] = useState('');
+  const [message, setMessage] = useState('');
+  const [androidUrl, setAndroidUrl] = useState('');
+  const [iosUrl, setIosUrl] = useState('');
+  const [rolloutConfirmed, setRolloutConfirmed] = useState(false);
 
-  // Release Modal state
-  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
-  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
-  const [modalVersion, setModalVersion] = useState('');
-  const [modalBuildNumber, setModalBuildNumber] = useState('');
-  const [modalReleasedAt, setModalReleasedAt] = useState('');
-  const [modalStatus, setModalStatus] = useState<'draft' | 'published' | 'retired'>('published');
-  const [modalAndroidUrl, setModalAndroidUrl] = useState('');
-  const [modalIosUrl, setModalIosUrl] = useState('');
-  const [modalNotes, setModalNotes] = useState('');
-  const [submittingRelease, setSubmittingRelease] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Release | null>(null);
 
   const [confirm, confirmDialog] = useConfirm();
 
-  const authHeaders = () => ({
-    'Content-Type': 'application/json',
-  });
-
-  const fetchData = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await fetch('/api/proxy/superadmin/app-versions', {
-        headers: authHeaders(),
         cache: 'no-store',
       });
       const data = await res.json();
-      if (data.success) {
-        setReleases(data.releases || []);
-        setPolicies(data.policies || { customer: null, partner: null });
-        setAuditHistory(data.audit_history || []);
-      }
-    } catch (e) {
-      console.error('Failed to load app versions data:', e);
-      setFeedback({ tone: 'error', message: 'Failed to load app version configuration from backend.' });
+      if (!res.ok || !data.success) throw new Error(data.message);
+      setReleases(data.releases || []);
+      setPolicies(data.policies || { customer: null, partner: null });
+      setAudit(data.audit_history || []);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Deferred a tick, as on the Policy Settings page, so the fetch's state
+  // updates never run synchronously inside the effect.
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
-  // Releases filtered by active app
-  const appReleases = useMemo(() => {
-    return releases.filter((r) => r.app === currentApp);
-  }, [releases, currentApp]);
+  const retry = () => {
+    setLoading(true);
+    setLoadError(false);
+    load();
+  };
 
-  // Only published releases can be selected in active update policies
-  const publishedReleases = useMemo(() => {
-    return appReleases
-      .filter((r) => r.status === 'published')
-      .sort((a, b) => compareReleases(b.version, b.build_number, a.version, a.build_number));
-  }, [appReleases]);
+  const policy = policies[app];
 
-  // Sync form with current app's policy
-  useEffect(() => {
-    const policy = policies[currentApp];
-    const defaultLatestId = publishedReleases[0]?.id || '';
-    const defaultMinimumId = policy?.minimum_release_id || defaultLatestId;
+  /** This app's releases, newest first. */
+  const appReleases = useMemo(
+    () => releases.filter((r) => r.app === app).sort((a, b) => compareReleases(b, a)),
+    [releases, app],
+  );
+  const liveReleases = useMemo(() => appReleases.filter((r) => r.status === 'published'), [appReleases]);
+  const byId = useCallback((id: string) => appReleases.find((r) => r.id === id) || null, [appReleases]);
 
-    if (policy) {
-      const validLatest = publishedReleases.some((r) => r.id === policy.latest_release_id)
-        ? (policy.latest_release_id || '')
-        : defaultLatestId;
+  const savedLatest = policy?.latest_release_id ? byId(policy.latest_release_id) : null;
+  const savedMinimum = policy?.minimum_release_id ? byId(policy.minimum_release_id) : null;
 
-      const validMinimum = publishedReleases.some((r) => r.id === policy.minimum_release_id)
-        ? (policy.minimum_release_id || '')
-        : (validLatest || defaultMinimumId);
+  /** Put the form back to what is saved. */
+  const resetForm = useCallback(() => {
+    const live = (id: string | null | undefined) => (id && liveReleases.some((r) => r.id === id) ? id : '');
+    const latest = live(policy?.latest_release_id) || liveReleases[0]?.id || '';
+    setLatestId(latest);
+    setMinimumId(live(policy?.minimum_release_id) || latest);
+    setRule(ruleOf(policy));
+    setStartLater(Boolean(policy?.enforce_at));
+    setStartAt(toLocalInput(policy?.enforce_at ?? null));
+    setMessage(policy?.update_message || '');
+    setAndroidUrl(policy?.android_store_url || '');
+    setIosUrl(policy?.ios_store_url || '');
+    setRolloutConfirmed(false);
+  }, [policy, liveReleases]);
 
-      setFormLatestId(validLatest);
-      setFormMinimumId(validMinimum);
-      setFormUpdateMode(policy.update_mode || 'optional');
-      setFormIsEnforced(Boolean(policy.is_enforced));
-      // Format ISO datetime to YYYY-MM-DDTHH:mm for datetime-local input
-      if (policy.enforce_at) {
-        try {
-          const d = new Date(policy.enforce_at);
-          const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-          setFormEnforceAt(localIso);
-        } catch {
-          setFormEnforceAt('');
-        }
-      } else {
-        setFormEnforceAt('');
-      }
-      setFormUpdateMessage(policy.update_message || '');
-      setFormAndroidUrl(policy.android_store_url || '');
-      setFormIosUrl(policy.ios_store_url || '');
-    } else {
-      setFormLatestId(defaultLatestId);
-      setFormMinimumId(defaultLatestId);
-      setFormUpdateMode('optional');
-      setFormIsEnforced(false);
-      setFormEnforceAt('');
-      setFormUpdateMessage('');
-      setFormAndroidUrl('');
-      setFormIosUrl('');
-    }
-  }, [currentApp, policies, publishedReleases]);
+  // Re-seed the form when the app switches or a saved rule comes back from the
+  // server — during render, not in an effect, so there is no flash of stale
+  // values. New releases alone do not re-seed, so a just-recorded release can
+  // be pre-selected as latest without being overwritten.
+  const syncKey = loading ? '' : `${app}|${policy?.updated_at ?? 'none'}|${liveReleases.length > 0}`;
+  const [syncedKey, setSyncedKey] = useState('');
+  if (syncKey && syncKey !== syncedKey) {
+    setSyncedKey(syncKey);
+    resetForm();
+  }
 
-  const selectedLatest = useMemo(() => {
-    return publishedReleases.find((r) => r.id === formLatestId) || null;
-  }, [publishedReleases, formLatestId]);
+  const latest = byId(latestId);
+  const minimum = rule === 'everyone' ? latest : rule === 'minimum' ? byId(minimumId) : null;
 
-  const selectedMinimum = useMemo(() => {
-    return publishedReleases.find((r) => r.id === formMinimumId) || null;
-  }, [publishedReleases, formMinimumId]);
+  /** What the form would save — compared with the saved policy for "dirty". */
+  const payload = useMemo(
+    () => ({
+      latest_release_id: latestId,
+      // Required by the API even when nothing is blocked; it is ignored then.
+      minimum_release_id: rule === 'everyone' ? latestId : rule === 'minimum' ? minimumId : minimumId || latestId,
+      update_mode: rule === 'everyone' ? 'mandatory' : 'optional',
+      is_enforced: rule !== 'remind',
+      enforce_at: rule !== 'remind' && startLater && startAt ? new Date(startAt).toISOString() : null,
+      update_message: message.trim() || null,
+      android_store_url: cleanUrl(androidUrl),
+      ios_store_url: cleanUrl(iosUrl),
+    }),
+    [latestId, minimumId, rule, startLater, startAt, message, androidUrl, iosUrl],
+  );
 
-  // Semantic version comparison check
-  const semverMismatchError = useMemo(() => {
-    if (!selectedLatest || !selectedMinimum) return null;
-    const diff = compareReleases(
-      selectedMinimum.version,
-      selectedMinimum.build_number,
-      selectedLatest.version,
-      selectedLatest.build_number
-    );
-    if (diff > 0) {
-      return `Minimum supported version (v${selectedMinimum.version} #${selectedMinimum.build_number}) cannot be higher than the latest published version (v${selectedLatest.version} #${selectedLatest.build_number}).`;
-    }
-    return null;
-  }, [selectedLatest, selectedMinimum]);
-
-  // Missing store URL detection
-  const missingStoreUrlsWarning = useMemo(() => {
-    if (!selectedLatest) return null;
-    const effectiveAndroid = formAndroidUrl || selectedLatest.android_store_url;
-    const effectiveIos = formIosUrl || selectedLatest.ios_store_url;
-    const missing: string[] = [];
-    if (!effectiveAndroid) missing.push('Google Play Store URL');
-    if (!effectiveIos) missing.push('Apple App Store URL');
-    if (missing.length > 0) {
-      return `${missing.join(' and ')} not configured. Users redirected to update will not have a valid store link.`;
-    }
-    return null;
-  }, [selectedLatest, formAndroidUrl, formIosUrl]);
-
-  // Detect if form has unsaved modifications
   const isDirty = useMemo(() => {
-    const policy = policies[currentApp];
-    if (!policy) {
-      return Boolean(formLatestId || formMinimumId || formIsEnforced || formUpdateMessage);
-    }
-    const currentEnforceAtIso = formEnforceAt ? new Date(formEnforceAt).toISOString() : null;
-    const origEnforceAtIso = policy.enforce_at ? new Date(policy.enforce_at).toISOString() : null;
-
+    if (!policy) return Boolean(latestId);
+    const savedAt = policy.enforce_at ? new Date(policy.enforce_at).toISOString() : null;
     return (
-      formLatestId !== (policy.latest_release_id || '') ||
-      formMinimumId !== (policy.minimum_release_id || '') ||
-      formUpdateMode !== policy.update_mode ||
-      formIsEnforced !== policy.is_enforced ||
-      currentEnforceAtIso !== origEnforceAtIso ||
-      formUpdateMessage !== (policy.update_message || '') ||
-      formAndroidUrl !== (policy.android_store_url || '') ||
-      formIosUrl !== (policy.ios_store_url || '')
+      payload.latest_release_id !== (policy.latest_release_id || '') ||
+      (rule !== 'remind' && payload.minimum_release_id !== (policy.minimum_release_id || '')) ||
+      payload.update_mode !== policy.update_mode ||
+      payload.is_enforced !== policy.is_enforced ||
+      payload.enforce_at !== savedAt ||
+      payload.update_message !== (policy.update_message || null) ||
+      payload.android_store_url !== (policy.android_store_url || null) ||
+      payload.ios_store_url !== (policy.ios_store_url || null)
     );
-  }, [
-    currentApp,
-    policies,
-    formLatestId,
-    formMinimumId,
-    formUpdateMode,
-    formIsEnforced,
-    formEnforceAt,
-    formUpdateMessage,
-    formAndroidUrl,
-    formIosUrl,
-  ]);
+  }, [payload, policy, rule, latestId]);
 
-  const cleanStoreUrl = (url: string) => {
-    const trimmed = url.trim();
-    if (!trimmed) return null;
-    if (!/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(trimmed)) {
-      return `https://${trimmed}`;
-    }
-    return trimmed;
+  // Leaving the page with unsaved rule changes loses them silently otherwise.
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+
+  /* ---- validation (shown inline, also gates Save) */
+
+  const blocks = rule !== 'remind';
+  const errors: Partial<Record<'latest' | 'minimum' | 'startAt' | 'android' | 'ios' | 'rollout', string>> = {};
+  if (!latestId) errors.latest = 'Choose the newest version that is live on the store.';
+  if (rule === 'minimum' && !minimumId) errors.minimum = 'Choose the oldest version people may keep using.';
+  if (rule === 'minimum' && latest && minimum && compareReleases(minimum, latest) > 0)
+    errors.minimum = 'This cannot be newer than the latest version.';
+  if (blocks && startLater && !startAt) errors.startAt = 'Pick when blocking should start.';
+  else if (blocks && startLater && new Date(startAt) <= new Date()) errors.startAt = 'This time has already passed.';
+  if (androidUrl.trim() && !isValidUrl(androidUrl)) errors.android = 'This is not a valid link.';
+  if (iosUrl.trim() && !isValidUrl(iosUrl)) errors.ios = 'This is not a valid link.';
+  if (blocks && isDirty && !rolloutConfirmed) errors.rollout = 'Confirm the rollout before blocking anyone.';
+  const canSave = isDirty && Object.keys(errors).length === 0;
+
+  const effectiveAndroid = cleanUrl(androidUrl) || latest?.android_store_url || null;
+  const androidMismatch =
+    effectiveAndroid &&
+    /play\.google\.com/.test(effectiveAndroid) &&
+    !effectiveAndroid.includes(`id=${PLAY_PACKAGE[app]}`);
+
+  /* ---- actions */
+
+  const switchApp = async (next: AppId) => {
+    if (next === app) return;
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Discard unsaved changes?',
+        body: `Your changes to the ${APP_LABEL[app]} update rule have not been saved.`,
+        confirmLabel: 'Discard changes',
+        tone: 'danger',
+      }))
+    )
+      return;
+    setFeedback(null);
+    setApp(next);
   };
 
-  const handleSavePolicy = async () => {
-    if (!formLatestId || !formMinimumId) {
-      setFeedback({ tone: 'error', message: 'Please select both Latest and Minimum Supported releases.' });
-      return;
-    }
-    if (semverMismatchError) {
-      setFeedback({ tone: 'error', message: semverMismatchError });
-      return;
-    }
-
-    const appName = currentApp === 'customer' ? 'Customer App' : 'Partner App';
-    const confirmed = await confirm({
-      title: `Publish Update Policy for ${appName}?`,
-      body: `This will update the active policy for ${appName}. Enforcement is currently set to ${
-        formIsEnforced ? 'ENABLED (active)' : 'DISABLED'
-      }. Minimum version required: v${selectedMinimum?.version} #${selectedMinimum?.build_number}.`,
-      confirmLabel: 'Save & Publish Policy',
-      tone: 'accent',
+  const save = async () => {
+    if (!canSave || !latest) return;
+    const when = payload.enforce_at ? `From ${fmtDateTime(payload.enforce_at)}` : 'As soon as you save';
+    const summary =
+      rule === 'remind'
+        ? `People older than ${v(latest)} will see a reminder they can dismiss. Nobody is blocked.`
+        : rule === 'minimum'
+          ? `${when}, people older than ${v(minimum)} cannot use the app until they update. Others older than ${v(
+              latest,
+            )} get a reminder.`
+          : `${when}, everyone not on ${v(latest)} cannot use the app until they update.`;
+    const ok = await confirm({
+      title: `Save update rule for the ${APP_LABEL[app]}?`,
+      body: summary,
+      confirmLabel: blocks ? 'Save and start blocking' : 'Save rule',
+      tone: blocks ? 'danger' : 'accent',
     });
+    if (!ok) return;
 
-    if (!confirmed) return;
-
+    setSaving(true);
+    setFeedback(null);
     try {
-      setSavingPolicy(true);
-      setFeedback(null);
-
-      const payload = {
-        latest_release_id: formLatestId,
-        minimum_release_id: formMinimumId,
-        update_mode: formUpdateMode,
-        is_enforced: formIsEnforced,
-        enforce_at: formEnforceAt ? new Date(formEnforceAt).toISOString() : null,
-        update_message: formUpdateMessage.trim() || null,
-        android_store_url: cleanStoreUrl(formAndroidUrl),
-        ios_store_url: cleanStoreUrl(formIosUrl),
-      };
-
-      const res = await fetch(`/api/proxy/superadmin/app-versions/policies/${currentApp}`, {
+      const res = await fetch(`/api/proxy/superadmin/app-versions/policies/${app}`, {
         method: 'PUT',
-        headers: authHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
         body: JSON.stringify(payload),
       });
-
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to save update policy.');
-      }
-
+      if (!res.ok || !data.success) throw new Error(firstError(data) || 'Could not save the update rule.');
       setFeedback({
         tone: 'success',
-        message: `${appName} update policy saved successfully. Cache has been invalidated.`,
+        message: `${APP_LABEL[app]} update rule saved. Apps pick it up within a few minutes.`,
       });
-      fetchData();
-    } catch (err: any) {
-      setFeedback({ tone: 'error', message: err.message || 'Error saving update policy.' });
-    } finally {
-      setSavingPolicy(false);
-    }
-  };
-
-  const openCreateReleaseModal = () => {
-    setEditingRelease(null);
-    setModalVersion('');
-    setModalBuildNumber('');
-    setModalReleasedAt(new Date().toISOString().slice(0, 10));
-    setModalStatus('published');
-    setModalAndroidUrl('');
-    setModalIosUrl('');
-    setModalNotes('');
-    setIsReleaseModalOpen(true);
-  };
-
-  const openEditReleaseModal = (r: Release) => {
-    setEditingRelease(r);
-    setModalVersion(r.version);
-    setModalBuildNumber(String(r.build_number));
-    setModalReleasedAt(r.released_at ? r.released_at.slice(0, 10) : '');
-    setModalStatus(r.status);
-    setModalAndroidUrl(r.android_store_url || '');
-    setModalIosUrl(r.ios_store_url || '');
-    setModalNotes(r.release_notes || '');
-    setIsReleaseModalOpen(true);
-  };
-
-  const handleSaveRelease = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modalVersion.trim() || !modalBuildNumber.trim()) {
-      setFeedback({ tone: 'error', message: 'Version and Build Number are required.' });
-      return;
-    }
-
-    try {
-      setSubmittingRelease(true);
-      setFeedback(null);
-
-      const payload = {
-        app: currentApp,
-        version: modalVersion.trim().replace(/^v/i, ''),
-        build_number: parseInt(modalBuildNumber, 10),
-        released_at: modalReleasedAt ? new Date(modalReleasedAt).toISOString() : null,
-        status: modalStatus,
-        android_store_url: cleanStoreUrl(modalAndroidUrl),
-        ios_store_url: cleanStoreUrl(modalIosUrl),
-        release_notes: modalNotes.trim() || null,
-      };
-
-      const url = editingRelease
-        ? `/api/proxy/superadmin/app-versions/releases/${editingRelease.id}`
-        : '/api/proxy/superadmin/app-versions/releases';
-
-      const method = editingRelease ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: authHeaders(),
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to save release.');
-      }
-
-      setIsReleaseModalOpen(false);
+      await load();
+    } catch (e) {
       setFeedback({
-        tone: 'success',
-        message: editingRelease
-          ? `Release v${payload.version} updated successfully.`
-          : `Release v${payload.version} registered successfully.`,
+        tone: 'error',
+        message: e instanceof Error ? e.message : 'Could not save the update rule.',
       });
-      fetchData();
-    } catch (err: any) {
-      setFeedback({ tone: 'error', message: err.message || 'Error saving release.' });
     } finally {
-      setSubmittingRelease(false);
+      setSaving(false);
     }
   };
 
-  const activePolicy = policies[currentApp];
+  const openNewRelease = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+
+  /* ---- render */
 
   return (
-    <div className={styles.container}>
+    <div className={styles.page}>
       <PageHeader
-        eyebrow="Platform Maintenance"
-        title="App Version Management"
-        subtitle="Manage releases, store distribution links, and control server-side force updates for BookALook mobile apps."
+        eyebrow="Platform"
+        title="App Versions"
+        subtitle="Record each app release and decide what people on older versions see: a reminder, or a block until they update."
         actions={
-          <Button variant="primary" icon="plus" onClick={openCreateReleaseModal}>
-            Register New Release
+          <Button variant="primary" icon="plus" onClick={openNewRelease} disabled={loading || loadError}>
+            New release
           </Button>
         }
       />
+
+      <div className={styles.switchRow}>
+        <Segmented
+          ariaLabel="Choose app"
+          value={app}
+          onChange={switchApp}
+          options={(['customer', 'partner'] as AppId[]).map((id) => ({
+            value: id,
+            label: (
+              <span className={styles.segLabel}>
+                {APP_LABEL[id]}
+                {!loading && <RuleDot rule={ruleOf(policies[id])} active={policies[id]?.is_active} />}
+              </span>
+            ),
+          }))}
+        />
+        {policy?.updated_at && (
+          <span className={styles.metaNote}>
+            Rule last changed {timeAgo(policy.updated_at)}
+            {policy.updated_by ? ` by ${policy.updated_by}` : ''}
+          </span>
+        )}
+      </div>
 
       {feedback && (
         <Alert tone={feedback.tone} onClose={() => setFeedback(null)}>
@@ -442,615 +468,848 @@ export default function AppVersionsPage() {
         </Alert>
       )}
 
-      {/* App Selector Tabs */}
-      <div className={styles.topBar}>
-        <div className={styles.appSelector}>
-          <Segmented
-            ariaLabel="Select Application"
-            value={currentApp}
-            onChange={(val) => setCurrentApp(val as AppId)}
-            options={[
-              { value: 'customer', label: 'Customer App' },
-              { value: 'partner', label: 'Partner App' },
-            ]}
-          />
-        </div>
-      </div>
-
-      {loading ? (
+      {loadError ? (
         <Card padded>
-          <Skeleton height={200} />
+          <EmptyState
+            icon="alert"
+            title="Could not load app versions"
+            hint="The server did not respond. Check your connection and try again."
+            action={
+              <Button icon="refresh" onClick={retry}>
+                Try again
+              </Button>
+            }
+          />
         </Card>
       ) : (
-        <div className={styles.grid}>
-          {/* Active Policy Settings */}
-          <Card
-            title={`Active Update Policy — ${currentApp === 'customer' ? 'Customer App' : 'Partner App'}`}
-            subtitle="Define minimum supported version, update mode, and automated server-side enforcement."
-            actions={
-              <Button variant="ghost" size="sm" icon="plus" onClick={openCreateReleaseModal}>
-                Register Release
-              </Button>
-            }
-            padded
-          >
-            <div className={styles.policyCard}>
-              {/* Status Banner */}
-              <div
-                className={`${styles.statusBanner} ${
-                  formIsEnforced ? styles.statusActive : styles.statusDisabled
-                }`}
-              >
-                <div className={styles.statusInfo}>
-                  <Badge tone={formIsEnforced ? 'success' : 'neutral'} pulse={formIsEnforced}>
-                    {formIsEnforced ? 'ENFORCEMENT ENABLED' : 'ENFORCEMENT DISABLED'}
-                  </Badge>
-                  <div>
-                    <div className={styles.statusTitle}>
-                      {formIsEnforced
-                        ? formEnforceAt && new Date(formEnforceAt) > new Date()
-                          ? `Scheduled: Starts ${new Date(formEnforceAt).toLocaleString()}`
-                          : 'Blocking Outdated Clients (HTTP 426)'
-                        : 'Updates are non-blocking'}
-                    </div>
-                    <div className={styles.statusDesc}>
-                      {activePolicy?.updated_by
-                        ? `Last updated by ${activePolicy.updated_by} on ${new Date(
-                            activePolicy.updated_at || ''
-                          ).toLocaleDateString()}`
-                        : 'No prior update recorded.'}
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <>
+          {/* ---------- current state at a glance */}
+          <div className={styles.stats}>
+            <StatCard
+              loading={loading}
+              label="Latest version"
+              icon="smartphone"
+              value={savedLatest ? v(savedLatest) : 'Not set'}
+              sub={
+                savedLatest
+                  ? `Build ${savedLatest.build_number} · ${fmtDate(savedLatest.released_at)}`
+                  : 'Register your first release'
+              }
+            />
+            <StatCard
+              loading={loading}
+              label="What older versions see"
+              icon={ruleOf(policy) === 'remind' ? 'bell' : 'alert'}
+              tone={ruleOf(policy) === 'remind' ? 'info' : policy?.is_active ? 'danger' : 'warning'}
+              value={
+                !policy
+                  ? 'Nothing yet'
+                  : ruleOf(policy) === 'remind'
+                    ? 'Reminder'
+                    : policy.is_active
+                      ? 'Blocked'
+                      : 'Block scheduled'
+              }
+              sub={
+                !policy
+                  ? 'No rule saved'
+                  : ruleOf(policy) === 'remind'
+                    ? 'Nobody is blocked'
+                    : !policy.is_active && policy.enforce_at
+                      ? `Starts ${fmtDateTime(policy.enforce_at)}`
+                      : `Below ${v(savedMinimum)} must update`
+              }
+            />
+            <StatCard
+              loading={loading}
+              label="Play Store link"
+              icon="external"
+              tone={policy?.resolved_android_url ? 'success' : 'warning'}
+              value={policy?.resolved_android_url ? 'Set' : 'Missing'}
+              sub={
+                policy?.resolved_android_url ? (
+                  <a href={policy.resolved_android_url} target="_blank" rel="noreferrer" className={styles.statLink}>
+                    Open listing
+                  </a>
+                ) : (
+                  'The Update button has nowhere to go'
+                )
+              }
+            />
+          </div>
 
-              {/* Version Selectors */}
-              <div className={styles.formGrid}>
-                {publishedReleases.length === 0 && (
-                  <div className={styles.fullCol}>
-                    <Alert tone="warning">
-                      No published releases found for {currentApp === 'customer' ? 'Customer App' : 'Partner App'}.{' '}
+          {loading ? (
+            <Card padded>
+              <Skeleton height={320} />
+            </Card>
+          ) : liveReleases.length === 0 ? (
+            <Card padded>
+              <EmptyState
+                icon="smartphone"
+                title={`No live ${APP_LABEL[app]} release yet`}
+                hint="Record the version that is on the Play Store (for example 1.0.0, build 1) and mark it Live. Then you can set the update rule."
+                action={
+                  <Button variant="primary" icon="plus" onClick={openNewRelease}>
+                    Record a release
+                  </Button>
+                }
+              />
+            </Card>
+          ) : (
+            <div className={styles.grid}>
+              {/* ---------- the rule */}
+              <Card title="Update rule" subtitle={`What ${APP_LABEL[app]} users on older versions experience.`}>
+                <div className={styles.form}>
+                  <section className={styles.step}>
+                    <StepHead
+                      n={1}
+                      title="Latest version"
+                      hint="The newest version that is live on the Play Store for everyone."
+                    />
+                    <Field label="Version" hint={errors.latest}>
+                      <select className="control" value={latestId} onChange={(e) => setLatestId(e.target.value)}>
+                        {liveReleases.map((r, i) => (
+                          <option key={r.id} value={r.id}>
+                            {v(r)} · build {r.build_number}
+                            {i === 0 ? ' · newest' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {liveReleases[0] && latestId && liveReleases[0].id !== latestId && (
                       <button
                         type="button"
-                        onClick={openCreateReleaseModal}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--accent-color, #7c3aed)',
-                          textDecoration: 'underline',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          padding: 0,
-                          font: 'inherit',
-                        }}
+                        className={styles.inlineNudge}
+                        onClick={() => setLatestId(liveReleases[0].id)}
                       >
-                        Click here to register a release
-                      </button>{' '}
-                      to enable version selection and update enforcement.
-                    </Alert>
-                  </div>
-                )}
+                        <Icon name="arrowUp" size={14} /> {v(liveReleases[0])} is newer — use it
+                      </button>
+                    )}
+                  </section>
 
-                <Field
-                  label="Latest Published Release"
-                  hint="The most recent release available to end users."
-                >
-                  <select
-                    className="control"
-                    value={formLatestId}
-                    onChange={(e) => setFormLatestId(e.target.value)}
-                  >
-                    <option value="">
-                      {publishedReleases.length === 0
-                        ? '— No published releases registered —'
-                        : '— Select Latest Release —'}
-                    </option>
-                    {publishedReleases.map((r, idx) => (
-                      <option key={r.id} value={r.id}>
-                        v{r.version} (Build #{r.build_number}) {idx === 0 ? '— Newest' : ''} ({r.released_at ? r.released_at.slice(0, 10) : 'Active'})
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field
-                  label="Minimum Supported Version"
-                  hint="Clients older than this build will be required to update."
-                >
-                  <select
-                    className="control"
-                    value={formMinimumId}
-                    onChange={(e) => setFormMinimumId(e.target.value)}
-                  >
-                    <option value="">
-                      {publishedReleases.length === 0
-                        ? '— No published releases registered —'
-                        : '— Select Minimum Release —'}
-                    </option>
-                    {publishedReleases.map((r, idx) => (
-                      <option key={r.id} value={r.id}>
-                        v{r.version} (Build #{r.build_number}) {idx === 0 ? '— Newest' : ''} ({r.released_at ? r.released_at.slice(0, 10) : 'Active'})
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                {semverMismatchError && (
-                  <div className={styles.fullCol}>
-                    <Alert tone="error">{semverMismatchError}</Alert>
-                  </div>
-                )}
-
-                <Field label="Update Mode" hint="Optional encourages updates; Mandatory blocks usage.">
-                  <select
-                    className="control"
-                    value={formUpdateMode}
-                    onChange={(e) => setFormUpdateMode(e.target.value as any)}
-                  >
-                    <option value="optional">Optional (Soft Prompt)</option>
-                    <option value="mandatory">Mandatory (Hard Enforce)</option>
-                  </select>
-                </Field>
-
-                <Field
-                  label="Scheduled Enforcement Date & Time (Optional)"
-                  hint="Leave empty for immediate enforcement."
-                >
-                  <input
-                    type="datetime-local"
-                    className="control"
-                    value={formEnforceAt}
-                    onChange={(e) => setFormEnforceAt(e.target.value)}
-                  />
-                </Field>
-
-                {/* Enforcement Toggle */}
-                <div className={`${styles.fullCol} ${styles.toggleRow}`}>
-                  <div>
-                    <div className={styles.toggleLabel}>Enable Server-Side Enforcement</div>
-                    <div className={styles.toggleHint}>
-                      When enabled, API requests from clients below minimum version return HTTP 426 Upgrade Required.
+                  <section className={styles.step}>
+                    <StepHead
+                      n={2}
+                      title="People on older versions"
+                      hint="Only block when you must: a security or payment bug, or a backend change old versions cannot handle."
+                    />
+                    <div className={styles.choices} role="radiogroup" aria-label="What people on older versions see">
+                      <Choice
+                        checked={rule === 'remind'}
+                        onSelect={() => setRule('remind')}
+                        icon="bell"
+                        tone="info"
+                        title="Remind them"
+                        body={`A “New version available” popup they can dismiss. Nobody is blocked.`}
+                        tag="Recommended"
+                      />
+                      <Choice
+                        checked={rule === 'minimum'}
+                        onSelect={() => setRule('minimum')}
+                        icon="alert"
+                        tone="warning"
+                        title="Block very old versions"
+                        body="Versions older than the one you choose stop working until updated. Everyone else gets the reminder."
+                      />
+                      <Choice
+                        checked={rule === 'everyone'}
+                        onSelect={() => setRule('everyone')}
+                        icon="userX"
+                        tone="danger"
+                        title="Everyone must update"
+                        body={`Anyone not on ${v(latest)} sees a full-screen update screen and cannot use the app.`}
+                      />
                     </div>
-                  </div>
-                  <label className={styles.switch}>
-                    <input
-                      type="checkbox"
-                      checked={formIsEnforced}
-                      onChange={(e) => setFormIsEnforced(e.target.checked)}
-                    />
-                    <span className={styles.slider} />
-                  </label>
-                </div>
 
-                {/* Store URLs */}
-                <Field
-                  label="Android Store URL"
-                  hint="Play Store link. Defaults to latest release URL if left blank."
-                >
-                  <input
-                    type="url"
-                    className="control"
-                    placeholder="https://play.google.com/store/apps/details?id=..."
-                    value={formAndroidUrl}
-                    onChange={(e) => setFormAndroidUrl(e.target.value)}
-                  />
-                </Field>
+                    {rule === 'minimum' && (
+                      <Field
+                        label="Oldest version still allowed"
+                        hint={errors.minimum || 'Anything older than this is blocked.'}
+                        className={errors.minimum ? styles.fieldError : undefined}
+                      >
+                        <select className="control" value={minimumId} onChange={(e) => setMinimumId(e.target.value)}>
+                          {liveReleases
+                            .filter((r) => !latest || compareReleases(r, latest) <= 0)
+                            .map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {v(r)} · build {r.build_number}
+                                {r.id === latestId ? ' · same as latest' : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </Field>
+                    )}
 
-                <Field
-                  label="iOS App Store URL"
-                  hint="App Store link. Defaults to latest release URL if left blank."
-                >
-                  <input
-                    type="url"
-                    className="control"
-                    placeholder="https://apps.apple.com/app/..."
-                    value={formIosUrl}
-                    onChange={(e) => setFormIosUrl(e.target.value)}
-                  />
-                </Field>
-
-                {/* Update Message */}
-                <div className={styles.fullCol}>
-                  <Field
-                    label="User-Facing Update Message"
-                    hint="Message displayed on the update screen or dialog when the user opens an outdated app."
-                  >
-                    <textarea
-                      rows={3}
-                      className="control"
-                      placeholder="A new version with important speed improvements and security updates is now available."
-                      value={formUpdateMessage}
-                      onChange={(e) => setFormUpdateMessage(e.target.value)}
-                    />
-                  </Field>
-                </div>
-
-                {/* Store URL warning if missing */}
-                {missingStoreUrlsWarning && (
-                  <div className={styles.fullCol}>
-                    <div className={styles.warningBox}>
-                      <Icon name="alert" size={18} />
-                      <div>
-                        <strong>Store URL Notice:</strong>
-                        <div>{missingStoreUrlsWarning}</div>
+                    {blocks && (
+                      <div className={styles.blockOptions}>
+                        <div className={styles.startChoice} role="radiogroup" aria-label="When blocking starts">
+                          <span className={styles.subLabel}>Start blocking</span>
+                          <Segmented
+                            ariaLabel="When blocking starts"
+                            value={startLater ? 'later' : 'now'}
+                            onChange={(val) => setStartLater(val === 'later')}
+                            options={[
+                              { value: 'now', label: 'As soon as I save' },
+                              { value: 'later', label: 'At a set time' },
+                            ]}
+                          />
+                        </div>
+                        {startLater && (
+                          <Field
+                            label="Blocking starts at"
+                            hint={
+                              errors.startAt || 'Until then, everyone gets the reminder. 2–3 days of warning is kind.'
+                            }
+                            className={errors.startAt ? styles.fieldError : undefined}
+                          >
+                            <input
+                              type="datetime-local"
+                              className="control"
+                              value={startAt}
+                              onChange={(e) => setStartAt(e.target.value)}
+                            />
+                          </Field>
+                        )}
+                        {isDirty && (
+                          <label className={cx(styles.rolloutCheck, errors.rollout && styles.rolloutCheckOpen)}>
+                            <input
+                              type="checkbox"
+                              checked={rolloutConfirmed}
+                              onChange={(e) => setRolloutConfirmed(e.target.checked)}
+                            />
+                            <span>
+                              <strong>{v(latest)} is live for 100% of users on Google Play.</strong>
+                              <span className={styles.rolloutHint}>
+                                If the staged rollout has not finished, blocked people tap Update and Play has nothing
+                                to give them — they are locked out.
+                              </span>
+                            </span>
+                          </label>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    )}
+                  </section>
 
-              {/* Action Bar */}
-              <div className={styles.actionsBar}>
-                <Button
-                  variant="primary"
-                  loading={savingPolicy}
-                  disabled={!isDirty || Boolean(semverMismatchError)}
-                  onClick={handleSavePolicy}
+                  <section className={styles.step}>
+                    <StepHead n={3} title="Message and store links" hint="Shown on the update popup and screen." />
+                    <Field
+                      label="Message to users (optional)"
+                      hint={`${message.length}/200 · Leave blank for the default wording.`}
+                    >
+                      <textarea
+                        rows={2}
+                        maxLength={200}
+                        className="control"
+                        placeholder="A new version with faster booking and important fixes is ready."
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                      />
+                    </Field>
+                    <Field
+                      label="Play Store link"
+                      className={errors.android ? styles.fieldError : undefined}
+                      hint={
+                        errors.android ||
+                        (androidMismatch
+                          ? `This link is not for ${PLAY_PACKAGE[app]} — the ${APP_LABEL[app]}'s package.`
+                          : !androidUrl && latest?.android_store_url
+                            ? `Blank uses the link saved on ${v(latest)}.`
+                            : 'Where the Update button sends Android users.')
+                      }
+                    >
+                      <div className={styles.inputWithAction}>
+                        <input
+                          type="url"
+                          className="control"
+                          placeholder={playUrl(app)}
+                          value={androidUrl}
+                          onChange={(e) => setAndroidUrl(e.target.value)}
+                        />
+                        {androidUrl !== playUrl(app) && (
+                          <Button size="sm" variant="secondary" onClick={() => setAndroidUrl(playUrl(app))}>
+                            Use {APP_LABEL[app]} link
+                          </Button>
+                        )}
+                      </div>
+                    </Field>
+                    <Field
+                      label="App Store link (iPhone)"
+                      className={errors.ios ? styles.fieldError : undefined}
+                      hint={errors.ios || 'Leave blank until the iPhone app is published.'}
+                    >
+                      <input
+                        type="url"
+                        className="control"
+                        placeholder="https://apps.apple.com/in/app/…"
+                        value={iosUrl}
+                        onChange={(e) => setIosUrl(e.target.value)}
+                      />
+                    </Field>
+                  </section>
+                </div>
+
+                <div className={cx(styles.saveBar, isDirty && styles.saveBarDirty)}>
+                  <span className={styles.saveState}>
+                    {isDirty ? (
+                      <>
+                        <span className={styles.dirtyDot} /> Unsaved changes
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="checkCircle" size={15} /> Saved
+                      </>
+                    )}
+                  </span>
+                  <div className={styles.saveActions}>
+                    {isDirty && (
+                      <Button variant="ghost" onClick={resetForm} disabled={saving}>
+                        Discard
+                      </Button>
+                    )}
+                    <Button variant={blocks ? 'danger' : 'primary'} loading={saving} disabled={!canSave} onClick={save}>
+                      {blocks ? 'Save and block' : 'Save rule'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* ---------- consequences + how-to */}
+              <div className={styles.side}>
+                <Card
+                  title="Who sees what"
+                  subtitle={isDirty ? 'Preview of your unsaved changes.' : 'With the rule as saved.'}
+                  padded
                 >
-                  Save & Publish Policy
+                  <ImpactPreview
+                    rule={rule}
+                    latest={latest}
+                    minimum={minimum}
+                    startsAt={blocks && startLater && startAt ? new Date(startAt).toISOString() : null}
+                  />
+                </Card>
+
+                <Card title="Releasing a new version" padded>
+                  <ol className={styles.checklist}>
+                    <li>
+                      Bump <code>version</code> in <code>pubspec.yaml</code> — the build number after <code>+</code>{' '}
+                      must go up every upload.
+                    </li>
+                    <li>Upload to Play internal testing and check it on a phone.</li>
+                    <li>Promote to production as a staged rollout: 10% → 50% → 100%.</li>
+                    <li>
+                      At 100%, click <strong>New release</strong> here, mark it Live, and choose it as the latest
+                      version.
+                    </li>
+                    <li>Block older versions only if you have to, ideally with a few days’ notice.</li>
+                  </ol>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* ---------- releases */}
+          {!loading && appReleases.length > 0 && (
+            <Card
+              title="Releases"
+              subtitle={`${appReleases.length} recorded · ${liveReleases.length} live`}
+              actions={
+                <Button size="sm" icon="plus" onClick={openNewRelease}>
+                  New release
                 </Button>
+              }
+            >
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Version</th>
+                      <th>Status</th>
+                      <th>Released</th>
+                      <th>What’s new</th>
+                      <th aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appReleases.map((r) => {
+                      const isLatest = savedLatest?.id === r.id;
+                      const isMin = ruleOf(policy) === 'minimum' && savedMinimum?.id === r.id;
+                      return (
+                        <tr key={r.id} className={r.status === 'retired' ? styles.rowMuted : undefined}>
+                          <td>
+                            <div className={styles.versionCell}>
+                              <span className={styles.version}>{v(r)}</span>
+                              <span className={styles.build}>build {r.build_number}</span>
+                            </div>
+                            {(isLatest || isMin) && (
+                              <div className={styles.rowBadges}>
+                                {isLatest && <Badge tone="accent">Latest</Badge>}
+                                {isMin && <Badge tone="warning">Oldest allowed</Badge>}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <Badge tone={STATUS_META[r.status].tone}>{STATUS_META[r.status].label}</Badge>
+                          </td>
+                          <td className={styles.nowrap}>{fmtDate(r.released_at)}</td>
+                          <td className={styles.notesCell}>
+                            {r.release_notes ? (
+                              <span title={r.release_notes}>{r.release_notes}</span>
+                            ) : (
+                              <span className={styles.muted}>—</span>
+                            )}
+                          </td>
+                          <td className={styles.actionsCell}>
+                            {r.status === 'published' && latestId !== r.id && compareReleases(r, latest || r) > 0 && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setLatestId(r.id);
+                                  window.scrollTo({
+                                    top: 0,
+                                    behavior: 'smooth',
+                                  });
+                                }}
+                              >
+                                Make latest
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              icon="edit"
+                              onClick={() => {
+                                setEditing(r);
+                                setModalOpen(true);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
-          {/* Quick Summary / Status */}
-          <Card
-            title="App Distribution Status"
-            subtitle="Platform configuration overview."
-            padded
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Target Application
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4 }}>
-                  {currentApp === 'customer' ? 'Customer App' : 'Partner App'}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Active Minimum Version
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
-                  {activePolicy?.minimum_release ? (
-                    <>
-                      v{activePolicy.minimum_release.version} (Build #{activePolicy.minimum_release.build_number})
-                    </>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Not configured yet</span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Active Latest Version
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
-                  {activePolicy?.latest_release ? (
-                    <>
-                      v{activePolicy.latest_release.version} (Build #{activePolicy.latest_release.build_number})
-                    </>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Not configured yet</span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Resolved Store URLs
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-                  <div className={styles.urlPill} title={activePolicy?.resolved_android_url || 'Missing'}>
-                    <Icon name="smartphone" size={13} />
-                    Android:{' '}
-                    {activePolicy?.resolved_android_url ? (
-                      <a href={activePolicy.resolved_android_url} target="_blank" rel="noreferrer">
-                        {activePolicy.resolved_android_url}
-                      </a>
-                    ) : (
-                      'None'
-                    )}
-                  </div>
-                  <div className={styles.urlPill} title={activePolicy?.resolved_ios_url || 'Missing'}>
-                    <Icon name="smartphone" size={13} />
-                    iOS:{' '}
-                    {activePolicy?.resolved_ios_url ? (
-                      <a href={activePolicy.resolved_ios_url} target="_blank" rel="noreferrer">
-                        {activePolicy.resolved_ios_url}
-                      </a>
-                    ) : (
-                      'None'
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Registered Releases
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>
-                  {appReleases.length} Total ({publishedReleases.length} Published)
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+          {/* ---------- history */}
+          {!loading && audit.length > 0 && (
+            <Card title="Activity" subtitle="Changes to releases and update rules, newest first." padded>
+              <ul className={styles.timeline}>
+                {(showAllAudit ? audit : audit.slice(0, 6)).map((item) => (
+                  <li key={item.id} className={styles.timelineItem}>
+                    <span className={styles.timelineDot} />
+                    <div className={styles.timelineBody}>
+                      <span className={styles.timelineText}>{item.label}</span>
+                      <span className={styles.timelineMeta} title={fmtDateTime(item.created_at)}>
+                        {item.actor} · {timeAgo(item.created_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {audit.length > 6 && (
+                <Button variant="ghost" size="sm" onClick={() => setShowAllAudit((s) => !s)}>
+                  {showAllAudit ? 'Show less' : `Show all ${audit.length}`}
+                </Button>
+              )}
+            </Card>
+          )}
+        </>
       )}
 
-      {/* Release Registry Section */}
-      <Card
-        title={`Release Registry — ${currentApp === 'customer' ? 'Customer App' : 'Partner App'}`}
-        subtitle="Historical catalog of all registered app binaries and release notes."
-        actions={
-          <Button variant="secondary" size="sm" icon="plus" onClick={openCreateReleaseModal}>
-            Register Release
-          </Button>
-        }
-      >
-        {appReleases.length === 0 ? (
-          <EmptyState
-            icon="smartphone"
-            title="No releases registered yet"
-            hint={`Register your first release for the ${
-              currentApp === 'customer' ? 'Customer' : 'Partner'
-            } App to populate update policies.`}
-            action={
-              <Button variant="primary" icon="plus" onClick={openCreateReleaseModal}>
-                Register Release
-              </Button>
+      {modalOpen && (
+        <ReleaseModal
+          key={editing?.id ?? 'new'}
+          app={app}
+          editing={editing}
+          releases={appReleases}
+          onClose={() => setModalOpen(false)}
+          onSaved={async (msg, savedRelease) => {
+            setModalOpen(false);
+            setFeedback({ tone: 'success', message: msg });
+            await load();
+            // A newer live release is almost always the next "latest" — offer it
+            // in the form rather than making the admin hunt for it.
+            if (
+              savedRelease &&
+              savedRelease.status === 'published' &&
+              (!latest || compareReleases(savedRelease, latest) > 0)
+            ) {
+              setLatestId(savedRelease.id);
             }
-          />
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Version</th>
-                  <th>Build #</th>
-                  <th>Release Date</th>
-                  <th>Status</th>
-                  <th>Store Links</th>
-                  <th>Release Notes</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {appReleases.map((r) => {
-                  const isCurrentLatest = activePolicy?.latest_release_id === r.id;
-                  const isCurrentMinimum = activePolicy?.minimum_release_id === r.id;
-                  return (
-                    <tr key={r.id}>
-                      <td>
-                        <div className={styles.versionBadge}>v{r.version}</div>
-                        {(isCurrentLatest || isCurrentMinimum) && (
-                          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                            {isCurrentLatest && <Badge tone="accent">Latest</Badge>}
-                            {isCurrentMinimum && <Badge tone="warning">Min Supported</Badge>}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={styles.buildNum}>#{r.build_number}</span>
-                      </td>
-                      <td>
-                        {r.released_at ? new Date(r.released_at).toLocaleDateString() : '—'}
-                      </td>
-                      <td>
-                        <Badge
-                          tone={
-                            r.status === 'published'
-                              ? 'success'
-                              : r.status === 'draft'
-                              ? 'neutral'
-                              : 'danger'
-                          }
-                        >
-                          {r.status.toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          {r.android_store_url && (
-                            <a
-                              href={r.android_store_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Android Store URL"
-                              style={{ color: 'var(--accent-color)' }}
-                            >
-                              Android
-                            </a>
-                          )}
-                          {r.ios_store_url && (
-                            <a
-                              href={r.ios_store_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="iOS App Store URL"
-                              style={{ color: 'var(--accent-color)' }}
-                            >
-                              iOS
-                            </a>
-                          )}
-                          {!r.android_store_url && !r.ios_store_url && (
-                            <span style={{ color: 'var(--text-muted)' }}>None</span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ maxWidth: 260 }}>
-                        <div
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            color: 'var(--text-muted)',
-                          }}
-                          title={r.release_notes || ''}
-                        >
-                          {r.release_notes || '—'}
-                        </div>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon="edit"
-                          onClick={() => openEditReleaseModal(r)}
-                        >
-                          Edit
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {/* Audit History Card */}
-      <Card
-        title="Version Management Audit Trail"
-        subtitle="Recent administrative changes to app releases and force update policies."
-        padded
-        className={styles.auditLogCard}
-      >
-        {auditHistory.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No audit records found yet.</div>
-        ) : (
-          <div>
-            {auditHistory.map((item) => (
-              <div key={item.id} className={styles.auditItem}>
-                <div>
-                  <div className={styles.auditActor}>{item.label}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
-                    Triggered by <strong>{item.actor}</strong>
-                  </div>
-                </div>
-                <div className={styles.auditTime}>
-                  {new Date(item.created_at).toLocaleString()}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Register / Edit Release Modal */}
-      <Modal
-        open={isReleaseModalOpen}
-        onClose={() => setIsReleaseModalOpen(false)}
-        title={editingRelease ? `Edit Release v${editingRelease.version}` : 'Register New Release'}
-        description={`Configure version details and download URLs for ${
-          currentApp === 'customer' ? 'Customer App' : 'Partner App'
-        }.`}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setIsReleaseModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              loading={submittingRelease}
-              onClick={handleSaveRelease}
-            >
-              {editingRelease ? 'Update Release' : 'Register Release'}
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleSaveRelease} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className={styles.formGrid}>
-            <Field label="Version String" hint="e.g. 2.4.0">
-              <input
-                type="text"
-                required
-                className="control"
-                placeholder="2.4.0"
-                value={modalVersion}
-                onChange={(e) => setModalVersion(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Numeric Build Number" hint="e.g. 42">
-              <input
-                type="number"
-                min="1"
-                required
-                className="control"
-                placeholder="42"
-                value={modalBuildNumber}
-                onChange={(e) => setModalBuildNumber(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Release Date">
-              <input
-                type="date"
-                className="control"
-                value={modalReleasedAt}
-                onChange={(e) => setModalReleasedAt(e.target.value)}
-              />
-            </Field>
-
-            <Field label="Release Status">
-              <select
-                className="control"
-                value={modalStatus}
-                onChange={(e) => setModalStatus(e.target.value as any)}
-              >
-                <option value="draft">Draft (Internal Testing)</option>
-                <option value="published">Published (Available in Store)</option>
-                <option value="retired">Retired (Deprecated)</option>
-              </select>
-            </Field>
-
-            <div className={styles.fullCol}>
-              <Field label="Android Store / APK URL (Optional)">
-                <input
-                  type="url"
-                  className="control"
-                  placeholder="https://play.google.com/store/apps/details?id=in.bookalook.app"
-                  value={modalAndroidUrl}
-                  onChange={(e) => setModalAndroidUrl(e.target.value)}
-                />
-              </Field>
-            </div>
-
-            <div className={styles.fullCol}>
-              <Field label="iOS App Store URL (Optional)">
-                <input
-                  type="url"
-                  className="control"
-                  placeholder="https://apps.apple.com/app/bookalook/id123456789"
-                  value={modalIosUrl}
-                  onChange={(e) => setModalIosUrl(e.target.value)}
-                />
-              </Field>
-            </div>
-
-            <div className={styles.fullCol}>
-              <Field label="Release Notes (Optional)">
-                <textarea
-                  rows={3}
-                  className="control"
-                  placeholder="Describe bug fixes, new features, or optimizations included in this build."
-                  value={modalNotes}
-                  onChange={(e) => setModalNotes(e.target.value)}
-                />
-              </Field>
-            </div>
-          </div>
-        </form>
-      </Modal>
+          }}
+        />
+      )}
 
       {confirmDialog}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ pieces */
+
+function firstError(data: { message?: string; errors?: Record<string, string[]> }) {
+  const fieldErr = data.errors && Object.values(data.errors)[0]?.[0];
+  return fieldErr || data.message;
+}
+
+function RuleDot({ rule, active }: { rule: Rule; active?: boolean }) {
+  const cls = rule === 'remind' ? styles.dotInfo : active ? styles.dotDanger : styles.dotWarning;
+  const label = rule === 'remind' ? 'Reminder only' : active ? 'Blocking older versions' : 'Blocking scheduled';
+  return <span className={cx(styles.ruleDot, cls)} title={label} aria-label={label} />;
+}
+
+function StepHead({ n, title, hint }: { n: number; title: string; hint: string }) {
+  return (
+    <div className={styles.stepHead}>
+      <span className={styles.stepNum}>{n}</span>
+      <div>
+        <div className={styles.stepTitle}>{title}</div>
+        <div className={styles.stepHint}>{hint}</div>
+      </div>
+    </div>
+  );
+}
+
+function Choice({
+  checked,
+  onSelect,
+  icon,
+  tone,
+  title,
+  body,
+  tag,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  icon: IconName;
+  tone: 'info' | 'warning' | 'danger';
+  title: string;
+  body: string;
+  tag?: string;
+}) {
+  return (
+    <label className={cx(styles.choice, checked && styles.choiceOn, checked && styles[`choice_${tone}`])}>
+      <input type="radio" name="update-rule" checked={checked} onChange={onSelect} className={styles.srOnly} />
+      <span className={cx(styles.choiceIcon, styles[`tone_${tone}`])}>
+        <Icon name={icon} size={18} />
+      </span>
+      <span className={styles.choiceText}>
+        <span className={styles.choiceTitle}>
+          {title}
+          {tag && <span className={styles.choiceTag}>{tag}</span>}
+        </span>
+        <span className={styles.choiceBody}>{body}</span>
+      </span>
+      <span className={styles.choiceRadio} aria-hidden />
+    </label>
+  );
+}
+
+function ImpactPreview({
+  rule,
+  latest,
+  minimum,
+  startsAt,
+}: {
+  rule: Rule;
+  latest: Release | null;
+  minimum: Release | null;
+  startsAt: string | null;
+}) {
+  if (!latest) return <p className={styles.muted}>Choose a latest version to see the effect.</p>;
+
+  const rows: {
+    who: ReactNode;
+    sees: string;
+    tone: 'success' | 'info' | 'danger';
+  }[] = [{ who: <>On {v(latest)}</>, sees: 'Nothing — up to date', tone: 'success' }];
+  if (rule === 'remind') {
+    rows.push({
+      who: <>Older than {v(latest)}</>,
+      sees: 'Reminder popup, can dismiss',
+      tone: 'info',
+    });
+  } else if (rule === 'everyone' || (minimum && minimum.id === latest.id)) {
+    rows.push({
+      who: <>Older than {v(latest)}</>,
+      sees: 'Blocked until they update',
+      tone: 'danger',
+    });
+  } else if (minimum) {
+    rows.push({
+      who: (
+        <>
+          {v(minimum)} up to {v(latest)}
+        </>
+      ),
+      sees: 'Reminder popup, can dismiss',
+      tone: 'info',
+    });
+    rows.push({
+      who: <>Older than {v(minimum)}</>,
+      sees: 'Blocked until they update',
+      tone: 'danger',
+    });
+  }
+
+  return (
+    <div className={styles.impact}>
+      {rows.map((r, i) => (
+        <div key={i} className={styles.impactRow}>
+          <span className={styles.impactWho}>{r.who}</span>
+          <Badge tone={r.tone}>{r.sees}</Badge>
+        </div>
+      ))}
+      {rule !== 'remind' && (
+        <p className={styles.impactNote}>
+          <Icon name="info" size={14} />
+          {startsAt
+            ? `Blocking starts ${fmtDateTime(startsAt)}. Until then everyone gets the reminder.`
+            : 'Blocked phones also have their requests refused by the server, so an old app cannot keep booking.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------- release modal */
+
+function ReleaseModal({
+  app,
+  editing,
+  releases,
+  onClose,
+  onSaved,
+}: {
+  app: AppId;
+  editing: Release | null;
+  releases: Release[];
+  onClose: () => void;
+  onSaved: (message: string, release: Release | null) => void | Promise<void>;
+}) {
+  const others = useMemo(() => releases.filter((r) => r.id !== editing?.id), [releases, editing]);
+  const highestBuild = others.reduce((m, r) => Math.max(m, r.build_number), 0);
+  const newest = others[0] || null;
+
+  // Seeded once per mount (the parent keys this by release). For a new
+  // release, suggest the next patch and build — the usual case.
+  const [version, setVersion] = useState(() => editing?.version ?? (newest ? bumpPatch(newest.version) : '1.0.0'));
+  const [build, setBuild] = useState(() => String(editing?.build_number ?? highestBuild + 1));
+  const [status, setStatus] = useState<ReleaseStatus>(() => editing?.status ?? 'published');
+  const [releasedAt, setReleasedAt] = useState(() =>
+    editing ? (editing.released_at ? editing.released_at.slice(0, 10) : '') : new Date().toISOString().slice(0, 10),
+  );
+  const [notes, setNotes] = useState(() => editing?.release_notes ?? '');
+  const [androidUrl, setAndroidUrl] = useState(() => editing?.android_store_url ?? '');
+  const [iosUrl, setIosUrl] = useState(() => editing?.ios_store_url ?? '');
+  const [showLinks, setShowLinks] = useState(() => Boolean(editing?.android_store_url || editing?.ios_store_url));
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  const cleanVersion = version.trim().replace(/^v/i, '');
+  const buildNum = parseInt(build, 10);
+  const errors: Partial<Record<'version' | 'build' | 'android' | 'ios', string>> = {};
+  if (!SEMVER_RE.test(cleanVersion)) errors.version = 'Use three numbers, like 1.0.1.';
+  if (!Number.isInteger(buildNum) || buildNum < 1) errors.build = 'A whole number, 1 or more.';
+  else if (others.some((r) => r.version === cleanVersion && r.build_number === buildNum))
+    errors.build = `v${cleanVersion} build ${buildNum} is already recorded.`;
+  if (androidUrl.trim() && !isValidUrl(androidUrl)) errors.android = 'This is not a valid link.';
+  if (iosUrl.trim() && !isValidUrl(iosUrl)) errors.ios = 'This is not a valid link.';
+  const buildWarning =
+    !editing && !errors.build && buildNum <= highestBuild
+      ? `Play only accepts a build higher than ${highestBuild}, the highest recorded so far.`
+      : null;
+  const valid = Object.keys(errors).length === 0;
+
+  const submit = async (e?: FormEvent) => {
+    e?.preventDefault();
+    setTouched(true);
+    if (!valid) return;
+    setSubmitting(true);
+    setServerError(null);
+    try {
+      const body = {
+        app,
+        version: cleanVersion,
+        build_number: buildNum,
+        released_at: releasedAt ? new Date(releasedAt).toISOString() : null,
+        status,
+        android_store_url: cleanUrl(androidUrl),
+        ios_store_url: cleanUrl(iosUrl),
+        release_notes: notes.trim() || null,
+      };
+      const res = await fetch(
+        editing
+          ? `/api/proxy/superadmin/app-versions/releases/${editing.id}`
+          : '/api/proxy/superadmin/app-versions/releases',
+        {
+          method: editing ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(firstError(data) || 'Could not save the release.');
+      await onSaved(
+        editing ? `v${cleanVersion} updated.` : `v${cleanVersion} (build ${buildNum}) recorded.`,
+        (data.release as Release) || null,
+      );
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not save the release.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const show = (k: keyof typeof errors) => (touched || k === 'build' ? errors[k] : undefined);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={editing ? `Edit v${editing.version}` : `New ${APP_LABEL[app]} release`}
+      description={editing ? APP_LABEL[app] : 'Record a version after it is uploaded to the Play Store.'}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" form="release-form" loading={submitting}>
+            {editing ? 'Save changes' : 'Record release'}
+          </Button>
+        </>
+      }
+    >
+      <form id="release-form" onSubmit={submit} className={styles.modalForm} noValidate>
+        {serverError && <Alert tone="error">{serverError}</Alert>}
+
+        <div className={styles.twoCol}>
+          <Field
+            label="Version"
+            hint={show('version') || 'Three numbers, like 1.0.1'}
+            className={show('version') ? styles.fieldError : undefined}
+          >
+            <input
+              className="control"
+              inputMode="decimal"
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              onBlur={() => setTouched(true)}
+              placeholder="1.0.1"
+              autoFocus
+            />
+          </Field>
+          <Field
+            label="Build number"
+            hint={show('build') || buildWarning || `Highest so far: ${highestBuild || 'none'}`}
+            className={show('build') ? styles.fieldError : buildWarning ? styles.fieldWarn : undefined}
+          >
+            <input
+              className="control"
+              type="number"
+              min={1}
+              value={build}
+              onChange={(e) => setBuild(e.target.value)}
+              placeholder="2"
+            />
+          </Field>
+        </div>
+
+        {SEMVER_RE.test(cleanVersion) && Number.isInteger(buildNum) && buildNum > 0 && (
+          <div className={styles.pubspec}>
+            <span>
+              Must match the app’s <code>pubspec.yaml</code>:
+            </span>
+            <code className={styles.pubspecLine}>
+              version: {cleanVersion}+{buildNum}
+            </code>
+          </div>
+        )}
+
+        <fieldset className={styles.statusSet}>
+          <legend className={styles.subLabel}>Status</legend>
+          <div className={styles.statusOptions}>
+            {(['published', 'draft', 'retired'] as ReleaseStatus[]).map((s) => (
+              <label key={s} className={cx(styles.statusOption, status === s && styles.statusOptionOn)}>
+                <input
+                  type="radio"
+                  name="release-status"
+                  checked={status === s}
+                  onChange={() => setStatus(s)}
+                  className={styles.srOnly}
+                />
+                <Badge tone={STATUS_META[s].tone}>{STATUS_META[s].label}</Badge>
+                <span className={styles.statusHint}>{STATUS_META[s].hint}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className={styles.twoCol}>
+          <Field label="Release date">
+            <input type="date" className="control" value={releasedAt} onChange={(e) => setReleasedAt(e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label="What’s new (optional)" hint="Shown to users on the update popup and screen. Keep it short.">
+          <textarea
+            rows={3}
+            className="control"
+            placeholder="Faster booking, clearer refund status, bug fixes."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </Field>
+
+        <button
+          type="button"
+          className={styles.disclosure}
+          onClick={() => setShowLinks((s) => !s)}
+          aria-expanded={showLinks}
+        >
+          <Icon name={showLinks ? 'chevronDown' : 'chevronRight'} size={14} />
+          Store links for this release only
+          <span className={styles.muted}> — usually not needed</span>
+        </button>
+        {showLinks && (
+          <div className={styles.linkFields}>
+            <p className={styles.muted}>
+              Used only if the update rule has no store link of its own. Normally set the link once on the rule instead.
+            </p>
+            <Field
+              label="Play Store link"
+              hint={show('android')}
+              className={show('android') ? styles.fieldError : undefined}
+            >
+              <input
+                type="url"
+                className="control"
+                placeholder={playUrl(app)}
+                value={androidUrl}
+                onChange={(e) => setAndroidUrl(e.target.value)}
+              />
+            </Field>
+            <Field label="App Store link" hint={show('ios')} className={show('ios') ? styles.fieldError : undefined}>
+              <input
+                type="url"
+                className="control"
+                placeholder="https://apps.apple.com/in/app/…"
+                value={iosUrl}
+                onChange={(e) => setIosUrl(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+      </form>
+    </Modal>
   );
 }

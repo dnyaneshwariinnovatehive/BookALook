@@ -3,7 +3,7 @@ import LegalDocumentView from '@/components/LegalDocumentView';
 import { CANCELLATION_REFUND_POLICY } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'Cancellation & Refund Policy',
+  title: 'Cancellation, Rescheduling & Refund Policy',
   description: CANCELLATION_REFUND_POLICY.summary,
 };
 

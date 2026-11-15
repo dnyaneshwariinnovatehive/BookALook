@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/app_version_service.dart';
+import '../services/play_update_service.dart';
 import '../theme/app_theme.dart';
 
 class OptionalUpdateDialog extends StatelessWidget {
@@ -12,6 +13,14 @@ class OptionalUpdateDialog extends StatelessWidget {
   });
 
   static Future<void> showIfEligible(BuildContext context, AppUpdateInfo info) async {
+    // A flexible update Play already downloaded only needs a restart, not
+    // another "update available" prompt.
+    if (await PlayUpdateService.isFlexibleDownloaded()) {
+      if (!context.mounted) return;
+      PlayUpdateService.showRestartSnackBar(ScaffoldMessenger.maybeOf(context));
+      return;
+    }
+
     final shouldPrompt = await AppVersionService.instance.shouldPromptOptional(info.targetVersion);
     if (!shouldPrompt) return;
 
@@ -175,8 +184,16 @@ class OptionalUpdateDialog extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
+                      // Captured before pop: the download outlives this dialog,
+                      // and the root messenger shows the "Restart" prompt.
+                      final messenger = ScaffoldMessenger.maybeOf(context);
                       Navigator.of(context).pop();
-                      await AppVersionService.launchStoreUrl(updateInfo.storeUrl);
+                      final outcome = await PlayUpdateService.startFlexible(
+                        onDownloaded: () => PlayUpdateService.showRestartSnackBar(messenger),
+                      );
+                      if (outcome == PlayUpdateOutcome.unavailable) {
+                        await AppVersionService.launchStoreUrl(updateInfo.storeUrl);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.accentColor,

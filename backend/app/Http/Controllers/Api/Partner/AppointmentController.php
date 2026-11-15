@@ -13,6 +13,77 @@ class AppointmentController extends Controller
 {
     public function index(Request $request, $salon_id)
     {
+        $query = $this->visibleAppointments($request, $salon_id);
+        if ($query instanceof \Illuminate\Http\JsonResponse) {
+            return $query;
+        }
+
+        if ($request->has('date') && !empty($request->date) && $request->date !== 'All') {
+            $query->whereDate('appointment_date', $request->date);
+        }
+
+        if ($request->has('provider_id') && !empty($request->provider_id) && $request->provider_id !== 'All') {
+            $pId = $request->provider_id;
+            $query->where(function ($q) use ($pId) {
+                $q->where('appointed_provider_id', $pId)
+                  ->orWhere('serving_provider_id', $pId);
+            });
+        }
+
+        if ($request->has('status') && !empty($request->status) && $request->status !== 'All') {
+            $query->where('status', strtolower($request->status));
+        }
+
+        $appointments = $query->orderBy('start_time', 'asc')->get();
+
+        // Add explicit is_rescheduled flag for the frontend UI tag
+        $appointments->each(function ($appointment) {
+            $appointment->is_rescheduled = !is_null($appointment->rescheduled_from_id);
+        });
+
+        // Paid / partly paid / unpaid and the advance still due, from the
+        // payments the salon has recorded.
+        $summaries = app(\App\Services\BookingPaymentService::class)->summaries($appointments);
+        $appointments->each(fn ($appointment) => $appointment->setAttribute('payment', $summaries[$appointment->id] ?? null));
+
+        return response()->json(['appointments' => $appointments]);
+    }
+
+    /**
+     * One booking, in exactly the shape index() returns for each row. The
+     * partner app opens it when a push notification is tapped, knowing only
+     * the booking id. Same visibility as the list: an owner sees their own
+     * salon's bookings, a staff member only the ones they are on.
+     */
+    public function show(Request $request, $salon_id, $id)
+    {
+        $query = $this->visibleAppointments($request, $salon_id);
+        if ($query instanceof \Illuminate\Http\JsonResponse) {
+            return $query;
+        }
+
+        $appointment = $query->where('id', $id)->first();
+        if (! $appointment) {
+            return response()->json(['message' => 'Booking not found.'], 404);
+        }
+
+        $appointment->is_rescheduled = !is_null($appointment->rescheduled_from_id);
+        $summaries = app(\App\Services\BookingPaymentService::class)
+            ->summaries(new \Illuminate\Database\Eloquent\Collection([$appointment]));
+        $appointment->setAttribute('payment', $summaries[$appointment->id] ?? null);
+
+        return response()->json(['appointment' => $appointment]);
+    }
+
+    /**
+     * Bookings this user may see at this salon, with the relations the partner
+     * app shows, or a 403 response. Shared by index() and show() so the list
+     * and a single booking can never disagree about who sees what.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Http\JsonResponse
+     */
+    private function visibleAppointments(Request $request, string $salon_id)
+    {
         $user = $request->user();
 
         // appointedProvider.user and services.service.template are what the
@@ -52,35 +123,7 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
-        if ($request->has('date') && !empty($request->date) && $request->date !== 'All') {
-            $query->whereDate('appointment_date', $request->date);
-        }
-
-        if ($request->has('provider_id') && !empty($request->provider_id) && $request->provider_id !== 'All') {
-            $pId = $request->provider_id;
-            $query->where(function ($q) use ($pId) {
-                $q->where('appointed_provider_id', $pId)
-                  ->orWhere('serving_provider_id', $pId);
-            });
-        }
-
-        if ($request->has('status') && !empty($request->status) && $request->status !== 'All') {
-            $query->where('status', strtolower($request->status));
-        }
-
-        $appointments = $query->orderBy('start_time', 'asc')->get();
-
-        // Add explicit is_rescheduled flag for the frontend UI tag
-        $appointments->each(function ($appointment) {
-            $appointment->is_rescheduled = !is_null($appointment->rescheduled_from_id);
-        });
-
-        // Paid / partly paid / unpaid and the advance still due, from the
-        // payments the salon has recorded.
-        $summaries = app(\App\Services\BookingPaymentService::class)->summaries($appointments);
-        $appointments->each(fn ($appointment) => $appointment->setAttribute('payment', $summaries[$appointment->id] ?? null));
-
-        return response()->json(['appointments' => $appointments]);
+        return $query;
     }
 
     public function markNoShow(Request $request, $id)

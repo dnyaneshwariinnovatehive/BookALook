@@ -9,12 +9,12 @@ import {
   PARTNER_APP_STORE_URL,
   PARTNER_PLAY_STORE_URL,
 } from '@/lib/site-links';
-import s from '../landing.module.css';
+import st from '../site.module.css';
 
 /**
- * Where the landing page's QR codes point. A phone that scans one is sent
- * straight to its own store — App Store on an iPhone, Play Store on Android —
- * so one code works for everybody. Anything else gets both buttons.
+ * Where the site's QR codes point. A phone that scans one is sent straight to
+ * its own store — App Store on an iPhone, Play Store on Android — so one code
+ * works for everybody. Anything else gets both buttons.
  */
 function DownloadInner() {
   const params = useSearchParams();
@@ -35,22 +35,20 @@ function DownloadInner() {
   }, [ios, android]);
 
   return (
-    <main className={s.page}>
-      <section className={s.section}>
-        <div className={`${s.container} ${s.center}`}>
-          <p className={s.kicker}>{partner ? 'BookALook Partner' : 'BookALook'}</p>
-          <h1 className={s.title}>{redirecting ? 'Opening your app store…' : `Get the ${partner ? 'Partner ' : ''}app`}</h1>
-          <p className={s.lead}>
-            {partner
-              ? 'Run your salon’s bookings, staff, billing and payouts from your phone.'
-              : 'Book your next salon visit in a minute — no calls, no waiting.'}
-          </p>
-          <div className={s.badges}>
-            <StoreBadge store="google" url={android} label="Google Play" />
-            <StoreBadge store="apple" url={ios} label="App Store" />
-          </div>
+    <main className={st.simple}>
+      <div className={st.wrap}>
+        <p className={st.kicker}>{partner ? 'BookALook Partner' : 'BookALook'}</p>
+        <h1>{redirecting ? 'Opening your app store…' : `Get the ${partner ? 'Partner ' : ''}app`}</h1>
+        <p className={st.lead} style={{ marginLeft: 'auto', marginRight: 'auto' }}>
+          {partner
+            ? 'Run your salon’s bookings, staff, billing and payouts from your phone.'
+            : 'Book your next salon visit in a minute — no calls, no waiting.'}
+        </p>
+        <div className={st.cta}>
+          <StoreBadge store="google" url={android} label="Google Play" />
+          <StoreBadge store="apple" url={ios} label="App Store" />
         </div>
-      </section>
+      </div>
     </main>
   );
 }

@@ -7,11 +7,12 @@ import { CONTACT_ADDRESS, CONTACT_COMPANY, CONTACT_EMAIL } from './site-links';
  * wording change is a one-line edit instead of a hunt through five 400-line
  * components, and so the pages themselves stay trivial.
  *
- * Wording note: the Cancellation & Refund Policy deliberately does not name a
- * number of minutes anywhere. The live cancellation window is a per-platform
- * setting that a superadmin can change from Policy Settings, so publishing a
- * fixed figure in the document guarantees the two drift apart. The document
- * points the reader at the window shown on their booking instead.
+ * Wording note: the approved documents (Terms & Conditions, Privacy Policy,
+ * Cancellation, Rescheduling & Refund Policy, Salon Partner Policy — Nov 2026)
+ * name a 90-minute cancellation/reschedule cutoff and a 15-minute QR reveal.
+ * Those figures are SuperAdmin Policy Settings (`cancellation_cutoff_minutes`,
+ * `reschedule_cutoff_minutes`, `appointment_start_early_minutes`). If a
+ * setting is changed, the wording here must change with it.
  */
 
 export interface LegalBlock {
@@ -47,10 +48,10 @@ export interface LegalDocument {
 
 const ALL_RELATED: RelatedLink[] = [
   { href: '/about', label: 'About BookALook' },
-  { href: '/terms', label: 'Terms of Use' },
+  { href: '/terms', label: 'Terms & Conditions' },
   { href: '/privacy', label: 'Privacy Policy' },
-  { href: '/cancellation-refund', label: 'Cancellation & Refund Policy' },
-  { href: '/partner-terms', label: 'Partner Terms & Conditions' },
+  { href: '/cancellation-refund', label: 'Cancellation, Rescheduling & Refund Policy' },
+  { href: '/partner-terms', label: 'Salon Partner Policy' },
 ];
 
 // Reads as a letterhead: who you are writing to, where they are, how to reach
@@ -62,217 +63,277 @@ const CONTACT_BLOCKS: LegalBlock[] = [
   { text: CONTACT_EMAIL },
 ];
 
-// ------------------------------------------------------------- terms of use
+// ------------------------------------------------------- terms & conditions
 
 export const TERMS_OF_USE: LegalDocument = {
   slug: 'terms',
-  title: 'Terms of Use',
-  kicker: 'BookALook',
+  title: 'Terms & Conditions',
+  kicker: 'Book A Look',
   summary:
-    'These Terms of Use govern your access to and use of the BookALook.in website, mobile application and related services.',
+    'These Terms & Conditions govern access to and use of the Book A Look website, mobile application and related services operated by Bookalook Private Limited.',
   related: ALL_RELATED,
   sections: [
     {
-      heading: 'A. Introduction',
+      heading: '1. Introduction',
       blocks: [
         {
-          text: 'Welcome to BookALook.in ("Company", "we", "our", "us"). These Terms of Use ("Terms") govern your access to and use of our website, mobile application, and related services (collectively, the "Platform") that enable users to discover, schedule, and manage appointments with salons and beauty parlours ("Services").',
+          text: 'These Terms & Conditions govern access to and use of the Book A Look website, mobile application, and related services operated by Bookalook Private Limited ("Book A Look", "Company", "we", "us" or "our").',
         },
         {
-          text: 'By accessing or using the Platform, you agree to be bound by these Terms and our Privacy Policy. If you do not agree, you must not use or access the Platform.',
+          text: 'By accessing the website, downloading or using the application, creating an account, or making a booking, you ("Customer", "User" or "you") agree to these Terms & Conditions.',
         },
+        { text: 'If you do not agree with these terms, please discontinue using our services.' },
       ],
     },
     {
-      heading: 'B. Eligibility',
+      heading: '2. About Book A Look',
       blocks: [
         {
-          text: 'You must be at least 18 years of age and capable of entering into a legally binding contract under the Indian Contract Act, 1872 to use our Platform. By using the Platform, you represent and warrant that you meet these eligibility requirements.',
+          text: 'Book A Look is an online salon discovery and appointment booking marketplace that enables customers to discover participating salons, view available services and listed prices, check appointment availability, and book appointments.',
         },
-      ],
-    },
-    {
-      heading: 'C. Platform Overview',
-      blocks: [
-        {
-          text: 'BookALook.in provides an online appointment booking and discovery platform for salons, spas, and beauty parlours. The Platform connects users seeking grooming or beauty services ("Customers") with independent salon owners or professionals ("Service Providers").',
-        },
-        {
-          text: 'We do not own, operate, or control any salon or service listed on the Platform. Each Service Provider is solely responsible for its services, staff, pricing, availability, and quality standards.',
-        },
-      ],
-    },
-    {
-      heading: 'D. Account Registration and Responsibilities',
-      blocks: [
-        {
-          text: 'To access booking features, you may be required to create an account by providing accurate personal information.',
-        },
-        {
-          text: 'You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.',
-        },
-        {
-          text: 'You agree to immediately notify us of any unauthorised access or use of your account.',
-        },
-        {
-          text: 'BookALook.in reserves the right to suspend or terminate accounts suspected of misuse, fraudulent activity, or violation of these Terms.',
-        },
-      ],
-    },
-    {
-      heading: 'E. Role of BookALook.in',
-      blocks: [
-        {
-          text: 'BookALook.in acts solely as a facilitator and intermediary between Customers and Service Providers.',
-        },
-        { text: 'All bookings are directly between the Customer and the Service Provider.' },
-        { text: 'The Company is not responsible for:' },
+        { text: 'Book A Look acts as a technology platform connecting customers with independent salon partners.' },
+        { text: 'Unless expressly stated otherwise, the salon partner is responsible for:' },
         {
           bullets: [
-            'The quality, timing, pricing, or completion of services.',
-            'Any disputes or damages arising between Customers and Service Providers.',
-            'The conduct or background of any Service Provider.',
+            'Providing the salon services.',
+            'Maintaining service quality and hygiene.',
+            'Ensuring staff availability.',
+            'Delivering services at the listed prices.',
+            'Handling customer concerns relating to the actual salon service.',
+          ],
+        },
+        { text: 'Book A Look does not itself provide salon, grooming, or beauty services.' },
+      ],
+    },
+    {
+      heading: '3. Eligibility and Account Registration',
+      blocks: [
+        { text: 'Users must provide accurate and complete information when creating an account or making a booking.' },
+        { text: 'You agree:' },
+        {
+          bullets: [
+            'To provide a valid mobile number and other requested information.',
+            'Not to impersonate another person.',
+            'Not to create fraudulent or duplicate accounts.',
+            'To maintain the confidentiality of your account credentials and OTPs.',
+            'To notify us if you suspect unauthorized access to your account.',
+          ],
+        },
+        { text: 'You are responsible for activities performed through your account, subject to applicable law.' },
+      ],
+    },
+    {
+      heading: '4. Salon Information and Services',
+      blocks: [
+        {
+          text: 'Salon profiles, service descriptions, prices, photographs, operating hours, and availability may be provided by salon partners.',
+        },
+        {
+          text: 'Book A Look makes reasonable efforts to maintain accurate platform information but cannot guarantee that every listing is continuously updated or error-free.',
+        },
+        { text: 'Customers should review the service details and applicable price before confirming a booking.' },
+      ],
+    },
+    {
+      heading: '5. Appointment Booking',
+      blocks: [
+        { text: 'A booking request must be submitted through the available booking interface.' },
+        {
+          text: 'A booking shall be treated as confirmed only when the platform displays a confirmed booking status or communicates confirmation through an authorized notification channel.',
+        },
+        { text: 'Each confirmed booking may have a unique booking reference and QR code.' },
+        { text: 'The customer must verify:' },
+        {
+          bullets: [
+            'Salon name and location.',
+            'Selected service.',
+            'Appointment date and time.',
+            'Applicable service price.',
+            'Selected payment method.',
+          ],
+        },
+        { text: 'The customer should arrive at the salon at the scheduled appointment time.' },
+      ],
+    },
+    {
+      heading: '6. Payment Methods',
+      blocks: [
+        {
+          text: 'Book A Look may support the following payment methods, depending on the salon, service, and availability:',
+        },
+        { lead: 'A. Online Payment' },
+        { text: 'Customers may pay through supported payment gateways and payment methods displayed at checkout.' },
+        {
+          text: 'Online transactions are subject to the applicable payment gateway terms, bank policies, and transaction processing rules.',
+        },
+        {
+          text: 'A booking requiring online payment will be confirmed according to the payment and booking confirmation process displayed in the application.',
+        },
+        { lead: 'B. Pay at Store' },
+        { text: 'Customers selecting Pay at Store must pay the salon directly when visiting the salon.' },
+        {
+          text: 'Accepted payment methods at the salon may include cash, UPI, debit card, credit card, or other methods accepted by that salon.',
+        },
+        { text: 'Book A Look does not collect the service amount for a Pay at Store booking.' },
+        { text: 'Customers should confirm any payment-related questions directly with the salon.' },
+      ],
+    },
+    {
+      heading: '7. Pricing and Additional Charges',
+      blocks: [
+        { text: 'The prices displayed on Book A Look are based on information supplied by the salon partner.' },
+        { text: 'Customers must review the displayed service price before booking.' },
+        {
+          text: 'Any additional service, upgrade, or charge must be communicated to the customer before the customer agrees to receive it.',
+        },
+        { text: 'Book A Look does not authorize salons to impose undisclosed charges.' },
+      ],
+    },
+    {
+      heading: '8. Cancellation and Rescheduling',
+      blocks: [
+        {
+          text: 'Customers may cancel or request rescheduling through the available booking functionality, subject to the following standard rule:',
+        },
+        {
+          bullets: [
+            'Cancellation or rescheduling must be completed at least 90 minutes before the scheduled appointment start time.',
+            'Requests made within the 90-minute restricted period may not be permitted through the platform.',
+            'Rescheduling is subject to available appointment slots.',
+            'A rescheduled appointment will be governed by the revised booking details and applicable cancellation rules.',
+          ],
+        },
+        { text: 'Any exception must be handled through the customer support process and in accordance with applicable law.' },
+        { text: 'Detailed refund conditions are described in the Cancellation, Rescheduling and Refund Policy.' },
+      ],
+    },
+    {
+      heading: '9. QR Code and Salon Check-in',
+      blocks: [
+        { text: 'A unique QR code may be generated for each confirmed booking.' },
+        { text: 'Where the QR check-in feature is enabled:' },
+        {
+          bullets: [
+            "The QR code becomes visible in the customer's booking section 15 minutes before the scheduled appointment.",
+            'The QR code is intended to verify the booking at the salon.',
+            'The salon may scan the QR code using the authorized check-in functionality.',
+            "A QR code must not be shared, copied, misused, or presented for another person's booking.",
+            "QR validation and booking status are subject to the platform's server-side verification.",
+          ],
+        },
+        { text: 'A QR code does not independently guarantee that a salon service has been completed.' },
+      ],
+    },
+    {
+      heading: '10. Customer Responsibilities',
+      blocks: [
+        { text: 'Customers must:' },
+        {
+          bullets: [
+            'Provide accurate booking information.',
+            'Arrive at the salon on time.',
+            'Follow salon hygiene and safety instructions.',
+            'Treat salon staff respectfully.',
+            'Avoid fraudulent bookings and misuse of promotional offers.',
+            'Inform the salon of any relevant service requirements before the appointment.',
           ],
         },
       ],
     },
     {
-      heading: 'F. User Obligations',
+      heading: '11. Salon Partner Responsibilities',
       blocks: [
-        { text: 'When using the Platform, you agree that you will not:' },
         {
-          bullets: [
-            'Post, transmit or share false, misleading, defamatory, obscene, or unlawful information.',
-            'Attempt to hack, disable or interfere with the operation of the Platform.',
-            'Use the Platform to solicit or promote illegal services.',
-            'Resell, redistribute, or exploit the Platform for commercial gain without written consent.',
-          ],
+          text: 'Salon partners are responsible for delivering the booked services professionally and in accordance with applicable laws.',
+        },
+        {
+          text: 'Salon partners must maintain accurate service prices, operating hours, and availability and must not knowingly accept bookings they cannot fulfil.',
         },
       ],
     },
     {
-      heading: 'G. Booking, Payment and Pricing',
+      heading: '12. Offers and Promotions',
       blocks: [
         {
-          text: 'Customers can book appointments with listed salons through the Platform by selecting a preferred service, date and time.',
+          text: 'Promotional offers may be subject to additional eligibility conditions, expiry dates, service restrictions, and participating salon limitations.',
         },
+        { text: 'Offers cannot be exchanged for cash unless expressly stated.' },
         {
-          text: 'Payments for confirmed bookings, including any advance, are made directly to the salon and recorded on the Platform.',
-        },
-        {
-          text: 'The Company is not responsible for payment disputes arising from user error or failed transactions.',
-        },
-        {
-          text: 'Taxes (including GST) are applied as per applicable law and may vary by salon and location.',
-        },
-        {
-          text: 'A valid booking confirmation shall be issued upon successful payment or as per Service Provider policy.',
+          text: 'Book A Look may withdraw or modify an offer in accordance with its stated conditions and applicable law.',
         },
       ],
     },
     {
-      heading: 'H. Cancellation and Refund Policy',
+      heading: '13. Reviews and User Content',
       blocks: [
+        { text: 'Customers must provide genuine and honest reviews based on their actual experience.' },
         {
-          text: 'Cancellations, rescheduling and refunds are governed by our Cancellation and Refund Policy, available separately on our Platform. By making a booking, you acknowledge that you have read and agreed to that policy.',
-        },
-      ],
-      // The reader who lands here mid-search is usually the one who wants to
-      // cancel, so the cross-link sits in the section rather than only at the
-      // bottom of the page.
-    },
-    {
-      heading: 'I. Content and Intellectual Property',
-      blocks: [
-        {
-          text: 'All content on the Platform — including text, graphics, images, logos, software, and layout — is the exclusive property of BookALook.in or its licensors and is protected under applicable copyright and trademark laws.',
-        },
-        {
-          text: 'You may not copy, reproduce, modify, distribute or create derivative works from the Platform without prior written consent.',
-        },
-        {
-          text: 'Any feedback, suggestions, or ideas submitted by users may be used by the Company without restriction or compensation.',
+          text: 'We may moderate, remove, or restrict content that is unlawful, abusive, misleading, fraudulent, or violates these terms.',
         },
       ],
     },
     {
-      heading: 'J. Third-Party Services',
+      heading: '14. Platform Availability',
       blocks: [
         {
-          text: 'The Platform may contain links to third-party websites or integrate services from third-party providers (including payment gateways, analytics tools, etc.). BookALook.in is not responsible for the content, terms, or privacy practices of such third parties.',
+          text: 'We may update, maintain, suspend, or modify any part of the website or application to improve functionality, security, or performance.',
+        },
+        { text: 'We will make reasonable efforts to minimize service disruption.' },
+      ],
+    },
+    {
+      heading: '15. Limitation of Liability',
+      blocks: [
+        {
+          text: 'To the extent permitted by applicable law, Book A Look shall not be responsible for independent salon operations, service delivery decisions, or conduct of salon personnel.',
+        },
+        {
+          text: 'Nothing in these terms excludes liability that cannot legally be excluded, including liability arising from fraud, wilful misconduct, or other non-excludable obligations.',
         },
       ],
     },
     {
-      heading: 'K. Disclaimer of Warranties',
+      heading: '16. Suspension and Termination',
       blocks: [
         {
-          text: 'The Platform and its content are provided "as is" and "as available" without warranties of any kind, either express or implied. We do not warrant that:',
+          text: 'Book A Look may restrict or suspend an account where there is reasonable evidence of fraud, misuse, unlawful activity, security threats, or repeated violations of these terms.',
         },
         {
-          bullets: [
-            'The Platform will be uninterrupted or error-free.',
-            'Information on the Platform will be accurate, current or reliable.',
-            'Services provided by third parties will meet user expectations.',
-          ],
+          text: 'Users may request account closure through customer support, subject to outstanding bookings, transactions, and applicable legal retention requirements.',
         },
       ],
     },
     {
-      heading: 'L. Limitation of Liability',
-      blocks: [
-        {
-          text: 'To the fullest extent permitted by law, BookALook.in shall not be liable for any direct, indirect, incidental, consequential, or punitive damages arising out of or relating to:',
-        },
-        {
-          bullets: [
-            'Use or inability to use the Platform;',
-            'Any service, act, or omission of a salon or service provider;',
-            'Loss of profits, data, goodwill, or other intangible losses.',
-          ],
-        },
-        {
-          text: 'Our total liability, whether in contract, tort, or otherwise, shall not exceed the total amount paid by you for the relevant booking.',
-        },
-      ],
+      heading: '17. Privacy',
+      blocks: [{ text: 'Personal information is handled in accordance with the Book A Look Privacy Policy.' }],
     },
     {
-      heading: 'M. Indemnification',
+      heading: '18. Grievance Redressal',
       blocks: [
-        {
-          text: 'You agree to indemnify, defend and hold harmless BookALook.in, its partners, employees, affiliates, and service providers from any claims, liabilities, damages, or expenses (including legal fees) arising from your use of the Platform or violation of these Terms.',
-        },
-      ],
-    },
-    {
-      heading: 'N. Termination',
-      blocks: [
-        {
-          text: 'We may suspend or terminate your account and access to the Platform at any time if we believe you have violated these Terms or engaged in fraudulent or harmful activities. Upon termination, all outstanding obligations or dues (if any) must be settled immediately.',
-        },
-      ],
-    },
-    {
-      heading: 'O. Modifications to Terms',
-      blocks: [
-        {
-          text: 'BookALook.in reserves the right to amend or update these Terms from time to time. Updated versions will be posted on the Platform with an effective date. Continued use of the Platform constitutes your acceptance of the revised Terms.',
-        },
-      ],
-    },
-    {
-      heading: 'P. Governing Law and Jurisdiction',
-      blocks: [
-        {
-          text: 'These Terms are governed by the laws of India. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India.',
-        },
-      ],
-    },
-    {
-      heading: 'Q. Contact Information',
-      blocks: [
-        { text: 'For any queries, complaints, or notices regarding these Terms, please contact us at:' },
+        { text: 'For complaints, concerns, or disputes, contact:' },
+        { lead: 'Grievance Officer / Customer Support' },
         ...CONTACT_BLOCKS,
+        { text: 'Please include your booking reference where relevant.' },
+      ],
+    },
+    {
+      heading: '19. Governing Law and Jurisdiction',
+      blocks: [
+        { text: 'These terms shall be governed by the laws of India.' },
+        {
+          text: "Subject to applicable consumer protection laws and the jurisdiction of competent authorities, courts having jurisdiction at the Company's registered office location shall have jurisdiction over disputes.",
+        },
+      ],
+    },
+    {
+      heading: '20. Changes to These Terms',
+      blocks: [
+        {
+          text: 'Book A Look may update these terms from time to time. The revised version will be published on the website and/or application with an updated effective date.',
+        },
+        {
+          text: 'Continued use of the platform after the effective date will be subject to the revised terms, to the extent permitted by law.',
+        },
       ],
     },
   ],
@@ -283,532 +344,765 @@ export const TERMS_OF_USE: LegalDocument = {
 export const PRIVACY_POLICY: LegalDocument = {
   slug: 'privacy',
   title: 'Privacy Policy',
-  kicker: 'BookALook',
+  kicker: 'Book A Look',
   summary:
-    'This Privacy Policy sets out how BookALook.in collects, uses, discloses and protects your personal information, in accordance with applicable laws of India.',
-  related: ALL_RELATED,
-  sections: [
-    {
-      heading: 'A. Introduction',
-      blocks: [
-        {
-          text: 'BookALook.in ("Company", "we", "our", "us") recognises the importance of the privacy of its users ("you", "your", "User") and the confidentiality of the information that you provide in the use of our website, platform, and related services (collectively, the "Platform"). This Privacy Policy sets out the practices for collection, use, disclosure and protection of your Personal Information in accordance with applicable laws of India.',
-        },
-        {
-          text: 'By accessing or using our Platform, you agree to the terms and conditions of this Privacy Policy. If you do not agree with this Privacy Policy, please discontinue use of the Platform immediately.',
-        },
-      ],
-    },
-    {
-      heading: 'B. Scope & Applicability',
-      blocks: [
-        {
-          text: 'This Privacy Policy applies to all Users of the Platform (including customers, salon partners, and service providers) and to all information collected via the Platform, its website, mobile application, and any offline channels operated by us. The Policy does not apply to any third-party website, apps or services that we do not control or operate.',
-        },
-        {
-          text: 'You are advised to review the privacy policies of any such third-party services prior to use.',
-        },
-      ],
-    },
-    {
-      heading: 'C. Information We Collect',
-      blocks: [
-        { lead: 'C.1 Personal Information' },
-        { text: 'We may collect the following types of Personal Information:' },
-        {
-          bullets: [
-            'Full name, phone number, email address, location/address.',
-            'Appointment, booking and service usage history and preferences.',
-          ],
-        },
-        { lead: 'C.2 Non-Personal / Aggregate Information' },
-        {
-          text: 'We may also collect information that does not identify you personally, including:',
-        },
-        {
-          bullets: [
-            'Device information (type, operating system, browser), IP address, date/time of visit, usage patterns, cookies and analytics data.',
-          ],
-        },
-        { lead: 'C.3 Payment Information' },
-        {
-          text: 'Payments are made to the salon and recorded on the Platform. We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping.',
-        },
-      ],
-    },
-    {
-      heading: 'D. Purposes for Collection and Legal Basis',
-      blocks: [
-        { text: 'We collect, use and process your information for the following purposes:' },
-        {
-          bullets: [
-            'To enable you to make salon or parlour appointments and related services via the Platform.',
-            'To send confirmations, reminders, updates, and notifications regarding your booking or service.',
-            'To administer your account, profile and preferences and to personalise your experience on the Platform.',
-            "To conduct analytics and improve the Platform's design, features, performance and functionality.",
-            'To send you promotional offers, marketing communications, subject to your consent where required.',
-            'To comply with applicable laws, prevent fraud, misuse or other illegal or unauthorised activities.',
-          ],
-        },
-      ],
-    },
-    {
-      heading: 'E. Cookies and Similar Technologies',
-      blocks: [
-        {
-          text: 'Our Platform uses cookies, web beacons, tracking pixels and similar technologies to remember your preferences, maintain your session and compile aggregate usage information. These allow us to personalise your experience and improve the Platform.',
-        },
-        {
-          text: 'You may disable cookies via your browser settings, but this may limit your ability to use certain features of the Platform.',
-        },
-      ],
-    },
-    {
-      heading: 'F. Sharing, Disclosure and Transfer of Information',
-      blocks: [
-        { text: 'We do not sell or rent your Personal Information. We may share your information as follows:' },
-        {
-          bullets: [
-            'With salon partners / service providers (to facilitate your booking and service fulfilment).',
-            'With payment gateway and financial institutions (for payment processing and refunds).',
-            'With third-party service providers (analytics, hosting, support) under appropriate confidentiality obligations.',
-            'With legal, regulatory or governmental authorities when required by law or court order.',
-            "In connection with business transfers or restructuring; your data may be transferred to an acquirer subject to the acquirer's obligations in respect of confidentiality.",
-          ],
-        },
-        {
-          text: 'If your information is transferred outside India for processing, we will ensure such processing is subject to appropriate safeguards.',
-        },
-      ],
-    },
-    {
-      heading: 'G. How Long Do We Keep Your Personal Information?',
-      blocks: [
-        {
-          text: 'We retain your Personal Information for as long as is necessary for the purposes described above, or as required by law (such as taxation, accounting or regulatory retention). Once no longer required, your information will be anonymised or securely deleted.',
-        },
-      ],
-    },
-    {
-      heading: 'H. Data Security',
-      blocks: [
-        {
-          text: 'We implement commercially reasonable technical, physical and administrative safeguards to protect your Personal Information against unauthorised access, alteration, disclosure or destruction. However, no method of transmission over the internet or electronic storage is completely secure; we cannot guarantee absolute security.',
-        },
-      ],
-    },
-    {
-      heading: 'I. Your Rights and Choices',
-      blocks: [
-        { text: 'You have the right to:' },
-        {
-          bullets: [
-            'Access or request a copy of the Personal Information we hold about you.',
-            'Request correction, update or deletion of your Personal Information (subject to legal or contractual restrictions).',
-            'Withdraw your consent for processing where such processing is based on consent (for example, marketing communications).',
-            'Object to or restrict certain processing of your Personal Information.',
-          ],
-        },
-        {
-          text: `To exercise your rights, or if you have any queries, you may contact us at ${CONTACT_EMAIL}. We may require verification of your identity before processing requests.`,
-        },
-      ],
-    },
-    {
-      heading: "J. Children's Privacy",
-      blocks: [
-        {
-          text: 'The Platform is not intended for use by children under the age of 18. We do not knowingly collect Personal Information of children under 18. If you believe we have inadvertently collected such information, please contact us and we will take steps to delete such information.',
-        },
-      ],
-    },
-    {
-      heading: 'K. Third-Party Links and Content',
-      blocks: [
-        {
-          text: 'The Platform may contain links to third-party websites, applications or services not operated or controlled by us. We do not assume any responsibility for their privacy practices, content or availability. You are strongly advised to review their respective privacy policies.',
-        },
-      ],
-    },
-    {
-      heading: 'L. Withdrawal of Consent, Account Deletion & Data Access',
-      blocks: [
-        {
-          text: 'You may withdraw your consent at any time to our collection, use or disclosure of your Personal Information, subject to certain limitations (for example, if data is required to fulfil an ongoing booking). To request deletion of your account or data, contact ' + CONTACT_EMAIL + '. Please note that we may retain certain transactional or service-fulfilment data as required by applicable law.',
-        },
-      ],
-    },
-    {
-      heading: 'M. Changes to this Privacy Policy',
-      blocks: [
-        {
-          text: 'This Privacy Policy may be updated from time to time to reflect changes in our practices or legal/regulatory requirements. Any changes will be posted on this page with an updated "Effective Date". Continued use of the Platform after such changes constitutes your acceptance of the revised policy.',
-        },
-      ],
-    },
-    {
-      heading: 'N. Governing Law and Jurisdiction',
-      blocks: [
-        {
-          text: 'This Privacy Policy is governed by the laws of India. Any disputes or claims arising out of or in connection with this Privacy Policy shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India.',
-        },
-      ],
-    },
-    {
-      heading: 'O. Contact Us',
-      blocks: [
-        {
-          text: 'If you have any questions, concerns or requests regarding this Privacy Policy or your Personal Information, you may contact us at:',
-        },
-        ...CONTACT_BLOCKS,
-      ],
-    },
-  ],
-};
-
-// ------------------------------------------------ cancellation & refund policy
-
-export const CANCELLATION_REFUND_POLICY: LegalDocument = {
-  slug: 'cancellation-refund',
-  title: 'Cancellation & Refund Policy',
-  kicker: 'BookALook',
-  summary:
-    'How cancellations, rescheduling and refunds work for appointments booked through BookALook.in.',
-  related: ALL_RELATED,
-  sections: [
-    {
-      heading: 'A. Introduction',
-      blocks: [
-        {
-          text: 'This Cancellation and Refund Policy ("Policy") describes the terms under which BookALook.in ("Company", "we", "our", "us") permits cancellation, rescheduling, and refund of appointments booked through our website or mobile application ("Platform").',
-        },
-        {
-          text: 'By booking an appointment via BookALook.in, the user ("Customer", "you", "your") acknowledges and agrees to the terms stated herein.',
-        },
-      ],
-    },
-    {
-      heading: 'B. Cancellation Policy',
-      blocks: [
-        { lead: 'Customer-Initiated Cancellations' },
-        {
-          text: 'You may cancel an appointment at any point before the cancellation window shown on your booking closes.',
-        },
-        {
-          text: 'Cancellations made before that window closes are eligible for a full refund of the booking amount.',
-        },
-        {
-          text: 'Cancellations made once that window has closed are not eligible for any refund.',
-        },
-        { lead: 'Service Provider Cancellations' },
-        {
-          text: 'In the unlikely event that a salon or service provider cancels your confirmed appointment, you will be entitled to a full refund or, at your discretion, a rescheduled appointment at no extra charge.',
-        },
-        { lead: 'Platform Cancellations' },
-        {
-          text: 'BookALook.in reserves the right to cancel a booking for operational, technical, or compliance reasons. In such cases, a full refund shall be processed to the original payment method.',
-        },
-      ],
-    },
-    {
-      heading: 'C. Rescheduling Policy',
-      blocks: [
-        { text: 'Customers are permitted to reschedule a booking only once.' },
-        {
-          text: 'Once a booking has been rescheduled, it cannot be cancelled or rescheduled again under any circumstance.',
-        },
-        {
-          text: 'Rescheduling is subject to slot availability and approval by the service provider.',
-        },
-      ],
-    },
-    {
-      heading: 'D. Refund Process',
-      blocks: [
-        {
-          text: 'Refunds (where applicable) shall be initiated within 5-7 business days after cancellation confirmation.',
-        },
-        {
-          text: 'All refunds shall be credited to the original mode of payment used during the booking (e.g., cash, credit/debit card, UPI, net banking).',
-        },
-        {
-          text: "The actual credit to the customer's account may take additional time depending on the payment gateway and the customer's bank policies.",
-        },
-        {
-          text: 'The Company is not responsible for any delay caused by third-party payment processors.',
-        },
-      ],
-    },
-    {
-      heading: 'E. Non-Refundable Scenarios',
-      blocks: [
-        { text: 'Refunds shall not be applicable in the following cases:' },
-        {
-          bullets: [
-            'Cancellations made once the cancellation window shown on your booking has closed.',
-            '"No-Show" situations where the customer fails to appear at the salon at the scheduled time.',
-            'Situations where services were rendered but not up to personal expectation (quality issues must be raised directly with the salon).',
-            'Multiple reschedule requests for the same booking.',
-          ],
-        },
-      ],
-    },
-    {
-      heading: 'F. Special Conditions / Force Majeure',
-      blocks: [
-        {
-          text: "In case of unforeseen circumstances such as natural disasters, government restrictions, internet outages, or technical failures beyond the Company's control, BookALook.in reserves the right to cancel or reschedule bookings without liability. Refund eligibility in such cases shall be determined at the Company's sole discretion.",
-        },
-      ],
-    },
-    {
-      heading: 'G. Contact for Refund Support',
-      blocks: [
-        { text: 'For refund or cancellation queries, please contact our support team at:' },
-        { text: CONTACT_EMAIL },
-        { text: 'Our support team will respond to refund-related queries within 2-3 working days.' },
-      ],
-    },
-    {
-      heading: 'H. Modification of Policy',
-      blocks: [
-        {
-          text: 'BookALook.in reserves the right to modify, amend, or update this Policy at any time without prior notice. The updated Policy shall be posted on the Platform with a revised effective date. Your continued use of the Platform after such updates constitutes acceptance of the revised terms.',
-        },
-      ],
-    },
-    {
-      heading: 'I. Governing Law and Jurisdiction',
-      blocks: [
-        {
-          text: 'This Policy shall be governed by and construed in accordance with the laws of India. Any disputes arising from or related to this Policy shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India.',
-        },
-      ],
-    },
-  ],
-};
-
-// ------------------------------------------------------ partner terms & conds
-
-export const PARTNER_TERMS: LegalDocument = {
-  slug: 'partner-terms',
-  title: 'Partner Terms & Conditions',
-  kicker: 'BookALook for Salons',
-  summary:
-    'The agreement between BookALook.in and every salon, parlour or individual stylist who lists and provides services on the platform.',
+    'What information Book A Look collects through its website and mobile application, how it is used and shared, and the choices available to you.',
   related: ALL_RELATED,
   sections: [
     {
       heading: '1. Introduction',
       blocks: [
         {
-          text: 'These Partner Terms and Conditions ("Agreement") govern the relationship between BookALook.in ("Platform", "Company", "We", "Our", "Us") and each salon, parlour, or individual stylist ("Partner", "You", "Your") who lists and provides services through the BookALook.in platform.',
+          text: 'Bookalook Private Limited ("Book A Look", "Company", "we", "us" or "our") respects your privacy and is committed to protecting personal information collected through our website, mobile application, and related services.',
         },
         {
-          text: 'By registering as a Partner, You acknowledge that You have read, understood, and agreed to be bound by the terms of this Agreement, the Privacy Policy, and the general Terms of Use available on BookALook.in.',
+          text: 'This Privacy Policy explains what information we collect, how we use it, when it may be shared, and the choices available to users.',
         },
+        { text: 'By accessing or using Book A Look, you acknowledge that you have read this Privacy Policy.' },
       ],
     },
     {
-      heading: '2. Registration & Onboarding',
+      heading: '2. Information We Collect',
       blocks: [
-        {
-          text: 'Partners must provide accurate and verifiable details during registration, including business name, address, GST number, and owner identification.',
-        },
-        {
-          text: 'BookALook.in reserves the right to verify such information and approve or reject onboarding requests at its discretion.',
-        },
-        {
-          text: 'The Partner shall be responsible for maintaining and updating its information to ensure it remains true and accurate at all times.',
-        },
-      ],
-    },
-    {
-      heading: '3. Services & Listing Responsibilities',
-      blocks: [
-        {
-          text: 'Partners are solely responsible for the accuracy of their service descriptions, prices, offers, and images displayed on the platform.',
-        },
-        {
-          text: 'BookALook.in shall not be liable for any misrepresentation or outdated information provided by the Partner.',
-        },
-        {
-          text: 'Partners must update their service availability regularly to prevent double bookings or schedule conflicts.',
-        },
-      ],
-    },
-    {
-      heading: '4. Booking, Cancellations & Customer Handling',
-      blocks: [
-        { text: 'Partners agree to honour all confirmed bookings received through the platform.' },
-        {
-          text: 'Any cancellation by the Partner must be immediately communicated to both the customer and BookALook.in.',
-        },
-        {
-          text: 'Repeated cancellations, delays, or customer complaints may lead to temporary suspension or permanent delisting from the platform.',
-        },
-      ],
-    },
-    {
-      heading: '5. Fees, Commissions & Subscriptions',
-      blocks: [
-        {
-          text: 'BookALook.in may charge subscription fees or commissions on bookings made through the platform.',
-        },
-        {
-          text: 'The applicable commission or subscription structure will be communicated via the Partner Dashboard or onboarding process.',
-        },
-        {
-          text: 'All such fees are exclusive of GST and applicable taxes under Indian law.',
-        },
-      ],
-    },
-    {
-      heading: '6. Payments & Settlements',
-      blocks: [
-        {
-          text: 'Payments to Partners will be made after deducting platform commissions, taxes, and other applicable charges.',
-        },
-        {
-          text: 'Settlements will occur on a defined payment cycle as communicated by BookALook.in.',
-        },
-        {
-          text: 'BookALook.in shall not be liable for delays arising from banking networks or other payment intermediaries.',
-        },
-      ],
-    },
-    {
-      heading: '7. Compliance & Standards',
-      blocks: [
-        {
-          text: 'Partners must comply with all relevant laws, including labour, taxation, hygiene, and safety regulations. Salons must ensure:',
-        },
+        { text: 'Depending on how you use our platform, we may collect:' },
+        { lead: 'A. Personal Information' },
+        { bullets: ['Name.', 'Mobile number.', 'Email address.', 'Account and profile details.'] },
+        { lead: 'B. Booking Information' },
         {
           bullets: [
-            'Proper hygiene and sanitisation of tools and equipment.',
-            'Professional and courteous staff behaviour.',
-            'Compliance with applicable local municipal or state health laws.',
+            'Selected salon.',
+            'Selected service.',
+            'Appointment date and time.',
+            'Booking reference.',
+            'Booking and cancellation history.',
+            'QR code and check-in status.',
+          ],
+        },
+        { lead: 'C. Location Information' },
+        {
+          text: 'Where location permissions are enabled, we may process location information to help display nearby salons or improve location-based search.',
+        },
+        {
+          text: 'You may disable location permissions through your device settings. Some location-related features may then become unavailable.',
+        },
+        { lead: 'D. Payment Information' },
+        {
+          text: 'For online payments, transactions are processed through authorized third-party payment service providers.',
+        },
+        { text: 'We may receive information such as:' },
+        {
+          bullets: [
+            'Transaction reference.',
+            'Payment status.',
+            'Payment method category.',
+            'Refund status.',
+            'Relevant transaction records.',
           ],
         },
         {
-          text: 'BookALook.in may remove any Partner who fails to maintain the required quality standards.',
-        },
-      ],
-    },
-    {
-      heading: '8. Ratings & Reviews',
-      blocks: [
-        { text: 'Customers can rate and review Partner services on the platform.' },
-        {
-          text: 'BookALook.in reserves the right to display, remove, or moderate reviews at its discretion.',
+          text: 'We do not intend to store complete card numbers, CVV values, or payment authentication credentials on our servers.',
         },
         {
-          text: 'Repeated negative feedback or verified complaints may result in suspension or delisting.',
+          text: 'For Pay at Store bookings, we may record the selected payment method or booking payment status where supported. Payment is made directly to the salon.',
         },
-      ],
-    },
-    {
-      heading: '9. Intellectual Property',
-      blocks: [
-        {
-          text: 'Partners grant BookALook.in a non-exclusive, royalty-free licence to use their business name, logo, photos, and descriptions for marketing and listing purposes.',
-        },
-        {
-          text: "Partners shall not use BookALook.in's name, logo, or brand assets without prior written consent.",
-        },
-      ],
-    },
-    {
-      heading: '10. Termination',
-      blocks: [
-        { text: "Either party may terminate this Agreement with 30 days' written notice." },
-        {
-          text: 'BookALook.in may terminate immediately for material breaches, fraud, or repeated service failures.',
-        },
-        { text: 'Upon termination, all outstanding dues must be settled before account closure.' },
-      ],
-    },
-    {
-      heading: '11. Indemnity & Liability',
-      blocks: [
-        {
-          text: 'The Partner agrees to indemnify and hold BookALook.in harmless from any claims, damages, or losses arising out of:',
-        },
+        { lead: 'E. Technical Information' },
         {
           bullets: [
-            'Non-performance or service issues.',
-            'Breach of applicable laws.',
-            "Customer disputes relating to the Partner's actions.",
+            'Device and operating system information.',
+            'App version.',
+            'IP address and basic log information.',
+            'Crash reports and diagnostic information.',
+            'Usage and interaction information.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '3. How We Use Your Information',
+      blocks: [
+        { text: 'We may use your information to:' },
+        {
+          bullets: [
+            'Create and manage customer accounts.',
+            'Authenticate users through OTP or other supported methods.',
+            'Display salons and services.',
+            'Create and manage appointments.',
+            'Generate booking references and QR codes.',
+            'Send booking confirmations and reminders.',
+            'Process online payments and refunds through payment partners.',
+            'Share relevant booking information with the selected salon.',
+            'Provide customer support.',
+            'Detect fraud and unauthorized activities.',
+            'Improve application performance and user experience.',
+            'Meet legal, regulatory, accounting, and security requirements.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '4. Sharing Information With Salon Partners',
+      blocks: [
+        {
+          text: 'When you make a booking, relevant information may be shared with the selected salon so that it can manage and fulfil your appointment.',
+        },
+        { text: 'This may include:' },
+        {
+          bullets: [
+            'Customer name.',
+            'Contact information necessary for appointment coordination.',
+            'Selected service.',
+            'Appointment date and time.',
+            'Booking reference.',
+            'Relevant booking status.',
           ],
         },
         {
-          text: "BookALook.in's liability under this Agreement shall be limited to the amount of commission earned from the disputed transaction.",
+          text: 'Salon partners are expected to use this information only for legitimate booking-related purposes and their applicable legal obligations.',
         },
       ],
     },
     {
-      heading: '12. Governing Law',
+      heading: '5. Sharing Information With Third Parties',
       blocks: [
+        { text: 'We may share necessary information with:' },
         {
-          text: 'This Agreement shall be governed by and construed in accordance with the laws of India. The courts at Chhatrapati Sambhajinagar, Maharashtra shall have exclusive jurisdiction.',
+          bullets: [
+            'Payment gateway providers.',
+            'OTP and authentication service providers.',
+            'WhatsApp or other notification providers.',
+            'Cloud hosting and infrastructure providers.',
+            'Analytics and crash-monitoring providers.',
+            'Customer support and operational service providers.',
+            'Government authorities or law enforcement where legally required.',
+          ],
+        },
+        {
+          text: 'Such sharing will be limited to legitimate operational, contractual, security, or legal purposes.',
         },
       ],
     },
     {
-      heading: '13. Service Level Agreement (SLA)',
+      heading: '6. Online Payment Privacy',
       blocks: [
-        { text: 'Partners must maintain punctuality, hygiene, and professional conduct at all times.' },
         {
-          text: 'BookALook.in may conduct quality checks and customer surveys to ensure service standards.',
+          text: 'For online payments, the payment gateway processes payment credentials according to its own security and privacy practices.',
         },
         {
-          text: 'Breach of SLA terms may result in penalties, temporary suspension, or removal from the platform.',
+          text: 'Book A Look may receive transaction confirmation and related payment status information to update your booking.',
+        },
+        { text: 'Customers should review the privacy policy of the payment provider where applicable.' },
+      ],
+    },
+    {
+      heading: '7. Pay at Store Privacy',
+      blocks: [
+        { text: 'For Pay at Store bookings, Book A Look does not collect the service payment from the customer.' },
+        { text: 'The salon may independently process the payment and maintain its own transaction records.' },
+        { text: 'The salon is responsible for handling payment information collected directly by it.' },
+      ],
+    },
+    {
+      heading: '8. Notifications and Communications',
+      blocks: [
+        { text: 'We may send:' },
+        {
+          bullets: [
+            'OTP and authentication messages.',
+            'Booking confirmations.',
+            'Appointment reminders.',
+            'Cancellation and rescheduling updates.',
+            'Payment and refund updates.',
+            'Important service announcements.',
+            'Promotional communications, where appropriate and subject to applicable consent requirements.',
+          ],
+        },
+        {
+          text: 'You may opt out of promotional communications through available controls. Transactional and essential service communications may still be sent where necessary.',
         },
       ],
     },
     {
-      heading: '14. Non-Solicitation & Platform Integrity',
+      heading: '9. Data Retention',
       blocks: [
         {
-          text: "Partners shall not directly approach, solicit, or induce BookALook.in customers to transact outside the platform.",
+          text: 'We retain personal information only for as long as reasonably necessary for the purposes described in this policy, including:',
         },
         {
-          text: 'Any circumvention of platform booking, manipulation of pricing, or fee avoidance shall constitute a material breach, leading to termination and potential damages recovery.',
+          bullets: [
+            'Maintaining accounts.',
+            'Completing bookings.',
+            'Handling disputes and refunds.',
+            'Meeting accounting and legal requirements.',
+            'Preventing fraud and ensuring platform security.',
+          ],
+        },
+        { text: 'Information may be retained for longer where required by applicable law.' },
+      ],
+    },
+    {
+      heading: '10. Data Security',
+      blocks: [
+        {
+          text: 'We implement reasonable technical and organizational safeguards to protect personal information against unauthorized access, disclosure, alteration, loss, and misuse.',
+        },
+        { text: 'However, no electronic transmission or storage method can be guaranteed to be completely secure.' },
+      ],
+    },
+    {
+      heading: '11. User Rights and Choices',
+      blocks: [
+        { text: 'Subject to applicable law, users may request:' },
+        {
+          bullets: [
+            'Access to information relating to their account.',
+            'Correction of inaccurate personal information.',
+            'Deletion of personal information where legally permissible.',
+            'Withdrawal of consent where processing is based on consent.',
+            'Grievance redressal regarding personal information.',
+          ],
+        },
+        { text: `Requests can be submitted to ${CONTACT_EMAIL}.` },
+        { text: 'We may need to verify your identity before processing such requests.' },
+      ],
+    },
+    {
+      heading: "12. Children's Privacy",
+      blocks: [
+        { text: 'Our platform is intended for individuals legally capable of entering into applicable transactions.' },
+        {
+          text: 'If we become aware that personal information has been collected from a child in circumstances prohibited by applicable law, we will take appropriate steps.',
         },
       ],
     },
     {
-      heading: '15. Confidentiality',
+      heading: '13. Cookies and Similar Technologies',
       blocks: [
         {
-          text: 'Both parties shall keep all non-public data, including customer information and platform analytics, strictly confidential.',
+          text: 'Our website may use cookies and similar technologies for essential functionality, analytics, security, and user experience.',
         },
         {
-          text: 'Partners may use customer data only for service fulfilment, not for direct marketing or third-party sharing.',
-        },
-        {
-          text: 'BookALook.in will handle partner data in compliance with applicable Indian data protection and IT laws.',
+          text: 'Users can manage browser cookie settings. Disabling certain cookies may affect website functionality.',
         },
       ],
     },
     {
-      heading: '16. Dispute Resolution',
+      heading: '14. Third-Party Links',
       blocks: [
-        { text: 'Disputes shall first be resolved amicably through discussion within 30 days.' },
+        { text: 'Our website or application may contain links to third-party websites or services.' },
         {
-          text: 'If unresolved, disputes will be referred to binding arbitration under the Arbitration and Conciliation Act, 1996.',
-        },
-        {
-          text: 'The arbitration venue shall be Chhatrapati Sambhajinagar, Maharashtra, and proceedings shall be conducted in English.',
+          text: 'We are not responsible for the privacy practices of external services. Users should review their respective privacy policies.',
         },
       ],
     },
     {
-      heading: '17. Contact',
+      heading: '15. Changes to This Privacy Policy',
       blocks: [
-        { text: 'For partner support, clarifications, or legal queries, please reach out to:' },
+        { text: 'We may update this policy to reflect changes in our services, technology, or applicable laws.' },
+        { text: 'The revised policy will be published with an updated date.' },
+      ],
+    },
+    {
+      heading: '16. Contact and Grievance Redressal',
+      blocks: [{ lead: 'Privacy and Grievance Contact' }, ...CONTACT_BLOCKS],
+    },
+  ],
+};
+
+// ---------------------------------------- cancellation, rescheduling & refund
+
+export const CANCELLATION_REFUND_POLICY: LegalDocument = {
+  slug: 'cancellation-refund',
+  title: 'Cancellation, Rescheduling & Refund Policy',
+  kicker: 'Book A Look',
+  summary:
+    'How cancellation, rescheduling, refunds and appointment-related payment issues are handled for bookings made through Book A Look.',
+  related: ALL_RELATED,
+  sections: [
+    {
+      heading: '1. Introduction',
+      blocks: [
+        {
+          text: 'This policy governs cancellation, rescheduling, refunds, and appointment-related payment issues for bookings made through Book A Look.',
+        },
+        { text: 'Book A Look is a marketplace connecting customers with independent salon partners.' },
+      ],
+    },
+    {
+      heading: '2. Cancellation Time Limit',
+      blocks: [
+        {
+          text: 'Customers may cancel a confirmed appointment through the application, subject to the following standard rule:',
+        },
+        {
+          bullets: [
+            'Cancellation must be completed at least 90 minutes before the scheduled appointment start time.',
+            'Cancellations requested within 90 minutes of the appointment may not be permitted through the application.',
+            'Requests for exceptions may be submitted to customer support and will be reviewed based on the circumstances and applicable law.',
+          ],
+        },
+        {
+          text: 'The relevant appointment time displayed in the booking details will be used to determine the cancellation deadline.',
+        },
+      ],
+    },
+    {
+      heading: '3. Rescheduling Rules',
+      blocks: [
+        { text: 'Customers may request rescheduling at least 90 minutes before the original appointment start time.' },
+        { text: 'Rescheduling:' },
+        {
+          bullets: [
+            'Is subject to available appointment slots.',
+            'Must be completed through the supported application functionality or customer support process.',
+            'Is not confirmed until the revised appointment details are displayed as confirmed.',
+            'May be subject to additional restrictions displayed during the booking process.',
+          ],
+        },
+        {
+          text: 'Any restriction on repeated rescheduling must be clearly disclosed to the customer before the booking is confirmed.',
+        },
+      ],
+    },
+    {
+      heading: '4. Online Payment Bookings',
+      blocks: [
+        { text: 'Where a customer has paid online:' },
+        { lead: 'A. Cancellation Within the Permitted Time' },
+        {
+          text: 'Where cancellation is completed at least 90 minutes before the appointment, the customer will be eligible for a refund of the amount paid for the cancelled booking, subject to applicable law and any clearly disclosed non-refundable charges permitted by law.',
+        },
+        { lead: 'B. Cancellation Within the Restricted Period' },
+        {
+          text: 'Where cancellation is attempted within 90 minutes of the appointment, the platform may not permit cancellation or refund through the normal booking process.',
+        },
+        {
+          text: 'Exceptions may be considered where the salon cancels, the service cannot be provided, a duplicate transaction occurs, or another circumstance warrants a remedy under applicable law.',
+        },
+        { lead: 'C. Salon-Initiated Cancellation' },
+        {
+          text: 'If a salon cancels a confirmed appointment and the service cannot be provided, the customer will be eligible for a refund of the amount paid online for that booking.',
+        },
+        { lead: 'D. Failed or Duplicate Transactions' },
+        {
+          text: 'If a customer is charged but the booking is not successfully confirmed, or a duplicate payment is identified, the transaction will be investigated and the applicable amount refunded or reversed.',
+        },
+      ],
+    },
+    {
+      heading: '5. Pay at Store Bookings',
+      blocks: [
+        { text: 'For Pay at Store bookings:' },
+        {
+          bullets: [
+            'The customer pays the salon directly.',
+            'Book A Look does not collect the service amount.',
+            'Book A Look cannot directly refund an amount that it has not received.',
+            'If the salon has collected any advance payment independently, the salon is responsible for processing the applicable refund, subject to applicable law and the disclosed payment terms.',
+          ],
+        },
+        { text: 'Customers may contact Book A Look for assistance in resolving booking-related disputes.' },
+      ],
+    },
+    {
+      heading: '6. Refund Processing',
+      blocks: [
+        { text: 'For eligible online payment refunds:' },
+        {
+          bullets: [
+            'Refund requests will be initiated after the relevant cancellation or refund decision is confirmed.',
+            'Refunds will ordinarily be sent to the original payment method.',
+            'The payment gateway, bank, or payment provider may require additional processing time.',
+            'The expected processing timeline should be displayed or communicated to the customer.',
+          ],
+        },
+        { text: "The final crediting time may depend on the customer's bank or payment provider." },
+      ],
+    },
+    {
+      heading: '7. No-Show',
+      blocks: [
+        {
+          text: 'If a customer fails to arrive for a confirmed appointment without cancelling it within the permitted time:',
+        },
+        {
+          bullets: [
+            'The booking may be marked as a no-show.',
+            'The salon may decline to provide the missed appointment slot.',
+            'Refund eligibility will be assessed according to the disclosed booking conditions and applicable law.',
+          ],
+        },
+        { text: 'No-show conditions must be visible to the customer before confirmation.' },
+      ],
+    },
+    {
+      heading: '8. Service Not Provided or Unsatisfactory Service',
+      blocks: [
+        {
+          text: 'If a salon fails to provide a confirmed service, customers should report the issue to Book A Look as soon as possible.',
+        },
+        {
+          text: 'Where a service is materially different from what was booked, or a service is not provided, Book A Look may coordinate with the salon and assess an appropriate remedy.',
+        },
+        { text: 'Refunds or other remedies will be considered in accordance with applicable consumer protection law.' },
+      ],
+    },
+    {
+      heading: '9. How to Request Assistance',
+      blocks: [
+        { text: 'Customers should contact:' },
+        { text: `Email: ${CONTACT_EMAIL}` },
+        { text: 'Please provide:' },
+        {
+          bullets: [
+            'Customer name.',
+            'Booking reference.',
+            'Salon name.',
+            'Appointment date and time.',
+            'Transaction reference, if applicable.',
+            'Brief description of the issue.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '10. Policy Changes',
+      blocks: [
+        {
+          text: 'Book A Look may revise this policy from time to time. Updated terms will be published on the website and application.',
+        },
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------- salon partner policy
+
+export const PARTNER_TERMS: LegalDocument = {
+  slug: 'partner-terms',
+  title: 'Salon Partner Policy',
+  kicker: 'Book A Look for Salons',
+  summary:
+    'The rules for salons, barbershops, grooming studios and other service providers that list and take bookings on Book A Look.',
+  related: ALL_RELATED,
+  sections: [
+    {
+      heading: '1. Introduction',
+      blocks: [
+        {
+          text: 'This Salon Partner Policy governs the participation of salons, barbershops, grooming studios, and other eligible service providers ("Salon Partners") on Book A Look, operated by Bookalook Private Limited.',
+        },
+        {
+          text: 'By registering with or using the Book A Look partner platform, the Salon Partner agrees to comply with this policy and the applicable partner agreement.',
+        },
+      ],
+    },
+    {
+      heading: '2. Platform Relationship',
+      blocks: [
+        {
+          text: 'Book A Look provides technology that enables salon discovery, appointment booking, and booking management.',
+        },
+        {
+          text: 'The Salon Partner remains an independent service provider and is responsible for delivering salon services to customers.',
+        },
+        {
+          text: 'Nothing in this policy automatically creates an employer-employee, partnership, franchise, or agency relationship between Book A Look and a Salon Partner.',
+        },
+      ],
+    },
+    {
+      heading: '3. Salon Registration',
+      blocks: [
+        { text: 'Salon Partners must provide accurate information, including:' },
+        {
+          bullets: [
+            'Business and salon name.',
+            'Owner or authorized representative details.',
+            'Valid contact information.',
+            'Salon address and location.',
+            'Applicable business registration or licences, where required.',
+            'Service categories and prices.',
+            'Operating hours.',
+            'Staff and appointment availability.',
+          ],
+        },
+        { text: "Book A Look may request supporting documents to verify the salon's information." },
+      ],
+    },
+    {
+      heading: '4. Listing Accuracy',
+      blocks: [
+        { text: 'Salon Partners must:' },
+        {
+          bullets: [
+            'Maintain accurate salon profiles.',
+            'Provide genuine photographs and descriptions.',
+            'Keep service prices updated.',
+            'Update operating hours and holiday schedules.',
+            'Maintain accurate appointment availability.',
+            'Inform Book A Look about changes to business details.',
+          ],
+        },
+        { text: 'Misleading listings, fake prices, or unauthorized use of images are prohibited.' },
+      ],
+    },
+    {
+      heading: '5. Appointment Management',
+      blocks: [
+        { text: 'Salon Partners must:' },
+        {
+          bullets: [
+            'Monitor incoming bookings.',
+            "Accept or reject booking requests according to the platform's booking workflow.",
+            'Avoid accepting appointments beyond available capacity.',
+            'Honour confirmed bookings.',
+            'Update booking statuses accurately.',
+            'Inform customers promptly of unavoidable changes.',
+            'Avoid double-booking.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '6. Customer Service and Quality',
+      blocks: [
+        { text: 'Salon Partners are responsible for:' },
+        {
+          bullets: [
+            'Providing services professionally.',
+            'Maintaining reasonable hygiene and safety standards.',
+            'Ensuring staff competence.',
+            'Treating customers respectfully.',
+            'Honouring confirmed service descriptions and prices.',
+            'Handling complaints relating to the actual salon service.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '7. Payment Methods',
+      blocks: [
+        { text: 'Book A Look may support online payment and Pay at Store bookings.' },
+        { lead: 'A. Online Payment' },
+        { text: 'Where online payments are enabled:' },
+        {
+          bullets: [
+            'Payments will be processed using the payment arrangement approved for the platform.',
+            'The Salon Partner must comply with the applicable settlement and reconciliation process.',
+            'The Salon Partner must not collect an additional amount for a service already paid in full online unless the customer has agreed to a legitimate additional service or charge.',
+            'Refund responsibilities will follow the applicable partner agreement and refund workflow.',
+          ],
+        },
+        {
+          text: 'The precise collection, settlement, commission, gateway fee, and refund arrangement will be communicated separately to the Salon Partner.',
+        },
+        { lead: 'B. Pay at Store' },
+        { text: 'Where Pay at Store is selected:' },
+        {
+          bullets: [
+            'The customer pays the Salon Partner directly.',
+            'The Salon Partner is responsible for collecting payment and issuing any applicable receipt.',
+            'The Salon Partner must honour the price displayed at the time of booking, subject to customer-approved changes.',
+            'Book A Look may record booking and payment status for platform administration.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '8. Commission and Subscription',
+      blocks: [
+        {
+          text: 'Applicable commission rates, subscription charges, taxes, and settlement arrangements will be communicated through the selected partner plan or a separate commercial agreement.',
+        },
+        {
+          text: 'No commission or fee shall be assumed unless it has been disclosed and accepted under the applicable partner arrangement.',
+        },
+      ],
+    },
+    {
+      heading: '9. Cancellations and Salon-Initiated Changes',
+      blocks: [
+        { text: 'Salon Partners should avoid cancelling confirmed bookings except where reasonably necessary.' },
+        { text: 'If a salon cannot honour an appointment, it must:' },
+        {
+          bullets: [
+            'Inform the customer as soon as possible.',
+            'Update the booking status through the platform.',
+            'Cooperate with customer support.',
+            'Assist with applicable refunds where the salon is responsible under the payment arrangement.',
+          ],
+        },
+        {
+          text: 'Repeated unjustified cancellations may result in reduced visibility, suspension, or removal from the platform.',
+        },
+      ],
+    },
+    {
+      heading: '10. QR Check-in',
+      blocks: [
+        { text: 'Where QR check-in is enabled:' },
+        {
+          bullets: [
+            'Each booking may have a unique QR code.',
+            'The customer QR code becomes available 15 minutes before the appointment.',
+            'The salon must use the authorized check-in functionality.',
+            'QR codes must not be reused or manually manipulated.',
+            'Booking completion must be recorded accurately.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '11. Customer Data and Confidentiality',
+      blocks: [
+        { text: 'Salon Partners may access customer information necessary to manage confirmed appointments.' },
+        { text: 'They must:' },
+        {
+          bullets: [
+            'Use customer information only for legitimate appointment-related purposes and other lawful purposes.',
+            'Protect customer contact information.',
+            'Avoid selling or sharing customer information without lawful authority.',
+            'Avoid unsolicited marketing without the required permission.',
+            'Secure devices and accounts used to access the partner platform.',
+            'Comply with applicable data protection laws.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '12. Prohibited Conduct',
+      blocks: [
+        { text: 'Salon Partners must not:' },
+        {
+          bullets: [
+            'Create fake bookings or reviews.',
+            'Misrepresent services or prices.',
+            'Manipulate appointment statuses.',
+            'Misuse customer data.',
+            'Circumvent agreed platform charges.',
+            'Discriminate unlawfully against customers.',
+            'Engage in fraudulent or misleading conduct.',
+            'Upload content that infringes third-party rights.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '13. Suspension and Termination',
+      blocks: [
+        {
+          text: 'Book A Look may investigate complaints and restrict or suspend partner accounts where there is evidence of fraud, repeated customer complaints, inaccurate listings, misuse of the platform, or violation of this policy.',
+        },
+        {
+          text: 'Where practical, the Salon Partner will be informed of the concern and given an opportunity to respond.',
+        },
+      ],
+    },
+    {
+      heading: '14. Complaints and Disputes',
+      blocks: [
+        { text: 'Salon Partners should first attempt to resolve customer service complaints fairly and promptly.' },
+        { text: 'Platform-related concerns may be sent to:' },
         { text: CONTACT_EMAIL },
       ],
+    },
+    {
+      heading: '15. Changes to This Policy',
+      blocks: [
+        {
+          text: 'Book A Look may revise this policy from time to time. Updated terms will be communicated or published through the partner platform.',
+        },
+      ],
+    },
+  ],
+};
+
+// ------------------------------------------------------------ delete account
+
+/**
+ * Google Play requires apps that let users create an account to publish a web
+ * page explaining how to request account deletion, and to link it from the
+ * Data safety form. The customer steps mirror the in-app flow (Profile →
+ * Delete Account → CustomerAuthController::deleteAccount, which anonymises the
+ * profile and keeps booking/payment records). Partner accounts carry
+ * settlements and dues, so they are closed on request by support.
+ */
+export const ACCOUNT_DELETION: LegalDocument = {
+  slug: 'delete-account',
+  title: 'Delete Your Account',
+  kicker: 'Book A Look',
+  summary:
+    'How to delete your Book A Look customer or salon partner account, what is removed, and what is kept and why.',
+  related: ALL_RELATED,
+  sections: [
+    {
+      heading: '1. Customers — Delete From the App',
+      blocks: [
+        { text: 'You can delete your customer account yourself at any time from the Book A Look app:' },
+        {
+          bullets: [
+            'Open the Book A Look app and sign in.',
+            'Go to the Profile tab.',
+            'Tap Delete Account at the bottom of the page.',
+            'Confirm by tapping Delete.',
+          ],
+        },
+        {
+          text: `If you no longer have the app, email ${CONTACT_EMAIL} with the subject "Delete my account" and the mobile number registered with Book A Look. We may need to verify that the number belongs to you before deleting the account.`,
+        },
+      ],
+    },
+    {
+      heading: '2. Salon Partners — Request Deletion',
+      blocks: [
+        {
+          text: 'Salon partner accounts are closed by our support team, because pending bookings, settlements, and dues have to be resolved first. To request deletion:',
+        },
+        {
+          bullets: [
+            'In the Book A Look Partner app, open More → Delete Account to see these steps, or',
+            `Email ${CONTACT_EMAIL} with the subject "Delete my partner account".`,
+            'Include the salon name, owner name, and the mobile number registered with Book A Look.',
+          ],
+        },
+        {
+          text: 'We will verify the request with the registered owner, settle any outstanding bookings, payouts, or dues under the applicable partner arrangement, then close the account and remove the salon listing from Book A Look.',
+        },
+      ],
+    },
+    {
+      heading: '3. What Is Deleted',
+      blocks: [
+        {
+          bullets: [
+            'Your name, mobile number, email address, address, pincode, and date of birth are removed from your profile.',
+            'You are signed out of every device and the account can no longer be used to sign in.',
+            'For salon partners, the salon listing is no longer shown to customers.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '4. What Is Kept and Why',
+      blocks: [
+        {
+          text: 'Some records must be retained after an account is deleted, as described in our Privacy Policy:',
+        },
+        {
+          bullets: [
+            'Booking and appointment history, payment, refund, and invoice records — for accounting, tax, and legal requirements.',
+            'Records relating to open disputes, refunds, or settlements — until they are resolved.',
+            'Limited records needed to prevent fraud and ensure platform security.',
+          ],
+        },
+        {
+          text: 'Retained records are no longer linked to your name, mobile number, or email address, and are kept only as long as reasonably necessary or as required by applicable law.',
+        },
+      ],
+    },
+    {
+      heading: '5. Need Help?',
+      blocks: [{ text: 'For any question about deleting your account or your personal information, contact:' }, ...CONTACT_BLOCKS],
     },
   ],
 };

@@ -10,6 +10,7 @@ import 'mandatory_update_screen.dart';
 import 'phone_screen.dart';
 import 'dashboard/salon_switching.dart';
 import 'dashboard/service_provider_dashboard.dart';
+import '../services/notification_router.dart';
 import 'dashboard/collaborator_dashboard.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -106,6 +107,10 @@ class _SplashScreenState extends State<SplashScreen>
       );
       return;
     }
+
+    // Past the update gate: whatever screen comes next is a real one, so a
+    // notification tapped while the app was closed can now be opened.
+    NotificationRouter.markAppReady();
 
     if (_cachedToken != null &&
         _cachedToken!.isNotEmpty &&

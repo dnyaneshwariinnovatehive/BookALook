@@ -1808,8 +1808,10 @@ html {
   margin: 0 0 0.6rem !important;
 }
 .blk-page__toc-list {
+  /* Headings carry their own numbers ("1. Introduction"), so the list adds none. */
+  list-style: none;
   margin: 0;
-  padding-left: 1.1rem;
+  padding-left: 0;
   display: grid;
   gap: 0.3rem;
   font-size: 0.95rem;

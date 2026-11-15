@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.partner_app"
+    namespace = "com.bookalook.partner_app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.partner_app"
+        applicationId = "com.bookalook.partner_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -58,4 +58,14 @@ tasks.whenTaskAdded {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Firebase (push notifications). Reads app/google-services.json, which is
+// downloaded from the Firebase console for com.bookalook.partner_app. Applied
+// only when the file is present so the app still builds without it — push
+// then stays off and the app logs why, instead of the whole build failing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("Partner App: android/app/google-services.json is missing — push notifications are disabled in this build.")
 }

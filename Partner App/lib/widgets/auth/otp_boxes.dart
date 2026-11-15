@@ -117,6 +117,18 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
     }
   }
 
+  /// Bring the keyboard back. If the user closed it (back button, swipe)
+  /// the field usually still has focus, and requestFocus() on a focused node
+  /// does nothing, which is why a tap used to need several attempts. So when
+  /// focus is already here, ask the platform to show the keyboard directly.
+  void _openKeyboard() {
+    if (_focus.hasFocus) {
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    } else {
+      _focus.requestFocus();
+    }
+  }
+
   @override
   void dispose() {
     widget.controller.removeListener(_onText);
@@ -257,7 +269,7 @@ class _OtpBoxesState extends State<OtpBoxes> with TickerProviderStateMixin {
                       return Transform.scale(
                         scale: scale,
                         child: GestureDetector(
-                          onTap: widget.enabled ? _focus.requestFocus : null,
+                          onTap: widget.enabled ? _openKeyboard : null,
                           behavior: HitTestBehavior.opaque,
                           child: AnimatedContainer(
                             duration: AuthMotion.fast,

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/app_version_service.dart';
+import '../services/play_update_service.dart';
 import '../theme/app_theme.dart';
 import 'splash_screen.dart';
 
@@ -37,6 +40,8 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Google requires an interrupted immediate update to be resumed.
+      unawaited(PlayUpdateService.resumeImmediateIfInProgress());
       _recheckVersion();
     }
   }
@@ -69,6 +74,17 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen>
       _errorMessage = null;
     });
 
+    // Prefer Play's own full-screen update; it installs and restarts the app.
+    final outcome = await PlayUpdateService.startImmediate();
+    if (!mounted) return;
+    if (outcome != PlayUpdateOutcome.unavailable) {
+      // Started (Play restarts the app) or declined (stay on this screen).
+      setState(() => _isLaunching = false);
+      return;
+    }
+
+    // Play can't help here (sideloaded build, iOS, rollout not reached this
+    // user yet) — open the store listing instead.
     final storeUrl = widget.updateInfo.storeUrl;
     final success = await AppVersionService.launchStoreUrl(storeUrl);
 

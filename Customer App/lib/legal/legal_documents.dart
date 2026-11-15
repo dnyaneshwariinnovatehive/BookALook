@@ -12,9 +12,9 @@
 
 // The contact details the policy documents name. Kept as top-level constants
 // because every "Contact us" section in the document set quotes them.
-const String kLegalContactCompany = "BOOKALOOK PRIVATE LIMITED";
+const String kLegalContactCompany = "Bookalook Private Limited";
 const String kLegalContactEmail = "bookalook01@gmail.com";
-const String kLegalContactAddress = "PLOT NO 44 SR NO 17/22, DEVGIRI COLONY N-2, Aurangabad (MH), Aurangabad, Aurangabad- 431001, Maharashtra";
+const String kLegalContactAddress = "Plot No. 44, Survey No. 17/22, Devgiri Colony, N-2, Aurangabad, Maharashtra – 431001, India";
 
 /// One paragraph, or a labelled sub-clause, or a bullet list.
 class LegalBlock {
@@ -63,149 +63,214 @@ class LegalDocument {
 const List<LegalDocument> kLegalDocuments = [
   LegalDocument(
     slug: "terms",
-    title: "Terms of Use",
-    kicker: "BookALook",
-    summary: "These Terms of Use govern your access to and use of the BookALook.in website, mobile application and related services.",
-    related: "About BookALook · Terms of Use · Privacy Policy · Cancellation & Refund Policy · Partner Terms & Conditions",
+    title: "Terms & Conditions",
+    kicker: "Book A Look",
+    summary: "These Terms & Conditions govern access to and use of the Book A Look website, mobile application and related services operated by Bookalook Private Limited.",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
     sections: [
       LegalSection(
-        heading: "A. Introduction",
+        heading: "1. Introduction",
         blocks: [
-          LegalBlock(text: "Welcome to BookALook.in (\"Company\", \"we\", \"our\", \"us\"). These Terms of Use (\"Terms\") govern your access to and use of our website, mobile application, and related services (collectively, the \"Platform\") that enable users to discover, schedule, and manage appointments with salons and beauty parlours (\"Services\")."),
-          LegalBlock(text: "By accessing or using the Platform, you agree to be bound by these Terms and our Privacy Policy. If you do not agree, you must not use or access the Platform."),
+          LegalBlock(text: "These Terms & Conditions govern access to and use of the Book A Look website, mobile application, and related services operated by Bookalook Private Limited (\"Book A Look\", \"Company\", \"we\", \"us\" or \"our\")."),
+          LegalBlock(text: "By accessing the website, downloading or using the application, creating an account, or making a booking, you (\"Customer\", \"User\" or \"you\") agree to these Terms & Conditions."),
+          LegalBlock(text: "If you do not agree with these terms, please discontinue using our services."),
         ],
       ),
       LegalSection(
-        heading: "B. Eligibility",
+        heading: "2. About Book A Look",
         blocks: [
-          LegalBlock(text: "You must be at least 18 years of age and capable of entering into a legally binding contract under the Indian Contract Act, 1872 to use our Platform. By using the Platform, you represent and warrant that you meet these eligibility requirements."),
-        ],
-      ),
-      LegalSection(
-        heading: "C. Platform Overview",
-        blocks: [
-          LegalBlock(text: "BookALook.in provides an online appointment booking and discovery platform for salons, spas, and beauty parlours. The Platform connects users seeking grooming or beauty services (\"Customers\") with independent salon owners or professionals (\"Service Providers\")."),
-          LegalBlock(text: "We do not own, operate, or control any salon or service listed on the Platform. Each Service Provider is solely responsible for its services, staff, pricing, availability, and quality standards."),
-        ],
-      ),
-      LegalSection(
-        heading: "D. Account Registration and Responsibilities",
-        blocks: [
-          LegalBlock(text: "To access booking features, you may be required to create an account by providing accurate personal information."),
-          LegalBlock(text: "You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account."),
-          LegalBlock(text: "You agree to immediately notify us of any unauthorised access or use of your account."),
-          LegalBlock(text: "BookALook.in reserves the right to suspend or terminate accounts suspected of misuse, fraudulent activity, or violation of these Terms."),
-        ],
-      ),
-      LegalSection(
-        heading: "E. Role of BookALook.in",
-        blocks: [
-          LegalBlock(text: "BookALook.in acts solely as a facilitator and intermediary between Customers and Service Providers."),
-          LegalBlock(text: "All bookings are directly between the Customer and the Service Provider."),
-          LegalBlock(text: "The Company is not responsible for:"),
+          LegalBlock(text: "Book A Look is an online salon discovery and appointment booking marketplace that enables customers to discover participating salons, view available services and listed prices, check appointment availability, and book appointments."),
+          LegalBlock(text: "Book A Look acts as a technology platform connecting customers with independent salon partners."),
+          LegalBlock(text: "Unless expressly stated otherwise, the salon partner is responsible for:"),
           LegalBlock(bullets: [
-            "The quality, timing, pricing, or completion of services.",
-            "Any disputes or damages arising between Customers and Service Providers.",
-            "The conduct or background of any Service Provider.",
+            "Providing the salon services.",
+            "Maintaining service quality and hygiene.",
+            "Ensuring staff availability.",
+            "Delivering services at the listed prices.",
+            "Handling customer concerns relating to the actual salon service.",
+          ]),
+          LegalBlock(text: "Book A Look does not itself provide salon, grooming, or beauty services."),
+        ],
+      ),
+      LegalSection(
+        heading: "3. Eligibility and Account Registration",
+        blocks: [
+          LegalBlock(text: "Users must provide accurate and complete information when creating an account or making a booking."),
+          LegalBlock(text: "You agree:"),
+          LegalBlock(bullets: [
+            "To provide a valid mobile number and other requested information.",
+            "Not to impersonate another person.",
+            "Not to create fraudulent or duplicate accounts.",
+            "To maintain the confidentiality of your account credentials and OTPs.",
+            "To notify us if you suspect unauthorized access to your account.",
+          ]),
+          LegalBlock(text: "You are responsible for activities performed through your account, subject to applicable law."),
+        ],
+      ),
+      LegalSection(
+        heading: "4. Salon Information and Services",
+        blocks: [
+          LegalBlock(text: "Salon profiles, service descriptions, prices, photographs, operating hours, and availability may be provided by salon partners."),
+          LegalBlock(text: "Book A Look makes reasonable efforts to maintain accurate platform information but cannot guarantee that every listing is continuously updated or error-free."),
+          LegalBlock(text: "Customers should review the service details and applicable price before confirming a booking."),
+        ],
+      ),
+      LegalSection(
+        heading: "5. Appointment Booking",
+        blocks: [
+          LegalBlock(text: "A booking request must be submitted through the available booking interface."),
+          LegalBlock(text: "A booking shall be treated as confirmed only when the platform displays a confirmed booking status or communicates confirmation through an authorized notification channel."),
+          LegalBlock(text: "Each confirmed booking may have a unique booking reference and QR code."),
+          LegalBlock(text: "The customer must verify:"),
+          LegalBlock(bullets: [
+            "Salon name and location.",
+            "Selected service.",
+            "Appointment date and time.",
+            "Applicable service price.",
+            "Selected payment method.",
+          ]),
+          LegalBlock(text: "The customer should arrive at the salon at the scheduled appointment time."),
+        ],
+      ),
+      LegalSection(
+        heading: "6. Payment Methods",
+        blocks: [
+          LegalBlock(text: "Book A Look may support the following payment methods, depending on the salon, service, and availability:"),
+          LegalBlock(lead: "A. Online Payment"),
+          LegalBlock(text: "Customers may pay through supported payment gateways and payment methods displayed at checkout."),
+          LegalBlock(text: "Online transactions are subject to the applicable payment gateway terms, bank policies, and transaction processing rules."),
+          LegalBlock(text: "A booking requiring online payment will be confirmed according to the payment and booking confirmation process displayed in the application."),
+          LegalBlock(lead: "B. Pay at Store"),
+          LegalBlock(text: "Customers selecting Pay at Store must pay the salon directly when visiting the salon."),
+          LegalBlock(text: "Accepted payment methods at the salon may include cash, UPI, debit card, credit card, or other methods accepted by that salon."),
+          LegalBlock(text: "Book A Look does not collect the service amount for a Pay at Store booking."),
+          LegalBlock(text: "Customers should confirm any payment-related questions directly with the salon."),
+        ],
+      ),
+      LegalSection(
+        heading: "7. Pricing and Additional Charges",
+        blocks: [
+          LegalBlock(text: "The prices displayed on Book A Look are based on information supplied by the salon partner."),
+          LegalBlock(text: "Customers must review the displayed service price before booking."),
+          LegalBlock(text: "Any additional service, upgrade, or charge must be communicated to the customer before the customer agrees to receive it."),
+          LegalBlock(text: "Book A Look does not authorize salons to impose undisclosed charges."),
+        ],
+      ),
+      LegalSection(
+        heading: "8. Cancellation and Rescheduling",
+        blocks: [
+          LegalBlock(text: "Customers may cancel or request rescheduling through the available booking functionality, subject to the following standard rule:"),
+          LegalBlock(bullets: [
+            "Cancellation or rescheduling must be completed at least 90 minutes before the scheduled appointment start time.",
+            "Requests made within the 90-minute restricted period may not be permitted through the platform.",
+            "Rescheduling is subject to available appointment slots.",
+            "A rescheduled appointment will be governed by the revised booking details and applicable cancellation rules.",
+          ]),
+          LegalBlock(text: "Any exception must be handled through the customer support process and in accordance with applicable law."),
+          LegalBlock(text: "Detailed refund conditions are described in the Cancellation, Rescheduling and Refund Policy."),
+        ],
+      ),
+      LegalSection(
+        heading: "9. QR Code and Salon Check-in",
+        blocks: [
+          LegalBlock(text: "A unique QR code may be generated for each confirmed booking."),
+          LegalBlock(text: "Where the QR check-in feature is enabled:"),
+          LegalBlock(bullets: [
+            "The QR code becomes visible in the customer's booking section 15 minutes before the scheduled appointment.",
+            "The QR code is intended to verify the booking at the salon.",
+            "The salon may scan the QR code using the authorized check-in functionality.",
+            "A QR code must not be shared, copied, misused, or presented for another person's booking.",
+            "QR validation and booking status are subject to the platform's server-side verification.",
+          ]),
+          LegalBlock(text: "A QR code does not independently guarantee that a salon service has been completed."),
+        ],
+      ),
+      LegalSection(
+        heading: "10. Customer Responsibilities",
+        blocks: [
+          LegalBlock(text: "Customers must:"),
+          LegalBlock(bullets: [
+            "Provide accurate booking information.",
+            "Arrive at the salon on time.",
+            "Follow salon hygiene and safety instructions.",
+            "Treat salon staff respectfully.",
+            "Avoid fraudulent bookings and misuse of promotional offers.",
+            "Inform the salon of any relevant service requirements before the appointment.",
           ]),
         ],
       ),
       LegalSection(
-        heading: "F. User Obligations",
+        heading: "11. Salon Partner Responsibilities",
         blocks: [
-          LegalBlock(text: "When using the Platform, you agree that you will not:"),
-          LegalBlock(bullets: [
-            "Post, transmit or share false, misleading, defamatory, obscene, or unlawful information.",
-            "Attempt to hack, disable or interfere with the operation of the Platform.",
-            "Use the Platform to solicit or promote illegal services.",
-            "Resell, redistribute, or exploit the Platform for commercial gain without written consent.",
-          ]),
+          LegalBlock(text: "Salon partners are responsible for delivering the booked services professionally and in accordance with applicable laws."),
+          LegalBlock(text: "Salon partners must maintain accurate service prices, operating hours, and availability and must not knowingly accept bookings they cannot fulfil."),
         ],
       ),
       LegalSection(
-        heading: "G. Booking, Payment and Pricing",
+        heading: "12. Offers and Promotions",
         blocks: [
-          LegalBlock(text: "Customers can book appointments with listed salons through the Platform by selecting a preferred service, date and time."),
-          LegalBlock(text: "Payments for confirmed bookings, including any advance, are made directly to the salon and recorded on the Platform."),
-          LegalBlock(text: "The Company is not responsible for payment disputes arising from user error or failed transactions."),
-          LegalBlock(text: "Taxes (including GST) are applied as per applicable law and may vary by salon and location."),
-          LegalBlock(text: "A valid booking confirmation shall be issued upon successful payment or as per Service Provider policy."),
+          LegalBlock(text: "Promotional offers may be subject to additional eligibility conditions, expiry dates, service restrictions, and participating salon limitations."),
+          LegalBlock(text: "Offers cannot be exchanged for cash unless expressly stated."),
+          LegalBlock(text: "Book A Look may withdraw or modify an offer in accordance with its stated conditions and applicable law."),
         ],
       ),
       LegalSection(
-        heading: "H. Cancellation and Refund Policy",
+        heading: "13. Reviews and User Content",
         blocks: [
-          LegalBlock(text: "Cancellations, rescheduling and refunds are governed by our Cancellation and Refund Policy, available separately on our Platform. By making a booking, you acknowledge that you have read and agreed to that policy."),
+          LegalBlock(text: "Customers must provide genuine and honest reviews based on their actual experience."),
+          LegalBlock(text: "We may moderate, remove, or restrict content that is unlawful, abusive, misleading, fraudulent, or violates these terms."),
         ],
       ),
       LegalSection(
-        heading: "I. Content and Intellectual Property",
+        heading: "14. Platform Availability",
         blocks: [
-          LegalBlock(text: "All content on the Platform — including text, graphics, images, logos, software, and layout — is the exclusive property of BookALook.in or its licensors and is protected under applicable copyright and trademark laws."),
-          LegalBlock(text: "You may not copy, reproduce, modify, distribute or create derivative works from the Platform without prior written consent."),
-          LegalBlock(text: "Any feedback, suggestions, or ideas submitted by users may be used by the Company without restriction or compensation."),
+          LegalBlock(text: "We may update, maintain, suspend, or modify any part of the website or application to improve functionality, security, or performance."),
+          LegalBlock(text: "We will make reasonable efforts to minimize service disruption."),
         ],
       ),
       LegalSection(
-        heading: "J. Third-Party Services",
+        heading: "15. Limitation of Liability",
         blocks: [
-          LegalBlock(text: "The Platform may contain links to third-party websites or integrate services from third-party providers (including payment gateways, analytics tools, etc.). BookALook.in is not responsible for the content, terms, or privacy practices of such third parties."),
+          LegalBlock(text: "To the extent permitted by applicable law, Book A Look shall not be responsible for independent salon operations, service delivery decisions, or conduct of salon personnel."),
+          LegalBlock(text: "Nothing in these terms excludes liability that cannot legally be excluded, including liability arising from fraud, wilful misconduct, or other non-excludable obligations."),
         ],
       ),
       LegalSection(
-        heading: "K. Disclaimer of Warranties",
+        heading: "16. Suspension and Termination",
         blocks: [
-          LegalBlock(text: "The Platform and its content are provided \"as is\" and \"as available\" without warranties of any kind, either express or implied. We do not warrant that:"),
-          LegalBlock(bullets: [
-            "The Platform will be uninterrupted or error-free.",
-            "Information on the Platform will be accurate, current or reliable.",
-            "Services provided by third parties will meet user expectations.",
-          ]),
+          LegalBlock(text: "Book A Look may restrict or suspend an account where there is reasonable evidence of fraud, misuse, unlawful activity, security threats, or repeated violations of these terms."),
+          LegalBlock(text: "Users may request account closure through customer support, subject to outstanding bookings, transactions, and applicable legal retention requirements."),
         ],
       ),
       LegalSection(
-        heading: "L. Limitation of Liability",
+        heading: "17. Privacy",
         blocks: [
-          LegalBlock(text: "To the fullest extent permitted by law, BookALook.in shall not be liable for any direct, indirect, incidental, consequential, or punitive damages arising out of or relating to:"),
-          LegalBlock(bullets: [
-            "Use or inability to use the Platform;",
-            "Any service, act, or omission of a salon or service provider;",
-            "Loss of profits, data, goodwill, or other intangible losses.",
-          ]),
-          LegalBlock(text: "Our total liability, whether in contract, tort, or otherwise, shall not exceed the total amount paid by you for the relevant booking."),
+          LegalBlock(text: "Personal information is handled in accordance with the Book A Look Privacy Policy."),
         ],
       ),
       LegalSection(
-        heading: "M. Indemnification",
+        heading: "18. Grievance Redressal",
         blocks: [
-          LegalBlock(text: "You agree to indemnify, defend and hold harmless BookALook.in, its partners, employees, affiliates, and service providers from any claims, liabilities, damages, or expenses (including legal fees) arising from your use of the Platform or violation of these Terms."),
-        ],
-      ),
-      LegalSection(
-        heading: "N. Termination",
-        blocks: [
-          LegalBlock(text: "We may suspend or terminate your account and access to the Platform at any time if we believe you have violated these Terms or engaged in fraudulent or harmful activities. Upon termination, all outstanding obligations or dues (if any) must be settled immediately."),
-        ],
-      ),
-      LegalSection(
-        heading: "O. Modifications to Terms",
-        blocks: [
-          LegalBlock(text: "BookALook.in reserves the right to amend or update these Terms from time to time. Updated versions will be posted on the Platform with an effective date. Continued use of the Platform constitutes your acceptance of the revised Terms."),
-        ],
-      ),
-      LegalSection(
-        heading: "P. Governing Law and Jurisdiction",
-        blocks: [
-          LegalBlock(text: "These Terms are governed by the laws of India. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India."),
-        ],
-      ),
-      LegalSection(
-        heading: "Q. Contact Information",
-        blocks: [
-          LegalBlock(text: "For any queries, complaints, or notices regarding these Terms, please contact us at:"),
-          LegalBlock(text: "BOOKALOOK PRIVATE LIMITED"),
-          LegalBlock(text: "PLOT NO 44 SR NO 17/22, DEVGIRI COLONY N-2, Aurangabad (MH), Aurangabad, Aurangabad- 431001, Maharashtra"),
+          LegalBlock(text: "For complaints, concerns, or disputes, contact:"),
+          LegalBlock(lead: "Grievance Officer / Customer Support"),
+          LegalBlock(text: "Bookalook Private Limited"),
+          LegalBlock(text: "Plot No. 44, Survey No. 17/22, Devgiri Colony, N-2, Aurangabad, Maharashtra – 431001, India"),
           LegalBlock(text: "bookalook01@gmail.com"),
+          LegalBlock(text: "Please include your booking reference where relevant."),
+        ],
+      ),
+      LegalSection(
+        heading: "19. Governing Law and Jurisdiction",
+        blocks: [
+          LegalBlock(text: "These terms shall be governed by the laws of India."),
+          LegalBlock(text: "Subject to applicable consumer protection laws and the jurisdiction of competent authorities, courts having jurisdiction at the Company's registered office location shall have jurisdiction over disputes."),
+        ],
+      ),
+      LegalSection(
+        heading: "20. Changes to These Terms",
+        blocks: [
+          LegalBlock(text: "Book A Look may update these terms from time to time. The revised version will be published on the website and/or application with an updated effective date."),
+          LegalBlock(text: "Continued use of the platform after the effective date will be subject to the revised terms, to the extent permitted by law."),
         ],
       ),
     ],
@@ -213,138 +278,217 @@ const List<LegalDocument> kLegalDocuments = [
   LegalDocument(
     slug: "privacy",
     title: "Privacy Policy",
-    kicker: "BookALook",
-    summary: "This Privacy Policy sets out how BookALook.in collects, uses, discloses and protects your personal information, in accordance with applicable laws of India.",
-    related: "About BookALook · Terms of Use · Privacy Policy · Cancellation & Refund Policy · Partner Terms & Conditions",
+    kicker: "Book A Look",
+    summary: "What information Book A Look collects through its website and mobile application, how it is used and shared, and the choices available to you.",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
     sections: [
       LegalSection(
-        heading: "A. Introduction",
+        heading: "1. Introduction",
         blocks: [
-          LegalBlock(text: "BookALook.in (\"Company\", \"we\", \"our\", \"us\") recognises the importance of the privacy of its users (\"you\", \"your\", \"User\") and the confidentiality of the information that you provide in the use of our website, platform, and related services (collectively, the \"Platform\"). This Privacy Policy sets out the practices for collection, use, disclosure and protection of your Personal Information in accordance with applicable laws of India."),
-          LegalBlock(text: "By accessing or using our Platform, you agree to the terms and conditions of this Privacy Policy. If you do not agree with this Privacy Policy, please discontinue use of the Platform immediately."),
+          LegalBlock(text: "Bookalook Private Limited (\"Book A Look\", \"Company\", \"we\", \"us\" or \"our\") respects your privacy and is committed to protecting personal information collected through our website, mobile application, and related services."),
+          LegalBlock(text: "This Privacy Policy explains what information we collect, how we use it, when it may be shared, and the choices available to users."),
+          LegalBlock(text: "By accessing or using Book A Look, you acknowledge that you have read this Privacy Policy."),
         ],
       ),
       LegalSection(
-        heading: "B. Scope & Applicability",
+        heading: "2. Information We Collect",
         blocks: [
-          LegalBlock(text: "This Privacy Policy applies to all Users of the Platform (including customers, salon partners, and service providers) and to all information collected via the Platform, its website, mobile application, and any offline channels operated by us. The Policy does not apply to any third-party website, apps or services that we do not control or operate."),
-          LegalBlock(text: "You are advised to review the privacy policies of any such third-party services prior to use."),
-        ],
-      ),
-      LegalSection(
-        heading: "C. Information We Collect",
-        blocks: [
-          LegalBlock(lead: "C.1 Personal Information"),
-          LegalBlock(text: "We may collect the following types of Personal Information:"),
+          LegalBlock(text: "Depending on how you use our platform, we may collect:"),
+          LegalBlock(lead: "A. Personal Information"),
           LegalBlock(bullets: [
-            "Full name, phone number, email address, location/address.",
-            "Appointment, booking and service usage history and preferences.",
+            "Name.",
+            "Mobile number.",
+            "Email address.",
+            "Account and profile details.",
           ]),
-          LegalBlock(lead: "C.2 Non-Personal / Aggregate Information"),
-          LegalBlock(text: "We may also collect information that does not identify you personally, including:"),
+          LegalBlock(lead: "B. Booking Information"),
           LegalBlock(bullets: [
-            "Device information (type, operating system, browser), IP address, date/time of visit, usage patterns, cookies and analytics data.",
+            "Selected salon.",
+            "Selected service.",
+            "Appointment date and time.",
+            "Booking reference.",
+            "Booking and cancellation history.",
+            "QR code and check-in status.",
           ]),
-          LegalBlock(lead: "C.3 Payment Information"),
-          LegalBlock(text: "Payments are made to the salon and recorded on the Platform. We do not store or access your full payment card or bank account details; only minimal transaction information may be retained for record-keeping."),
-        ],
-      ),
-      LegalSection(
-        heading: "D. Purposes for Collection and Legal Basis",
-        blocks: [
-          LegalBlock(text: "We collect, use and process your information for the following purposes:"),
+          LegalBlock(lead: "C. Location Information"),
+          LegalBlock(text: "Where location permissions are enabled, we may process location information to help display nearby salons or improve location-based search."),
+          LegalBlock(text: "You may disable location permissions through your device settings. Some location-related features may then become unavailable."),
+          LegalBlock(lead: "D. Payment Information"),
+          LegalBlock(text: "For online payments, transactions are processed through authorized third-party payment service providers."),
+          LegalBlock(text: "We may receive information such as:"),
           LegalBlock(bullets: [
-            "To enable you to make salon or parlour appointments and related services via the Platform.",
-            "To send confirmations, reminders, updates, and notifications regarding your booking or service.",
-            "To administer your account, profile and preferences and to personalise your experience on the Platform.",
-            "To conduct analytics and improve the Platform's design, features, performance and functionality.",
-            "To send you promotional offers, marketing communications, subject to your consent where required.",
-            "To comply with applicable laws, prevent fraud, misuse or other illegal or unauthorised activities.",
+            "Transaction reference.",
+            "Payment status.",
+            "Payment method category.",
+            "Refund status.",
+            "Relevant transaction records.",
           ]),
-        ],
-      ),
-      LegalSection(
-        heading: "E. Cookies and Similar Technologies",
-        blocks: [
-          LegalBlock(text: "Our Platform uses cookies, web beacons, tracking pixels and similar technologies to remember your preferences, maintain your session and compile aggregate usage information. These allow us to personalise your experience and improve the Platform."),
-          LegalBlock(text: "You may disable cookies via your browser settings, but this may limit your ability to use certain features of the Platform."),
-        ],
-      ),
-      LegalSection(
-        heading: "F. Sharing, Disclosure and Transfer of Information",
-        blocks: [
-          LegalBlock(text: "We do not sell or rent your Personal Information. We may share your information as follows:"),
+          LegalBlock(text: "We do not intend to store complete card numbers, CVV values, or payment authentication credentials on our servers."),
+          LegalBlock(text: "For Pay at Store bookings, we may record the selected payment method or booking payment status where supported. Payment is made directly to the salon."),
+          LegalBlock(lead: "E. Technical Information"),
           LegalBlock(bullets: [
-            "With salon partners / service providers (to facilitate your booking and service fulfilment).",
-            "With payment gateway and financial institutions (for payment processing and refunds).",
-            "With third-party service providers (analytics, hosting, support) under appropriate confidentiality obligations.",
-            "With legal, regulatory or governmental authorities when required by law or court order.",
-            "In connection with business transfers or restructuring; your data may be transferred to an acquirer subject to the acquirer's obligations in respect of confidentiality.",
+            "Device and operating system information.",
+            "App version.",
+            "IP address and basic log information.",
+            "Crash reports and diagnostic information.",
+            "Usage and interaction information.",
           ]),
-          LegalBlock(text: "If your information is transferred outside India for processing, we will ensure such processing is subject to appropriate safeguards."),
         ],
       ),
       LegalSection(
-        heading: "G. How Long Do We Keep Your Personal Information?",
+        heading: "3. How We Use Your Information",
         blocks: [
-          LegalBlock(text: "We retain your Personal Information for as long as is necessary for the purposes described above, or as required by law (such as taxation, accounting or regulatory retention). Once no longer required, your information will be anonymised or securely deleted."),
-        ],
-      ),
-      LegalSection(
-        heading: "H. Data Security",
-        blocks: [
-          LegalBlock(text: "We implement commercially reasonable technical, physical and administrative safeguards to protect your Personal Information against unauthorised access, alteration, disclosure or destruction. However, no method of transmission over the internet or electronic storage is completely secure; we cannot guarantee absolute security."),
-        ],
-      ),
-      LegalSection(
-        heading: "I. Your Rights and Choices",
-        blocks: [
-          LegalBlock(text: "You have the right to:"),
+          LegalBlock(text: "We may use your information to:"),
           LegalBlock(bullets: [
-            "Access or request a copy of the Personal Information we hold about you.",
-            "Request correction, update or deletion of your Personal Information (subject to legal or contractual restrictions).",
-            "Withdraw your consent for processing where such processing is based on consent (for example, marketing communications).",
-            "Object to or restrict certain processing of your Personal Information.",
+            "Create and manage customer accounts.",
+            "Authenticate users through OTP or other supported methods.",
+            "Display salons and services.",
+            "Create and manage appointments.",
+            "Generate booking references and QR codes.",
+            "Send booking confirmations and reminders.",
+            "Process online payments and refunds through payment partners.",
+            "Share relevant booking information with the selected salon.",
+            "Provide customer support.",
+            "Detect fraud and unauthorized activities.",
+            "Improve application performance and user experience.",
+            "Meet legal, regulatory, accounting, and security requirements.",
           ]),
-          LegalBlock(text: "To exercise your rights, or if you have any queries, you may contact us at bookalook01@gmail.com. We may require verification of your identity before processing requests."),
         ],
       ),
       LegalSection(
-        heading: "J. Children's Privacy",
+        heading: "4. Sharing Information With Salon Partners",
         blocks: [
-          LegalBlock(text: "The Platform is not intended for use by children under the age of 18. We do not knowingly collect Personal Information of children under 18. If you believe we have inadvertently collected such information, please contact us and we will take steps to delete such information."),
+          LegalBlock(text: "When you make a booking, relevant information may be shared with the selected salon so that it can manage and fulfil your appointment."),
+          LegalBlock(text: "This may include:"),
+          LegalBlock(bullets: [
+            "Customer name.",
+            "Contact information necessary for appointment coordination.",
+            "Selected service.",
+            "Appointment date and time.",
+            "Booking reference.",
+            "Relevant booking status.",
+          ]),
+          LegalBlock(text: "Salon partners are expected to use this information only for legitimate booking-related purposes and their applicable legal obligations."),
         ],
       ),
       LegalSection(
-        heading: "K. Third-Party Links and Content",
+        heading: "5. Sharing Information With Third Parties",
         blocks: [
-          LegalBlock(text: "The Platform may contain links to third-party websites, applications or services not operated or controlled by us. We do not assume any responsibility for their privacy practices, content or availability. You are strongly advised to review their respective privacy policies."),
+          LegalBlock(text: "We may share necessary information with:"),
+          LegalBlock(bullets: [
+            "Payment gateway providers.",
+            "OTP and authentication service providers.",
+            "WhatsApp or other notification providers.",
+            "Cloud hosting and infrastructure providers.",
+            "Analytics and crash-monitoring providers.",
+            "Customer support and operational service providers.",
+            "Government authorities or law enforcement where legally required.",
+          ]),
+          LegalBlock(text: "Such sharing will be limited to legitimate operational, contractual, security, or legal purposes."),
         ],
       ),
       LegalSection(
-        heading: "L. Withdrawal of Consent, Account Deletion & Data Access",
+        heading: "6. Online Payment Privacy",
         blocks: [
-          LegalBlock(text: "You may withdraw your consent at any time to our collection, use or disclosure of your Personal Information, subject to certain limitations (for example, if data is required to fulfil an ongoing booking). To request deletion of your account or data, contact bookalook01@gmail.com. Please note that we may retain certain transactional or service-fulfilment data as required by applicable law."),
+          LegalBlock(text: "For online payments, the payment gateway processes payment credentials according to its own security and privacy practices."),
+          LegalBlock(text: "Book A Look may receive transaction confirmation and related payment status information to update your booking."),
+          LegalBlock(text: "Customers should review the privacy policy of the payment provider where applicable."),
         ],
       ),
       LegalSection(
-        heading: "M. Changes to this Privacy Policy",
+        heading: "7. Pay at Store Privacy",
         blocks: [
-          LegalBlock(text: "This Privacy Policy may be updated from time to time to reflect changes in our practices or legal/regulatory requirements. Any changes will be posted on this page with an updated \"Effective Date\". Continued use of the Platform after such changes constitutes your acceptance of the revised policy."),
+          LegalBlock(text: "For Pay at Store bookings, Book A Look does not collect the service payment from the customer."),
+          LegalBlock(text: "The salon may independently process the payment and maintain its own transaction records."),
+          LegalBlock(text: "The salon is responsible for handling payment information collected directly by it."),
         ],
       ),
       LegalSection(
-        heading: "N. Governing Law and Jurisdiction",
+        heading: "8. Notifications and Communications",
         blocks: [
-          LegalBlock(text: "This Privacy Policy is governed by the laws of India. Any disputes or claims arising out of or in connection with this Privacy Policy shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India."),
+          LegalBlock(text: "We may send:"),
+          LegalBlock(bullets: [
+            "OTP and authentication messages.",
+            "Booking confirmations.",
+            "Appointment reminders.",
+            "Cancellation and rescheduling updates.",
+            "Payment and refund updates.",
+            "Important service announcements.",
+            "Promotional communications, where appropriate and subject to applicable consent requirements.",
+          ]),
+          LegalBlock(text: "You may opt out of promotional communications through available controls. Transactional and essential service communications may still be sent where necessary."),
         ],
       ),
       LegalSection(
-        heading: "O. Contact Us",
+        heading: "9. Data Retention",
         blocks: [
-          LegalBlock(text: "If you have any questions, concerns or requests regarding this Privacy Policy or your Personal Information, you may contact us at:"),
-          LegalBlock(text: "BOOKALOOK PRIVATE LIMITED"),
-          LegalBlock(text: "PLOT NO 44 SR NO 17/22, DEVGIRI COLONY N-2, Aurangabad (MH), Aurangabad, Aurangabad- 431001, Maharashtra"),
+          LegalBlock(text: "We retain personal information only for as long as reasonably necessary for the purposes described in this policy, including:"),
+          LegalBlock(bullets: [
+            "Maintaining accounts.",
+            "Completing bookings.",
+            "Handling disputes and refunds.",
+            "Meeting accounting and legal requirements.",
+            "Preventing fraud and ensuring platform security.",
+          ]),
+          LegalBlock(text: "Information may be retained for longer where required by applicable law."),
+        ],
+      ),
+      LegalSection(
+        heading: "10. Data Security",
+        blocks: [
+          LegalBlock(text: "We implement reasonable technical and organizational safeguards to protect personal information against unauthorized access, disclosure, alteration, loss, and misuse."),
+          LegalBlock(text: "However, no electronic transmission or storage method can be guaranteed to be completely secure."),
+        ],
+      ),
+      LegalSection(
+        heading: "11. User Rights and Choices",
+        blocks: [
+          LegalBlock(text: "Subject to applicable law, users may request:"),
+          LegalBlock(bullets: [
+            "Access to information relating to their account.",
+            "Correction of inaccurate personal information.",
+            "Deletion of personal information where legally permissible.",
+            "Withdrawal of consent where processing is based on consent.",
+            "Grievance redressal regarding personal information.",
+          ]),
+          LegalBlock(text: "Requests can be submitted to bookalook01@gmail.com."),
+          LegalBlock(text: "We may need to verify your identity before processing such requests."),
+        ],
+      ),
+      LegalSection(
+        heading: "12. Children's Privacy",
+        blocks: [
+          LegalBlock(text: "Our platform is intended for individuals legally capable of entering into applicable transactions."),
+          LegalBlock(text: "If we become aware that personal information has been collected from a child in circumstances prohibited by applicable law, we will take appropriate steps."),
+        ],
+      ),
+      LegalSection(
+        heading: "13. Cookies and Similar Technologies",
+        blocks: [
+          LegalBlock(text: "Our website may use cookies and similar technologies for essential functionality, analytics, security, and user experience."),
+          LegalBlock(text: "Users can manage browser cookie settings. Disabling certain cookies may affect website functionality."),
+        ],
+      ),
+      LegalSection(
+        heading: "14. Third-Party Links",
+        blocks: [
+          LegalBlock(text: "Our website or application may contain links to third-party websites or services."),
+          LegalBlock(text: "We are not responsible for the privacy practices of external services. Users should review their respective privacy policies."),
+        ],
+      ),
+      LegalSection(
+        heading: "15. Changes to This Privacy Policy",
+        blocks: [
+          LegalBlock(text: "We may update this policy to reflect changes in our services, technology, or applicable laws."),
+          LegalBlock(text: "The revised policy will be published with an updated date."),
+        ],
+      ),
+      LegalSection(
+        heading: "16. Contact and Grievance Redressal",
+        blocks: [
+          LegalBlock(lead: "Privacy and Grievance Contact"),
+          LegalBlock(text: "Bookalook Private Limited"),
+          LegalBlock(text: "Plot No. 44, Survey No. 17/22, Devgiri Colony, N-2, Aurangabad, Maharashtra – 431001, India"),
           LegalBlock(text: "bookalook01@gmail.com"),
         ],
       ),
@@ -352,230 +496,383 @@ const List<LegalDocument> kLegalDocuments = [
   ),
   LegalDocument(
     slug: "cancellation-refund",
-    title: "Cancellation & Refund Policy",
-    kicker: "BookALook",
-    summary: "How cancellations, rescheduling and refunds work for appointments booked through BookALook.in.",
-    related: "About BookALook · Terms of Use · Privacy Policy · Cancellation & Refund Policy · Partner Terms & Conditions",
+    title: "Cancellation, Rescheduling & Refund Policy",
+    kicker: "Book A Look",
+    summary: "How cancellation, rescheduling, refunds and appointment-related payment issues are handled for bookings made through Book A Look.",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
     sections: [
       LegalSection(
-        heading: "A. Introduction",
+        heading: "1. Introduction",
         blocks: [
-          LegalBlock(text: "This Cancellation and Refund Policy (\"Policy\") describes the terms under which BookALook.in (\"Company\", \"we\", \"our\", \"us\") permits cancellation, rescheduling, and refund of appointments booked through our website or mobile application (\"Platform\")."),
-          LegalBlock(text: "By booking an appointment via BookALook.in, the user (\"Customer\", \"you\", \"your\") acknowledges and agrees to the terms stated herein."),
+          LegalBlock(text: "This policy governs cancellation, rescheduling, refunds, and appointment-related payment issues for bookings made through Book A Look."),
+          LegalBlock(text: "Book A Look is a marketplace connecting customers with independent salon partners."),
         ],
       ),
       LegalSection(
-        heading: "B. Cancellation Policy",
+        heading: "2. Cancellation Time Limit",
         blocks: [
-          LegalBlock(lead: "Customer-Initiated Cancellations"),
-          LegalBlock(text: "You may cancel an appointment at any point before the cancellation window shown on your booking closes."),
-          LegalBlock(text: "Cancellations made before that window closes are eligible for a full refund of the booking amount."),
-          LegalBlock(text: "Cancellations made once that window has closed are not eligible for any refund."),
-          LegalBlock(lead: "Service Provider Cancellations"),
-          LegalBlock(text: "In the unlikely event that a salon or service provider cancels your confirmed appointment, you will be entitled to a full refund or, at your discretion, a rescheduled appointment at no extra charge."),
-          LegalBlock(lead: "Platform Cancellations"),
-          LegalBlock(text: "BookALook.in reserves the right to cancel a booking for operational, technical, or compliance reasons. In such cases, a full refund shall be processed to the original payment method."),
-        ],
-      ),
-      LegalSection(
-        heading: "C. Rescheduling Policy",
-        blocks: [
-          LegalBlock(text: "Customers are permitted to reschedule a booking only once."),
-          LegalBlock(text: "Once a booking has been rescheduled, it cannot be cancelled or rescheduled again under any circumstance."),
-          LegalBlock(text: "Rescheduling is subject to slot availability and approval by the service provider."),
-        ],
-      ),
-      LegalSection(
-        heading: "D. Refund Process",
-        blocks: [
-          LegalBlock(text: "Refunds (where applicable) shall be initiated within 5-7 business days after cancellation confirmation."),
-          LegalBlock(text: "All refunds shall be credited to the original mode of payment used during the booking (e.g., cash, credit/debit card, UPI, net banking)."),
-          LegalBlock(text: "The actual credit to the customer's account may take additional time depending on the payment gateway and the customer's bank policies."),
-          LegalBlock(text: "The Company is not responsible for any delay caused by third-party payment processors."),
-        ],
-      ),
-      LegalSection(
-        heading: "E. Non-Refundable Scenarios",
-        blocks: [
-          LegalBlock(text: "Refunds shall not be applicable in the following cases:"),
+          LegalBlock(text: "Customers may cancel a confirmed appointment through the application, subject to the following standard rule:"),
           LegalBlock(bullets: [
-            "Cancellations made once the cancellation window shown on your booking has closed.",
-            "\"No-Show\" situations where the customer fails to appear at the salon at the scheduled time.",
-            "Situations where services were rendered but not up to personal expectation (quality issues must be raised directly with the salon).",
-            "Multiple reschedule requests for the same booking.",
+            "Cancellation must be completed at least 90 minutes before the scheduled appointment start time.",
+            "Cancellations requested within 90 minutes of the appointment may not be permitted through the application.",
+            "Requests for exceptions may be submitted to customer support and will be reviewed based on the circumstances and applicable law.",
+          ]),
+          LegalBlock(text: "The relevant appointment time displayed in the booking details will be used to determine the cancellation deadline."),
+        ],
+      ),
+      LegalSection(
+        heading: "3. Rescheduling Rules",
+        blocks: [
+          LegalBlock(text: "Customers may request rescheduling at least 90 minutes before the original appointment start time."),
+          LegalBlock(text: "Rescheduling:"),
+          LegalBlock(bullets: [
+            "Is subject to available appointment slots.",
+            "Must be completed through the supported application functionality or customer support process.",
+            "Is not confirmed until the revised appointment details are displayed as confirmed.",
+            "May be subject to additional restrictions displayed during the booking process.",
+          ]),
+          LegalBlock(text: "Any restriction on repeated rescheduling must be clearly disclosed to the customer before the booking is confirmed."),
+        ],
+      ),
+      LegalSection(
+        heading: "4. Online Payment Bookings",
+        blocks: [
+          LegalBlock(text: "Where a customer has paid online:"),
+          LegalBlock(lead: "A. Cancellation Within the Permitted Time"),
+          LegalBlock(text: "Where cancellation is completed at least 90 minutes before the appointment, the customer will be eligible for a refund of the amount paid for the cancelled booking, subject to applicable law and any clearly disclosed non-refundable charges permitted by law."),
+          LegalBlock(lead: "B. Cancellation Within the Restricted Period"),
+          LegalBlock(text: "Where cancellation is attempted within 90 minutes of the appointment, the platform may not permit cancellation or refund through the normal booking process."),
+          LegalBlock(text: "Exceptions may be considered where the salon cancels, the service cannot be provided, a duplicate transaction occurs, or another circumstance warrants a remedy under applicable law."),
+          LegalBlock(lead: "C. Salon-Initiated Cancellation"),
+          LegalBlock(text: "If a salon cancels a confirmed appointment and the service cannot be provided, the customer will be eligible for a refund of the amount paid online for that booking."),
+          LegalBlock(lead: "D. Failed or Duplicate Transactions"),
+          LegalBlock(text: "If a customer is charged but the booking is not successfully confirmed, or a duplicate payment is identified, the transaction will be investigated and the applicable amount refunded or reversed."),
+        ],
+      ),
+      LegalSection(
+        heading: "5. Pay at Store Bookings",
+        blocks: [
+          LegalBlock(text: "For Pay at Store bookings:"),
+          LegalBlock(bullets: [
+            "The customer pays the salon directly.",
+            "Book A Look does not collect the service amount.",
+            "Book A Look cannot directly refund an amount that it has not received.",
+            "If the salon has collected any advance payment independently, the salon is responsible for processing the applicable refund, subject to applicable law and the disclosed payment terms.",
+          ]),
+          LegalBlock(text: "Customers may contact Book A Look for assistance in resolving booking-related disputes."),
+        ],
+      ),
+      LegalSection(
+        heading: "6. Refund Processing",
+        blocks: [
+          LegalBlock(text: "For eligible online payment refunds:"),
+          LegalBlock(bullets: [
+            "Refund requests will be initiated after the relevant cancellation or refund decision is confirmed.",
+            "Refunds will ordinarily be sent to the original payment method.",
+            "The payment gateway, bank, or payment provider may require additional processing time.",
+            "The expected processing timeline should be displayed or communicated to the customer.",
+          ]),
+          LegalBlock(text: "The final crediting time may depend on the customer's bank or payment provider."),
+        ],
+      ),
+      LegalSection(
+        heading: "7. No-Show",
+        blocks: [
+          LegalBlock(text: "If a customer fails to arrive for a confirmed appointment without cancelling it within the permitted time:"),
+          LegalBlock(bullets: [
+            "The booking may be marked as a no-show.",
+            "The salon may decline to provide the missed appointment slot.",
+            "Refund eligibility will be assessed according to the disclosed booking conditions and applicable law.",
+          ]),
+          LegalBlock(text: "No-show conditions must be visible to the customer before confirmation."),
+        ],
+      ),
+      LegalSection(
+        heading: "8. Service Not Provided or Unsatisfactory Service",
+        blocks: [
+          LegalBlock(text: "If a salon fails to provide a confirmed service, customers should report the issue to Book A Look as soon as possible."),
+          LegalBlock(text: "Where a service is materially different from what was booked, or a service is not provided, Book A Look may coordinate with the salon and assess an appropriate remedy."),
+          LegalBlock(text: "Refunds or other remedies will be considered in accordance with applicable consumer protection law."),
+        ],
+      ),
+      LegalSection(
+        heading: "9. How to Request Assistance",
+        blocks: [
+          LegalBlock(text: "Customers should contact:"),
+          LegalBlock(text: "Email: bookalook01@gmail.com"),
+          LegalBlock(text: "Please provide:"),
+          LegalBlock(bullets: [
+            "Customer name.",
+            "Booking reference.",
+            "Salon name.",
+            "Appointment date and time.",
+            "Transaction reference, if applicable.",
+            "Brief description of the issue.",
           ]),
         ],
       ),
       LegalSection(
-        heading: "F. Special Conditions / Force Majeure",
+        heading: "10. Policy Changes",
         blocks: [
-          LegalBlock(text: "In case of unforeseen circumstances such as natural disasters, government restrictions, internet outages, or technical failures beyond the Company's control, BookALook.in reserves the right to cancel or reschedule bookings without liability. Refund eligibility in such cases shall be determined at the Company's sole discretion."),
-        ],
-      ),
-      LegalSection(
-        heading: "G. Contact for Refund Support",
-        blocks: [
-          LegalBlock(text: "For refund or cancellation queries, please contact our support team at:"),
-          LegalBlock(text: "bookalook01@gmail.com"),
-          LegalBlock(text: "Our support team will respond to refund-related queries within 2-3 working days."),
-        ],
-      ),
-      LegalSection(
-        heading: "H. Modification of Policy",
-        blocks: [
-          LegalBlock(text: "BookALook.in reserves the right to modify, amend, or update this Policy at any time without prior notice. The updated Policy shall be posted on the Platform with a revised effective date. Your continued use of the Platform after such updates constitutes acceptance of the revised terms."),
-        ],
-      ),
-      LegalSection(
-        heading: "I. Governing Law and Jurisdiction",
-        blocks: [
-          LegalBlock(text: "This Policy shall be governed by and construed in accordance with the laws of India. Any disputes arising from or related to this Policy shall be subject to the exclusive jurisdiction of the courts of Maharashtra, India."),
+          LegalBlock(text: "Book A Look may revise this policy from time to time. Updated terms will be published on the website and application."),
         ],
       ),
     ],
   ),
   LegalDocument(
     slug: "partner-terms",
-    title: "Partner Terms & Conditions",
-    kicker: "BookALook for Salons",
-    summary: "The agreement between BookALook.in and every salon, parlour or individual stylist who lists and provides services on the platform.",
-    related: "About BookALook · Terms of Use · Privacy Policy · Cancellation & Refund Policy · Partner Terms & Conditions",
+    title: "Salon Partner Policy",
+    kicker: "Book A Look for Salons",
+    summary: "The rules for salons, barbershops, grooming studios and other service providers that list and take bookings on Book A Look.",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
     sections: [
       LegalSection(
         heading: "1. Introduction",
         blocks: [
-          LegalBlock(text: "These Partner Terms and Conditions (\"Agreement\") govern the relationship between BookALook.in (\"Platform\", \"Company\", \"We\", \"Our\", \"Us\") and each salon, parlour, or individual stylist (\"Partner\", \"You\", \"Your\") who lists and provides services through the BookALook.in platform."),
-          LegalBlock(text: "By registering as a Partner, You acknowledge that You have read, understood, and agreed to be bound by the terms of this Agreement, the Privacy Policy, and the general Terms of Use available on BookALook.in."),
+          LegalBlock(text: "This Salon Partner Policy governs the participation of salons, barbershops, grooming studios, and other eligible service providers (\"Salon Partners\") on Book A Look, operated by Bookalook Private Limited."),
+          LegalBlock(text: "By registering with or using the Book A Look partner platform, the Salon Partner agrees to comply with this policy and the applicable partner agreement."),
         ],
       ),
       LegalSection(
-        heading: "2. Registration & Onboarding",
+        heading: "2. Platform Relationship",
         blocks: [
-          LegalBlock(text: "Partners must provide accurate and verifiable details during registration, including business name, address, GST number, and owner identification."),
-          LegalBlock(text: "BookALook.in reserves the right to verify such information and approve or reject onboarding requests at its discretion."),
-          LegalBlock(text: "The Partner shall be responsible for maintaining and updating its information to ensure it remains true and accurate at all times."),
+          LegalBlock(text: "Book A Look provides technology that enables salon discovery, appointment booking, and booking management."),
+          LegalBlock(text: "The Salon Partner remains an independent service provider and is responsible for delivering salon services to customers."),
+          LegalBlock(text: "Nothing in this policy automatically creates an employer-employee, partnership, franchise, or agency relationship between Book A Look and a Salon Partner."),
         ],
       ),
       LegalSection(
-        heading: "3. Services & Listing Responsibilities",
+        heading: "3. Salon Registration",
         blocks: [
-          LegalBlock(text: "Partners are solely responsible for the accuracy of their service descriptions, prices, offers, and images displayed on the platform."),
-          LegalBlock(text: "BookALook.in shall not be liable for any misrepresentation or outdated information provided by the Partner."),
-          LegalBlock(text: "Partners must update their service availability regularly to prevent double bookings or schedule conflicts."),
-        ],
-      ),
-      LegalSection(
-        heading: "4. Booking, Cancellations & Customer Handling",
-        blocks: [
-          LegalBlock(text: "Partners agree to honour all confirmed bookings received through the platform."),
-          LegalBlock(text: "Any cancellation by the Partner must be immediately communicated to both the customer and BookALook.in."),
-          LegalBlock(text: "Repeated cancellations, delays, or customer complaints may lead to temporary suspension or permanent delisting from the platform."),
-        ],
-      ),
-      LegalSection(
-        heading: "5. Fees, Commissions & Subscriptions",
-        blocks: [
-          LegalBlock(text: "BookALook.in may charge subscription fees or commissions on bookings made through the platform."),
-          LegalBlock(text: "The applicable commission or subscription structure will be communicated via the Partner Dashboard or onboarding process."),
-          LegalBlock(text: "All such fees are exclusive of GST and applicable taxes under Indian law."),
-        ],
-      ),
-      LegalSection(
-        heading: "6. Payments & Settlements",
-        blocks: [
-          LegalBlock(text: "Payments to Partners will be made after deducting platform commissions, taxes, and other applicable charges."),
-          LegalBlock(text: "Settlements will occur on a defined payment cycle as communicated by BookALook.in."),
-          LegalBlock(text: "BookALook.in shall not be liable for delays arising from banking networks or other payment intermediaries."),
-        ],
-      ),
-      LegalSection(
-        heading: "7. Compliance & Standards",
-        blocks: [
-          LegalBlock(text: "Partners must comply with all relevant laws, including labour, taxation, hygiene, and safety regulations. Salons must ensure:"),
+          LegalBlock(text: "Salon Partners must provide accurate information, including:"),
           LegalBlock(bullets: [
-            "Proper hygiene and sanitisation of tools and equipment.",
-            "Professional and courteous staff behaviour.",
-            "Compliance with applicable local municipal or state health laws.",
+            "Business and salon name.",
+            "Owner or authorized representative details.",
+            "Valid contact information.",
+            "Salon address and location.",
+            "Applicable business registration or licences, where required.",
+            "Service categories and prices.",
+            "Operating hours.",
+            "Staff and appointment availability.",
           ]),
-          LegalBlock(text: "BookALook.in may remove any Partner who fails to maintain the required quality standards."),
+          LegalBlock(text: "Book A Look may request supporting documents to verify the salon's information."),
         ],
       ),
       LegalSection(
-        heading: "8. Ratings & Reviews",
+        heading: "4. Listing Accuracy",
         blocks: [
-          LegalBlock(text: "Customers can rate and review Partner services on the platform."),
-          LegalBlock(text: "BookALook.in reserves the right to display, remove, or moderate reviews at its discretion."),
-          LegalBlock(text: "Repeated negative feedback or verified complaints may result in suspension or delisting."),
-        ],
-      ),
-      LegalSection(
-        heading: "9. Intellectual Property",
-        blocks: [
-          LegalBlock(text: "Partners grant BookALook.in a non-exclusive, royalty-free licence to use their business name, logo, photos, and descriptions for marketing and listing purposes."),
-          LegalBlock(text: "Partners shall not use BookALook.in's name, logo, or brand assets without prior written consent."),
-        ],
-      ),
-      LegalSection(
-        heading: "10. Termination",
-        blocks: [
-          LegalBlock(text: "Either party may terminate this Agreement with 30 days' written notice."),
-          LegalBlock(text: "BookALook.in may terminate immediately for material breaches, fraud, or repeated service failures."),
-          LegalBlock(text: "Upon termination, all outstanding dues must be settled before account closure."),
-        ],
-      ),
-      LegalSection(
-        heading: "11. Indemnity & Liability",
-        blocks: [
-          LegalBlock(text: "The Partner agrees to indemnify and hold BookALook.in harmless from any claims, damages, or losses arising out of:"),
+          LegalBlock(text: "Salon Partners must:"),
           LegalBlock(bullets: [
-            "Non-performance or service issues.",
-            "Breach of applicable laws.",
-            "Customer disputes relating to the Partner's actions.",
+            "Maintain accurate salon profiles.",
+            "Provide genuine photographs and descriptions.",
+            "Keep service prices updated.",
+            "Update operating hours and holiday schedules.",
+            "Maintain accurate appointment availability.",
+            "Inform Book A Look about changes to business details.",
           ]),
-          LegalBlock(text: "BookALook.in's liability under this Agreement shall be limited to the amount of commission earned from the disputed transaction."),
+          LegalBlock(text: "Misleading listings, fake prices, or unauthorized use of images are prohibited."),
         ],
       ),
       LegalSection(
-        heading: "12. Governing Law",
+        heading: "5. Appointment Management",
         blocks: [
-          LegalBlock(text: "This Agreement shall be governed by and construed in accordance with the laws of India. The courts at Chhatrapati Sambhajinagar, Maharashtra shall have exclusive jurisdiction."),
+          LegalBlock(text: "Salon Partners must:"),
+          LegalBlock(bullets: [
+            "Monitor incoming bookings.",
+            "Accept or reject booking requests according to the platform's booking workflow.",
+            "Avoid accepting appointments beyond available capacity.",
+            "Honour confirmed bookings.",
+            "Update booking statuses accurately.",
+            "Inform customers promptly of unavoidable changes.",
+            "Avoid double-booking.",
+          ]),
         ],
       ),
       LegalSection(
-        heading: "13. Service Level Agreement (SLA)",
+        heading: "6. Customer Service and Quality",
         blocks: [
-          LegalBlock(text: "Partners must maintain punctuality, hygiene, and professional conduct at all times."),
-          LegalBlock(text: "BookALook.in may conduct quality checks and customer surveys to ensure service standards."),
-          LegalBlock(text: "Breach of SLA terms may result in penalties, temporary suspension, or removal from the platform."),
+          LegalBlock(text: "Salon Partners are responsible for:"),
+          LegalBlock(bullets: [
+            "Providing services professionally.",
+            "Maintaining reasonable hygiene and safety standards.",
+            "Ensuring staff competence.",
+            "Treating customers respectfully.",
+            "Honouring confirmed service descriptions and prices.",
+            "Handling complaints relating to the actual salon service.",
+          ]),
         ],
       ),
       LegalSection(
-        heading: "14. Non-Solicitation & Platform Integrity",
+        heading: "7. Payment Methods",
         blocks: [
-          LegalBlock(text: "Partners shall not directly approach, solicit, or induce BookALook.in customers to transact outside the platform."),
-          LegalBlock(text: "Any circumvention of platform booking, manipulation of pricing, or fee avoidance shall constitute a material breach, leading to termination and potential damages recovery."),
+          LegalBlock(text: "Book A Look may support online payment and Pay at Store bookings."),
+          LegalBlock(lead: "A. Online Payment"),
+          LegalBlock(text: "Where online payments are enabled:"),
+          LegalBlock(bullets: [
+            "Payments will be processed using the payment arrangement approved for the platform.",
+            "The Salon Partner must comply with the applicable settlement and reconciliation process.",
+            "The Salon Partner must not collect an additional amount for a service already paid in full online unless the customer has agreed to a legitimate additional service or charge.",
+            "Refund responsibilities will follow the applicable partner agreement and refund workflow.",
+          ]),
+          LegalBlock(text: "The precise collection, settlement, commission, gateway fee, and refund arrangement will be communicated separately to the Salon Partner."),
+          LegalBlock(lead: "B. Pay at Store"),
+          LegalBlock(text: "Where Pay at Store is selected:"),
+          LegalBlock(bullets: [
+            "The customer pays the Salon Partner directly.",
+            "The Salon Partner is responsible for collecting payment and issuing any applicable receipt.",
+            "The Salon Partner must honour the price displayed at the time of booking, subject to customer-approved changes.",
+            "Book A Look may record booking and payment status for platform administration.",
+          ]),
         ],
       ),
       LegalSection(
-        heading: "15. Confidentiality",
+        heading: "8. Commission and Subscription",
         blocks: [
-          LegalBlock(text: "Both parties shall keep all non-public data, including customer information and platform analytics, strictly confidential."),
-          LegalBlock(text: "Partners may use customer data only for service fulfilment, not for direct marketing or third-party sharing."),
-          LegalBlock(text: "BookALook.in will handle partner data in compliance with applicable Indian data protection and IT laws."),
+          LegalBlock(text: "Applicable commission rates, subscription charges, taxes, and settlement arrangements will be communicated through the selected partner plan or a separate commercial agreement."),
+          LegalBlock(text: "No commission or fee shall be assumed unless it has been disclosed and accepted under the applicable partner arrangement."),
         ],
       ),
       LegalSection(
-        heading: "16. Dispute Resolution",
+        heading: "9. Cancellations and Salon-Initiated Changes",
         blocks: [
-          LegalBlock(text: "Disputes shall first be resolved amicably through discussion within 30 days."),
-          LegalBlock(text: "If unresolved, disputes will be referred to binding arbitration under the Arbitration and Conciliation Act, 1996."),
-          LegalBlock(text: "The arbitration venue shall be Chhatrapati Sambhajinagar, Maharashtra, and proceedings shall be conducted in English."),
+          LegalBlock(text: "Salon Partners should avoid cancelling confirmed bookings except where reasonably necessary."),
+          LegalBlock(text: "If a salon cannot honour an appointment, it must:"),
+          LegalBlock(bullets: [
+            "Inform the customer as soon as possible.",
+            "Update the booking status through the platform.",
+            "Cooperate with customer support.",
+            "Assist with applicable refunds where the salon is responsible under the payment arrangement.",
+          ]),
+          LegalBlock(text: "Repeated unjustified cancellations may result in reduced visibility, suspension, or removal from the platform."),
         ],
       ),
       LegalSection(
-        heading: "17. Contact",
+        heading: "10. QR Check-in",
         blocks: [
-          LegalBlock(text: "For partner support, clarifications, or legal queries, please reach out to:"),
+          LegalBlock(text: "Where QR check-in is enabled:"),
+          LegalBlock(bullets: [
+            "Each booking may have a unique QR code.",
+            "The customer QR code becomes available 15 minutes before the appointment.",
+            "The salon must use the authorized check-in functionality.",
+            "QR codes must not be reused or manually manipulated.",
+            "Booking completion must be recorded accurately.",
+          ]),
+        ],
+      ),
+      LegalSection(
+        heading: "11. Customer Data and Confidentiality",
+        blocks: [
+          LegalBlock(text: "Salon Partners may access customer information necessary to manage confirmed appointments."),
+          LegalBlock(text: "They must:"),
+          LegalBlock(bullets: [
+            "Use customer information only for legitimate appointment-related purposes and other lawful purposes.",
+            "Protect customer contact information.",
+            "Avoid selling or sharing customer information without lawful authority.",
+            "Avoid unsolicited marketing without the required permission.",
+            "Secure devices and accounts used to access the partner platform.",
+            "Comply with applicable data protection laws.",
+          ]),
+        ],
+      ),
+      LegalSection(
+        heading: "12. Prohibited Conduct",
+        blocks: [
+          LegalBlock(text: "Salon Partners must not:"),
+          LegalBlock(bullets: [
+            "Create fake bookings or reviews.",
+            "Misrepresent services or prices.",
+            "Manipulate appointment statuses.",
+            "Misuse customer data.",
+            "Circumvent agreed platform charges.",
+            "Discriminate unlawfully against customers.",
+            "Engage in fraudulent or misleading conduct.",
+            "Upload content that infringes third-party rights.",
+          ]),
+        ],
+      ),
+      LegalSection(
+        heading: "13. Suspension and Termination",
+        blocks: [
+          LegalBlock(text: "Book A Look may investigate complaints and restrict or suspend partner accounts where there is evidence of fraud, repeated customer complaints, inaccurate listings, misuse of the platform, or violation of this policy."),
+          LegalBlock(text: "Where practical, the Salon Partner will be informed of the concern and given an opportunity to respond."),
+        ],
+      ),
+      LegalSection(
+        heading: "14. Complaints and Disputes",
+        blocks: [
+          LegalBlock(text: "Salon Partners should first attempt to resolve customer service complaints fairly and promptly."),
+          LegalBlock(text: "Platform-related concerns may be sent to:"),
+          LegalBlock(text: "bookalook01@gmail.com"),
+        ],
+      ),
+      LegalSection(
+        heading: "15. Changes to This Policy",
+        blocks: [
+          LegalBlock(text: "Book A Look may revise this policy from time to time. Updated terms will be communicated or published through the partner platform."),
+        ],
+      ),
+    ],
+  ),
+  LegalDocument(
+    slug: "delete-account",
+    title: "Delete Your Account",
+    kicker: "Book A Look",
+    summary: "How to delete your Book A Look customer or salon partner account, what is removed, and what is kept and why.",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
+    sections: [
+      LegalSection(
+        heading: "1. Customers — Delete From the App",
+        blocks: [
+          LegalBlock(text: "You can delete your customer account yourself at any time from the Book A Look app:"),
+          LegalBlock(bullets: [
+            "Open the Book A Look app and sign in.",
+            "Go to the Profile tab.",
+            "Tap Delete Account at the bottom of the page.",
+            "Confirm by tapping Delete.",
+          ]),
+          LegalBlock(text: "If you no longer have the app, email bookalook01@gmail.com with the subject \"Delete my account\" and the mobile number registered with Book A Look. We may need to verify that the number belongs to you before deleting the account."),
+        ],
+      ),
+      LegalSection(
+        heading: "2. Salon Partners — Request Deletion",
+        blocks: [
+          LegalBlock(text: "Salon partner accounts are closed by our support team, because pending bookings, settlements, and dues have to be resolved first. To request deletion:"),
+          LegalBlock(bullets: [
+            "In the Book A Look Partner app, open More → Delete Account to see these steps, or",
+            "Email bookalook01@gmail.com with the subject \"Delete my partner account\".",
+            "Include the salon name, owner name, and the mobile number registered with Book A Look.",
+          ]),
+          LegalBlock(text: "We will verify the request with the registered owner, settle any outstanding bookings, payouts, or dues under the applicable partner arrangement, then close the account and remove the salon listing from Book A Look."),
+        ],
+      ),
+      LegalSection(
+        heading: "3. What Is Deleted",
+        blocks: [
+          LegalBlock(bullets: [
+            "Your name, mobile number, email address, address, pincode, and date of birth are removed from your profile.",
+            "You are signed out of every device and the account can no longer be used to sign in.",
+            "For salon partners, the salon listing is no longer shown to customers.",
+          ]),
+        ],
+      ),
+      LegalSection(
+        heading: "4. What Is Kept and Why",
+        blocks: [
+          LegalBlock(text: "Some records must be retained after an account is deleted, as described in our Privacy Policy:"),
+          LegalBlock(bullets: [
+            "Booking and appointment history, payment, refund, and invoice records — for accounting, tax, and legal requirements.",
+            "Records relating to open disputes, refunds, or settlements — until they are resolved.",
+            "Limited records needed to prevent fraud and ensure platform security.",
+          ]),
+          LegalBlock(text: "Retained records are no longer linked to your name, mobile number, or email address, and are kept only as long as reasonably necessary or as required by applicable law."),
+        ],
+      ),
+      LegalSection(
+        heading: "5. Need Help?",
+        blocks: [
+          LegalBlock(text: "For any question about deleting your account or your personal information, contact:"),
+          LegalBlock(text: "Bookalook Private Limited"),
+          LegalBlock(text: "Plot No. 44, Survey No. 17/22, Devgiri Colony, N-2, Aurangabad, Maharashtra – 431001, India"),
           LegalBlock(text: "bookalook01@gmail.com"),
         ],
       ),
@@ -586,7 +883,7 @@ const List<LegalDocument> kLegalDocuments = [
     title: "About BookALook",
     kicker: "India’s Smarter Way to Book Salon Appointments",
     summary: "BookALook is a modern online salon booking platform that helps customers discover trusted salons, book appointments instantly, and arrive at their scheduled time without unnecessary waiting.",
-    related: "About BookALook · Terms of Use · Privacy Policy · Cancellation & Refund Policy · Partner Terms & Conditions",
+    related: "About BookALook · Terms & Conditions · Privacy Policy · Cancellation, Rescheduling & Refund Policy · Salon Partner Policy",
     sections: [
       LegalSection(
         heading: "Why We Started BookALook",

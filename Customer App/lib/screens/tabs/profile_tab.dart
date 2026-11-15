@@ -35,7 +35,7 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   final ProfileService _profileService = ProfileService();
 
-  /// The documents a customer can reach from the profile. Partner Terms is
+  /// The documents a customer can reach from the profile. The Salon Partner Policy is
   /// deliberately absent — it governs salon partners, who use the Partner App,
   /// and showing it to a customer invites them to agree to the wrong contract.
   /// Insertion order is the reading order: what you agreed to, what happens to

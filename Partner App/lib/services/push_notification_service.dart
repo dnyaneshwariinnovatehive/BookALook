@@ -6,16 +6,37 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../firebase_options.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'api_config.dart';
 import '../utils/live_sync.dart';
-import '../main.dart' as main;
+import 'notification_router.dart';
 import 'package:path_provider/path_provider.dart';
+
+/// Android notification channel every push uses. Must match the backend's
+/// FCM_CHANNEL_ID (default `bookalook_notifications`): FCM names it on each
+/// message, and Android only shows a notification on a channel that exists.
+const String kPushChannelId = 'bookalook_notifications';
+
+const AndroidNotificationChannel _pushChannel = AndroidNotificationChannel(
+  kPushChannelId,
+  'Bookings and updates',
+  description: 'New bookings, cancellations, check-ins and account alerts.',
+  importance: Importance.high,
+);
+
+/// Starts Firebase. On Android the real project settings come from
+/// android/app/google-services.json (compiled in by the Google Services Gradle
+/// plugin), exactly as in the Customer app, so nothing secret or app-specific
+/// is copied into Dart. Other platforms still use firebase_options.dart.
+Future<FirebaseApp> _initFirebase() {
+  if (Firebase.apps.isNotEmpty) return Future.value(Firebase.app());
+  if (!kIsWeb && Platform.isAndroid) return Firebase.initializeApp();
+  return Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await _initFirebase();
   debugPrint("Handling a background message: ${message.messageId}");
 }
 
@@ -29,11 +50,11 @@ class PushNotificationService {
 
   Future<void> init() async {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      await _initFirebase();
     } catch (e) {
-      debugPrint("Firebase initialization failed (expected if missing credentials): $e");
+      // No google-services.json in this build: push stays off, the app runs.
+      debugPrint("Firebase initialization failed (is android/app/google-services.json missing?): $e");
+      return;
     }
 
     try {
@@ -47,6 +68,12 @@ class PushNotificationService {
         settings: initializationSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
+
+      // Created before any message can arrive, so pushes received while the
+      // app is in the background or closed have a channel to land on.
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_pushChannel);
 
       NotificationSettings settings = await FirebaseMessaging.instance.requestPermission();
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
@@ -135,8 +162,9 @@ class PushNotificationService {
       }
 
       AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'bookalook_partner_channel',
-        'Partner Notifications',
+        _pushChannel.id,
+        _pushChannel.name,
+        channelDescription: _pushChannel.description,
         importance: Importance.max,
         priority: Priority.high,
         styleInformation: styleInformation,
@@ -165,23 +193,9 @@ class PushNotificationService {
     }
   }
 
-  void _handleRouting(Map<String, dynamic> data) {
-    debugPrint('Routing to based on data: $data');
-    if (data.containsKey('type')) {
-      final String type = data['type'];
-      // Wait for navigator to be ready
-      Future.delayed(const Duration(milliseconds: 500), () {
-        final context = main.navigatorKey.currentContext;
-        if (context != null) {
-          // Typically we would parse an appointment_id and navigate to details.
-          // For now, simply log and show a snackbar as foundation
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(duration: const Duration(milliseconds: 2500), content: Text('Received notification type: $type')),
-          );
-        }
-      });
-    }
-  }
+  /// What a tapped notification opens lives in [NotificationRouter], which
+  /// also waits for the splash screen when the tap launched the app.
+  void _handleRouting(Map<String, dynamic> data) => NotificationRouter.handleTap(data);
 
   Future<void> registerDevice() async {
     final prefs = await SharedPreferences.getInstance();

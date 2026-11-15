@@ -8,6 +8,34 @@ class PartnerAppointmentService {
   // Must match the rest of the app — see ApiConfig.
   String get baseUrl => ApiConfig.baseUrl;
 
+  /// One booking, in the same shape as a row of [getAppointments]. Returns
+  /// null when it is gone or not visible to this user (404/403), so a tapped
+  /// notification about a cancelled or reassigned booking degrades gently.
+  Future<Map<String, dynamic>?> getAppointment(String salonId, String appointmentId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/partner/salons/$salonId/appointments/$appointmentId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final appointment = jsonDecode(response.body)['appointment'];
+      return appointment is Map<String, dynamic> ? appointment : null;
+    }
+    if (response.statusCode == 404 || response.statusCode == 403) return null;
+    if (response.statusCode == 401) {
+      prefs.remove('auth_token');
+      throw Exception('Session expired. Please log in again.');
+    }
+    debugPrint('Failed to load appointment: ${response.statusCode} - ${response.body}');
+    throw Exception('Failed to load booking');
+  }
+
   Future<List<dynamic>> getAppointments(String salonId, {String? date, String? providerId}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');

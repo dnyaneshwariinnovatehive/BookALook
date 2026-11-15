@@ -118,8 +118,8 @@ export default function SuperAdminLayout({
       <aside className={`${styles.sidebar} ${drawerOpen ? styles.sidebarOpen : ''}`} aria-label="Primary">
         <div className={styles.sidebarHeader}>
           <Link href="/superadmin" className={styles.brand} aria-label="BookALook admin home">
-            <Image src="/logo.png" alt="BookALook" width={150} height={26} className={`${styles.logoFull} ${styles.logoLight}`} priority />
-            <Image src="/logo-dark.png" alt="" width={150} height={26} className={`${styles.logoFull} ${styles.logoDark}`} priority />
+            <Image src="/logo-app.png" alt="BookALook" width={150} height={39} className={`${styles.logoFull} ${styles.logoLight}`} priority />
+            <Image src="/logo-app-light.png" alt="" width={150} height={39} className={`${styles.logoFull} ${styles.logoDark}`} priority />
             <span className={styles.logoMark} aria-hidden="true">B</span>
           </Link>
           <button

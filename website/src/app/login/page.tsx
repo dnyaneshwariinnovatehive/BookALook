@@ -77,8 +77,8 @@ export default function LoginPage() {
       <main className={styles.formPanel}>
         <div className={styles.loginCard}>
           <div className={styles.header}>
-            <Image src="/logo.png" alt="BookALook" width={180} height={32} className={`${styles.logo} ${styles.logoLight}`} priority />
-            <Image src="/logo-dark.png" alt="" width={180} height={32} className={`${styles.logo} ${styles.logoDark}`} priority />
+            <Image src="/logo-app.png" alt="BookALook" width={180} height={47} className={`${styles.logo} ${styles.logoLight}`} priority />
+            <Image src="/logo-app-light.png" alt="" width={180} height={47} className={`${styles.logo} ${styles.logoDark}`} priority />
             <h1 className={styles.title}>Welcome back</h1>
             <p className={styles.subtitle}>Sign in to the Super Admin portal</p>
           </div>

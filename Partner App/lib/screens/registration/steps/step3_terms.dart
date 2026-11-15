@@ -20,7 +20,7 @@ class Step3Terms extends StatefulWidget {
 class _Step3TermsState extends State<Step3Terms> {
   bool _agreed = false;
 
-  /// The document on screen in the reading pane. Partner Terms opens first,
+  /// The document on screen in the reading pane. Salon Partner Policy opens first,
   /// because that is the contract being offered and the one this step exists to
   /// get signed; the others are there for the questions the partner actually
   /// has ("what if I cancel a job?", "what do you do with my data?").
@@ -35,9 +35,9 @@ class _Step3TermsState extends State<Step3Terms> {
     'cancellation-refund',
   ];
 
-  /// What the partner agrees to. Partner Terms is the binding contract; the
+  /// What the partner agrees to. the Salon Partner Policy is the binding contract; the
   /// platform Terms govern how the app works, the Privacy Policy covers the
-  /// data this app collects, and Cancellation & Refund decides how much of a
+  /// data this app collects, and Cancellation, Rescheduling & Refund decides how much of a
   /// booking's money the salon keeps. A salon that has not read the refund rules
   /// is a salon about to argue with a customer.
   static const List<String> _consentDocuments = [

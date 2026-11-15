@@ -23,6 +23,15 @@ function onScroll() {
     ticking = false;
   });
 }
+/**
+ * Run [layer] once now and then once per animation frame while the page is
+ * scrolling or resizing. Returns the unsubscribe. Shared by every scroll-driven
+ * effect on the site, so there is one listener however many layers exist.
+ */
+export function onFrame(layer: Layer) {
+  return subscribe(layer);
+}
+
 function subscribe(layer: Layer) {
   if (layers.size === 0) {
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -42,17 +51,21 @@ function subscribe(layer: Layer) {
 /**
  * Moves with the scroll at its own speed, like a layer at a different depth.
  * [speed] is how far it travels per pixel scrolled (negative rises faster);
- * [rotate] turns it a little as it goes.
+ * [rotate] turns it a little as it goes; [axis] "x" slides it sideways
+ * instead. On phones the travel is cut to a third so nothing drifts out of a
+ * narrow screen, and layers far off screen are left alone.
  */
 export function Parallax({
   speed = 0.2,
   rotate = 0,
+  axis = 'y',
   className,
   style,
   children,
 }: {
   speed?: number;
   rotate?: number;
+  axis?: 'x' | 'y';
   className?: string;
   style?: CSSProperties;
   children?: ReactNode;
@@ -62,13 +75,22 @@ export function Parallax({
   useEffect(() => {
     const el = ref.current;
     if (!el || reducedMotion()) return;
+    // What this layer is currently shifted by, so its resting position can be
+    // read back out of the measured one.
+    let shift = 0;
     return subscribe(() => {
       const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const top = rect.top - (axis === 'y' ? shift : 0);
+      if (top > vh * 1.6 || top + rect.height < -vh * 0.6) return;
       // Distance of the element's centre from the middle of the screen.
-      const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
-      el.style.transform = `translate3d(0, ${(offset * speed).toFixed(1)}px, 0) rotate(${(offset * rotate * 0.05).toFixed(2)}deg)`;
+      const offset = top + rect.height / 2 - vh / 2;
+      const k = window.innerWidth < 760 ? 0.35 : 1;
+      shift = offset * speed * k;
+      const move = axis === 'x' ? `${shift.toFixed(1)}px, 0` : `0, ${shift.toFixed(1)}px`;
+      el.style.transform = `translate3d(${move}, 0) rotate(${(offset * rotate * 0.05 * k).toFixed(2)}deg)`;
     });
-  }, [speed, rotate]);
+  }, [speed, rotate, axis]);
 
   return (
     <div ref={ref} className={`${m.parallax} ${className ?? ''}`} style={style}>

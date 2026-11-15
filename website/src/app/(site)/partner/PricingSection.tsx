@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import s from './landing.module.css';
+import { Parallax, Reveal } from '../motion';
+import st from '../site.module.css';
+import p from './partner.module.css';
 
 /** A plan as `/api/public/subscription-plans` returns it. */
 interface Plan {
@@ -20,11 +22,11 @@ interface Plan {
 /** What every salon gets, whichever way it pays. */
 const EVERY_PLAN = [
   'Online bookings from the BookALook app',
-  'Advance payments that cut no-shows',
   'Staff, services and working hours',
   'Walk-ins, billing and invoices',
   'QR check-in at your door',
-  'Online advances paid out to your bank',
+  'WhatsApp booking updates for customers',
+  'Reports on bookings and revenue',
 ];
 
 const inr = (v: string | number) => `₹${Math.round(Number(v) || 0).toLocaleString('en-IN')}`;
@@ -76,66 +78,69 @@ export default function PricingSection() {
     : null;
 
   return (
-    <section id="pricing" className={s.section}>
-      <div className={s.container}>
-        <p className={s.kicker}>Pricing</p>
-        <h2 className={s.title}>Simple plans. No booking fees on top.</h2>
-        <p className={s.lead}>
-          Pick a monthly plan, or the Commission Model if you would rather pay only when bookings come in.
-          New salons get welcome reward coins they can put towards their first plan.
-        </p>
+    <section id="pricing" className={`${st.sec} ${p.pricing}`}>
+      <Parallax speed={-0.12} className={p.pricingOrb} />
+      <div className={st.wrap}>
+        <Reveal className={st.center}>
+          <p className={st.kicker}>Plans &amp; pricing</p>
+          <h2 className={st.big}>Pay monthly, or <em>only when you earn.</em></h2>
+          <p className={st.lead}>
+            Pick a monthly plan, or the Commission Model if you would rather pay only when bookings come in.
+            New salons get welcome reward coins they can put towards their first plan.
+          </p>
+        </Reveal>
 
         {plans === null && !failed ? (
-          <div className={s.planGrid} aria-busy="true">
-            {[0, 1, 2].map((i) => <div key={i} className={`${s.planCard} ${s.skeleton}`} />)}
+          <div className={p.plans} aria-busy="true">
+            {[0, 1, 2].map((i) => <div key={i} className={`${p.plan} ${p.skeleton}`} />)}
           </div>
         ) : (
-          <div className={s.planGrid}>
-            {(plans ?? []).map((plan) => {
+          <div className={p.plans}>
+            {(plans ?? []).map((plan, i) => {
               const featured = plan.id === featuredId;
               return (
-                <article key={plan.id} className={`${s.planCard} ${featured ? s.planFeatured : ''}`}>
-                  {featured && <span className={s.planRibbon}>Most popular</span>}
-                  <h3 className={s.planName}>{plan.name}</h3>
-                  <p className={s.planPrice}>
+                <Reveal as="article" key={plan.id} delay={i * 90} className={`${p.plan} ${featured ? p.planHot : ''}`}>
+                  {featured && <span className={p.ribbon}>Most popular</span>}
+                  <h3 className={p.planName}>{plan.name}</h3>
+                  <p className={p.price}>
                     <b>{inr(plan.price)}</b>
                     <span>/ {cycle(plan.validity_days)}</span>
                   </p>
-                  <ul className={s.planList}>
+                  <ul className={p.planList}>
                     {EVERY_PLAN.slice(0, 3).map((f) => <li key={f}>{f}</li>)}
-                    <li className={s.planAll}>+ everything in every plan</li>
-                    {extras(plan).map((f) => <li key={f} className={s.planExtra}>{f}</li>)}
+                    <li className={p.planAll}>+ everything in every plan</li>
+                    {extras(plan).map((f) => <li key={f} className={p.planExtra}>{f}</li>)}
                   </ul>
-                  <a className={`${s.btn} ${featured ? s.btnPrimary : s.btnSoft}`} href="#enquiry-section">
+                  <a className={`${st.btn} ${st.btnBlock} ${featured ? '' : st.btnGhost}`} href="#enquiry-section">
                     Start with {plan.name}
                   </a>
-                </article>
+                </Reveal>
               );
             })}
 
-            <article className={`${s.planCard} ${s.planCommission}`}>
-              <h3 className={s.planName}>Commission Model</h3>
-              <p className={s.planPrice}>
+            <Reveal as="article" delay={(plans ?? []).length * 90} className={`${p.plan} ${p.planCommission}`}>
+              <h3 className={p.planName}>Commission Model</h3>
+              <p className={p.price}>
                 <b>Pay as you earn</b>
                 <span>no monthly fee</span>
               </p>
-              <ul className={s.planList}>
+              <ul className={p.planList}>
                 <li>A small agreed percentage on app bookings only</li>
                 <li>Walk-ins stay commission-free</li>
-                <li>Settled once a month from your payouts</li>
-                {commissionPlan && <li className={s.planExtra}>Includes {commissionPlan.name} plan features</li>}
+                <li>Settled once a month</li>
+                {commissionPlan && <li className={p.planExtra}>Includes {commissionPlan.name} plan features</li>}
               </ul>
-              <a className={`${s.btn} ${s.btnSoft}`} href="#enquiry-section">Ask about commission</a>
-            </article>
+              <a className={`${st.btn} ${st.btnBlock} ${st.btnGhost}`} href="#enquiry-section">Ask about commission</a>
+            </Reveal>
           </div>
         )}
 
-        <div className={s.everyPlan}>
+        <Reveal className={p.everyPlan}>
           <p>Every salon gets</p>
           <ul>
             {EVERY_PLAN.map((f) => <li key={f}>{f}</li>)}
           </ul>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

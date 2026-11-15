@@ -3,7 +3,7 @@ import LegalDocumentView from '@/components/LegalDocumentView';
 import { TERMS_OF_USE } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'Terms of Use',
+  title: 'Terms & Conditions',
   description: TERMS_OF_USE.summary,
 };
 

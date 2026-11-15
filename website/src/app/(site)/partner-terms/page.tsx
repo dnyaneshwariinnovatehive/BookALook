@@ -3,7 +3,7 @@ import LegalDocumentView from '@/components/LegalDocumentView';
 import { PARTNER_TERMS } from '@/lib/legal';
 
 export const metadata: Metadata = {
-  title: 'Partner Terms & Conditions',
+  title: 'Salon Partner Policy',
   description: PARTNER_TERMS.summary,
 };
 

@@ -24,7 +24,7 @@ class AppReleaseSeeder extends Seeder
                 'status' => AppRelease::STATUS_PUBLISHED,
                 'released_at' => now(),
                 'release_notes' => 'Initial production release of BookALook Customer App.',
-                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.customer',
+                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.customer_app',
                 'ios_store_url' => 'https://apps.apple.com/app/bookalook/id0000000000',
             ]
         );
@@ -40,7 +40,7 @@ class AppReleaseSeeder extends Seeder
                 'status' => AppRelease::STATUS_PUBLISHED,
                 'released_at' => now(),
                 'release_notes' => 'Initial production release of BookALook Partner App.',
-                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.partner',
+                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.partner_app',
                 'ios_store_url' => 'https://apps.apple.com/app/bookalook-partner/id0000000000',
             ]
         );
@@ -54,7 +54,7 @@ class AppReleaseSeeder extends Seeder
                 'update_mode' => AppUpdatePolicy::MODE_OPTIONAL,
                 'is_enforced' => false,
                 'update_message' => 'A newer version of BookALook is available. Please update to enjoy the best booking experience!',
-                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.customer',
+                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.customer_app',
                 'ios_store_url' => 'https://apps.apple.com/app/bookalook/id0000000000',
             ]
         );
@@ -68,7 +68,7 @@ class AppReleaseSeeder extends Seeder
                 'update_mode' => AppUpdatePolicy::MODE_OPTIONAL,
                 'is_enforced' => false,
                 'update_message' => 'A newer version of BookALook Partner is available. Please update to access all new features and fixes!',
-                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.partner',
+                'android_store_url' => 'https://play.google.com/store/apps/details?id=com.bookalook.partner_app',
                 'ios_store_url' => 'https://apps.apple.com/app/bookalook-partner/id0000000000',
             ]
         );

@@ -9,10 +9,17 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
-        android:label="partner_app"
+        android:label="BookALook Partner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
+        <!-- Notifications that arrive while the app is closed are drawn by
+             Android itself. Point them at the channel the app creates at
+             startup (and the backend names in FCM_CHANNEL_ID), so they are
+             never dropped or filed under "Miscellaneous". -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="bookalook_notifications" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

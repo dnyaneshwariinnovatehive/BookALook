@@ -552,6 +552,8 @@ Route::prefix('partner')->group(function () {
 
         // Appointments
         Route::get('/salons/{salon_id}/appointments', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'index']);
+        // One booking, opened from a tapped push notification.
+        Route::get('/salons/{salon_id}/appointments/{id}', [\App\Http\Controllers\Api\Partner\AppointmentController::class, 'show'])->whereUuid('id');
         // Walk-ins. Staff serve themselves; an admin picks who is serving.
         Route::get('/salons/{salon_id}/walk-in/options', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'options']);
         Route::post('/salons/{salon_id}/walk-in/preview', [\App\Http\Controllers\Api\Partner\WalkInController::class, 'preview']);

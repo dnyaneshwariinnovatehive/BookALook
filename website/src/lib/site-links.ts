@@ -8,12 +8,14 @@
  * live.
  */
 
-// [PLACEHOLDER] App store listing URLs — replace with the real live listings.
+// Play Store links are built from each app's Android applicationId
+// (com.bookalook.customer_app / com.bookalook.partner_app). They go live when
+// the listings are published. [PLACEHOLDER] The App Store ids are not real yet.
 // Mirrors the same placeholders used in the superadmin settings policy page.
 export const CUSTOMER_APP_STORE_URL = 'https://apps.apple.com/in/app/bookalook/id0000000000'; // [PLACEHOLDER]
-export const CUSTOMER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.customer'; // [PLACEHOLDER]
+export const CUSTOMER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.customer_app';
 export const PARTNER_APP_STORE_URL = 'https://apps.apple.com/in/app/bookalook-partner/id0000000000'; // [PLACEHOLDER]
-export const PARTNER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.partner'; // [PLACEHOLDER]
+export const PARTNER_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.bookalook.partner_app';
 
 // [PLACEHOLDER] Social handles — replace with the real branded profiles.
 export const SOCIAL_URLS = {
@@ -35,7 +37,7 @@ export const SOCIAL_URLS = {
  * nothing to print under "Contact us" yet. Once a support number exists, add it
  * to the policy documents and to this file.
  */
-export const CONTACT_COMPANY = 'BOOKALOOK PRIVATE LIMITED';
+export const CONTACT_COMPANY = 'Bookalook Private Limited';
 export const CONTACT_EMAIL = 'bookalook01@gmail.com';
 export const CONTACT_ADDRESS =
-  'PLOT NO 44 SR NO 17/22, DEVGIRI COLONY N-2, Aurangabad (MH), Aurangabad, Aurangabad- 431001, Maharashtra';
+  'Plot No. 44, Survey No. 17/22, Devgiri Colony, N-2, Aurangabad, Maharashtra – 431001, India';

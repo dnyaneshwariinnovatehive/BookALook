@@ -45,7 +45,7 @@ async function loadLegalSource() {
   }
 }
 
-const { ABOUT, CANCELLATION_REFUND_POLICY, PARTNER_TERMS, PRIVACY_POLICY, TERMS_OF_USE } = await loadLegalSource();
+const { ABOUT, ACCOUNT_DELETION, CANCELLATION_REFUND_POLICY, PARTNER_TERMS, PRIVACY_POLICY, TERMS_OF_USE } = await loadLegalSource();
 const { CONTACT_ADDRESS, CONTACT_COMPANY, CONTACT_EMAIL } = await import(pathToFileURL(join(libDir, 'site-links.ts')).href);
 
 /** Shapes of the data read out of src/lib/legal.ts. The import is dynamic, so
@@ -168,7 +168,7 @@ class LegalDocument {
 }
 
 const List<LegalDocument> kLegalDocuments = [
-${[TERMS_OF_USE, PRIVACY_POLICY, CANCELLATION_REFUND_POLICY, PARTNER_TERMS, ABOUT].map(renderDoc).join('\n')}
+${[TERMS_OF_USE, PRIVACY_POLICY, CANCELLATION_REFUND_POLICY, PARTNER_TERMS, ACCOUNT_DELETION, ABOUT].map(renderDoc).join('\n')}
 ];
 
 /// Look a document up by [slug]. Returns null for an unknown slug so a bad

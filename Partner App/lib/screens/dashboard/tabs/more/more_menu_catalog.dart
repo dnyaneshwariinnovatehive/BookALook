@@ -863,7 +863,7 @@ class MoreMenuCatalog {
     results.add(
       MoreMenuItem(
         id: 'legal_terms',
-        title: 'Terms of Service',
+        title: 'Terms & Conditions',
         category: 'Account & app settings',
         subtitle: 'User agreement, platform rules & liability terms',
         icon: Icons.gavel_outlined,
@@ -889,13 +889,16 @@ class MoreMenuCatalog {
     results.add(
       MoreMenuItem(
         id: 'legal_partner_terms',
-        title: 'Partner Terms',
+        title: 'Salon Partner Policy',
         category: 'Account & app settings',
-        subtitle: 'Salon partner agreement & commercial terms',
+        subtitle: 'Listing, bookings, payments & conduct rules for salons',
         icon: Icons.handshake_outlined,
         iconColor: isDark ? AppTheme.darkInfo : AppTheme.lightInfo,
         keywords: const [
           'partner terms',
+          'partner policy',
+          'salon partner policy',
+          'vendor policy',
           'salon terms',
           'partner agreement',
           'merchant terms',
@@ -914,9 +917,9 @@ class MoreMenuCatalog {
     results.add(
       MoreMenuItem(
         id: 'legal_cancellation',
-        title: 'Cancellation & Refund Policy',
+        title: 'Cancellation, Rescheduling & Refund Policy',
         category: 'Account & app settings',
-        subtitle: 'Advance payment refund rules & cancellation windows',
+        subtitle: '90-minute cancellation window, reschedules & refunds',
         icon: Icons.event_busy_outlined,
         iconColor: isDark ? AppTheme.darkInfo : AppTheme.lightInfo,
         keywords: const [
@@ -924,6 +927,7 @@ class MoreMenuCatalog {
           'refund policy',
           'cancellation & refund policy',
           'refunds',
+          'rescheduling policy',
           'cancel appointment',
           'advance refund',
         ],
@@ -933,6 +937,35 @@ class MoreMenuCatalog {
             MaterialPageRoute(
               builder: (_) =>
                   const LegalDocumentScreen(slug: 'cancellation-refund'),
+            ),
+          );
+        },
+      ),
+    );
+
+    // Google Play requires an in-app path to request account deletion for any
+    // app that lets users create an account. Partner accounts carry bookings,
+    // payouts and dues, so deletion is a support request; this opens the steps.
+    results.add(
+      MoreMenuItem(
+        id: 'legal_delete_account',
+        title: 'Delete Account',
+        category: 'Account & app settings',
+        subtitle: 'How to close your partner account & what happens to your data',
+        icon: Icons.person_remove_outlined,
+        iconColor: isDark ? AppTheme.darkDanger : AppTheme.lightDanger,
+        keywords: const [
+          'delete account',
+          'close account',
+          'remove account',
+          'deactivate',
+          'delete my data',
+        ],
+        onSelect: (ctx, _, __) async {
+          await Navigator.push(
+            ctx,
+            MaterialPageRoute(
+              builder: (_) => const LegalDocumentScreen(slug: 'delete-account'),
             ),
           );
         },
