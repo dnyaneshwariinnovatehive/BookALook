@@ -423,10 +423,24 @@ class LocationService extends ChangeNotifier {
   /// refused, or the fix timed out. Every caller treats that as "carry on
   /// without it": location makes the list better, it never gates it, and a
   /// customer who says no must still be able to book.
-  Future<Position?> currentPosition({bool ask = true}) async {
+  Future<Position?> currentPosition({bool ask = true}) async => (await locate(ask: ask)).position;
+
+  /// A fix the phone took this recently is as good as a new one, and is
+  /// returned at once instead of waiting on the GPS.
+  static const _freshEnough = Duration(minutes: 2);
+
+  /// Like [currentPosition], but says why there is no position, so a screen
+  /// can offer the way out (turn location on, allow it in Settings) instead
+  /// of a dead-end message.
+  ///
+  /// Getting a fix is patient on purpose. It used to allow 3–5 seconds and
+  /// give up; a phone that has not used its GPS for a while (the usual case
+  /// after someone picked their city by hand) often needs longer, so "Use my
+  /// current location" failed for no reason the customer could fix.
+  Future<LocationAttempt> locate({bool ask = true}) async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        return null;
+        return const LocationAttempt.failed(LocationProblem.servicesOff);
       }
 
       var permission = await Geolocator.checkPermission();
@@ -436,13 +450,14 @@ class LocationService extends ChangeNotifier {
       }
 
       // deniedForever means the OS will not ask again; only Settings can undo
-      // it, so there is nothing to retry here.
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return null;
+      // it, so the screen offers Settings.
+      if (permission == LocationPermission.deniedForever) {
+        return const LocationAttempt.failed(LocationProblem.deniedForever);
+      }
+      if (permission == LocationPermission.denied) {
+        return const LocationAttempt.failed(LocationProblem.denied);
       }
 
-      // Fast-path: Check for cached last known position from the OS (instant <10ms response)
       Position? lastKnown;
       try {
         lastKnown = await Geolocator.getLastKnownPosition();
@@ -451,29 +466,35 @@ class LocationService extends ChangeNotifier {
       }
 
       Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            // If cached fix is already known, allow only 3s for a fresher fix; otherwise 5s max
-            timeLimit: Duration(seconds: lastKnown != null ? 3 : 5),
-          ),
-        );
-      } catch (e) {
-        // If fresh fix timed out indoors/low signal, fall back immediately to cached position
-        if (lastKnown != null) {
-          position = lastKnown;
-        } else {
-          debugPrint('Could not get fresh position and no cached position: $e');
-          return null;
-        }
+      if (lastKnown != null && DateTime.now().difference(lastKnown.timestamp) < _freshEnough) {
+        position = lastKnown;
+      } else {
+        position = await _freshFix(LocationAccuracy.medium, const Duration(seconds: 12)) ??
+            // Indoors the GPS may never lock; the network fix is coarser but
+            // plenty to find the city and the nearest salons.
+            await _freshFix(LocationAccuracy.low, const Duration(seconds: 8)) ??
+            lastKnown;
+      }
+
+      if (position == null) {
+        return const LocationAttempt.failed(LocationProblem.noFix);
       }
 
       await _rememberPosition(position.latitude, position.longitude);
-
-      return position;
+      return LocationAttempt.found(position);
     } catch (e) {
       debugPrint('Could not get a position: $e');
+      return const LocationAttempt.failed(LocationProblem.noFix);
+    }
+  }
+
+  Future<Position?> _freshFix(LocationAccuracy accuracy, Duration limit) async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(accuracy: accuracy, timeLimit: limit),
+      );
+    } catch (e) {
+      debugPrint('No ${accuracy.name} fix within ${limit.inSeconds}s: $e');
       return null;
     }
   }
@@ -543,14 +564,28 @@ class LocationService extends ChangeNotifier {
   /// open salon rather than a boundary — someone in Thane whose closest salons
   /// are all in Mumbai wants Mumbai, and no administrative line says that.
   ///
-  /// @return a message to show, or null when it simply worked.
-  Future<String?> useCurrentLocation() async {
-    final position = await currentPosition();
+  /// @return a message to show, or null when it simply worked. See
+  /// [useCurrentLocationResult] for why it failed and what would fix it.
+  Future<String?> useCurrentLocation() async => (await useCurrentLocationResult()).message;
+
+  /// [useCurrentLocation], with the reason when it did not work, so the
+  /// screen can offer "Turn on location" or "Open Settings" rather than only
+  /// telling the customer to pick a city by hand.
+  Future<CurrentLocationResult> useCurrentLocationResult() async {
+    final attempt = await locate();
+    final position = attempt.position;
 
     if (position == null) {
-      return 'We could not get your location. Pick your city below instead.';
+      return CurrentLocationResult.failed(attempt.problem ?? LocationProblem.noFix);
     }
 
+    final (message, switched) = await _switchToCityAt(position);
+    return CurrentLocationResult(message: message, switched: switched);
+  }
+
+  /// Asks the server which market [position] is in and switches to it.
+  /// Returns a message to show (or null), and whether the city was switched.
+  Future<(String?, bool)> _switchToCityAt(Position position) async {
     try {
       final uri = Uri.parse('$_baseUrl/cities/nearest').replace(queryParameters: {
         'lat': position.latitude.toString(),
@@ -561,7 +596,7 @@ class LocationService extends ChangeNotifier {
           await http.get(uri, headers: {'Accept': 'application/json'});
 
       if (response.statusCode != 200) {
-        return 'We could not work out your city. Pick one below instead.';
+        return ('We could not work out your city. Check your connection and try again.', false);
       }
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -577,13 +612,13 @@ class LocationService extends ChangeNotifier {
       // Honest about the edge case rather than pretending the nearest market
       // is local: it may be hundreds of kilometres away.
       if (body['in_range'] != true) {
-        return 'We are not in your area yet. Showing ${city.name} for now.';
+        return ('We are not in your area yet. Showing ${city.name} for now.', true);
       }
 
-      return null;
+      return (null, true);
     } catch (e) {
       debugPrint('Could not resolve the nearest city: $e');
-      return 'We could not work out your city. Pick one below instead.';
+      return ('We could not work out your city. Check your connection and try again.', false);
     }
   }
 
@@ -662,3 +697,70 @@ class LocationService extends ChangeNotifier {
   }
 }
 
+/// Why the device could not give a position.
+enum LocationProblem {
+  /// Location (GPS) is switched off on the phone.
+  servicesOff,
+
+  /// The customer said no to the permission prompt just now.
+  denied,
+
+  /// Permission was refused for good; only the app's Settings page can undo it.
+  deniedForever,
+
+  /// Everything is allowed, but no fix came back in time (indoors, no signal).
+  noFix,
+}
+
+/// One attempt to get the device's position: the position, or why not.
+class LocationAttempt {
+  const LocationAttempt.found(Position this.position) : problem = null;
+  const LocationAttempt.failed(LocationProblem this.problem) : position = null;
+
+  final Position? position;
+  final LocationProblem? problem;
+}
+
+/// The way out a screen can offer when "Use my current location" fails.
+enum LocationFix { none, retry, openLocationSettings, openAppSettings }
+
+/// What "Use my current location" did.
+class CurrentLocationResult {
+  const CurrentLocationResult({this.message, this.switched = false, this.problem});
+
+  /// From a position that could not be had: says why and what fixes it.
+  factory CurrentLocationResult.failed(LocationProblem problem) => CurrentLocationResult(
+        problem: problem,
+        message: switch (problem) {
+          LocationProblem.servicesOff => "Your phone's location is turned off. Turn it on to find salons near you.",
+          LocationProblem.denied => 'Allow location access to find salons near you.',
+          LocationProblem.deniedForever =>
+            'Location access is blocked for BookALook. Allow it in Settings to find salons near you.',
+          LocationProblem.noFix => 'Still finding you — your phone did not get a location fix yet. Try again in a moment.',
+        },
+      );
+
+  /// What to show, or null when it simply worked.
+  final String? message;
+
+  /// Whether the city (and area) were switched to where the device is.
+  final bool switched;
+
+  /// Set when no position could be had.
+  final LocationProblem? problem;
+
+  LocationFix get fix => switch (problem) {
+        LocationProblem.servicesOff => LocationFix.openLocationSettings,
+        LocationProblem.deniedForever => LocationFix.openAppSettings,
+        LocationProblem.denied || LocationProblem.noFix => LocationFix.retry,
+        null => switched ? LocationFix.none : LocationFix.retry,
+      };
+
+  /// The button label for [fix].
+  String? get fixLabel => switch (fix) {
+        LocationFix.openLocationSettings => 'Turn on location',
+        LocationFix.openAppSettings => 'Open Settings',
+        LocationFix.retry => 'Try again',
+        LocationFix.none => null,
+      };
+}

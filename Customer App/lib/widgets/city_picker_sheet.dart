@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/location_service.dart';
 import '../theme/app_colors.dart';
@@ -35,7 +36,7 @@ class _CityPickerSheet extends StatefulWidget {
   State<_CityPickerSheet> createState() => _CityPickerSheetState();
 }
 
-class _CityPickerSheetState extends State<_CityPickerSheet> {
+class _CityPickerSheetState extends State<_CityPickerSheet> with WidgetsBindingObserver {
   final _search = TextEditingController();
   List<ServiceCity> _all = [];
   List<RecentPlace> _recent = [];
@@ -51,18 +52,35 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
   /// Why "use my location" did not work (permission refused, services off),
   /// shown under the button. A SnackBar would appear behind this sheet.
   String? _locationProblem;
+
+  /// The button under [_locationProblem] that fixes it, if any.
+  CurrentLocationResult? _lastAttempt;
+
+  /// Set when we sent the customer to the phone's Settings; when they come
+  /// back, try again without making them tap a second time.
+  bool _retryOnResume = false;
   String _error = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _retryOnResume && !_locating) {
+      _retryOnResume = false;
+      _useMyLocation();
+    }
   }
 
   Future<void> _load() async {
@@ -104,23 +122,49 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
     setState(() {
       _locating = true;
       _locationProblem = null;
+      _lastAttempt = null;
     });
 
     final before = _placeKey();
-    final problem = await LocationService.instance.useCurrentLocation();
+    final result = await LocationService.instance.useCurrentLocationResult();
 
     if (!mounted) return;
     setState(() => _locating = false);
 
-    // "Not in your area yet" still switched the city: say so, then close.
-    if (problem != null && LocationService.instance.city == null) {
-      setState(() => _locationProblem = problem);
+    // Did not switch: stay open and say why, with the button that fixes it.
+    // This used to close the sheet whenever any city was already set (for
+    // instance one picked by hand), so the failure looked like a dead end.
+    if (!result.switched) {
+      setState(() {
+        _locationProblem = result.message;
+        _lastAttempt = result;
+      });
       return;
     }
-    if (problem != null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(problem)));
+
+    // "Not in your area yet" still switched the city: say so, then close.
+    final note = result.message;
+    if (note != null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(note)));
     }
     Navigator.pop(context, before != _placeKey());
+  }
+
+  Future<void> _fixLocation() async {
+    final attempt = _lastAttempt;
+    if (attempt == null) return;
+    switch (attempt.fix) {
+      case LocationFix.openLocationSettings:
+        _retryOnResume = true;
+        await Geolocator.openLocationSettings();
+      case LocationFix.openAppSettings:
+        _retryOnResume = true;
+        await Geolocator.openAppSettings();
+      case LocationFix.retry:
+        await _useMyLocation();
+      case LocationFix.none:
+        break;
+    }
   }
 
   String _placeKey() => '${LocationService.instance.city?.id}|${LocationService.instance.area}';
@@ -252,9 +296,15 @@ class _CityPickerSheetState extends State<_CityPickerSheet> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     child: InlineStatus(
+                      key: const ValueKey('location_problem'),
                       message: _locationProblem!,
                       kind: StatusKind.warning,
-                      onDismiss: () => setState(() => _locationProblem = null),
+                      onRetry: _lastAttempt?.fixLabel == null ? null : _fixLocation,
+                      retryLabel: _lastAttempt?.fixLabel ?? 'Try again',
+                      onDismiss: () => setState(() {
+                        _locationProblem = null;
+                        _lastAttempt = null;
+                      }),
                     ),
                   ),
               ],

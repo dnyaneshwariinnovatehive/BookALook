@@ -167,50 +167,36 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         AppHaptics.success();
-        final problem = await LocationService.instance.useCurrentLocation();
+        final result = await LocationService.instance.useCurrentLocationResult();
         if (!mounted) return;
 
-        if (problem != null) {
-          if (LocationService.instance.hasCity) {
-            // Nearest market resolved even if out of exact range
-            if (mounted) {
-              Navigator.of(context).pop(true);
-            }
-            final ctx = DeepLinkService.navigatorKey.currentContext;
-            if (ctx != null && ctx.mounted) {
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(
-                  content: Text(problem),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 4),
-                  backgroundColor: const Color(0xFF1E293B),
-                ),
-              );
-            }
-          } else {
-            // Failed to resolve coordinates or network error
-            if (mounted) {
-              Navigator.of(context).pop(false);
-            }
-            final ctx = DeepLinkService.navigatorKey.currentContext;
-            if (ctx != null && ctx.mounted) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (ctx.mounted) {
-                  showCityPicker(ctx);
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(
-                      content: Text(problem),
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
-                }
-              });
-            }
+        if (result.switched) {
+          Navigator.of(context).pop(true);
+          // "Not in your area yet": the nearest market was chosen, say so.
+          final note = result.message;
+          final ctx = DeepLinkService.navigatorKey.currentContext;
+          if (note != null && ctx != null && ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              SnackBar(
+                content: Text(note),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+                backgroundColor: const Color(0xFF1E293B),
+              ),
+            );
           }
         } else {
-          // Success!
-          Navigator.of(context).pop(true);
+          // Stay on this screen and say why, with the matching button
+          // (turn location on, open Settings) or the main button to try
+          // again. It used to close and claim success whenever any city was
+          // already set, leaving the customer where they started.
+          setState(() {
+            _loading = false;
+            _statusMessage = result.message;
+            _isServiceDisabled = result.problem == LocationProblem.servicesOff;
+            _isPermanentlyDenied = result.problem == LocationProblem.deniedForever;
+          });
+          AppHaptics.error();
         }
       } else if (permission == LocationPermission.deniedForever) {
         setState(() {

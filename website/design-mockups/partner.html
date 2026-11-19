@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookALook — partner mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mock.css">
+<style>
+.phero{background:var(--night);color:#fff;padding:160px 0 110px;overflow:hidden}
+.phero:before{content:"";position:absolute;right:-160px;top:-120px;width:900px;height:900px;border-radius:50%;background:radial-gradient(closest-side,rgba(152,80,241,.5),transparent 70%)}
+.phero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center;position:relative}
+.phero h1 em{background:linear-gradient(135deg,#C9A6FF,#9850F1);-webkit-background-clip:text;background-clip:text}
+.phero .sub{font-size:20px;line-height:1.6;color:#B9B3C9;margin-top:22px;max-width:540px}
+.phero .eyebrow{background:rgba(152,80,241,.2);color:#D9C2FF}
+.phero .btn.ghost{background:transparent;color:#fff;border-color:var(--nightBorder)}
+.phero .hdr .bar{background:rgba(28,24,36,.8);border-color:var(--nightBorder)}
+.pstage{position:relative;height:640px}
+.pstage .phone{position:absolute;left:50%;margin-left:-150px;top:10px;transform:rotate(-5deg)}
+.pstage .float{color:var(--ink)}
+.row2{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-top:8px}
+.row2 b{font-size:12px}.row2 small{display:block;color:var(--body);font-size:10px}
+.row2 i{font-style:normal;font-size:10px;font-weight:700;border-radius:999px;padding:4px 9px}
+.g{background:#E8F5E9;color:#2E7D32}.pp{background:var(--soft);color:var(--p2)}.o{background:#FFF2E0;color:#B25B05}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kpis div{background:var(--grad);color:#fff;border-radius:14px;padding:10px 12px}.kpis div+div{background:#fff;color:var(--ink);border:1px solid var(--border)}
+.kpis small{font-size:9.5px;opacity:.8;display:block}.kpis b{font-size:17px}
+
+.gains{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:54px}
+.gain{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:32px}
+.gain s{display:inline-block;color:var(--light);font-size:14.5px;background:#F6F4FA;border-radius:999px;padding:6px 13px}
+.gain b{display:block;font-size:24px;font-weight:700;letter-spacing:-.01em;margin-top:18px;line-height:1.2}
+.gain p{color:var(--body);font-size:16px;line-height:1.6;margin-top:10px}
+.gain:nth-child(2){background:var(--grad);color:#fff;border:0;transform:translateY(-16px);box-shadow:0 40px 70px -34px rgba(123,50,236,.7)}
+.gain:nth-child(2) s{background:rgba(255,255,255,.18);color:#EBDDFF}.gain:nth-child(2) p{color:#EBDDFF}
+
+.feat{background:var(--soft2)}
+.fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:50px}
+.fc{background:#fff;border:1px solid var(--border);border-radius:24px;padding:26px}
+.fc i{font-style:normal;width:48px;height:48px;border-radius:15px;background:var(--soft);display:grid;place-items:center;font-size:22px}
+.fc b{display:block;font-size:18px;font-weight:600;margin-top:18px}.fc p{color:var(--body);font-size:14.5px;line-height:1.55;margin-top:6px}
+
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:54px;align-items:start}
+.plan{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:34px}
+.plan small{font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--p)}
+.plan .pr{font-size:46px;font-weight:700;letter-spacing:-.03em;margin-top:12px}.plan .pr span{font-size:16px;font-weight:500;color:var(--body);letter-spacing:0}
+.plan li{list-style:none;display:flex;gap:10px;font-size:15.5px;padding:9px 0;color:#3d3750}
+.plan li:before{content:"✓";color:var(--p2);font-weight:800}
+.plan ul{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+.plan .btn{margin-top:22px;width:100%;justify-content:center}
+.plan.hot{background:var(--night);color:#fff;border:0;box-shadow:0 44px 80px -36px rgba(24,21,29,.7)}
+.plan.hot li{color:#D8D2E6}.plan.hot ul{border-color:var(--nightBorder)}.plan.hot small{color:#C9A6FF}.plan.hot .pr span{color:#A7A1B8}
+.tagx{float:right;background:var(--grad);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:5px 12px}
+
+.start{display:grid;grid-template-columns:.9fr 1.1fr;gap:64px;align-items:start}
+.steps{margin-top:36px}
+.stp{display:flex;gap:18px;padding:18px 0;border-top:1px solid var(--border)}
+.stp u{text-decoration:none;width:44px;height:44px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.stp b{font-size:18.5px}.stp p{color:var(--body);font-size:15.5px;line-height:1.55;margin-top:3px}
+.qrbox{display:flex;gap:18px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:24px;padding:18px;margin-top:22px}
+.qrbox .qr{width:92px;height:92px;flex:none}.qrbox b{font-size:17px}.qrbox p{color:var(--body);font-size:14.5px;margin-top:3px}
+.form{background:#fff;border:1px solid var(--border);border-radius:34px;padding:40px;box-shadow:0 50px 90px -50px rgba(123,50,236,.55)}
+.form h3{font-size:30px;font-weight:700;letter-spacing:-.02em}.form>p{color:var(--body);font-size:16px;margin-top:6px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+.fld label{display:block;font-size:13.5px;font-weight:600;margin-bottom:7px}
+.fld label em{color:var(--p);font-style:normal}
+.inp{border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;font-size:15.5px;color:var(--light);background:var(--bg);display:flex;justify-content:space-between}
+.inp.focus{border-color:var(--p);background:#fff;color:var(--ink);box-shadow:0 0 0 4px var(--soft)}
+.fld.full{grid-column:span 2}
+.drop{border:2px dashed var(--p3);background:var(--soft2);border-radius:18px;padding:24px;text-align:center;color:var(--body);font-size:14.5px}
+.drop b{display:block;color:var(--ink);font-size:16px;margin:8px 0 2px}
+.bank{border:1.5px solid var(--border);border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;font-weight:600;font-size:15.5px}
+.bank span{color:var(--body);font-weight:400;font-size:14px}
+.form .btn{width:100%;justify-content:center;padding:17px;font-size:17px;margin-top:22px}
+.hint{font-size:12.5px;color:var(--body);margin-top:6px}
+.same{margin-top:14px;background:#E8F5E9;color:#2E7D32;font-size:13px;border-radius:12px;padding:10px 14px}
+
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:50px;text-align:left}
+.role{border-radius:var(--r);padding:38px;background:#fff;border:1px solid var(--border)}
+.role small{font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--p)}
+.role b{display:block;font-size:28px;font-weight:700;letter-spacing:-.02em;margin-top:12px}.role p{color:var(--body);font-size:16.5px;line-height:1.6;margin-top:10px}
+@media (max-width:760px){
+  .phero{padding:104px 0 50px}.phero .grid{grid-template-columns:1fr}.phero .sub{font-size:16.5px}
+  .pstage{height:560px;transform:scale(.86);margin:-10px -30px -40px}
+  .gains,.fgrid,.plans,.roles{grid-template-columns:1fr;margin-top:30px}.gain:nth-child(2){transform:none}
+  .fgrid{grid-template-columns:1fr 1fr;gap:12px}.fc{padding:18px}.fc b{font-size:15.5px}.fc p{font-size:13px}
+  .start{grid-template-columns:1fr;gap:34px}.form{padding:24px;border-radius:26px}.fields{grid-template-columns:1fr}.fld.full{grid-column:auto}
+  .role{padding:26px}.role b{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<section class="phero" data-cut="01-partner-hero">
+  <header class="hdr"><div class="wrap"><div class="bar">
+    <img src="logo-app-light.png" alt="BookALook">
+    <nav class="nav" style="color:#D8D2E6"><span>Why BookALook</span><span>Features</span><span>Pricing</span><span>Get started</span><span>FAQ</span></nav>
+    <span class="owner" style="color:#A7A1B8">Looking to book? <b style="color:#C9A6FF">Get the customer app →</b></span>
+    <span class="btn">Register your salon</span>
+    <span class="burger">☰</span>
+  </div></div></header>
+  <div class="wrap grid">
+    <div>
+      <span class="eyebrow">💈 For salon owners &amp; barbers</span>
+      <h1>Fill every chair. <em>Run your salon</em> from one app.</h1>
+      <p class="sub">New customers find you in the BookALook app and book your free slots. You run bookings, walk-ins, staff, billing and reports from one Partner App.</p>
+      <div class="cta"><span class="btn">Register your salon →</span><span class="btn ghost">See plans &amp; pricing</span></div>
+      <div class="trust" style="margin-top:38px">
+        <div style="color:#D8D2E6"><span class="tick">✓</span>Live in days, not weeks</div>
+        <div style="color:#D8D2E6"><span class="tick">✓</span>No double-bookings</div>
+        <div style="color:#D8D2E6"><span class="tick">✓</span>Works for every branch</div>
+      </div>
+    </div>
+    <div class="pstage">
+      <div class="phone"><div class="screen">
+        <div class="sb"><span>9:41</span><span>● ● ●</span></div>
+        <div class="pad">
+          <div class="smeta">Partner App · Today</div><div class="stitle">Glow Studio</div>
+          <div class="kpis"><div><small>Bookings today</small><b>14</b></div><div><small>Chairs free now</small><b>2</b></div></div>
+          <div class="lbl">Up next</div>
+          <div class="row2"><div><b>5:00 PM · Haircut</b><small>Aarav · with Riya</small></div><i class="g">Checked in</i></div>
+          <div class="row2"><div><b>5:30 PM · Beard trim</b><small>Kabir · with Aman</small></div><i class="pp">Booked</i></div>
+          <div class="row2"><div><b>6:00 PM · Facial</b><small>Meera · with Neha</small></div><i class="pp">Booked</i></div>
+          <div class="row2"><div><b>6:15 PM · Walk-in</b><small>Haircut · with Riya</small></div><i class="o">Walk-in</i></div>
+          <div class="pbtn">+ Add walk-in</div>
+        </div>
+      </div></div>
+      <div class="float f1"><i>🔔</i><span>New booking<small>Haircut · 6:30 PM</small></span></div>
+      <div class="float f2" style="top:300px"><i>📲</i><span>QR scanned<small>Customer checked in</small></span></div>
+      <div class="float f3"><i>📈</i><span>Busy hours<small>See them in reports</small></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" data-cut="02-why-bookalook"><div class="wrap">
+  <div class="center"><p class="kicker">Why salons join</p><h2 class="big">Less chaos. <em>More full chairs.</em></h2></div>
+  <div class="gains">
+    <div class="gain"><s>Empty chairs on weekday afternoons</s><b>New customers find you in the app</b><p>Your salon, services and live free slots are listed for customers searching nearby, every hour of the day.</p></div>
+    <div class="gain"><s>Registers, calls and WhatsApp chaos</s><b>One app runs the whole salon</b><p>Bookings, walk-ins, staff hours, billing and reports — on your phone, for every branch.</p></div>
+    <div class="gain"><s>Double bookings and mix-ups</s><b>A live calendar for every stylist</b><p>Real-time availability per person, so a slot is only ever given once.</p></div>
+  </div>
+</div></section>
+
+<section class="sec feat" data-cut="03-partner-app-features"><div class="wrap">
+  <p class="kicker">Everything in the Partner App</p><h2 class="big">Built for how a salon <em>actually runs.</em></h2>
+  <div class="fgrid">
+    <div class="fc"><i>🗓️</i><b>Online bookings</b><p>Real-time availability per stylist. No double-booking.</p></div>
+    <div class="fc"><i>👥</i><b>Staff, hours and leave</b><p>Shifts, breaks and leave per person.</p></div>
+    <div class="fc"><i>🛍️</i><b>Walk-ins and billing</b><p>Add walk-ins, add services mid-visit, send invoices.</p></div>
+    <div class="fc"><i>📲</i><b>QR check-in</b><p>Know who is in the chair and when.</p></div>
+    <div class="fc"><i>💬</i><b>WhatsApp updates</b><p>Confirmations and reminders go out automatically.</p></div>
+    <div class="fc"><i>📈</i><b>Revenue insights</b><p>Busy hours, best services, quiet stylists.</p></div>
+    <div class="fc"><i>🏬</i><b>Every branch, one login</b><p>Switch between your salons in one tap.</p></div>
+    <div class="fc"><i>🪙</i><b>Reward coins</b><p>Welcome coins you can put towards your plan.</p></div>
+  </div>
+</div></section>
+
+<section class="sec" data-cut="04-pricing-live"><div class="wrap">
+  <div class="center"><p class="kicker">Plans &amp; pricing</p><h2 class="big">Pay monthly, or <em>only when you earn.</em></h2>
+  <p class="lead">Plans and prices load live from your system, exactly as today. Sample values shown in this mockup.</p></div>
+  <div class="plans">
+    <div class="plan"><small>Plan name</small><div class="pr">₹— <span>/ month</span></div><ul><li>Online bookings from the app</li><li>Staff, services and working hours</li><li>Walk-ins, billing and invoices</li><li>Essential reports</li></ul><span class="btn ghost">Choose plan</span></div>
+    <div class="plan hot"><span class="tagx">Most chosen</span><small>Plan name</small><div class="pr">₹— <span>/ month</span></div><ul><li>Everything in the first plan</li><li>Advanced revenue insights</li><li>Smart upsell suggestions</li><li>Know your regulars</li></ul><span class="btn">Choose plan</span></div>
+    <div class="plan"><small>Commission model</small><div class="pr">₹0 <span>/ month</span></div><ul><li>No monthly fee</li><li>Agreed % on app bookings only</li><li>Walk-ins never charged</li><li>Same Partner App</li></ul><span class="btn ghost">Talk to us</span></div>
+  </div>
+</div></section>
+
+<section class="sec feat" data-cut="05-get-started-registration-form"><div class="wrap start">
+  <div>
+    <p class="kicker">Get started</p><h2 class="big">On BookALook in <em>four steps.</em></h2>
+    <div class="steps">
+      <div class="stp"><u>1</u><div><b>Send the form</b><p>Two minutes: your salon, area and contact.</p></div></div>
+      <div class="stp"><u>2</u><div><b>We verify your salon</b><p>Our team checks the details, usually with a quick visit or call.</p></div></div>
+      <div class="stp"><u>3</u><div><b>Pick your plan</b><p>A monthly plan, or the Commission Model.</p></div></div>
+      <div class="stp"><u>4</u><div><b>Go live and take bookings</b><p>Set up services and staff in the Partner App.</p></div></div>
+    </div>
+    <div class="qrbox"><span class="qr"></span><div><b>Prefer your phone?</b><p>Scan to get the Partner App and register your salon yourself.</p></div></div>
+  </div>
+  <div class="form">
+    <h3>Partner with us</h3><p>Fill in the form and our team will get in touch to onboard your salon.</p>
+    <div class="fields">
+      <div class="fld"><label>Salon name <em>*</em></label><div class="inp focus">Glow Studio</div></div>
+      <div class="fld"><label>Owner name <em>*</em></label><div class="inp">Your full name</div></div>
+      <div class="fld"><label>Phone number <em>*</em></label><div class="inp">10-digit mobile number</div></div>
+      <div class="fld"><label>State <em>*</em></label><div class="inp">Select your state <span>▾</span></div></div>
+      <div class="fld"><label>City <em>*</em></label><div class="inp">Choose a state first <span>▾</span></div></div>
+      <div class="fld"><label>Area <em>*</em></label><div class="inp">Choose a city first <span>▾</span></div><p class="hint">Helps us send someone who already works near you.</p></div>
+      <div class="fld full"><label>Street address <em>*</em></label><div class="inp">Shop no., building, street</div></div>
+      <div class="fld"><label>Pincode <em>*</em></label><div class="inp">6-digit pincode</div></div>
+      <div class="fld"><label>Message (optional)</label><div class="inp">Anything else about your salon</div></div>
+      <div class="fld full"><label>Salon photo (optional)</label><div class="drop">🖼️<b>Click to upload a salon photo</b>PNG, JPG or WebP up to 5MB</div></div>
+      <div class="fld full"><div class="bank">Bank details for payouts (optional) <span>Add now or later in the app ▾</span></div></div>
+    </div>
+    <span class="btn">Submit enquiry</span>
+    <div class="same">✓ Same fields, same rules, same API as today — only the look changes.</div>
+  </div>
+</div></section>
+
+<section class="sec" data-cut="06-team-and-faq"><div class="wrap">
+  <div class="center"><p class="kicker">One app for the whole team</p><h2 class="big">You and your stylists, <em>in the same app.</em></h2></div>
+  <div class="roles">
+    <div class="role"><small>Salon owner</small><b>Run every branch</b><p>Bookings, staff, services and reports for each of your salons — switch between branches in one tap.</p></div>
+    <div class="role" style="background:var(--soft2)"><small>Stylists &amp; staff</small><b>Their day, on their phone</b><p>Each stylist sees their own appointments, checks customers in, adds walk-ins and requests leave.</p></div>
+  </div>
+  <div class="faq" style="margin-top:110px">
+    <div><p class="kicker">Owner FAQ</p><h2 class="big">Before you <em>sign up.</em></h2></div>
+    <div>
+      <div class="q open"><b>How much does BookALook cost my salon?</b><p>Choose a monthly plan (shown above, live from our system) or the Commission Model, where there is no monthly fee and you pay an agreed percentage on app bookings only. Walk-ins are never charged commission.</p></div>
+      <div class="q"><b>Can my staff use it, and do I need a separate app?</b></div>
+      <div class="q"><b>Do I need bank details to register?</b></div>
+      <div class="q"><b>How long until my salon is live?</b></div>
+    </div>
+  </div>
+</div></section>
+
+<footer style="padding-top:70px" data-cut="07-footer"><div class="wrap">
+  <div class="fg">
+    <div><img src="logo-app-light.png" alt="BookALook"><p class="tag">No waiting. Start booking. Verified salons, live slots and QR check-in.</p></div>
+    <div><h4>Customers</h4><a>Explore cities</a><a>Top categories</a><a>How it works</a><a>Download the app</a></div>
+    <div><h4>Company</h4><a>About BookALook</a><a>Terms &amp; Conditions</a><a>Privacy Policy</a><a>Cancellation &amp; Refund</a><a>Partner Terms</a></div>
+    <div><h4>Contact</h4><a>BOOKALOOK PRIVATE LIMITED</a><a style="line-height:1.5">Plot No 44, Devgiri Colony N-2, Aurangabad 431001, Maharashtra</a><a>bookalook01@gmail.com</a><a>Instagram · Facebook · X</a></div>
+  </div>
+  <div class="fb"><span>© 2026 BookALook. All rights reserved.</span><span>Made for salons and the people who love them.</span></div>
+</div></footer>
+
+<script src="mock.js"></script>
+</body>
+</html>
