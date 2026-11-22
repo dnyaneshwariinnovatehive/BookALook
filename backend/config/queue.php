@@ -76,7 +76,9 @@ return [
         // worker while the first is still running it.
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'state'),
+            // Not 'state' directly: see the 'queue' Redis connection in
+            // config/database.php for why the queue needs its own read timeout.
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
             'queue' => env('REDIS_QUEUE', 'default'),
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 180),
             'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),

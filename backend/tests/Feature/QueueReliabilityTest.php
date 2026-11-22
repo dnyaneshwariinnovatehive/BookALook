@@ -168,8 +168,23 @@ class QueueReliabilityTest extends TestCase
     public function test_every_job_timeout_is_below_retry_after(): void
     {
         $retryAfter = (int) config('queue.connections.redis.retry_after');
-        $this->assertSame('state', config('queue.connections.redis.connection'));
         $this->assertSame(5, config('queue.connections.redis.block_for'));
+
+        // Jobs live on the durable state instance (never the disposable cache),
+        // through the queue's own connection to it.
+        $queueConn = config('database.redis.'.config('queue.connections.redis.connection'));
+        $state = config('database.redis.state');
+        $this->assertSame('queue', config('queue.connections.redis.connection'));
+        foreach (['host', 'port', 'database'] as $key) {
+            $this->assertSame($state[$key], $queueConn[$key], "queue connection must use the state instance's {$key}");
+        }
+
+        // An idle worker holds BLPOP open for block_for seconds; a shorter read
+        // timeout turned every idle wait into "read error on connection".
+        $this->assertGreaterThan(
+            (float) config('queue.connections.redis.block_for'),
+            (float) $queueConn['read_timeout'],
+        );
 
         foreach ([SendWhatsAppMessageJob::class, SendPushNotificationJob::class, RetryPendingPushDeliveryJob::class,
                   SendSalonSyncJob::class, DispatchCampaignJob::class, SendCampaignMessageJob::class] as $class) {

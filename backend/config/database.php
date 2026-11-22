@@ -189,6 +189,25 @@ return [
             'read_timeout' => (float) env('REDIS_READ_TIMEOUT', 2.0),
         ],
 
+        // The queue's own connection to the state instance: same server, same
+        // keys, but a read timeout longer than the workers' blocking wait.
+        //
+        // An idle worker asks Redis to hold a BLPOP open for block_for seconds
+        // (5 by default). On the state connection the client gave up after
+        // read_timeout (2 s), so every idle wait ended in "read error on
+        // connection" — about 2,400 errors an hour in production, and a 3.9 GB
+        // log. The read timeout here is derived from block_for so the two can
+        // never drift apart again.
+        'queue' => [
+            'host' => env('REDIS_STATE_HOST', '127.0.0.1'),
+            'username' => env('REDIS_STATE_USERNAME'),
+            'password' => env('REDIS_STATE_PASSWORD'),
+            'port' => env('REDIS_STATE_PORT', '6380'),
+            'database' => env('REDIS_STATE_DB', '0'),
+            'timeout' => (float) env('REDIS_TIMEOUT', 1.0),
+            'read_timeout' => (float) env('REDIS_QUEUE_BLOCK_FOR', 5) + 5.0,
+        ],
+
         'cache' => [
             'host' => env('REDIS_CACHE_HOST', '127.0.0.1'),
             'username' => env('REDIS_CACHE_USERNAME'),
