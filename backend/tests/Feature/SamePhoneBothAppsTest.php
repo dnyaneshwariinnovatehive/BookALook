@@ -93,6 +93,24 @@ class SamePhoneBothAppsTest extends TestCase
         $this->user('collaborator', $phone);
     }
 
+    public function test_the_resync_migration_repairs_a_mistyped_owner_account(): void
+    {
+        // What stale API code did in production: an owner saved with the
+        // column default instead of the model hook.
+        $owner = $this->user('admin');
+        \Illuminate\Support\Facades\DB::table('users')->where('id', $owner->id)->update(['account_type' => 'customer']);
+
+        (require database_path('migrations/2026_11_22_000002_resync_user_account_type_with_role.php'))->up();
+
+        $this->assertSame(User::ACCOUNT_PARTNER, $owner->fresh()->account_type);
+
+        // And the Customer app no longer mistakes it for a customer account.
+        $this->allowLogin($owner->phone);
+        $this->postJson('/api/customer/auth/verify-otp', ['phone' => $owner->phone, 'otp' => self::CODE])
+            ->assertOk()
+            ->assertJsonPath('requires_registration', true);
+    }
+
     // ---------------------------------------------------- Customer app login
 
     public function test_a_staff_members_number_can_sign_up_in_the_customer_app(): void
