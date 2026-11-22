@@ -18,7 +18,9 @@ git pull --ff-only origin main
 after=$(git rev-parse HEAD)
 echo "Deployed: $(git log -1 --oneline)"
 
-changed() { git diff --name-only "$before" "$after" -- "$@" | grep -q . ; }
+# Paths are from the repo root, whatever folder the script has moved into
+# (it used to run this from backend/, so "website" never matched).
+changed() { git -C "$APP" diff --name-only "$before" "$after" -- "$@" | grep -q . ; }
 
 # --- backend
 cd "$APP/backend"
