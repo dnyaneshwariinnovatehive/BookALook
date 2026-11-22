@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/salon_location_api.dart';
@@ -11,18 +12,41 @@ class LocationPermissionModal extends StatelessWidget {
 
   const LocationPermissionModal({super.key, required this.salonId});
 
+  /// Salons already asked about since the app started.
+  static final Set<String> _askedThisSession = {};
+
+  /// Ask the owner to pin the salon when it has no location of its own yet
+  /// (never set, or only the city-centre stand-in), at most once a day.
+  ///
+  /// It used to ask based on the phone's location permission instead, so an
+  /// owner who had allowed location was never reminded that the salon itself
+  /// was still unpinned — and it was not shown anywhere at all.
   static Future<void> checkAndShow(BuildContext context, String salonId) async {
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      if (!context.mounted) return;
-      await showDialog(
-        context: context,
-        barrierDismissible: true,
-        barrierColor: Colors.black.withValues(alpha: 0.4),
-        builder: (context) => LocationPermissionModal(salonId: salonId),
-      );
+    if (_askedThisSession.contains(salonId)) return;
+
+    final SalonLocation location;
+    try {
+      location = await SalonLocationApi.fetch(salonId);
+    } catch (_) {
+      return; // Offline or server trouble: just try again next time.
     }
+    if (location.isOwnerPinned) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'salon_location_prompt_$salonId';
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (prefs.getString(key) == today) return;
+
+    _askedThisSession.add(salonId);
+    await prefs.setString(key, today);
+
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
+      builder: (context) => LocationPermissionModal(salonId: salonId),
+    );
   }
 
   Future<void> _enableLocation(BuildContext context) async {
@@ -195,7 +219,7 @@ class LocationPermissionModal extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Help nearby customers discover your salon and get walk-ins.',
+                        'Your salon is not on the map yet. Tap below while you are at the salon to pin it from your phone.',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
                           color: AppTheme.lightTextBody,

@@ -25,6 +25,7 @@ import '../../../utils/lifecycle_poller.dart';
 import '../../../services/bank_details_api.dart';
 import '../more/bank_details_screen.dart';
 import '../../../services/salon_access_api.dart';
+import '../../../widgets/location_permission_modal.dart';
 import '../../../widgets/commission_dues_banner.dart';
 
 class HomeTab extends StatefulWidget {
@@ -94,7 +95,13 @@ class HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    loadFuture = _fetchHomeData();
+    final firstLoad = _fetchHomeData();
+    loadFuture = firstLoad;
+    // Once the home screen has loaded: remind the owner to pin the salon if
+    // it is not on the map yet (at most once a day).
+    firstLoad.whenComplete(() {
+      if (mounted) LocationPermissionModal.checkAndShow(context, widget.salonId);
+    });
     _refreshUnreadCount();
     _poller = LifecyclePoller(
       debugLabel: 'HomeTab',

@@ -15,6 +15,7 @@ import '../../../widgets/collaborator/collaborator_chip.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/collaborator/collaborator_skeleton.dart';
 import '../../../widgets/collaborator/collaborator_thumb.dart';
+import '../../../widgets/salon_directions_button.dart';
 import '../../collaborator/onboard_salon_screen.dart';
 
 /// All salons the collaborator manages: assigned enquiries to onboard,
@@ -864,9 +865,11 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
           const SizedBox(height: 12),
           Divider(height: 1, color: palette.border),
           const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+            SalonDirectionsButton.fromSalon(salon, compact: true),
+            TextButton.icon(
               onPressed: () => _callOwner(
                 salon['owner_phone']?.toString(),
                 salon['name']?.toString() ?? 'the salon',
@@ -881,6 +884,7 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                 visualDensity: VisualDensity.compact,
               ),
             ),
+            ],
           ),
         ],
       ),
@@ -1272,23 +1276,26 @@ class CollaboratorOnboardedTabState extends State<CollaboratorOnboardedTab> {
                     '${salon['services_count'] == 1 ? 'service' : 'services'} priced',
           ),
           const SizedBox(height: 2),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _callOwner(
-                salon['owner_phone']?.toString(),
-                salon['name']?.toString() ?? 'the salon',
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => _callOwner(
+                  salon['owner_phone']?.toString(),
+                  salon['name']?.toString() ?? 'the salon',
+                ),
+                icon: const Icon(Icons.call, size: 15),
+                label: Text(
+                  'Call ${salon['owner_name'] ?? 'owner'}',
+                  style: const TextStyle(fontSize: 12.5),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.accentColor,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
-              icon: const Icon(Icons.call, size: 15),
-              label: Text(
-                'Call ${salon['owner_name'] ?? 'owner'}',
-                style: const TextStyle(fontSize: 12.5),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.accentColor,
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
+              const SizedBox(width: 6),
+              SalonDirectionsButton.fromSalon(salon),
+            ],
           ),
         ],
       ),

@@ -15,6 +15,7 @@ import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_chip.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/collaborator/collaborator_skeleton.dart';
+import '../../../widgets/salon_directions_button.dart';
 import '../../collaborator/onboard_salon_screen.dart';
 
 /// The collaborator's worklist: salons SuperAdmin has handed them to onboard.
@@ -391,6 +392,20 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
             Icons.location_city_outlined,
             enquiry['city']?.toString() ?? 'Unknown city',
           ),
+          _detail(
+            Icons.directions_outlined,
+            (enquiry['address']?.toString() ?? '').trim().isNotEmpty
+                ? enquiry['address'].toString()
+                : 'Get directions',
+            trailingIcon: Icons.directions,
+            onTap: () => openSalonDirections(
+              context,
+              latitude: (enquiry['latitude'] as num?)?.toDouble(),
+              longitude: (enquiry['longitude'] as num?)?.toDouble(),
+              address: enquiry['address']?.toString(),
+              city: enquiry['city']?.toString(),
+            ),
+          ),
 
           if ((enquiry['message']?.toString() ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -514,7 +529,7 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
   }
 
 
-  Widget _detail(IconData icon, String text, {VoidCallback? onTap}) {
+  Widget _detail(IconData icon, String text, {VoidCallback? onTap, IconData trailingIcon = Icons.call}) {
     final palette = context.colors;
 
     final row = Padding(
@@ -538,7 +553,7 @@ class CollaboratorAssignedTabState extends State<CollaboratorAssignedTab> {
             ),
           ),
           if (onTap != null)
-            Icon(Icons.call, size: 14, color: AppTheme.accentColor),
+            Icon(trailingIcon, size: 14, color: AppTheme.accentColor),
         ],
       ),
     );

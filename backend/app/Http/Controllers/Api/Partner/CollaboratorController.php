@@ -45,7 +45,7 @@ class CollaboratorController extends Controller
             return $this->notACollaborator();
         }
 
-        $enquiries = SalonEnquiry::with(['cityRecord:id,name', 'salon:id,name,status,rejection_reason,correction_notes,enquiry_id'])
+        $enquiries = SalonEnquiry::with(['cityRecord:id,name', 'subArea:id,name', 'salon:id,name,status,rejection_reason,correction_notes,enquiry_id,latitude,longitude'])
             ->where('assigned_collaborator_id', $user->id)
             ->where('status', 'assigned')
             ->where(function ($q) {
@@ -70,6 +70,12 @@ class CollaboratorController extends Controller
                     'owner_name' => $enquiry->owner_name,
                     'phone' => $enquiry->phone,
                     'city' => $enquiry->cityRecord?->name ?? ($enquiry->getAttribute('city') ?: ''),
+                    // Where to go: the address from the website form, and the
+                    // salon's pin once one exists. Feeds the Directions button.
+                    'address' => collect([$enquiry->street_address, $enquiry->subArea?->name, $enquiry->pincode])
+                        ->filter(fn ($part) => filled($part))->implode(', ') ?: null,
+                    'latitude' => $enquiry->salon?->latitude === null ? null : (float) $enquiry->salon->latitude,
+                    'longitude' => $enquiry->salon?->longitude === null ? null : (float) $enquiry->salon->longitude,
                     'message' => $enquiry->message,
                     // What the owner gave on the website, masked, so the
                     // collaborator knows not to ask again.
@@ -139,6 +145,9 @@ class CollaboratorController extends Controller
                     'approved_at' => $salon->approved_at,
                     'cover_photo_url' => $salon->cover_photo_url,
                     'address' => $salon->address,
+                    // For the Directions button next to Call.
+                    'latitude' => $salon->latitude === null ? null : (float) $salon->latitude,
+                    'longitude' => $salon->longitude === null ? null : (float) $salon->longitude,
                     'city' => $salon->city?->name,
                     'owner_name' => $salon->admin?->name,
                     'owner_phone' => $salon->admin?->phone,
@@ -234,6 +243,9 @@ class CollaboratorController extends Controller
                     'correction_notes' => $salon->correction_notes,
                     'cover_photo_url' => $salon->cover_photo_url,
                     'address' => $salon->address,
+                    // For the Directions button next to Call.
+                    'latitude' => $salon->latitude === null ? null : (float) $salon->latitude,
+                    'longitude' => $salon->longitude === null ? null : (float) $salon->longitude,
                     'city' => $salon->city?->name,
                     'services_count' => $salon->services_count,
                     'owner_name' => $salon->admin?->name,
@@ -313,6 +325,9 @@ class CollaboratorController extends Controller
                     'approved_at' => $salon->approved_at,
                     'cover_photo_url' => $salon->cover_photo_url,
                     'address' => $salon->address,
+                    // For the Directions button next to Call.
+                    'latitude' => $salon->latitude === null ? null : (float) $salon->latitude,
+                    'longitude' => $salon->longitude === null ? null : (float) $salon->longitude,
                     'city' => $salon->city?->name,
                     'services_count' => $salon->services_count,
                     'owner_name' => $salon->admin?->name,

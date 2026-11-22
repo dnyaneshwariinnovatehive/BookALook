@@ -579,13 +579,14 @@ class LocationService extends ChangeNotifier {
       return CurrentLocationResult.failed(attempt.problem ?? LocationProblem.noFix);
     }
 
-    final (message, switched) = await _switchToCityAt(position);
-    return CurrentLocationResult(message: message, switched: switched);
+    final (message, switched, outOfAreaCity) = await _switchToCityAt(position);
+    return CurrentLocationResult(message: message, switched: switched, outOfAreaCity: outOfAreaCity);
   }
 
   /// Asks the server which market [position] is in and switches to it.
-  /// Returns a message to show (or null), and whether the city was switched.
-  Future<(String?, bool)> _switchToCityAt(Position position) async {
+  /// Returns a message to show (or null), whether the city was switched, and
+  /// the city shown instead when the customer is outside every market.
+  Future<(String?, bool, String?)> _switchToCityAt(Position position) async {
     try {
       final uri = Uri.parse('$_baseUrl/cities/nearest').replace(queryParameters: {
         'lat': position.latitude.toString(),
@@ -596,7 +597,7 @@ class LocationService extends ChangeNotifier {
           await http.get(uri, headers: {'Accept': 'application/json'});
 
       if (response.statusCode != 200) {
-        return ('We could not work out your city. Check your connection and try again.', false);
+        return ('We could not work out your city. Check your connection and try again.', false, null);
       }
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -612,13 +613,13 @@ class LocationService extends ChangeNotifier {
       // Honest about the edge case rather than pretending the nearest market
       // is local: it may be hundreds of kilometres away.
       if (body['in_range'] != true) {
-        return ('We are not in your area yet. Showing ${city.name} for now.', true);
+        return ('We are not in your area yet. Showing ${city.name} for now.', true, city.name);
       }
 
-      return (null, true);
+      return (null, true, null);
     } catch (e) {
       debugPrint('Could not resolve the nearest city: $e');
-      return ('We could not work out your city. Check your connection and try again.', false);
+      return ('We could not work out your city. Check your connection and try again.', false, null);
     }
   }
 
@@ -726,7 +727,7 @@ enum LocationFix { none, retry, openLocationSettings, openAppSettings }
 
 /// What "Use my current location" did.
 class CurrentLocationResult {
-  const CurrentLocationResult({this.message, this.switched = false, this.problem});
+  const CurrentLocationResult({this.message, this.switched = false, this.problem, this.outOfAreaCity});
 
   /// From a position that could not be had: says why and what fixes it.
   factory CurrentLocationResult.failed(LocationProblem problem) => CurrentLocationResult(
@@ -748,6 +749,10 @@ class CurrentLocationResult {
 
   /// Set when no position could be had.
   final LocationProblem? problem;
+
+  /// Set when the customer is outside every city we serve: the city the app
+  /// switched to instead (the nearest one). Shown as a popup, not a snackbar.
+  final String? outOfAreaCity;
 
   LocationFix get fix => switch (problem) {
         LocationProblem.servicesOff => LocationFix.openLocationSettings,

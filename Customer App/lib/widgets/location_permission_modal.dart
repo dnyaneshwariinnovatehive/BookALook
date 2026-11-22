@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_haptics.dart';
 import 'city_picker_sheet.dart';
+import 'out_of_area_dialog.dart';
 import 'salon_illustration.dart';
 
 /// Shows the BookALook location permission modal with entrance animation.
@@ -177,18 +178,13 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
 
         if (result.switched) {
           Navigator.of(context).pop(true);
-          // "Not in your area yet": the nearest market was chosen, say so.
-          final note = result.message;
+          // "Not in your area yet": the nearest market was chosen. Say so in a
+          // popup, with a way to pick a different city.
+          final outOfArea = result.outOfAreaCity;
           final ctx = DeepLinkService.navigatorKey.currentContext;
-          if (note != null && ctx != null && ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(note),
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-                backgroundColor: const Color(0xFF1E293B),
-              ),
-            );
+          if (outOfArea != null && ctx != null && ctx.mounted) {
+            final changeCity = await showOutOfAreaDialog(ctx, cityName: outOfArea);
+            if (changeCity && ctx.mounted) await showCityPicker(ctx);
           }
         } else {
           // Stay on this screen and say why, with the matching button

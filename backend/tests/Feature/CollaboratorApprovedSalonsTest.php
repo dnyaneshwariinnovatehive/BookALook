@@ -165,6 +165,25 @@ class CollaboratorApprovedSalonsTest extends TestCase
         $this->assertNotContains($collab2ApprovedSalon->id, $returnedIds);
     }
 
+    public function test_approved_salons_carry_the_pin_for_directions(): void
+    {
+        $salon = $this->createSalon([
+            'name' => 'Pinned Salon',
+            'submitted_by' => $this->collaborator1->id,
+            'status' => 'active',
+            'approved_at' => now(),
+        ]);
+        $salon->forceFill(['latitude' => 18.5204, 'longitude' => 73.8567])->save();
+
+        Sanctum::actingAs($this->collaborator1);
+        $row = collect($this->getJson('/api/partner/collaborator/approved-salons')->assertOk()->json('data'))
+            ->firstWhere('id', $salon->id);
+
+        $this->assertEqualsWithDelta(18.5204, $row['latitude'], 0.0001);
+        $this->assertEqualsWithDelta(73.8567, $row['longitude'], 0.0001);
+        $this->assertArrayHasKey('address', $row);
+    }
+
     public function test_approved_salons_includes_assigned_collaborator_and_enquiry_assignments(): void
     {
         // Salon assigned directly via assigned_collaborator_id

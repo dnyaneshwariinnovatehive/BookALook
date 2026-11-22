@@ -12,6 +12,7 @@ import '../../../widgets/collaborator/collaborator_card.dart';
 import '../../../widgets/collaborator/collaborator_chip.dart';
 import '../../../widgets/collaborator/collaborator_empty_state.dart';
 import '../../../widgets/collaborator/collaborator_skeleton.dart';
+import '../../../widgets/salon_directions_button.dart';
 import '../../../widgets/collaborator/collaborator_thumb.dart';
 
 /// 3rd tab: Approved Salons.
@@ -331,6 +332,7 @@ class CollaboratorApprovedTabState extends State<CollaboratorApprovedTab> {
                   ),
                 ),
               ),
+              SalonDirectionsButton.fromSalon(salon, compact: true),
               TextButton.icon(
                 onPressed: () => _callOwner(ownerPhone, name),
                 icon: const Icon(Icons.call, size: 15),

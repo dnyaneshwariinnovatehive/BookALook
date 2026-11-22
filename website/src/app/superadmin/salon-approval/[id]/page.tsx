@@ -66,6 +66,8 @@ interface Salon {
   pincode: string;
   latitude?: number | null;
   longitude?: number | null;
+  /** 'owner' when the owner pinned it, 'city_centre' for the stand-in, null when never placed. */
+  location_source?: string | null;
   gender_focus?: string;
   description?: string;
   cover_photo_url?: string | null;
@@ -475,22 +477,67 @@ export default function SalonReviewPage() {
               <div className={styles.value}>{salon.gender_focus || 'N/A'}</div>
             </div>
 
-            {salon.latitude && salon.longitude && (
-              <div className={styles.infoGroup}>
-                <span className={styles.label}>GPS Coordinates</span>
+            {/* Location: always shown, so a missing pin is visible while reviewing. */}
+            <div className={styles.infoGroup}>
+              <span className={styles.label}>Salon location</span>
+              {salon.latitude != null && salon.longitude != null ? (
                 <div className={styles.value}>
-                  {salon.latitude}, {salon.longitude}{' '}
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${salon.latitude},${salon.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: 'var(--accent-color)', marginLeft: 8 }}
-                  >
-                    View on Google Maps ↗
-                  </a>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        color: salon.location_source === 'owner' ? 'var(--color-success)' : 'var(--color-warning)',
+                        background: salon.location_source === 'owner' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                      }}
+                    >
+                      {salon.location_source === 'owner' ? 'Pinned by the owner' : 'Approximate (city centre)'}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      {Number(salon.latitude).toFixed(5)}, {Number(salon.longitude).toFixed(5)}
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${salon.latitude},${salon.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: 'var(--accent-color)', fontWeight: 600 }}
+                    >
+                      Open in Google Maps ↗
+                    </a>
+                  </div>
+                  <iframe
+                    title="Salon location map"
+                    src={`https://www.google.com/maps?q=${salon.latitude},${salon.longitude}&z=16&output=embed`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    style={{
+                      width: '100%',
+                      height: 220,
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 12,
+                      marginTop: 10,
+                    }}
+                  />
                 </div>
-              </div>
-            )}
+              ) : (
+                <div
+                  className={styles.value}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    background: 'var(--color-warning-bg)',
+                    color: 'var(--color-warning)',
+                    fontWeight: 600,
+                    fontSize: 13,
+                  }}
+                >
+                  Not pinned yet — the owner can pin it from the Partner app (they are reminded on their home
+                  screen). Until then customers do not see a distance for this salon.
+                </div>
+              )}
+            </div>
 
             {salon.description && (
               <div className={styles.infoGroup}>

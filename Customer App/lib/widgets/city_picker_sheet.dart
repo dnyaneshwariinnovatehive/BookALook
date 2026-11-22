@@ -5,6 +5,7 @@ import '../services/location_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/bottom_clearance.dart';
+import 'out_of_area_dialog.dart';
 import 'feedback_states.dart';
 
 /// Where the customer chooses where they are, the way delivery apps do it:
@@ -154,10 +155,19 @@ class _CityPickerSheetState extends State<_CityPickerSheet> with WidgetsBindingO
       return;
     }
 
-    // "Not in your area yet" still switched the city: say so, then close.
-    final note = result.message;
-    if (note != null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(note)));
+    // Outside every city we serve: the nearest one was picked. Say so in a
+    // proper popup over this sheet; "Choose another city" keeps the sheet
+    // open so they can pick, "Explore" closes it.
+    final outOfArea = result.outOfAreaCity;
+    if (outOfArea != null) {
+      final changeCity = await showOutOfAreaDialog(context, cityName: outOfArea);
+      if (!mounted) return;
+      if (changeCity) {
+        setState(() {}); // Show the newly selected city as the current one.
+        return;
+      }
+    } else if (result.message != null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(result.message!)));
     }
     Navigator.pop(context, before != _placeKey());
   }
