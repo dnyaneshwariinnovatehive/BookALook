@@ -93,8 +93,11 @@ class PartnerAuthController extends Controller
         }
 
 
-        $user = User::where('phone', $request->phone)
-            ->whereIn('role', ['admin', 'service_provider', 'collaborator'])
+        // Only this number's partner account; a customer account on the same
+        // number belongs to the Customer app and is left alone.
+        $user = User::partnerAccounts()
+            ->where('phone', $request->phone)
+            ->whereIn('role', User::PARTNER_ROLES)
             ->first();
 
         if (!$user) {

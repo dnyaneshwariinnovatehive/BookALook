@@ -101,8 +101,11 @@ class SalonRegistrationController extends Controller
                 $adminUser = $authenticatedUser;
             } else {
                 // 1. Find or Create the Admin User
-                $adminUser = User::where('email', $request->email)
-                    ->orWhere('phone', $request->phone_number)
+                // Partner accounts only: a customer account with this phone or
+                // email is a separate account and does not block registering.
+                $adminUser = User::partnerAccounts()
+                    ->where(fn ($q) => $q->where('email', $request->email)
+                        ->orWhere('phone', $request->phone_number))
                     ->first();
 
                 if ($adminUser) {

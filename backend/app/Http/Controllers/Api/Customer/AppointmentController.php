@@ -1336,7 +1336,10 @@ class AppointmentController extends Controller
     private function bookingRelations(): array
     {
         return [
-            'salon:id,name,address',
+            // Every salon column presentBooking() reads. This was id, name and
+            // address only, so the cards' photo, call button and directions
+            // were always empty.
+            'salon:id,name,address,phone_num,latitude,longitude,cover_photo_url',
             'services.service.template:id,name,estimated_duration_minutes',
             'services.combo:id,name,will_refund_advance_if_cancelled',
             'appointedProvider.user:id,name',
@@ -1450,6 +1453,8 @@ class AppointmentController extends Controller
                 'id' => $appointment->salon_id,
                 'name' => $appointment->salon->name ?? 'Salon',
                 'address' => $appointment->salon->address ?? null,
+                // The home tab's Upcoming and Book again cards show it.
+                'cover_photo_url' => $appointment->salon->cover_photo_url ?? null,
                 // The salon's own contact number, so a customer with an upcoming
                 // booking can call the salon from the card. This is the business
                 // line the salon lists publicly; it is deliberately not the

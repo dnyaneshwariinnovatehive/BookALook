@@ -61,6 +61,61 @@ class User extends Authenticatable
     }
 
     /**
+     * Which app an account belongs to. A phone number (or email) is unique per
+     * account type, not across everyone: the same person can have a customer
+     * account and one partner account. Owner, staff and collaborator are all
+     * 'partner', so a number is still only one of those three.
+     */
+    public const ACCOUNT_CUSTOMER = 'customer';
+    public const ACCOUNT_PARTNER = 'partner';
+
+    /** Roles that sign in to the Partner app. */
+    public const PARTNER_ROLES = ['admin', 'service_provider', 'collaborator'];
+
+    public static function accountTypeFor(?string $role): string
+    {
+        return $role === 'customer' ? self::ACCOUNT_CUSTOMER : self::ACCOUNT_PARTNER;
+    }
+
+    /**
+     * account_type always follows role, so no caller can create a customer
+     * row on the partner side or the reverse.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            $user->account_type = self::accountTypeFor($user->role);
+        });
+    }
+
+    /**
+     * Validation rule: [column] (phone or email) not already used by another
+     * account of [accountType]. Use this instead of `unique:users`, which
+     * would wrongly block a number that only has an account on the other side.
+     */
+    public static function uniqueOn(string $accountType, string $column, ?string $ignoreId = null): \Illuminate\Validation\Rules\Unique
+    {
+        return \Illuminate\Validation\Rule::unique('users', $column)
+            ->where('account_type', $accountType)
+            ->ignore($ignoreId);
+    }
+
+    /** The message for a partner-side phone clash. */
+    public const PARTNER_PHONE_TAKEN = 'This number already has a partner account (salon owner, staff or collaborator).';
+
+    /** Customer-app accounts. */
+    public function scopeCustomerAccounts($query)
+    {
+        return $query->where('account_type', self::ACCOUNT_CUSTOMER);
+    }
+
+    /** Partner-app (and platform) accounts. */
+    public function scopePartnerAccounts($query)
+    {
+        return $query->where('account_type', self::ACCOUNT_PARTNER);
+    }
+
+    /**
      * Get the password for the user.
      *
      * @return string

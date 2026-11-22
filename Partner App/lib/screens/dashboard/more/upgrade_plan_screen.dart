@@ -2,6 +2,7 @@ import 'package:partner_app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:partner_app/services/api_config.dart';
@@ -12,6 +13,7 @@ import 'package:partner_app/widgets/subscription/subscription_plan_card.dart';
 import 'package:partner_app/theme/app_colors.dart';
 import 'package:partner_app/widgets/subscription/subscription_bill_summary_sheet.dart';
 import 'package:partner_app/widgets/subscription/payment_proof_viewer.dart';
+import 'package:partner_app/widgets/subscription/payment_screenshot_field.dart';
 import '../../../widgets/payment_qr_card.dart';
 
 class UpgradePlanScreen extends StatefulWidget {
@@ -47,6 +49,12 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
   bool _applyCoins = true;
   String? _selectedPlanId;
   XFile? _screenshot;
+
+  /// The picked screenshot's bytes, read once on pick so it can be previewed.
+  Uint8List? _screenshotBytes;
+
+  /// Set when Submit was tapped without a screenshot, to outline the field.
+  bool _screenshotMissing = false;
 
   /// What the owner can type alongside the screenshot to help SuperAdmin match
   /// it to a bank line. Both optional and both sent only when there is something
@@ -136,12 +144,16 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
 
   Future<void> _pickScreenshot() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _screenshot = pickedFile;
-      });
-    }
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (pickedFile == null) return;
+    final bytes = await pickedFile.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _screenshot = pickedFile;
+      _screenshotBytes = bytes;
+      _screenshotMissing = false;
+    });
+    PaymentScreenshotField.confirmAttached();
   }
 
   /// Coins the owner has chosen to put towards the selected plan.
@@ -325,6 +337,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
     // A plan the coins cover outright is activated on the spot, so the only
     // time a screenshot is needed is when real money changed hands.
     if (!_fullyPaidByCoins && _screenshot == null) {
+      setState(() => _screenshotMissing = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           duration: const Duration(milliseconds: 2500),
@@ -870,14 +883,17 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: _pickScreenshot,
-                      icon: Icon(Icons.upload_file),
-                      label: Text(
-                        _screenshot != null
-                            ? 'Screenshot Selected'
-                            : 'Upload Screenshot',
-                      ),
+                    PaymentScreenshotField(
+                      pickKey: const ValueKey('upgrade_pick_screenshot'),
+                      bytes: _screenshotBytes,
+                      fileName: _screenshot?.name,
+                      enabled: !_isProcessing,
+                      hasError: _screenshotMissing && _screenshot == null,
+                      onPick: _pickScreenshot,
+                      onRemove: () => setState(() {
+                        _screenshot = null;
+                        _screenshotBytes = null;
+                      }),
                     ),
                     const SizedBox(height: 20),
                     const Divider(),

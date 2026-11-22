@@ -134,13 +134,18 @@ class _LocationPermissionDialogState extends State<_LocationPermissionDialog>
       final serviceEnabled =
           await LocationService.instance.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        // Location is off on the phone: open the setting that turns it on
+        // straight away instead of asking for another tap. The resume check
+        // above carries on by itself once they come back with it on; if they
+        // come back with it still off, the message below is what they see.
         setState(() {
           _loading = false;
           _isServiceDisabled = true;
           _statusMessage =
               'Device location is turned off. Please turn on GPS or select your city manually.';
         });
-        AppHaptics.error();
+        AppHaptics.lightImpact();
+        await LocationService.instance.openLocationSettings();
         return;
       }
 

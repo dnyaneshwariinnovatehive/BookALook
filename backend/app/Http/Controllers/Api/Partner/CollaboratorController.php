@@ -408,7 +408,7 @@ class CollaboratorController extends Controller
 
         $data = $request->validate([
             'name' => 'required|string|max:150',
-            'email' => 'nullable|email|max:150|unique:users,email,' . $user->id,
+            'email' => ['nullable', 'email', 'max:150', \App\Models\User::uniqueOn(\App\Models\User::ACCOUNT_PARTNER, 'email', $user->id)],
             'gender' => 'nullable|in:male,female,other,unspecified',
             'date_of_birth' => 'nullable|date|before:today',
             'address' => 'nullable|string|max:500',

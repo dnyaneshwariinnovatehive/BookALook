@@ -20,7 +20,9 @@ class SuperAdminAuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        // The same email may also be on a customer account; only the
+        // SuperAdmin account can sign in here.
+        $user = User::where('email', $request->email)->where('role', 'superadmin')->first();
 
         if (!$user || !Hash::check($request->password, $user->password_hash)) {
             return response()->json([

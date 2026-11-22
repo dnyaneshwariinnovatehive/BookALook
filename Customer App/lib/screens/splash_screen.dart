@@ -106,7 +106,10 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    if (_sessionExpired) {
+    // Signed out (never signed in, signed out, or the session expired): open
+    // the login page straight from the splash. Opening the guest home first
+    // showed it for half a second before the first request bounced to login.
+    if (_sessionExpired || _cachedToken == null || _cachedToken!.isEmpty) {
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
@@ -120,27 +123,15 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    if (_cachedToken != null && _cachedToken!.isNotEmpty) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainScreen(),
-          transitionsBuilder: (_, animation, __, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainScreen(isGuest: true),
-          transitionsBuilder: (_, animation, __, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const MainScreen(),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override

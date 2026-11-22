@@ -1,8 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../services/payroll_api.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/subscription/payment_screenshot_field.dart';
 import '../../../widgets/payment_qr_card.dart';
 
 /// Paying BookALook what a payout says the salon owes: scan the QR, pay, and
@@ -43,7 +45,7 @@ class _PayDuesScreenState extends State<PayDuesScreen> {
   final _transaction = TextEditingController();
   final _note = TextEditingController();
   XFile? _screenshot;
-  List<int>? _bytes;
+  Uint8List? _bytes;
   bool _sending = false;
   String? _error;
 
@@ -64,6 +66,7 @@ class _PayDuesScreenState extends State<PayDuesScreen> {
       _bytes = bytes;
       _error = null;
     });
+    PaymentScreenshotField.confirmAttached();
   }
 
   Future<void> _send() async {
@@ -160,11 +163,17 @@ class _PayDuesScreenState extends State<PayDuesScreen> {
           Text('After paying, upload a screenshot of the payment.',
               textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant)),
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            key: const ValueKey('pay_dues_pick'),
-            onPressed: _sending ? null : _pick,
-            icon: Icon(_screenshot == null ? Icons.upload_file : Icons.check_circle, color: _screenshot == null ? null : Colors.green),
-            label: Text(_screenshot == null ? 'Upload Screenshot' : 'Screenshot selected — tap to change'),
+          PaymentScreenshotField(
+            pickKey: const ValueKey('pay_dues_pick'),
+            bytes: _bytes,
+            fileName: _screenshot?.name,
+            enabled: !_sending,
+            hasError: _error != null && _bytes == null,
+            onPick: _pick,
+            onRemove: () => setState(() {
+              _screenshot = null;
+              _bytes = null;
+            }),
           ),
           const SizedBox(height: 16),
           TextField(

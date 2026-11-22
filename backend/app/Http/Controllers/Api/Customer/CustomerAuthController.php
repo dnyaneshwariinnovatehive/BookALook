@@ -102,13 +102,10 @@ class CustomerAuthController extends Controller
         // The code was used up by check(); a new customer may now finish sign-up.
         $otps->markVerified($request->phone);
 
-        $user = User::where('phone', $request->phone)->first();
-
-        if ($user && $user->role !== 'customer') {
-            return response()->json([
-                'message' => 'This account is registered as a partner. Please use the Partner App to log in.',
-            ], 403);
-        }
+        // Only this number's customer account. The same number may also have a
+        // partner account (owner, staff or collaborator) — that is a separate
+        // account in the Partner app and does not block shopping as a customer.
+        $user = User::customerAccounts()->where('phone', $request->phone)->first();
 
         if (!$user) {
             return response()->json([
@@ -167,7 +164,7 @@ class CustomerAuthController extends Controller
             return response()->json(['message' => 'Phone number not verified or verification expired.'], 403);
         }
 
-        $user = User::where('phone', $request->phone)->first();
+        $user = User::customerAccounts()->where('phone', $request->phone)->first();
         if ($user) {
             return response()->json(['message' => 'User already exists.'], 400);
         }
@@ -222,11 +219,20 @@ class CustomerAuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:150',
             'phone' => 'sometimes|string|max:15',
-            'email' => 'nullable|email|max:255',
+            // Unique among customer accounts only: the same email may also be
+            // on this person's partner account.
+            'email' => [
+                'nullable', 'email', 'max:255',
+                \Illuminate\Validation\Rule::unique('users', 'email')
+                    ->where('account_type', User::ACCOUNT_CUSTOMER)
+                    ->ignore($request->user()?->id),
+            ],
             'gender' => 'nullable|in:male,female,other,unspecified',
             'date_of_birth' => 'nullable|date',
             'address' => 'nullable|string',
             'pincode' => 'nullable|string|max:10',
+        ], [
+            'email.unique' => 'This email is already used by another customer account.',
         ]);
 
         if ($validator->fails()) {

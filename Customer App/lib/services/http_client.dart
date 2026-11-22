@@ -126,7 +126,10 @@ Future<void> _handle401(http_real.Response response, Map<String, String> sentHea
       .where((h) => h.key.toLowerCase() == 'authorization')
       .map((h) => h.value)
       .join();
-  if (authorization.trim().isEmpty) return;
+  // Many services build the header as 'Bearer $token' even with no token, so
+  // a signed-out request carries "Bearer null". That is not a session either.
+  final bearer = authorization.trim().replaceFirst(RegExp(r'^Bearer\s*', caseSensitive: false), '');
+  if (bearer.isEmpty || bearer == 'null') return;
 
   if (!AuthService.beginSessionExpiryRedirect()) return;
 

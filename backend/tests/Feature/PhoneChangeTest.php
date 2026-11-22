@@ -134,13 +134,26 @@ class PhoneChangeTest extends TestCase
 
     public function test_cannot_take_a_number_another_account_uses(): void
     {
+        // Another customer account: same side, so the number is taken.
         $user = $this->user('customer', 'me');
-        $other = $this->user('admin', 'other');
+        $other = $this->user('customer', 'other');
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/customer/profile/phone/send-otp', ['phone' => $other->phone])
             ->assertStatus(422)
             ->assertJsonValidationErrors('phone');
+    }
+
+    public function test_can_take_a_number_that_only_has_a_partner_account(): void
+    {
+        // A salon owner's number is on the partner side; a customer account
+        // may use it too (one number, one account per app).
+        $user = $this->user('customer', 'me');
+        $owner = $this->user('admin', 'owner');
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/customer/profile/phone/send-otp', ['phone' => $owner->phone])
+            ->assertStatus(200);
     }
 
     public function test_number_taken_between_sending_and_confirming_is_refused(): void
@@ -149,7 +162,7 @@ class PhoneChangeTest extends TestCase
         $new = $this->phone('new');
         $this->actingAs($user, 'sanctum')->postJson('/api/customer/profile/phone/send-otp', ['phone' => $new])->assertStatus(200);
 
-        $this->user('admin', 'sniper')->update(['phone' => $new]);
+        $this->user('customer', 'sniper')->update(['phone' => $new]);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/customer/profile/phone/verify', ['phone' => $new, 'otp' => '123456'])

@@ -79,7 +79,9 @@ class _CityPickerSheetState extends State<_CityPickerSheet> with WidgetsBindingO
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _retryOnResume && !_locating) {
       _retryOnResume = false;
-      _useMyLocation();
+      // Coming back from Settings: if location is still off, say so rather
+      // than sending them straight back there.
+      _useMyLocation(openSettingsIfOff: false);
     }
   }
 
@@ -118,7 +120,7 @@ class _CityPickerSheetState extends State<_CityPickerSheet> with WidgetsBindingO
   /// Let the device pick the city and name the area, and say so plainly when
   /// it cannot. Location is a shortcut, never a requirement — a refusal
   /// leaves the list below fully usable rather than blocking the screen.
-  Future<void> _useMyLocation() async {
+  Future<void> _useMyLocation({bool openSettingsIfOff = true}) async {
     setState(() {
       _locating = true;
       _locationProblem = null;
@@ -130,6 +132,16 @@ class _CityPickerSheetState extends State<_CityPickerSheet> with WidgetsBindingO
 
     if (!mounted) return;
     setState(() => _locating = false);
+
+    // Location switched off on the phone: go straight to the setting that
+    // turns it on — that is the only way forward, so asking first was just an
+    // extra tap. Back in the app, the lookup runs again on its own.
+    if (!result.switched && result.problem == LocationProblem.servicesOff && openSettingsIfOff) {
+      _retryOnResume = true;
+      final opened = await Geolocator.openLocationSettings();
+      if (opened || !mounted) return;
+      _retryOnResume = false; // Settings did not open; fall through to the message.
+    }
 
     // Did not switch: stay open and say why, with the button that fixes it.
     // This used to close the sheet whenever any city was already set (for

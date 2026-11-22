@@ -47,8 +47,8 @@ class SuperAdminCollaboratorController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'nullable|email|max:255|unique:users',
-            'phone' => 'required|string|max:20|unique:users,phone',
+            'email' => ['nullable', 'email', 'max:255', User::uniqueOn(User::ACCOUNT_PARTNER, 'email')],
+            'phone' => ['required', 'string', 'max:20', User::uniqueOn(User::ACCOUNT_PARTNER, 'phone')],
             // Where this collaborator works. Without it they can never be
             // matched to an enquiry, which is the whole point of assigning one.
             'city_id' => 'required|uuid|exists:cities,id',
@@ -58,6 +58,11 @@ class SuperAdminCollaboratorController extends Controller
                     fn ($q) => $q->where('city_id', $request->city_id)
                 ),
             ],
+        ]);
+
+        $validator->setCustomMessages([
+            'phone.unique' => User::PARTNER_PHONE_TAKEN,
+            'email.unique' => 'This email already has a partner account.',
         ]);
 
         if ($validator->fails()) {

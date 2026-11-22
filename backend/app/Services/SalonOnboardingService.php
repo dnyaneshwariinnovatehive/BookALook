@@ -181,7 +181,9 @@ class SalonOnboardingService
     private function resolveOwner(?SalonEnquiry $enquiry, array $payload): User
     {
         $phone = $payload['owner_phone'] ?? $enquiry?->phone;
-        $existing = User::where('phone', $phone)->first();
+        // The number's partner account, if any. A customer account on the same
+        // number does not matter: the owner gets a separate partner account.
+        $existing = User::partnerAccounts()->where('phone', $phone)->first();
 
         if ($existing) {
             if ($existing->role !== 'admin') {

@@ -128,7 +128,12 @@ class PhoneChangeService
             throw ValidationException::withMessages(['phone' => 'This is already your phone number.']);
         }
 
-        if (User::where('phone', $phone)->where('id', '!=', $user->id)->exists()) {
+        // Only accounts on the same side clash: moving a customer account to a
+        // number that also has a partner account (or the reverse) is fine.
+        if (User::where('phone', $phone)
+            ->where('account_type', User::accountTypeFor($user->role))
+            ->where('id', '!=', $user->id)
+            ->exists()) {
             throw ValidationException::withMessages(['phone' => 'This number is already used by another account.']);
         }
 

@@ -69,8 +69,10 @@ class StaffManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'phone' => 'required|string|unique:users',
-            'email' => 'nullable|email|unique:users',
+            // A customer account on this number is fine: staff get a separate
+            // partner account. Another partner account on it is not.
+            'phone' => ['required', 'string', User::uniqueOn(User::ACCOUNT_PARTNER, 'phone')],
+            'email' => ['nullable', 'email', User::uniqueOn(User::ACCOUNT_PARTNER, 'email')],
             'specialization' => 'nullable|string|max:150',
             'base_salary' => 'numeric|min:0',
             'commission_percentage' => 'numeric|min:0|max:100',
@@ -85,6 +87,11 @@ class StaffManagementController extends Controller
             'working_hours.*.shift_end' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_weekly_off,false',
             'working_hours.*.break_start' => 'nullable|date_format:H:i:s',
             'working_hours.*.break_end' => 'nullable|date_format:H:i:s',
+        ]);
+
+        $validator->setCustomMessages([
+            'phone.unique' => User::PARTNER_PHONE_TAKEN,
+            'email.unique' => 'This email already has a partner account.',
         ]);
 
         if ($validator->fails()) {
@@ -172,8 +179,8 @@ class StaffManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|required|string|max:255',
-            'phone' => 'sometimes|required|string|unique:users,phone,' . $user->id,
-            'email' => 'nullable|email|unique:users,email,' . $user->id,
+            'phone' => ['sometimes', 'required', 'string', User::uniqueOn(User::ACCOUNT_PARTNER, 'phone', $user->id)],
+            'email' => ['nullable', 'email', User::uniqueOn(User::ACCOUNT_PARTNER, 'email', $user->id)],
             'specialization' => 'nullable|string|max:150',
             'base_salary' => 'sometimes|numeric|min:0',
             'commission_percentage' => 'sometimes|numeric|min:0|max:100',
@@ -188,6 +195,11 @@ class StaffManagementController extends Controller
             'working_hours.*.shift_end' => 'nullable|date_format:H:i:s|required_if:working_hours.*.is_weekly_off,false',
             'working_hours.*.break_start' => 'nullable|date_format:H:i:s',
             'working_hours.*.break_end' => 'nullable|date_format:H:i:s',
+        ]);
+
+        $validator->setCustomMessages([
+            'phone.unique' => User::PARTNER_PHONE_TAKEN,
+            'email.unique' => 'This email already has a partner account.',
         ]);
 
         if ($validator->fails()) {
